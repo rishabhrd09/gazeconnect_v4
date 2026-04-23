@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GazeConnect Pro — Complete Engineering Textbook</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,400;0,500;0,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════════
+     DESIGN SYSTEM — Codebase Explainer v3.0
+     ═══════════════════════════════════════════════════ */
+  :root {
+    --page-bg: #f7f5f0;
+    --diagram-bg: #0e0e14;
+    --gold: #d4a574;
+    --gold-light: #f0c070;
+    --teal: #0d9488;
+    --teal-light: #5eead4;
+    --navy: #0f1f3d;
+    --navy-light: #1e3a5f;
+    --code-bg: #0d1117;
+    --code-text: #e6edf3;
+    --text-primary: #1a1a2e;
+    --text-secondary: #4a4a6a;
+    --text-muted: #8b8ba0;
+    --border: #e2e0d8;
+    --callout-concept: #0d9488;
+    --callout-warning: #d4a574;
+    --callout-info: #3b82f6;
+    --callout-critical: #ef4444;
+    --table-header: #0f1f3d;
+    --table-row-alt: #f9fafb;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    line-height: 1.75;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Typography ── */
+  h1, h2, h3 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; }
+  h1 { font-size: 2.8rem; line-height: 1.15; margin-bottom: 1rem; color: var(--navy); }
+  h2 { font-size: 2rem; line-height: 1.25; margin-top: 3.5rem; margin-bottom: 1.2rem; color: var(--navy); border-bottom: 2px solid var(--gold); padding-bottom: 0.5rem; }
+  h3 { font-size: 1.4rem; line-height: 1.35; margin-top: 2.5rem; margin-bottom: 0.8rem; color: var(--text-primary); }
+  h4 { font-family: 'DM Sans', sans-serif; font-size: 1.1rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.6rem; color: var(--text-primary); }
+
+  p { margin-bottom: 1rem; color: var(--text-secondary); }
+  strong { color: var(--text-primary); }
+  em { font-style: italic; }
+
+  a { color: var(--teal); text-decoration: none; border-bottom: 1px solid rgba(13,148,136,0.3); }
+  a:hover { border-bottom-color: var(--teal); }
+
+  /* ── Layout ── */
+  .page { max-width: 960px; margin: 0 auto; padding: 0 2rem; }
+  .section { padding: 2rem 0; }
+  .chapter-number { font-family: 'DM Serif Display', serif; font-size: 0.85rem; color: var(--gold); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 0.3rem; display: block; }
+
+  /* ── Cover Page ── */
+  .cover {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f1f3d 0%, #0e0e14 50%, #1a0e2e 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 4rem 2rem; position: relative; overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute; top: -20%; right: -10%; width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(212,165,116,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .cover::after {
+    content: '';
+    position: absolute; bottom: -15%; left: -10%; width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(13,148,136,0.1) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .cover h1 { color: #fff; font-size: 3.6rem; margin-bottom: 0.5rem; position: relative; z-index: 1; }
+  .cover .subtitle { color: rgba(255,255,255,0.55); font-size: 1.15rem; line-height: 1.7; max-width: 600px; position: relative; z-index: 1; }
+  .cover .badge { display: inline-block; background: rgba(212,165,116,0.15); border: 1px solid rgba(212,165,116,0.3); color: var(--gold); padding: 6px 18px; border-radius: 100px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2rem; position: relative; z-index: 1; }
+  .cover .meta { color: rgba(255,255,255,0.3); font-size: 0.85rem; margin-top: 2.5rem; position: relative; z-index: 1; }
+  .cover .accent-line { width: 60px; height: 3px; background: linear-gradient(90deg, var(--gold), var(--teal-light)); margin: 1.5rem auto; border-radius: 2px; position: relative; z-index: 1; }
+
+  /* ── Table of Contents ── */
+  .toc { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 2.5rem; margin: 3rem 0; box-shadow: var(--shadow); }
+  .toc h2 { border-bottom: none; margin-top: 0; }
+  .toc-book { margin-bottom: 1.5rem; }
+  .toc-book-title { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: var(--navy); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem; }
+  .toc-book-title .num { color: var(--gold); font-size: 0.85rem; }
+  .toc-sections { list-style: none; padding-left: 1.8rem; }
+  .toc-sections li { font-size: 0.9rem; color: var(--text-muted); padding: 2px 0; }
+  .toc-sections li::before { content: '—'; margin-right: 0.5rem; color: var(--border); }
+
+  /* ── Code Blocks ── */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    padding: 1.4rem 1.6rem;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 1.2rem 0;
+    position: relative;
+    border: 1px solid #30363d;
+  }
+  pre .cm { color: #8b949e; font-style: italic; }
+  pre .kw { color: #ff7b72; }
+  pre .str { color: #a5d6ff; }
+  pre .fn { color: #d2a8ff; }
+  pre .num { color: #79c0ff; }
+  pre .type { color: #7ee787; }
+  pre .op { color: #79c0ff; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    background: rgba(13,148,136,0.08);
+    color: var(--teal);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .copy-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+    color: #8b949e; padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.15); color: #e6edf3; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  thead th { background: var(--table-header); color: #fff; font-weight: 600; font-size: 0.85rem; padding: 12px 16px; text-align: left; letter-spacing: 0.03em; }
+  tbody td { padding: 11px 16px; font-size: 0.88rem; border-bottom: 1px solid #eee; color: var(--text-secondary); }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+  tbody tr:hover { background: rgba(13,148,136,0.04); }
+
+  /* ── Callouts ── */
+  .callout { padding: 1.2rem 1.4rem; border-radius: 10px; margin: 1.5rem 0; border-left: 4px solid; display: flex; gap: 0.8rem; }
+  .callout-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+  .callout-content { flex: 1; }
+  .callout-content strong { display: block; margin-bottom: 0.3rem; font-size: 0.9rem; }
+  .callout-content p { margin: 0; font-size: 0.9rem; }
+
+  .callout-concept { background: rgba(13,148,136,0.06); border-color: var(--callout-concept); }
+  .callout-concept strong { color: var(--callout-concept); }
+  .callout-warning { background: rgba(212,165,116,0.08); border-color: var(--callout-warning); }
+  .callout-warning strong { color: var(--callout-warning); }
+  .callout-info { background: rgba(59,130,246,0.06); border-color: var(--callout-info); }
+  .callout-info strong { color: var(--callout-info); }
+  .callout-critical { background: rgba(239,68,68,0.06); border-color: var(--callout-critical); }
+  .callout-critical strong { color: var(--callout-critical); }
+
+  /* ── Diagrams ── */
+  .diagram-container {
+    background: var(--diagram-bg);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2rem 0;
+    overflow-x: auto;
+    border: 1px solid #2a2a3a;
+  }
+  .diagram-container svg { width: 100%; height: auto; display: block; }
+  .diagram-caption { text-align: center; color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 1rem; font-style: italic; }
+
+  /* ── File Tree ── */
+  .file-tree { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.8; color: var(--text-secondary); background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem 2rem; margin: 1rem 0; }
+  .file-tree .dir { color: var(--teal); font-weight: 700; }
+  .file-tree .file { color: var(--text-muted); }
+  .file-tree .comment { color: var(--gold); font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-style: italic; }
+
+  /* ── Progress Bar ── */
+  #progress-bar {
+    position: fixed; top: 0; left: 0; height: 3px; z-index: 9999;
+    background: linear-gradient(90deg, var(--gold), var(--teal-light));
+    transition: width 0.15s ease;
+  }
+
+  /* ── Collapsible Sections ── */
+  .collapsible-header { cursor: pointer; display: flex; align-items: center; gap: 0.5rem; user-select: none; }
+  .collapsible-header .toggle { transition: transform 0.2s; font-size: 0.7rem; color: var(--gold); }
+  .collapsible-header.open .toggle { transform: rotate(90deg); }
+  .collapsible-body { overflow: hidden; transition: max-height 0.3s ease; }
+
+  /* ── Misc ── */
+  .divider { height: 1px; background: var(--border); margin: 3rem 0; }
+  .tag { display: inline-block; background: rgba(13,148,136,0.1); color: var(--teal); padding: 3px 10px; border-radius: 100px; font-size: 0.75rem; font-weight: 600; margin: 2px; }
+  .tag-gold { background: rgba(212,165,116,0.12); color: var(--gold); }
+
+  /* ── Print ── */
+  @media print {
+    .cover { min-height: auto; padding: 3rem; break-after: page; }
+    .toc { break-after: page; }
+    h2 { break-before: page; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    #progress-bar { display: none; }
+    body { font-size: 11pt; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .page { padding: 0 1rem; }
+    h1 { font-size: 2rem; }
+    .cover h1 { font-size: 2.4rem; }
+    pre { font-size: 0.78rem; padding: 1rem; }
+    table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress-bar" style="width: 0%;"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     COVER PAGE
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="badge">Complete Engineering Textbook</div>
+  <h1>GazeConnect Pro</h1>
+  <div class="accent-line"></div>
+  <div class="subtitle">
+    Medical-grade AAC application for ALS/MND patients using Tobii Eye Tracker 5.<br>
+    Electron + React + Python + .NET — a full-stack engineering deep dive.
+  </div>
+  <div class="meta">
+    Stack: Electron 28 &middot; React 18 &middot; TypeScript 5.3 &middot; Python 3.10+ &middot; .NET 6.0<br>
+    6 Books &middot; 30+ Sections &middot; 7 Architectural Diagrams
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     TABLE OF CONTENTS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="toc">
+    <h2>Table of Contents</h2>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Book 1</span> What Is GazeConnect Pro?</div>
+      <ul class="toc-sections">
+        <li>1.1 Problem &amp; Users</li>
+        <li>1.2 User Journey</li>
+        <li>1.3 High-Level Architecture</li>
+        <li>1.4 Technical Promises</li>
+        <li>1.5 Tech Choices &amp; Why</li>
+        <li>1.6 File Tree Walkthrough</li>
+      </ul>
+    </div>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Book 2</span> How Everything Connects</div>
+      <ul class="toc-sections">
+        <li>2.1 Layer Stack Diagram</li>
+        <li>2.2 Data Contracts &amp; Message Protocol</li>
+        <li>2.3 Environment Comparison</li>
+        <li>2.4 Auth &amp; Session Flow</li>
+        <li>2.5 Key Algorithm: Word Prediction Pipeline</li>
+      </ul>
+    </div>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Book 3</span> Frontend Layer</div>
+      <ul class="toc-sections">
+        <li>3.1 Framework Fundamentals</li>
+        <li>3.2 Entry Point &amp; Routing</li>
+        <li>3.3 State Management (8 Context Providers)</li>
+        <li>3.4 WebSocket Client Layer</li>
+        <li>3.5 Screen Walkthrough</li>
+        <li>3.6 Core Gaze Components</li>
+        <li>3.7 Design System</li>
+      </ul>
+    </div>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Book 4</span> Backend / API Layer</div>
+      <ul class="toc-sections">
+        <li>4.1 Python Backend Architecture</li>
+        <li>4.2 WebSocket Message Protocol</li>
+        <li>4.3 Word Prediction Engine (5 Layers)</li>
+        <li>4.4 CIFG-LSTM Neural Model</li>
+        <li>4.5 Gaze Pipeline &amp; Signal Processing</li>
+        <li>4.6 Safety: Prediction Guardrails</li>
+        <li>4.7 Services Overview</li>
+      </ul>
+    </div>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Book 5</span> DevOps &amp; Deployment</div>
+      <ul class="toc-sections">
+        <li>5.1 Development Setup</li>
+        <li>5.2 Build Pipeline</li>
+        <li>5.3 Tobii Eye Tracker Integration</li>
+        <li>5.4 Production Build &amp; Installer</li>
+      </ul>
+    </div>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Book 6</span> Data Layer Deep Dive</div>
+      <ul class="toc-sections">
+        <li>6.1 Data Files &amp; Schemas</li>
+        <li>6.2 Neural Model Training Data</li>
+        <li>6.3 Customization Persistence</li>
+        <li>6.4 Performance Budget</li>
+      </ul>
+    </div>
+
+    <div class="toc-book">
+      <div class="toc-book-title"><span class="num">Appendix</span></div>
+      <ul class="toc-sections">
+        <li>A. Environment Variables &amp; Configuration</li>
+        <li>B. Tech Stack Table</li>
+        <li>C. WebSocket Message Reference</li>
+        <li>D. Glossary</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       BOOK 1 — WHAT IS GAZECONNECT PRO?
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="book-1"><span class="chapter-number">Book 1</span>What Is GazeConnect Pro?</h2>
+
+  <h3 id="s1-1">1.1 Problem &amp; Users</h3>
+
+  <p>Amyotrophic Lateral Sclerosis (ALS) progressively strips away a person's ability to speak, move, and eventually breathe — but it leaves cognition fully intact. Patients are literally trapped inside their own bodies. The ability to communicate is not a luxury; it is a lifeline for expressing pain levels to caregivers, calling for emergency suction, telling loved ones "I love you," or simply saying "I'm cold."</p>
+
+  <p>GazeConnect Pro is a medical-grade <strong>Augmentative and Alternative Communication (AAC)</strong> application designed specifically for ALS/MND patients. It uses the <strong>Tobii Eye Tracker 5</strong> — a consumer-grade eye tracking device — to let patients control a full communication interface using only their eye movements. No hands, no voice, no switches required.</p>
+
+  <div class="callout callout-concept">
+    <span class="callout-icon">💡</span>
+    <div class="callout-content">
+      <strong>Why This Matters</strong>
+      <p>Commercial AAC devices cost $8,000–$15,000 and often require insurance approval that takes months. GazeConnect Pro runs on a standard Windows laptop with a $230 Tobii Eye Tracker 5 — making it accessible to patients who cannot wait or cannot afford medical-grade hardware.</p>
+    </div>
+  </div>
+
+  <p><strong>Primary users:</strong></p>
+  <table>
+    <thead><tr><th>User Type</th><th>Needs</th><th>ALS Stage</th></tr></thead>
+    <tbody>
+      <tr><td>ALS Patients</td><td>Eye-gaze typing, phrase selection, emergency alerts, TTS output</td><td>Early → Late</td></tr>
+      <tr><td>Caregivers</td><td>Configure phrases, manage medical items, monitor fatigue, set dwell speeds</td><td>N/A</td></tr>
+      <tr><td>Family Members</td><td>Personalize contacts, add custom phrases, set up home screen</td><td>N/A</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-2">1.2 User Journey</h3>
+
+  <p>Understanding how a patient uses GazeConnect Pro end-to-end reveals why every architectural decision was made. The system must be <em>zero-friction</em> — every extra millisecond of latency or misplaced button could mean the difference between communicating a medical emergency and suffering in silence.</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 2000 520" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow1"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dx="0" dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="arrowGold" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#d4a574"/></marker>
+        <marker id="arrowTeal" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#5eead4"/></marker>
+      </defs>
+      <rect width="2000" height="520" fill="#0e0e14" rx="12"/>
+      <text x="1000" y="45" text-anchor="middle" fill="#d4a574" font-family="DM Serif Display,serif" font-size="24">User Journey — From Launch to Communication</text>
+
+      <!-- Step 1 -->
+      <rect x="40" y="80" width="240" height="140" rx="12" fill="#1a2744" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow1)"/>
+      <text x="160" y="115" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">STEP 1</text>
+      <text x="160" y="142" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="19">App Launch</text>
+      <text x="160" y="170" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Electron starts Python</text>
+      <text x="160" y="190" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">backend + Tobii helper</text>
+      <text x="160" y="210" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">WebSocket connects</text>
+
+      <line x1="280" y1="150" x2="340" y2="150" stroke="#d4a574" stroke-width="2" marker-end="url(#arrowGold)"/>
+
+      <!-- Step 2 -->
+      <rect x="350" y="80" width="240" height="140" rx="12" fill="#1a2744" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow1)"/>
+      <text x="470" y="115" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">STEP 2</text>
+      <text x="470" y="142" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="19">Home Screen</text>
+      <text x="470" y="170" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Emergency cards always visible</text>
+      <text x="470" y="190" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Gaze cursor tracks eyes</text>
+      <text x="470" y="210" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Dwell to select any tile</text>
+
+      <line x1="590" y1="150" x2="650" y2="150" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowTeal)"/>
+
+      <!-- Step 3 -->
+      <rect x="660" y="80" width="240" height="140" rx="12" fill="#1a2744" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow1)"/>
+      <text x="780" y="115" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">STEP 3</text>
+      <text x="780" y="142" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="19">Keyboard / Phrases</text>
+      <text x="780" y="170" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Type with gaze or pick phrases</text>
+      <text x="780" y="190" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Neural word prediction (13.5ms)</text>
+      <text x="780" y="210" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Smart bigrams + LSTM fusion</text>
+
+      <line x1="900" y1="150" x2="960" y2="150" stroke="#d4a574" stroke-width="2" marker-end="url(#arrowGold)"/>
+
+      <!-- Step 4 -->
+      <rect x="970" y="80" width="240" height="140" rx="12" fill="#1a2744" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow1)"/>
+      <text x="1090" y="115" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">STEP 4</text>
+      <text x="1090" y="142" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="19">Speak (TTS)</text>
+      <text x="1090" y="170" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">pyttsx3 SAPI5 engine</text>
+      <text x="1090" y="190" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Browser SpeechSynthesis fallback</text>
+      <text x="1090" y="210" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Bilingual: English + Hindi</text>
+
+      <line x1="1210" y1="150" x2="1270" y2="150" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowTeal)"/>
+
+      <!-- Step 5 -->
+      <rect x="1280" y="80" width="240" height="140" rx="12" fill="#1a2744" stroke="#ef4444" stroke-width="1.5" filter="url(#shadow1)"/>
+      <text x="1400" y="115" text-anchor="middle" fill="#ef4444" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">ALWAYS</text>
+      <text x="1400" y="142" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="19">Emergency Access</text>
+      <text x="1400" y="170" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">400ms dwell (fastest)</text>
+      <text x="1400" y="190" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Fixed position, never hidden</text>
+      <text x="1400" y="210" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">Alert mode lock-down</text>
+
+      <!-- Feedback loop -->
+      <rect x="660" y="300" width="550" height="100" rx="12" fill="rgba(13,148,136,0.1)" stroke="rgba(94,234,212,0.3)" stroke-width="1" stroke-dasharray="6,4"/>
+      <text x="935" y="340" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="14" font-weight="700">Continuous Feedback Loop</text>
+      <text x="935" y="365" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="13">Gaze data at 66Hz &#8594; Kalman filtering &#8594; Dwell detection &#8594; Magnetism &#8594; Visual progress ring</text>
+      <text x="935" y="385" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="13">Fatigue monitoring &#8594; Break reminders &#8594; Session logging</text>
+
+      <text x="1000" y="480" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="12" font-style="italic">Fig 1.1 — End-to-end user journey through GazeConnect Pro</text>
+    </svg>
+  </div>
+
+  <h3 id="s1-3">1.3 High-Level Architecture</h3>
+
+  <p>GazeConnect Pro is a <strong>four-process desktop application</strong>. Each process is a separate executable, communicating over local network protocols. This separation ensures that a crash in the word prediction engine never freezes the gaze cursor, and a TTS hang never blocks emergency alerts.</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 2000 700" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow2"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dx="0" dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="arr1" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#5eead4"/></marker>
+        <marker id="arr2" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#d4a574"/></marker>
+        <marker id="arr3" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#ff7b72"/></marker>
+      </defs>
+      <rect width="2000" height="700" fill="#0e0e14" rx="12"/>
+      <text x="1000" y="45" text-anchor="middle" fill="#d4a574" font-family="DM Serif Display,serif" font-size="24">System Architecture — Four-Process Desktop Application</text>
+
+      <!-- Process 1: Electron -->
+      <rect x="100" y="90" width="500" height="260" rx="14" fill="#0d2137" stroke="#3b82f6" stroke-width="2" filter="url(#shadow2)"/>
+      <text x="350" y="125" text-anchor="middle" fill="#3b82f6" font-family="DM Sans,sans-serif" font-size="12" font-weight="700" letter-spacing="0.15em">PROCESS 1</text>
+      <text x="350" y="155" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="22">Electron 28 (Main + Renderer)</text>
+      <rect x="130" y="175" width="200" height="55" rx="8" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.25)" stroke-width="1"/>
+      <text x="230" y="200" text-anchor="middle" fill="#60a5fa" font-family="DM Sans,sans-serif" font-size="13" font-weight="600">React 18 UI</text>
+      <text x="230" y="218" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-family="DM Sans,sans-serif" font-size="11">16 screens, gaze components</text>
+      <rect x="370" y="175" width="200" height="55" rx="8" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.25)" stroke-width="1"/>
+      <text x="470" y="200" text-anchor="middle" fill="#60a5fa" font-family="DM Sans,sans-serif" font-size="13" font-weight="600">Electron Main</text>
+      <text x="470" y="218" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-family="DM Sans,sans-serif" font-size="11">IPC, window, process mgmt</text>
+      <rect x="130" y="250" width="440" height="40" rx="8" fill="rgba(59,130,246,0.06)" stroke="rgba(59,130,246,0.15)" stroke-width="1"/>
+      <text x="350" y="275" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">8 Context Providers &middot; Vite 5 &middot; TypeScript 5.3 &middot; Preload Bridge</text>
+      <rect x="130" y="305" width="440" height="30" rx="6" fill="rgba(59,130,246,0.04)"/>
+      <text x="350" y="325" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">Port 5173 (dev) &middot; file:// (prod)</text>
+
+      <!-- Process 2: Python -->
+      <rect x="100" y="420" width="500" height="230" rx="14" fill="#0d2f24" stroke="#5eead4" stroke-width="2" filter="url(#shadow2)"/>
+      <text x="350" y="455" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="12" font-weight="700" letter-spacing="0.15em">PROCESS 2</text>
+      <text x="350" y="485" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="22">Python 3.10+ Backend</text>
+      <rect x="130" y="505" width="135" height="45" rx="8" fill="rgba(94,234,212,0.08)" stroke="rgba(94,234,212,0.2)" stroke-width="1"/>
+      <text x="197" y="530" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="11" font-weight="600">Gaze Pipeline</text>
+      <text x="197" y="543" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">66Hz filter chain</text>
+      <rect x="285" y="505" width="135" height="45" rx="8" fill="rgba(94,234,212,0.08)" stroke="rgba(94,234,212,0.2)" stroke-width="1"/>
+      <text x="352" y="530" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="11" font-weight="600">Prediction Engine</text>
+      <text x="352" y="543" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">5-layer, 13.5ms</text>
+      <rect x="440" y="505" width="135" height="45" rx="8" fill="rgba(94,234,212,0.08)" stroke="rgba(94,234,212,0.2)" stroke-width="1"/>
+      <text x="507" y="530" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="11" font-weight="600">TTS + Services</text>
+      <text x="507" y="543" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">pyttsx3, fatigue</text>
+      <rect x="130" y="565" width="445" height="30" rx="6" fill="rgba(94,234,212,0.04)"/>
+      <text x="350" y="585" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">WebSocket :8765 &middot; asyncio &middot; ONNX Runtime &middot; 40+ message types</text>
+      <rect x="130" y="605" width="445" height="30" rx="6" fill="rgba(94,234,212,0.03)"/>
+      <text x="350" y="625" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="11">Prediction guardrails: 110 blocked words &middot; CIFG-LSTM 661-vocab neural model (1.9MB)</text>
+
+      <!-- Process 3: Tobii -->
+      <rect x="750" y="90" width="400" height="200" rx="14" fill="#2d1a0d" stroke="#d4a574" stroke-width="2" filter="url(#shadow2)"/>
+      <text x="950" y="125" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="12" font-weight="700" letter-spacing="0.15em">PROCESS 3</text>
+      <text x="950" y="155" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="22">TobiiGazeHelper.exe</text>
+      <text x="950" y="185" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="13">.NET 6.0 &middot; C# &middot; Tobii Interaction Library</text>
+      <text x="950" y="210" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="13">Raw gaze at 133Hz → Normalized [0,1] → JSON</text>
+      <rect x="780" y="230" width="340" height="30" rx="6" fill="rgba(212,165,116,0.06)"/>
+      <text x="950" y="250" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">TCP :5555 → Python</text>
+
+      <!-- Process 4: Tobii Hardware -->
+      <rect x="750" y="350" width="400" height="120" rx="14" fill="#1a1a2e" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" filter="url(#shadow2)"/>
+      <text x="950" y="385" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="DM Sans,sans-serif" font-size="12" font-weight="700" letter-spacing="0.15em">HARDWARE</text>
+      <text x="950" y="415" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="20">Tobii Eye Tracker 5</text>
+      <text x="950" y="445" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-family="DM Sans,sans-serif" font-size="13">USB 3.0 &middot; Near-IR LEDs &middot; 133Hz &middot; &lt;50ms latency</text>
+
+      <!-- Connections -->
+      <line x1="600" y1="220" x2="750" y2="190" stroke="#d4a574" stroke-width="2" stroke-dasharray="6,4"/>
+      <text x="675" y="195" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">launches</text>
+
+      <line x1="350" y1="350" x2="350" y2="420" stroke="#5eead4" stroke-width="2.5" marker-end="url(#arr1)"/>
+      <text x="370" y="390" fill="#5eead4" font-family="JetBrains Mono,monospace" font-size="11">WS :8765</text>
+
+      <line x1="750" y1="260" x2="600" y2="420" stroke="#d4a574" stroke-width="2" marker-end="url(#arr2)"/>
+      <text x="645" y="330" fill="#d4a574" font-family="JetBrains Mono,monospace" font-size="11">TCP :5555</text>
+
+      <line x1="950" y1="290" x2="950" y2="350" stroke="rgba(255,255,255,0.2)" stroke-width="2" marker-end="url(#arr3)"/>
+      <text x="980" y="325" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">USB 3.0</text>
+
+      <text x="1000" y="670" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="12" font-style="italic">Fig 1.2 — Four-process architecture showing inter-process communication</text>
+    </svg>
+  </div>
+
+  <h3 id="s1-4">1.4 Technical Promises</h3>
+
+  <p>GazeConnect Pro makes several non-negotiable technical promises that drive every implementation decision:</p>
+
+  <table>
+    <thead><tr><th>Promise</th><th>Specification</th><th>Why It Matters</th></tr></thead>
+    <tbody>
+      <tr><td>Gaze latency</td><td>&lt;5ms point-to-broadcast</td><td>66Hz gaze pipeline must never stall — ALS patients lose eye control if feedback lags</td></tr>
+      <tr><td>Prediction latency</td><td>13.5ms mean</td><td>Word suggestions must appear instantly to maintain typing flow</td></tr>
+      <tr><td>Neural timeout</td><td>30ms hard cap</td><td>CIFG-LSTM inference never blocks the main gaze loop</td></tr>
+      <tr><td>Emergency access</td><td>400ms dwell, always visible</td><td>Life-threatening situations demand the fastest possible response</td></tr>
+      <tr><td>Button minimum</td><td>80px (2&deg; visual angle)</td><td>Eye tracking accuracy at 60cm viewing distance requires this minimum</td></tr>
+      <tr><td>Screen fit</td><td>13" to 27" without scrolling</td><td>Patients cannot scroll — all content must fit in viewport</td></tr>
+      <tr><td>Safety guardrails</td><td>110 blocked words</td><td>Predictions must never surface violent, harmful, or inappropriate content</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-5">1.5 Tech Choices &amp; Why</h3>
+
+  <table>
+    <thead><tr><th>Technology</th><th>Version</th><th>Why This Choice</th></tr></thead>
+    <tbody>
+      <tr><td>Electron</td><td>28</td><td>Desktop app with full OS access (TTS, process spawning, file I/O). Web tech enables rapid UI iteration.</td></tr>
+      <tr><td>React</td><td>18</td><td>Component model ideal for building reusable gaze-aware UI elements. Concurrent features for smooth 66Hz updates.</td></tr>
+      <tr><td>TypeScript</td><td>5.3</td><td>Type safety critical for medical-grade software. Catches gaze coordinate mismatches at compile time.</td></tr>
+      <tr><td>Vite</td><td>5</td><td>Sub-second HMR for rapid eye-tracking UI tuning. ES modules for clean dependency tree.</td></tr>
+      <tr><td>Python</td><td>3.10+</td><td>asyncio for non-blocking gaze pipeline. Rich ML ecosystem (ONNX, numpy). pyttsx3 for SAPI5 TTS.</td></tr>
+      <tr><td>.NET</td><td>6.0</td><td>Tobii SDK is native Windows/.NET. C# interop required for eye tracker hardware access.</td></tr>
+      <tr><td>ONNX Runtime</td><td>1.16+</td><td>Cross-platform neural inference. INT8 quantization reduces model from 7.2MB to 1.9MB with negligible quality loss.</td></tr>
+      <tr><td>WebSockets</td><td>12+</td><td>Bidirectional real-time communication. 40+ message types at 66Hz. Lower overhead than HTTP polling.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-6">1.6 File Tree Walkthrough</h3>
+
+  <div class="file-tree">
+    <span class="dir">gazeconnect_v3/</span><br>
+    ├── <span class="dir">src/</span> <span class="comment">— React frontend (TypeScript)</span><br>
+    │&nbsp;&nbsp; ├── <span class="file">main.tsx</span> <span class="comment">— React 18 root renderer</span><br>
+    │&nbsp;&nbsp; ├── <span class="file">App.tsx</span> <span class="comment">— Root component: 16-screen router, 8 context providers</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">screens/</span> <span class="comment">— 16 full-screen components (Home, Keyboard, Medical, Phrases...)</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">components/</span><br>
+    │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="dir">core/</span> <span class="comment">— GazeButton, GazeCursor, GazeControlToggle, ErrorBoundary</span><br>
+    │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="dir">settings/</span> <span class="comment">— 9 settings panels + shared UI primitives</span><br>
+    │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="dir">icons/</span> <span class="comment">— SVG icon components (general + medical)</span><br>
+    │&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="file">GlobalNavBar.tsx</span> <span class="comment">— Top nav bar on every screen</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">contexts/</span> <span class="comment">— 8 React contexts (Customization, Theme, DwellTime, Gaze...)</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">hooks/</span> <span class="comment">— useWebSocket (23K), useGazeBrowser, useSettings</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">utils/</span> <span class="comment">— design.ts, responsive.ts, gazeSnapping.ts, hitZones...</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">types/</span> <span class="comment">— TypeScript interfaces for all data models</span><br>
+    │&nbsp;&nbsp; └── <span class="dir">config/</span> <span class="comment">— dwellTimeConfig.ts (presets, ALS stages)</span><br>
+    ├── <span class="dir">electron/</span> <span class="comment">— Electron main process</span><br>
+    │&nbsp;&nbsp; ├── <span class="file">main.ts</span> <span class="comment">— Window lifecycle, Python/Tobii launchers, IPC, BrowserView</span><br>
+    │&nbsp;&nbsp; └── <span class="file">preload.ts</span> <span class="comment">— Context bridge: safe APIs for renderer</span><br>
+    ├── <span class="dir">python/</span> <span class="comment">— Python backend</span><br>
+    │&nbsp;&nbsp; ├── <span class="file">main.py</span> <span class="comment">— WebSocket server (3,126 lines), gaze pipeline, TTS</span><br>
+    │&nbsp;&nbsp; ├── <span class="file">prediction_guardrails.py</span> <span class="comment">— 110 blocked words</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">services/</span> <span class="comment">— word_prediction, dwell_detector, calibration, filters...</span><br>
+    │&nbsp;&nbsp; ├── <span class="dir">ml/</span> <span class="comment">— CIFG-LSTM model, training, inference, fusion</span><br>
+    │&nbsp;&nbsp; └── <span class="dir">data/</span> <span class="comment">— smart_bigrams.json, custom_dictionary.json</span><br>
+    ├── <span class="dir">tobii-helper/</span> <span class="comment">— .NET 6.0 eye tracker bridge</span><br>
+    │&nbsp;&nbsp; └── <span class="dir">TobiiGazeHelper/</span> <span class="comment">— Program.cs, TobiiInterop.cs, bundled DLLs</span><br>
+    ├── <span class="dir">docs/</span> <span class="comment">— Documentation</span><br>
+    ├── <span class="file">start-dev.bat</span> <span class="comment">— Development launcher (--simulate for mouse mode)</span><br>
+    ├── <span class="file">build-installer.bat</span> <span class="comment">— Production .exe builder (5 stages)</span><br>
+    └── <span class="file">package.json</span> <span class="comment">— React 18, Electron 28, Vite 5, TypeScript 5.3</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       BOOK 2 — HOW EVERYTHING CONNECTS
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="book-2"><span class="chapter-number">Book 2</span>How Everything Connects</h2>
+
+  <h3 id="s2-1">2.1 Layer Stack Diagram</h3>
+
+  <p>GazeConnect Pro is organized into clearly separated layers. Each layer communicates only with its neighbors through well-defined protocols, ensuring that failures remain isolated and each layer can be tested independently.</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 2000 600" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow3"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dx="0" dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.2"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect width="2000" height="600" fill="#0e0e14" rx="12"/>
+      <text x="1000" y="45" text-anchor="middle" fill="#d4a574" font-family="DM Serif Display,serif" font-size="24">Layer Stack — From Hardware to User Interface</text>
+
+      <!-- Layer 1: Hardware -->
+      <rect x="200" y="480" width="1600" height="70" rx="10" fill="#2d1a0d" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow3)"/>
+      <text x="1000" y="520" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="16" font-weight="700">Hardware Layer</text>
+      <text x="1000" y="540" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">Tobii Eye Tracker 5 (USB 3.0, 133Hz, Near-IR) &middot; Windows 10/11 &middot; SAPI5 TTS voices</text>
+
+      <!-- Layer 2: Native Bridge -->
+      <rect x="200" y="390" width="1600" height="70" rx="10" fill="#1e2d1a" stroke="#7ee787" stroke-width="1.5" filter="url(#shadow3)"/>
+      <text x="1000" y="430" text-anchor="middle" fill="#7ee787" font-family="DM Sans,sans-serif" font-size="16" font-weight="700">Native Bridge Layer</text>
+      <text x="1000" y="450" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">TobiiGazeHelper.exe (.NET 6.0/C#) &middot; P/Invoke to Tobii SDK &middot; TCP :5555 JSON output</text>
+
+      <!-- Layer 3: Backend -->
+      <rect x="200" y="290" width="1600" height="80" rx="10" fill="#0d2f24" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow3)"/>
+      <text x="1000" y="325" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="16" font-weight="700">Backend Intelligence Layer</text>
+      <text x="1000" y="347" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">Python asyncio &middot; Gaze filtering (Kalman + OptiKey) &middot; Word prediction (N-gram + LSTM) &middot; TTS &middot; Dwell detection</text>
+      <text x="1000" y="363" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">WebSocket :8765 &middot; 40+ message types &middot; ONNX Runtime &middot; Datamuse API</text>
+
+      <!-- Layer 4: Desktop Shell -->
+      <rect x="200" y="190" width="1600" height="80" rx="10" fill="#1a1a3d" stroke="#818cf8" stroke-width="1.5" filter="url(#shadow3)"/>
+      <text x="1000" y="225" text-anchor="middle" fill="#818cf8" font-family="DM Sans,sans-serif" font-size="16" font-weight="700">Desktop Shell Layer</text>
+      <text x="1000" y="247" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">Electron 28 main process &middot; Window management &middot; Process lifecycle (Python, Tobii) &middot; IPC bridge</text>
+      <text x="1000" y="263" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">Preload context bridge &middot; File I/O &middot; System tray &middot; BrowserView for web browsing</text>
+
+      <!-- Layer 5: UI -->
+      <rect x="200" y="80" width="1600" height="90" rx="10" fill="#0d2137" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow3)"/>
+      <text x="1000" y="115" text-anchor="middle" fill="#60a5fa" font-family="DM Sans,sans-serif" font-size="16" font-weight="700">User Interface Layer</text>
+      <text x="1000" y="137" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">React 18 + TypeScript &middot; 16 screens &middot; 8 contexts &middot; GazeButton dwell system &middot; GazeCursor visual feedback</text>
+      <text x="1000" y="158" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">Design system (design.ts) &middot; clamp() responsive &middot; Dark mode primary &middot; 80px min buttons &middot; No scrolling</text>
+
+      <text x="1000" y="575" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="12" font-style="italic">Fig 2.1 — Five-layer architecture stack</text>
+    </svg>
+  </div>
+
+  <h3 id="s2-2">2.2 Data Contracts &amp; Message Protocol</h3>
+
+  <p>All inter-process communication uses JSON messages over WebSocket (frontend ↔ backend) or TCP (Tobii ↔ backend). Every message has a <code>type</code> field that determines routing.</p>
+
+  <h4>Gaze Data (Tobii → Python, TCP :5555)</h4>
+  <pre><code>{
+  <span class="str">"type"</span>: <span class="str">"gaze"</span>,
+  <span class="str">"x"</span>: <span class="num">0.5</span>,        <span class="cm">// Normalized [0,1] horizontal position</span>
+  <span class="str">"y"</span>: <span class="num">0.5</span>,        <span class="cm">// Normalized [0,1] vertical position</span>
+  <span class="str">"timestamp"</span>: <span class="num">1739000000000</span>,  <span class="cm">// Milliseconds since epoch</span>
+  <span class="str">"left_valid"</span>: <span class="kw">true</span>,   <span class="cm">// Left eye detected</span>
+  <span class="str">"right_valid"</span>: <span class="kw">true</span>,  <span class="cm">// Right eye detected</span>
+  <span class="str">"confidence"</span>: <span class="num">1.0</span>    <span class="cm">// Tracking quality [0,1]</span>
+}</code></pre>
+
+  <h4>Prediction Request (Frontend → Python, WS :8765)</h4>
+  <pre><code>{
+  <span class="str">"type"</span>: <span class="str">"get_predictions"</span>,
+  <span class="str">"text"</span>: <span class="str">"I want to "</span>,  <span class="cm">// Current typed text</span>
+  <span class="str">"length_hint"</span>: <span class="num">5</span>,       <span class="cm">// Max word suggestions</span>
+  <span class="str">"top_k"</span>: <span class="num">8</span>,              <span class="cm">// Neural candidates to consider</span>
+  <span class="str">"request_id"</span>: <span class="str">"pred_42"</span>  <span class="cm">// For response matching</span>
+}</code></pre>
+
+  <h4>Prediction Response (Python → Frontend)</h4>
+  <pre><code>{
+  <span class="str">"type"</span>: <span class="str">"predictions"</span>,
+  <span class="str">"words"</span>: [
+    {<span class="str">"word"</span>: <span class="str">"eat"</span>,   <span class="str">"score"</span>: <span class="num">0.85</span>, <span class="str">"source"</span>: <span class="str">"bigram+neural"</span>},
+    {<span class="str">"word"</span>: <span class="str">"drink"</span>, <span class="str">"score"</span>: <span class="num">0.72</span>, <span class="str">"source"</span>: <span class="str">"bigram"</span>},
+    {<span class="str">"word"</span>: <span class="str">"go"</span>,    <span class="str">"score"</span>: <span class="num">0.61</span>, <span class="str">"source"</span>: <span class="str">"ngram"</span>}
+  ],
+  <span class="str">"sentences"</span>: [<span class="str">"I want to eat something"</span>, <span class="str">"I want to go home"</span>],
+  <span class="str">"request_id"</span>: <span class="str">"pred_42"</span>
+}</code></pre>
+
+  <h3 id="s2-3">2.3 Environment Comparison</h3>
+
+  <table>
+    <thead><tr><th>Aspect</th><th>Development</th><th>Production</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>Vite dev server (port 5173, HMR)</td><td>Built static files via <code>file://</code></td></tr>
+      <tr><td>Python Backend</td><td><code>python main.py</code> (source)</td><td><code>GazeConnectBackend.exe</code> (PyInstaller bundle)</td></tr>
+      <tr><td>Tobii Helper</td><td><code>dotnet run</code> or prebuilt .exe</td><td>Self-contained <code>TobiiGazeHelper.exe</code></td></tr>
+      <tr><td>Eye Tracker</td><td>Optional (<code>--simulate</code> flag uses mouse)</td><td>Required (Tobii Eye Tracker 5)</td></tr>
+      <tr><td>Launch</td><td><code>start-dev.bat [--simulate]</code></td><td>Installed via <code>.exe</code> installer</td></tr>
+      <tr><td>Debug</td><td>DevTools open, GazeDebugOverlay available</td><td>DevTools hidden, minimal logging</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s2-4">2.4 Auth &amp; Session Flow</h3>
+
+  <p>GazeConnect Pro is a <strong>local-only desktop application</strong> with no user authentication, cloud accounts, or remote servers. This is a deliberate choice: ALS patients should never be locked out of their communication device by an expired token, network outage, or forgotten password.</p>
+
+  <div class="callout callout-concept">
+    <span class="callout-icon">💡</span>
+    <div class="callout-content">
+      <strong>No Auth By Design</strong>
+      <p>All data (customization, learned words, settings) is stored locally on the machine. The only optional network call is to the free Datamuse API for word enrichment — and it has a 300ms timeout with graceful fallback. The app works fully offline.</p>
+    </div>
+  </div>
+
+  <p><strong>Session state</strong> is managed through React contexts and browser storage:</p>
+  <ul style="margin-left: 1.5rem; margin-bottom: 1rem; color: var(--text-secondary);">
+    <li><code>sessionStorage</code> — Keyboard text persistence across screen navigation</li>
+    <li><code>localStorage</code> — Dwell time settings (<code>gazeconnect_dwell_settings</code>)</li>
+    <li>Electron file I/O — Customization data (phrases, people, medical items, layout)</li>
+    <li>Python in-memory — Learned words, sentence history, gaze calibration profile</li>
+  </ul>
+
+  <h3 id="s2-5">2.5 Key Algorithm: Word Prediction Pipeline</h3>
+
+  <p>The word prediction system is the crown jewel of GazeConnect Pro. It combines five complementary approaches to suggest words with 13.5ms mean latency — fast enough that predictions appear before the patient finishes dwelling on the current key.</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 2000 650" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow4"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dx="0" dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.2"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="arrDown" markerWidth="12" markerHeight="12" refX="6" refY="10" orient="auto"><path d="M0,0 L6,12 L12,0 Z" fill="#5eead4"/></marker>
+      </defs>
+      <rect width="2000" height="650" fill="#0e0e14" rx="12"/>
+      <text x="1000" y="45" text-anchor="middle" fill="#d4a574" font-family="DM Serif Display,serif" font-size="24">Word Prediction — 5-Layer Pipeline Architecture</text>
+
+      <!-- Input -->
+      <rect x="750" y="70" width="500" height="50" rx="10" fill="rgba(59,130,246,0.15)" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="1000" y="100" text-anchor="middle" fill="#60a5fa" font-family="DM Sans,sans-serif" font-size="15" font-weight="700">Input: "I want to " → get_predictions</text>
+
+      <line x1="1000" y1="120" x2="1000" y2="150" stroke="#5eead4" stroke-width="2" marker-end="url(#arrDown)"/>
+
+      <!-- Layer 1 -->
+      <rect x="200" y="155" width="350" height="80" rx="10" fill="#1a2744" stroke="#ff7b72" stroke-width="1.5" filter="url(#shadow4)"/>
+      <text x="375" y="185" text-anchor="middle" fill="#ff7b72" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">LAYER 1: N-Gram Model</text>
+      <text x="375" y="205" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">3000+ word vocab · Frequency ranking</text>
+      <text x="375" y="222" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">Medical + patient-learned words</text>
+
+      <!-- Layer 2 -->
+      <rect x="600" y="155" width="350" height="80" rx="10" fill="#1a2744" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow4)"/>
+      <text x="775" y="185" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">LAYER 2: Smart Bigrams</text>
+      <text x="775" y="205" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">1,339 word pairs · 36KB</text>
+      <text x="775" y="222" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">"want" → ["some":72, "to":40, ...]</text>
+
+      <!-- Layer 3 -->
+      <rect x="1000" y="155" width="350" height="80" rx="10" fill="#1a2744" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow4)"/>
+      <text x="1175" y="185" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">LAYER 3: CIFG-LSTM Neural</text>
+      <text x="1175" y="205" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">1.9MB ONNX · 661 vocab · 30ms max</text>
+      <text x="1175" y="222" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">Semantic reranking via PredictionFusion</text>
+
+      <!-- Layer 4 -->
+      <rect x="1400" y="155" width="350" height="80" rx="10" fill="#1a2744" stroke="#818cf8" stroke-width="1.5" filter="url(#shadow4)"/>
+      <text x="1575" y="185" text-anchor="middle" fill="#818cf8" font-family="DM Sans,sans-serif" font-size="13" font-weight="700">LAYER 4: Datamuse API</text>
+      <text x="1575" y="205" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">Free, no API key · 300ms timeout</text>
+      <text x="1575" y="222" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="11">Optional, non-blocking enrichment</text>
+
+      <!-- Merge -->
+      <line x1="375" y1="235" x2="900" y2="310" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+      <line x1="775" y1="235" x2="950" y2="310" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+      <line x1="1175" y1="235" x2="1050" y2="310" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+      <line x1="1575" y1="235" x2="1100" y2="310" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+
+      <rect x="800" y="310" width="400" height="60" rx="10" fill="rgba(94,234,212,0.1)" stroke="#5eead4" stroke-width="2"/>
+      <text x="1000" y="345" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="15" font-weight="700">Score Fusion &amp; Ranking</text>
+
+      <line x1="1000" y1="370" x2="1000" y2="400" stroke="#5eead4" stroke-width="2" marker-end="url(#arrDown)"/>
+
+      <!-- Layer 5 -->
+      <rect x="700" y="405" width="600" height="70" rx="10" fill="#2d1a0d" stroke="#d4a574" stroke-width="2" filter="url(#shadow4)"/>
+      <text x="1000" y="435" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="14" font-weight="700">LAYER 5: Patient Personalization</text>
+      <text x="1000" y="458" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">3x bigram boost · 2x vocab boost · Topic-aware · 15% agreement bonus</text>
+
+      <line x1="1000" y1="475" x2="1000" y2="505" stroke="#d4a574" stroke-width="2" marker-end="url(#arrDown)"/>
+
+      <!-- Guardrails -->
+      <rect x="750" y="510" width="500" height="50" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="1000" y="540" text-anchor="middle" fill="#ef4444" font-family="DM Sans,sans-serif" font-size="14" font-weight="700">Safety Filter: 110 Blocked Words Removed</text>
+
+      <line x1="1000" y1="560" x2="1000" y2="590" stroke="#5eead4" stroke-width="2" marker-end="url(#arrDown)"/>
+
+      <!-- Output -->
+      <rect x="750" y="595" width="500" height="40" rx="8" fill="rgba(34,197,94,0.15)" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="1000" y="620" text-anchor="middle" fill="#22c55e" font-family="DM Sans,sans-serif" font-size="14" font-weight="700">Output: ["eat", "drink", "go", "sleep", "rest"] in 13.5ms</text>
+
+      <text x="1000" y="648" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="12" font-style="italic">Fig 2.2 — Five-layer word prediction pipeline with safety guardrails</text>
+    </svg>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       BOOK 3 — FRONTEND LAYER
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="book-3"><span class="chapter-number">Book 3</span>Frontend Layer</h2>
+
+  <h3 id="s3-1">3.1 Framework Fundamentals</h3>
+
+  <p>The frontend is a <strong>pure React 18 application</strong> — no external UI library, no Tailwind, no styled-components. Every component is built from scratch with inline styles and the custom design system in <code>design.ts</code>. This isn't a style preference — it's a medical necessity. Eye-gaze interfaces need pixel-perfect control over button sizes, hit zones, and visual feedback that no generic UI library provides.</p>
+
+  <div class="callout callout-warning">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-content">
+      <strong>Why No UI Library?</strong>
+      <p>Generic UI components assume mouse/touch input with hover states, focus rings, and click handlers. GazeConnect needs dwell-based selection with onset delays, progress rings, magnetism, and cooldowns — none of which exist in Material UI, Chakra, or Ant Design.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-2">3.2 Entry Point &amp; Routing</h3>
+
+  <p>The app uses a <strong>single-screen state machine</strong> instead of React Router. There are no URLs to navigate — the patient looks at a navigation button, dwells on it, and the screen state changes. This is simpler, faster, and eliminates any browser history issues.</p>
+
+  <pre><code><span class="cm">// src/App.tsx — Root component with screen state machine</span>
+<span class="kw">const</span> [currentScreen, setCurrentScreen] = <span class="fn">useState</span>(<span class="str">'home'</span>);
+
+<span class="cm">// 8 context providers wrapped in correct dependency order:</span>
+<span class="cm">// CustomizationProvider → ThemeProvider → DwellTimeProvider →</span>
+<span class="cm">// FocusModeProvider → AlertModeProvider → WebSocketProvider →</span>
+<span class="cm">// RealGazeProvider → GazeControlProvider</span>
+
+<span class="cm">// Screen rendering based on state:</span>
+<span class="kw">switch</span> (currentScreen) {
+  <span class="kw">case</span> <span class="str">'home'</span>:     <span class="kw">return</span> &lt;<span class="type">HomeScreen</span> /&gt;;
+  <span class="kw">case</span> <span class="str">'keyboard'</span>: <span class="kw">return</span> &lt;<span class="type">KeyboardScreen</span> /&gt;;
+  <span class="kw">case</span> <span class="str">'medical'</span>:  <span class="kw">return</span> &lt;<span class="type">MedicalScreen</span> /&gt;;
+  <span class="cm">// ... 13 more screens</span>
+}</code></pre>
+
+  <h3 id="s3-3">3.3 State Management (8 Context Providers)</h3>
+
+  <p>React Context is the sole state management solution — no Redux, no Zustand, no external stores. Each context manages a focused domain, and they're layered in a specific order because some contexts depend on others.</p>
+
+  <table>
+    <thead><tr><th>Context</th><th>Domain</th><th>Persistence</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CustomizationContext</strong></td><td>People, phrases, medical items, home layout, activities, settings</td><td>Electron file I/O</td></tr>
+      <tr><td><strong>ThemeContext</strong></td><td>Dark/light mode toggle</td><td>Part of customization</td></tr>
+      <tr><td><strong>DwellTimeContext</strong></td><td>15+ configurable dwell times, presets (slow/balanced/quick), ALS stage presets</td><td>localStorage</td></tr>
+      <tr><td><strong>FocusModeContext</strong></td><td>Focus mode toggle — locks navigation when active</td><td>Session only</td></tr>
+      <tr><td><strong>AlertModeContext</strong></td><td>Alert mode — locks to emergency screen</td><td>Session only</td></tr>
+      <tr><td><strong>WebSocketProvider</strong></td><td>Python backend connection, prediction fetching, gaze subscription</td><td>N/A (real-time)</td></tr>
+      <tr><td><strong>RealGazeContext</strong></td><td>Distinguishes real eye tracker from mouse simulation</td><td>N/A (detected)</td></tr>
+      <tr><td><strong>GazeControlContext</strong></td><td>Gaze enable/disable, cooldowns, post-navigation freeze</td><td>Session only</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s3-4">3.4 WebSocket Client Layer</h3>
+
+  <p>The <code>useWebSocket</code> hook (23,000+ characters) is the primary communication channel with the Python backend. It handles auto-reconnection with exponential backoff, message routing, and provides typed methods for every supported operation.</p>
+
+  <pre><code><span class="cm">// src/hooks/useWebSocket.tsx — Key capabilities</span>
+<span class="kw">const</span> {
+  isConnected,           <span class="cm">// WebSocket connection status</span>
+  getPredictions,        <span class="cm">// Request word predictions</span>
+  speak,                 <span class="cm">// Trigger TTS output</span>
+  learnSentence,         <span class="cm">// Add to sentence history</span>
+  addWord,               <span class="cm">// Add custom word to dictionary</span>
+  registerTargets,       <span class="cm">// Register dwell detection targets</span>
+  setGazeEnabled,        <span class="cm">// Enable/disable gaze tracking</span>
+  startCalibration,      <span class="cm">// Begin 9-point calibration</span>
+  getFatigue,            <span class="cm">// Check fatigue level</span>
+  setFilterPreset,       <span class="cm">// Change gaze filter (balanced/sensitive/stable)</span>
+} = <span class="fn">useWebSocket</span>();</code></pre>
+
+  <h3 id="s3-5">3.5 Screen Walkthrough</h3>
+
+  <p>All 16 screens are full-viewport components. No scrolling is allowed — every element must fit within the visible area on screens from 13" to 27".</p>
+
+  <table>
+    <thead><tr><th>Screen</th><th>Purpose</th><th>Key Feature</th></tr></thead>
+    <tbody>
+      <tr><td><strong>HomeScreen</strong></td><td>Main dashboard</td><td>Emergency cards always visible, customizable tile grid</td></tr>
+      <tr><td><strong>KeyboardScreen</strong></td><td>Eye-gaze QWERTY keyboard</td><td>Neural word prediction (v3), sentence completion</td></tr>
+      <tr><td><strong>SpatialKeyboardScreen</strong></td><td>9-zone directional input</td><td>Alternative to QWERTY for advanced users</td></tr>
+      <tr><td><strong>PhrasesScreen</strong></td><td>Pre-set phrase categories</td><td>Courtesy, reactions, common needs — one-dwell communication</td></tr>
+      <tr><td><strong>PeopleScreen</strong></td><td>Contact-specific phrases</td><td>Personalized messages per person</td></tr>
+      <tr><td><strong>MedicalScreen</strong></td><td>Medical needs &amp; alerts</td><td>Suction, pain scale, vital checks, emergency actions</td></tr>
+      <tr><td><strong>FeelingScreen</strong></td><td>Emotional expression</td><td>Happy, sad, pain, tired, anxious — quick emotional state</td></tr>
+      <tr><td><strong>BasicNeedsScreen</strong></td><td>Physical needs</td><td>Hunger, comfort, hygiene, rest</td></tr>
+      <tr><td><strong>ActivitiesScreen</strong></td><td>Entertainment &amp; social</td><td>Learning, entertainment, social activities</td></tr>
+      <tr><td><strong>QuickWordsScreen</strong></td><td>Overlay word injection</td><td>Floating overlay for rapid word selection</td></tr>
+      <tr><td><strong>SettingsScreen</strong></td><td>Configuration hub</td><td>Routes to 9 sub-panels (app, dictionary, layout, medical...)</td></tr>
+      <tr><td><strong>WebBrowsingScreen</strong></td><td>Gaze-controlled browser</td><td>Electron BrowserView with gaze scroll &amp; click</td></tr>
+      <tr><td><strong>FloorPlanSurveyScreen</strong></td><td>Home layout survey</td><td>Multi-step survey for floor plan generation</td></tr>
+      <tr><td><strong>CompassMapScreen</strong></td><td>Compass navigation</td><td>Spatial directional input for home navigation</td></tr>
+      <tr><td><strong>AdvancedMapScreen</strong></td><td>Map refinement</td><td>Advanced mode for compass refinement</td></tr>
+      <tr><td><strong>AlertModeScreen</strong></td><td>Emergency lock-down</td><td>Full-screen emergency alerting, cannot be accidentally dismissed</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s3-6">3.6 Core Gaze Components</h3>
+
+  <p>The heart of the UI is the gaze interaction system. These components implement the two-stage dwell selection process that makes eye-gaze typing possible.</p>
+
+  <h4>GazeButton — The Foundation</h4>
+
+  <p>Every interactive element in the app is a <code>GazeButton</code>. It implements a research-backed two-stage dwell process:</p>
+
+  <ol style="margin-left: 1.5rem; margin-bottom: 1rem; color: var(--text-secondary);">
+    <li><strong>Onset delay</strong> (150–450ms, configurable per ALS stage) — Hidden timer that prevents jitter-triggered selections. The user sees nothing during this phase.</li>
+    <li><strong>Visible dwell</strong> (900–2000ms, context-dependent) — A progress ring fills around the button. When complete, the action fires.</li>
+  </ol>
+
+  <pre><code><span class="cm">// src/components/core/GazeButton.tsx — Key props</span>
+<span class="kw">interface</span> <span class="type">GazeButtonProps</span> {
+  dwellTime?: <span class="type">number</span>;        <span class="cm">// Override default dwell duration</span>
+  dwellCategory?: <span class="type">string</span>;    <span class="cm">// 'navigation' | 'keyboard' | 'emergency' | ...</span>
+  variant?: <span class="type">string</span>;          <span class="cm">// Visual style variant</span>
+  size?: <span class="type">string</span>;             <span class="cm">// 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl'</span>
+  onDwellProgress?: <span class="fn">(progress: number) => void</span>;
+  onDwellComplete?: <span class="fn">() => void</span>;  <span class="cm">// Fires on successful dwell</span>
+}</code></pre>
+
+  <h4>Dwell Timing by Context</h4>
+  <table>
+    <thead><tr><th>Context</th><th>Dwell Time</th><th>Onset Delay</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Emergency</td><td>400ms</td><td>100ms</td><td>Life-critical — must be fastest</td></tr>
+      <tr><td>QuickFire (Yes/No)</td><td>700ms</td><td>150ms</td><td>Rapid responses in conversation</td></tr>
+      <tr><td>Keyboard keys</td><td>900–1200ms</td><td>200ms</td><td>Balance speed vs. accuracy for typing</td></tr>
+      <tr><td>Navigation</td><td>1200ms</td><td>250ms</td><td>Prevent accidental screen changes</td></tr>
+      <tr><td>Settings</td><td>1500ms</td><td>300ms</td><td>Destructive actions need deliberate intent</td></tr>
+    </tbody>
+  </table>
+
+  <h4>GazeCursor — Visual Feedback</h4>
+  <p>Renders a smooth cursor that follows the patient's gaze point at 66Hz. Implements a state machine with three modes: normal (translucent dot), locked (solid ring when dwelling), and debug (velocity vectors, filter zone visualization).</p>
+
+  <h3 id="s3-7">3.7 Design System</h3>
+
+  <p>The design system in <code>src/utils/design.ts</code> is the single source of truth for all visual tokens. It exports typed constants for colors, typography, spacing, button sizes, dwell timing, and per-screen theme overrides.</p>
+
+  <table>
+    <thead><tr><th>Token Category</th><th>Key Values</th></tr></thead>
+    <tbody>
+      <tr><td>Background</td><td>Dark: <code>#0D1117</code>, Light: <code>#F5F5F5</code></td></tr>
+      <tr><td>Accent</td><td>Teal: <code>#2DD4BF</code></td></tr>
+      <tr><td>Emergency</td><td>Red: high-contrast, always visible</td></tr>
+      <tr><td>Font sizes</td><td>xs (14px) → 5xl (52px), 10 steps</td></tr>
+      <tr><td>Button sizes</td><td>xs (60px) → xxl (160px), min 44px accessible</td></tr>
+      <tr><td>Spacing scale</td><td>0–24rem (14 steps)</td></tr>
+      <tr><td>Border radius</td><td>Consistent rounded corners</td></tr>
+      <tr><td>Accessibility</td><td>4.5:1 AA contrast, 7:1 AAA contrast ratios</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-critical">
+    <span class="callout-icon">🚨</span>
+    <div class="callout-content">
+      <strong>Responsive Rule</strong>
+      <p>All sizing uses <code>clamp(min, preferred, max)</code> — never fixed pixels. Content must fit 13" laptops (768px height) through 27" monitors (1080px+ height) without scrolling. <code>overflow: hidden</code> is intentional throughout.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       BOOK 4 — BACKEND / API LAYER
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="book-4"><span class="chapter-number">Book 4</span>Backend / API Layer</h2>
+
+  <h3 id="s4-1">4.1 Python Backend Architecture</h3>
+
+  <p>The Python backend (<code>python/main.py</code>, 3,126 lines) is a single-file asyncio application that serves as the intelligence hub. It runs an <code>asyncio</code> event loop that handles WebSocket connections, gaze data processing, word prediction, TTS, and dwell detection — all without blocking.</p>
+
+  <pre><code><span class="cm"># python/main.py — Core classes</span>
+<span class="kw">class</span> <span class="type">GazeConnectBackend</span>:
+    <span class="cm">"""Main orchestrator — launches all services, routes messages"""</span>
+    <span class="cm"># Initializes: TobiiReceiver, TTSEngine, WordPredictionEngine,</span>
+    <span class="cm"># DwellManager, CalibrationSession, FatigueDetector, SessionLogger</span>
+
+<span class="kw">class</span> <span class="type">TobiiReceiver</span>:
+    <span class="cm">"""TCP client for TobiiGazeHelper.exe on port 5555"""</span>
+    <span class="cm"># Reads JSON gaze points at 133Hz</span>
+    <span class="cm"># Normalizes timestamps (millis/nanos/raw)</span>
+
+<span class="kw">class</span> <span class="type">TTSEngine</span>:
+    <span class="cm">"""Text-to-speech via pyttsx3 (SAPI5)"""</span>
+    <span class="cm"># Background thread, non-blocking</span>
+
+<span class="kw">class</span> <span class="type">DatamuseCache</span>:
+    <span class="cm">"""LRU cache for Datamuse API responses"""</span>
+    <span class="cm"># 500 entries max, 3600s TTL</span></code></pre>
+
+  <h3 id="s4-2">4.2 WebSocket Message Protocol</h3>
+
+  <p>The WebSocket server on port 8765 handles 40+ message types. Messages are JSON objects with a <code>type</code> field for routing. The server uses lambda-based handler dispatch for zero-overhead routing.</p>
+
+  <table>
+    <thead><tr><th>Category</th><th>Messages</th><th>Direction</th></tr></thead>
+    <tbody>
+      <tr><td>Gaze Control</td><td><code>set_gaze_enabled</code>, <code>start_calibration</code>, <code>set_screen_size</code>, <code>set_gaze_offset</code>, <code>register_targets</code></td><td>Client → Server</td></tr>
+      <tr><td>Word Prediction</td><td><code>get_predictions</code>, <code>expand_abbreviation</code>, <code>add_word</code>, <code>get_dictionary_data</code>, <code>get_neural_model_info</code></td><td>Client → Server</td></tr>
+      <tr><td>Sentence</td><td><code>learn_sentence</code>, <code>get_sentence_history</code>, <code>add_sentence_template</code>, <code>get_phrases</code></td><td>Client → Server</td></tr>
+      <tr><td>TTS</td><td><code>speak</code>, <code>stop_speaking</code>, <code>set_tts_rate</code>, <code>set_tts_volume</code></td><td>Client → Server</td></tr>
+      <tr><td>Fatigue</td><td><code>get_fatigue</code>, <code>take_break</code>, <code>snooze_break</code>, <code>skip_break</code></td><td>Client → Server</td></tr>
+      <tr><td>Gaze Output</td><td><code>gaze</code> (x, y, zone, locked, confidence)</td><td>Server → Client, ~66Hz</td></tr>
+      <tr><td>Predictions</td><td><code>predictions</code> (words, sentences, request_id)</td><td>Server → Client</td></tr>
+      <tr><td>Dwell Events</td><td><code>dwell_start</code>, <code>dwell_progress</code>, <code>dwell_complete</code>, <code>dwell_cancel</code></td><td>Server → Client</td></tr>
+      <tr><td>Breaks</td><td><code>break_warning</code>, <code>break_needed</code></td><td>Server → Client</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s4-3">4.3 Word Prediction Engine (5 Layers)</h3>
+
+  <p>The <code>WordPredictionEngine</code> in <code>python/services/word_prediction.py</code> (164KB) is the largest single service. It implements a five-layer pipeline where each layer contributes candidates that are merged, ranked, filtered, and personalized.</p>
+
+  <h4>Layer 1: N-Gram Model</h4>
+  <p>Maintains a 3,000+ word vocabulary with frequency rankings. Includes three sub-vocabularies: core (500 common English words), medical (ALS-specific terms like "suction", "tracheostomy", "bipap"), and patient (350+ words learned from the patient's typing history).</p>
+
+  <h4>Layer 2: Smart Bigrams</h4>
+  <p>Pre-computed conditional probabilities from <code>python/data/smart_bigrams.json</code> (1,339 word pairs, 36KB). Given the previous word, returns ranked next-word candidates. Example: after "want" → <code>{"some": 72, "drink": 40, "eat": 34, "the": 30}</code>.</p>
+
+  <h4>Layer 3: CIFG-LSTM Neural Fusion</h4>
+  <p>A custom Coupled Input-Forget Gate LSTM model (1.9MB quantized ONNX) with 661-token vocabulary. The "coupled" gate means the forget gate is computed as <code>1 - input_gate</code>, reducing parameters by ~25% while maintaining quality. Runs via ONNX Runtime with a hard 30ms timeout — if inference takes longer, the pipeline returns n-gram results only.</p>
+
+  <h4>Layer 4: Datamuse API</h4>
+  <p>Free online API (no key required) that provides semantically related words. Called in the background with a 300ms timeout. Results are cached (500 entries, 1-hour TTL). Entirely optional — the app works fully offline without it.</p>
+
+  <h4>Layer 5: Patient Personalization</h4>
+  <p>Words the patient has typed before get significant score boosts: 3x for bigram matches, 2x for vocabulary presence. When a word appears in both the n-gram and neural models ("agreement"), it gets an additional 15% bonus. The <code>SessionTopicTracker</code> provides decay-weighted topic boosts based on recent conversation context.</p>
+
+  <h3 id="s4-4">4.4 CIFG-LSTM Neural Model</h3>
+
+  <pre><code><span class="cm"># python/ml/model.py — Custom LSTM cell with coupled gates</span>
+<span class="kw">class</span> <span class="type">CIFGLSTMCell</span>:
+    <span class="cm">"""Coupled Input-Forget Gate LSTM</span>
+<span class="cm">    Key insight: forget_gate = 1 - input_gate</span>
+<span class="cm">    This reduces parameters by ~25% with minimal quality loss.</span>
+<span class="cm">    Perfect for edge deployment on patient laptops."""</span>
+
+<span class="kw">class</span> <span class="type">GazeConnectLM</span>:
+    <span class="cm">"""Full language model with weight tying</span>
+<span class="cm">    Architecture: Embedding(128) → CIFG-LSTM(512) → Dropout(0.2) → Linear</span>
+<span class="cm">    Training: 25 epochs, lr=0.002, batch=64, seq_len=32"""</span></code></pre>
+
+  <table>
+    <thead><tr><th>Model File</th><th>Size</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>gazeconnect_lm.onnx</code></td><td>7.2MB</td><td>Full-precision ONNX model</td></tr>
+      <tr><td><code>gazeconnect_lm_quantized.onnx</code></td><td>1.9MB</td><td>INT8 quantized (used in production)</td></tr>
+      <tr><td><code>gazeconnect_lm.pt</code></td><td>21MB</td><td>PyTorch checkpoint (for retraining)</td></tr>
+      <tr><td><code>vocabulary.json</code></td><td>24KB</td><td>Word-to-index mapping (661 tokens)</td></tr>
+      <tr><td><code>training_log.json</code></td><td>6KB</td><td>Training metrics (25 epochs)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s4-5">4.5 Gaze Pipeline &amp; Signal Processing</h3>
+
+  <p>The gaze pipeline is a multi-stage signal processing chain that transforms raw eye tracker data into smooth, reliable cursor positions. Each stage addresses a specific noise source.</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 2000 380" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow5"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dx="0" dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.2"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="arrR" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#5eead4"/></marker>
+      </defs>
+      <rect width="2000" height="380" fill="#0e0e14" rx="12"/>
+      <text x="1000" y="40" text-anchor="middle" fill="#d4a574" font-family="DM Serif Display,serif" font-size="22">Gaze Signal Processing Pipeline (66Hz)</text>
+
+      <!-- Stage boxes -->
+      <rect x="40" y="70" width="210" height="80" rx="8" fill="#1a2744" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow5)"/>
+      <text x="145" y="100" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">TOBII HARDWARE</text>
+      <text x="145" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">133Hz raw gaze</text>
+      <text x="145" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">TCP :5555 JSON</text>
+
+      <line x1="250" y1="110" x2="290" y2="110" stroke="#5eead4" stroke-width="2" marker-end="url(#arrR)"/>
+
+      <rect x="300" y="70" width="210" height="80" rx="8" fill="#1a2744" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow5)"/>
+      <text x="405" y="100" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">SIGNAL CONDITIONER</text>
+      <text x="405" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">Validity check</text>
+      <text x="405" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">Drop stale (150ms TTL)</text>
+
+      <line x1="510" y1="110" x2="550" y2="110" stroke="#5eead4" stroke-width="2" marker-end="url(#arrR)"/>
+
+      <rect x="560" y="70" width="210" height="80" rx="8" fill="#1a2744" stroke="#818cf8" stroke-width="1.5" filter="url(#shadow5)"/>
+      <text x="665" y="100" text-anchor="middle" fill="#818cf8" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">CALIBRATION</text>
+      <text x="665" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">Apply correction profile</text>
+      <text x="665" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">9-point grid</text>
+
+      <line x1="770" y1="110" x2="810" y2="110" stroke="#5eead4" stroke-width="2" marker-end="url(#arrR)"/>
+
+      <rect x="820" y="70" width="210" height="80" rx="8" fill="#1a2744" stroke="#ff7b72" stroke-width="1.5" filter="url(#shadow5)"/>
+      <text x="925" y="100" text-anchor="middle" fill="#ff7b72" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">GAZE CLASSIFIER</text>
+      <text x="925" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">Fixation vs saccade</text>
+      <text x="925" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">State machine</text>
+
+      <line x1="1030" y1="110" x2="1070" y2="110" stroke="#5eead4" stroke-width="2" marker-end="url(#arrR)"/>
+
+      <rect x="1080" y="70" width="210" height="80" rx="8" fill="#1a2744" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow5)"/>
+      <text x="1185" y="100" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">KALMAN FILTER</text>
+      <text x="1185" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">Adaptive smoothing</text>
+      <text x="1185" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">State-aware params</text>
+
+      <line x1="1290" y1="110" x2="1330" y2="110" stroke="#5eead4" stroke-width="2" marker-end="url(#arrR)"/>
+
+      <rect x="1340" y="70" width="210" height="80" rx="8" fill="#1a2744" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow5)"/>
+      <text x="1445" y="100" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">OPTIKEY 4-ZONE</text>
+      <text x="1445" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">Free/fixation/lock/edge</text>
+      <text x="1445" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">Gravity wells</text>
+
+      <line x1="1550" y1="110" x2="1590" y2="110" stroke="#5eead4" stroke-width="2" marker-end="url(#arrR)"/>
+
+      <rect x="1600" y="70" width="210" height="80" rx="8" fill="#0d2f24" stroke="#22c55e" stroke-width="2" filter="url(#shadow5)"/>
+      <text x="1705" y="100" text-anchor="middle" fill="#22c55e" font-family="DM Sans,sans-serif" font-size="11" font-weight="700">DWELL + MAGNETISM</text>
+      <text x="1705" y="120" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="11">Sticky cursor lock</text>
+      <text x="1705" y="137" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="DM Sans,sans-serif" font-size="10">→ WebSocket broadcast</text>
+
+      <!-- Bottom info -->
+      <rect x="200" y="200" width="1600" height="70" rx="10" fill="rgba(94,234,212,0.05)" stroke="rgba(94,234,212,0.15)" stroke-width="1"/>
+      <text x="1000" y="225" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="13" font-weight="600">Key Constants</text>
+      <text x="1000" y="250" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="JetBrains Mono,monospace" font-size="12">POINT_TTL = 150ms &middot; FRAME_GAP_HOLD = 150ms &middot; MAGNET_BIAS = 8px &middot; ON_KEY_HOLD = 120ms</text>
+
+      <text x="1000" y="350" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="12" font-style="italic">Fig 4.1 — Seven-stage gaze signal processing pipeline</text>
+    </svg>
+  </div>
+
+  <h3 id="s4-6">4.6 Safety: Prediction Guardrails</h3>
+
+  <p>The <code>prediction_guardrails.py</code> module enforces a blocklist of 110 words that must never appear as prediction suggestions. This is critical for an AAC device used by vulnerable patients — accidentally surfacing violent, profane, or emotionally harmful words could cause distress.</p>
+
+  <pre><code><span class="cm"># python/prediction_guardrails.py — Safety categories</span>
+BLOCKED_CATEGORIES = {
+    <span class="str">"violent"</span>:     [<span class="str">"dead"</span>, <span class="str">"kill"</span>, <span class="str">"murder"</span>, <span class="str">"suicide"</span>, <span class="str">"attack"</span>, <span class="str">"bomb"</span>, <span class="str">"weapon"</span>, ...],
+    <span class="str">"profane"</span>:     [<span class="str">"damn"</span>, <span class="str">"hell"</span>, <span class="str">"idiot"</span>, <span class="str">"stupid"</span>, <span class="str">"trash"</span>, ...],
+    <span class="str">"harmful"</span>:     [<span class="str">"helpless"</span>, <span class="str">"hopeless"</span>, <span class="str">"worthless"</span>, <span class="str">"burden"</span>, <span class="str">"suicidal"</span>, ...],
+    <span class="str">"inappropriate"</span>: [<span class="str">"sexy"</span>, <span class="str">"drunk"</span>, <span class="str">"gambling"</span>, <span class="str">"racist"</span>, ...],
+    <span class="str">"too_negative"</span>: [<span class="str">"awful"</span>, <span class="str">"terrible"</span>, <span class="str">"embarrassed"</span>, <span class="str">"overwhelmed"</span>, ...],
+}
+
+<span class="cm"># Enforced functions — called on EVERY prediction path</span>
+<span class="kw">def</span> <span class="fn">is_blocked_prediction_word</span>(word: <span class="type">str</span>) -> <span class="type">bool</span>: ...
+<span class="kw">def</span> <span class="fn">filter_prediction_words</span>(words: <span class="type">list</span>) -> <span class="type">list</span>: ...</code></pre>
+
+  <div class="callout callout-critical">
+    <span class="callout-icon">🚨</span>
+    <div class="callout-content">
+      <strong>Non-Negotiable Safety Rule</strong>
+      <p>These 110 words are blocked across ALL prediction paths — n-gram, bigram, neural, and Datamuse. A word on this list will never surface as a suggestion, regardless of how high its prediction score is. The "harmful to mental health" category is particularly important for ALS patients who may experience depression.</p>
+    </div>
+  </div>
+
+  <h3 id="s4-7">4.7 Services Overview</h3>
+
+  <table>
+    <thead><tr><th>Service</th><th>File</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><strong>WordPredictionEngine</strong></td><td>word_prediction.py (164KB)</td><td>5-layer prediction pipeline</td></tr>
+      <tr><td><strong>SentencePredictor</strong></td><td>sentence_prediction.py (35KB)</td><td>Sentence completion from history + templates</td></tr>
+      <tr><td><strong>DwellManager</strong></td><td>dwell_detector.py (20KB)</td><td>Adaptive dwell detection per button context</td></tr>
+      <tr><td><strong>CalibrationSession</strong></td><td>calibration.py (26KB)</td><td>9-point in-app calibration with gaze correction</td></tr>
+      <tr><td><strong>OptiKeyGazeFilter</strong></td><td>one_euro_filter.py (44KB)</td><td>4-zone filter + Adaptive Kalman + gravity wells</td></tr>
+      <tr><td><strong>GazeClassifier</strong></td><td>gaze_classifier.py (6.6KB)</td><td>Fixation vs. saccade detection state machine</td></tr>
+      <tr><td><strong>SignalConditioner</strong></td><td>signal_conditioner.py (8KB)</td><td>Gaze validity checking, stale point rejection</td></tr>
+      <tr><td><strong>FatigueDetector</strong></td><td>fatigue_monitor.py (21KB)</td><td>Eye fatigue detection, 20-20-20 break reminders, dry eye monitoring</td></tr>
+      <tr><td><strong>NeuralPredictor</strong></td><td>ml/inference.py</td><td>ONNX Runtime inference wrapper (thread-safe, 30ms timeout)</td></tr>
+      <tr><td><strong>PredictionFusion</strong></td><td>ml/fusion.py</td><td>Dynamic interpolation between n-gram and neural scores</td></tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       BOOK 5 — DEVOPS & DEPLOYMENT
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="book-5"><span class="chapter-number">Book 5</span>DevOps &amp; Deployment</h2>
+
+  <h3 id="s5-1">5.1 Development Setup</h3>
+
+  <h4>Prerequisites</h4>
+  <table>
+    <thead><tr><th>Tool</th><th>Version</th><th>Check Command</th></tr></thead>
+    <tbody>
+      <tr><td>Node.js</td><td>18+</td><td><code>node --version</code></td></tr>
+      <tr><td>Python</td><td>3.10+</td><td><code>python --version</code></td></tr>
+      <tr><td>.NET SDK</td><td>6.0+</td><td><code>dotnet --version</code></td></tr>
+      <tr><td>Tobii Eye Tracker 5</td><td>Latest firmware</td><td>Tobii Experience app</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Quick Start</h4>
+  <pre><code><span class="cm"># 1. Install dependencies</span>
+<span class="fn">npm</span> install               <span class="cm"># Frontend dependencies</span>
+<span class="fn">pip</span> install -r python/requirements.txt  <span class="cm"># Backend dependencies</span>
+
+<span class="cm"># 2. Start development (with eye tracker)</span>
+.\start-dev.bat
+
+<span class="cm"># 3. Start development (mouse simulation — no eye tracker needed)</span>
+.\start-dev.bat --simulate
+
+<span class="cm"># 4. UI-only development (fastest iteration)</span>
+<span class="fn">npm</span> run dev               <span class="cm"># Vite dev server on :5173</span></code></pre>
+
+  <h3 id="s5-2">5.2 Build Pipeline</h3>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 2000 400" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow6"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dx="0" dy="3"/><feComponentTransfer><feFuncA type="linear" slope="0.2"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="arrB" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#d4a574"/></marker>
+      </defs>
+      <rect width="2000" height="400" fill="#0e0e14" rx="12"/>
+      <text x="1000" y="40" text-anchor="middle" fill="#d4a574" font-family="DM Serif Display,serif" font-size="22">Production Build Pipeline (build-installer.bat)</text>
+
+      <!-- Stage 1 -->
+      <rect x="60" y="80" width="320" height="110" rx="10" fill="#1a2744" stroke="#ff7b72" stroke-width="1.5" filter="url(#shadow6)"/>
+      <text x="220" y="110" text-anchor="middle" fill="#ff7b72" font-family="DM Sans,sans-serif" font-size="12" font-weight="700">STAGE 1/5</text>
+      <text x="220" y="135" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="17">PyInstaller Bundle</text>
+      <text x="220" y="160" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">Python → GazeConnectBackend.exe</text>
+      <text x="220" y="178" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">~50MB (includes ONNX, services)</text>
+
+      <line x1="380" y1="135" x2="420" y2="135" stroke="#d4a574" stroke-width="2" marker-end="url(#arrB)"/>
+
+      <!-- Stage 2 -->
+      <rect x="430" y="80" width="320" height="110" rx="10" fill="#1a2744" stroke="#d4a574" stroke-width="1.5" filter="url(#shadow6)"/>
+      <text x="590" y="110" text-anchor="middle" fill="#d4a574" font-family="DM Sans,sans-serif" font-size="12" font-weight="700">STAGE 2/5</text>
+      <text x="590" y="135" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="17">.NET Publish</text>
+      <text x="590" y="160" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">C# → TobiiGazeHelper.exe</text>
+      <text x="590" y="178" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">Self-contained, win-x64</text>
+
+      <line x1="750" y1="135" x2="790" y2="135" stroke="#d4a574" stroke-width="2" marker-end="url(#arrB)"/>
+
+      <!-- Stage 3 -->
+      <rect x="800" y="80" width="320" height="110" rx="10" fill="#1a2744" stroke="#5eead4" stroke-width="1.5" filter="url(#shadow6)"/>
+      <text x="960" y="110" text-anchor="middle" fill="#5eead4" font-family="DM Sans,sans-serif" font-size="12" font-weight="700">STAGE 3/5</text>
+      <text x="960" y="135" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="17">React Build</text>
+      <text x="960" y="160" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">Vite → dist/index.html</text>
+      <text x="960" y="178" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">Optimized, code-split</text>
+
+      <line x1="1120" y1="135" x2="1160" y2="135" stroke="#d4a574" stroke-width="2" marker-end="url(#arrB)"/>
+
+      <!-- Stage 4 -->
+      <rect x="1170" y="80" width="320" height="110" rx="10" fill="#1a2744" stroke="#818cf8" stroke-width="1.5" filter="url(#shadow6)"/>
+      <text x="1330" y="110" text-anchor="middle" fill="#818cf8" font-family="DM Sans,sans-serif" font-size="12" font-weight="700">STAGE 4/5</text>
+      <text x="1330" y="135" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="17">Electron Compile</text>
+      <text x="1330" y="160" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">TypeScript → dist-electron/main.js</text>
+      <text x="1330" y="178" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">CommonJS target</text>
+
+      <line x1="1490" y1="135" x2="1530" y2="135" stroke="#d4a574" stroke-width="2" marker-end="url(#arrB)"/>
+
+      <!-- Stage 5 -->
+      <rect x="1540" y="80" width="320" height="110" rx="10" fill="#0d2f24" stroke="#22c55e" stroke-width="2" filter="url(#shadow6)"/>
+      <text x="1700" y="110" text-anchor="middle" fill="#22c55e" font-family="DM Sans,sans-serif" font-size="12" font-weight="700">STAGE 5/5</text>
+      <text x="1700" y="135" text-anchor="middle" fill="#fff" font-family="DM Serif Display,serif" font-size="17">Electron Builder</text>
+      <text x="1700" y="160" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Sans,sans-serif" font-size="12">→ GazeConnect Pro Setup.exe</text>
+      <text x="1700" y="178" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="JetBrains Mono,monospace" font-size="11">NSIS installer, auto-update</text>
+
+      <text x="1000" y="370" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="DM Sans,sans-serif" font-size="12" font-style="italic">Fig 5.1 — Five-stage production build pipeline</text>
+    </svg>
+  </div>
+
+  <h3 id="s5-3">5.3 Tobii Eye Tracker Integration</h3>
+
+  <p>The Tobii Eye Tracker 5 connects via USB 3.0 and provides raw gaze data at 133Hz using near-infrared LED illumination. The <code>TobiiGazeHelper.exe</code> (.NET 6.0) bridges the native Tobii SDK to the Python backend.</p>
+
+  <h4>Data Flow</h4>
+  <pre><code><span class="cm">// tobii-helper/TobiiGazeHelper/Program.cs</span>
+<span class="cm">// 1. Initialize Tobii Interaction Library</span>
+<span class="kw">var</span> host = <span class="kw">new</span> <span class="type">Host</span>();
+<span class="kw">var</span> stream = host.<span class="fn">Streams</span>.<span class="fn">CreateGazePointDataStream</span>(
+    <span class="type">GazePointDataMode</span>.LightlyFiltered  <span class="cm">// Minimal built-in filtering</span>
+);
+
+<span class="cm">// 2. On each gaze point (133Hz):</span>
+<span class="cm">//    - Normalize to [0,1] range</span>
+<span class="cm">//    - Apply DPI-aware scaling</span>
+<span class="cm">//    - Send JSON over TCP to port 5555</span>
+stream.<span class="fn">GazePoint</span>((x, y, ts) => {
+    <span class="kw">var</span> msg = <span class="type">JsonSerializer</span>.<span class="fn">Serialize</span>(<span class="kw">new</span> {
+        type = <span class="str">"gaze"</span>,
+        x = x / screenWidth,   <span class="cm">// Normalized [0,1]</span>
+        y = y / screenHeight,  <span class="cm">// Normalized [0,1]</span>
+        timestamp = ts
+    });
+    tcpClient.<span class="fn">Send</span>(msg);
+});</code></pre>
+
+  <h3 id="s5-4">5.4 Production Build &amp; Installer</h3>
+
+  <p>The production build creates a single Windows installer (<code>.exe</code>) that bundles all four processes. The patient or caregiver runs the installer, and the app is ready to use — no Python, Node.js, or .NET installation required.</p>
+
+  <pre><code><span class="cm"># Build the production installer</span>
+.\build-installer.bat
+
+<span class="cm"># Output: release/GazeConnect Pro Setup *.exe</span>
+<span class="cm"># Contents:</span>
+<span class="cm">#   - Electron shell + React bundle</span>
+<span class="cm">#   - GazeConnectBackend.exe (PyInstaller ~50MB)</span>
+<span class="cm">#   - TobiiGazeHelper.exe (.NET self-contained)</span>
+<span class="cm">#   - ONNX model (1.9MB quantized)</span>
+<span class="cm">#   - Smart bigrams data (36KB)</span>
+<span class="cm">#   - Tobii SDK DLLs</span></code></pre>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       BOOK 6 — DATA LAYER DEEP DIVE
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="book-6"><span class="chapter-number">Book 6</span>Data Layer Deep Dive</h2>
+
+  <h3 id="s6-1">6.1 Data Files &amp; Schemas</h3>
+
+  <p>GazeConnect Pro uses file-based storage — no database. All data is JSON files stored locally on the patient's machine. This ensures the app works fully offline and data never leaves the device.</p>
+
+  <table>
+    <thead><tr><th>File</th><th>Size</th><th>Schema</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>smart_bigrams.json</code></td><td>36KB</td><td><code>{"word1": {"word2": count, ...}}</code></td><td>1,339 pre-computed word pair frequencies</td></tr>
+      <tr><td><code>custom_dictionary.json</code></td><td>Variable</td><td><code>{"words": [...], "abbreviations": {...}}</code></td><td>Patient-added words and abbreviations</td></tr>
+      <tr><td><code>vocabulary.json</code></td><td>24KB</td><td><code>{"word": index, ...}</code></td><td>661-token neural model vocabulary mapping</td></tr>
+      <tr><td><code>training_log.json</code></td><td>6KB</td><td><code>[{epoch, train_loss, val_loss, perplexity}]</code></td><td>Neural model training metrics</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Smart Bigrams Structure</h4>
+  <pre><code><span class="cm">// python/data/smart_bigrams.json — 1,339 word pairs</span>
+{
+  <span class="str">"i"</span>: {<span class="str">"need"</span>: <span class="num">150</span>, <span class="str">"want"</span>: <span class="num">120</span>, <span class="str">"am"</span>: <span class="num">100</span>, <span class="str">"feel"</span>: <span class="num">80</span>, ...},
+  <span class="str">"want"</span>: {<span class="str">"some"</span>: <span class="num">72</span>, <span class="str">"drink"</span>: <span class="num">40</span>, <span class="str">"eat"</span>: <span class="num">34</span>, <span class="str">"the"</span>: <span class="num">30</span>, ...},
+  <span class="str">"please"</span>: {<span class="str">"help"</span>: <span class="num">95</span>, <span class="str">"call"</span>: <span class="num">60</span>, <span class="str">"turn"</span>: <span class="num">45</span>, ...},
+  <span class="cm">// ... 1,336 more entries</span>
+}</code></pre>
+
+  <h3 id="s6-2">6.2 Neural Model Training Data</h3>
+
+  <p>The CIFG-LSTM model was trained on a curated AAC corpus combining three sources:</p>
+
+  <table>
+    <thead><tr><th>Source</th><th>Content</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Core vocabulary</td><td>500 common English words</td><td>General language coverage</td></tr>
+      <tr><td>Medical vocabulary</td><td>ALS-specific terms (suction, tracheostomy, bipap, ventilator...)</td><td>Medical context accuracy</td></tr>
+      <tr><td>Patient chat history</td><td>350+ words from real usage</td><td>Personalization seed data</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Training Configuration</h4>
+  <pre><code><span class="cm"># python/ml/train.py — Hyperparameters</span>
+config = {
+    <span class="str">"vocab_size"</span>: <span class="num">12000</span>,      <span class="cm"># Maximum vocabulary capacity</span>
+    <span class="str">"embed_dim"</span>: <span class="num">128</span>,        <span class="cm"># Word embedding dimension</span>
+    <span class="str">"hidden_size"</span>: <span class="num">512</span>,      <span class="cm"># LSTM hidden state size</span>
+    <span class="str">"dropout"</span>: <span class="num">0.2</span>,          <span class="cm"># Regularization</span>
+    <span class="str">"seq_length"</span>: <span class="num">32</span>,        <span class="cm"># Context window for predictions</span>
+    <span class="str">"batch_size"</span>: <span class="num">64</span>,        <span class="cm"># Training batch size</span>
+    <span class="str">"learning_rate"</span>: <span class="num">0.002</span>,  <span class="cm"># Initial LR (decays 0.95x/epoch)</span>
+    <span class="str">"epochs"</span>: <span class="num">25</span>,            <span class="cm"># Total training epochs</span>
+}</code></pre>
+
+  <h3 id="s6-3">6.3 Customization Persistence</h3>
+
+  <p>Patient customization data is persisted through Electron's file I/O system via the <code>CustomizationService</code>. The data model is defined in <code>src/types/customization.ts</code>.</p>
+
+  <table>
+    <thead><tr><th>Data Type</th><th>TypeScript Interface</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Phrases</td><td><code>Phrase { text, category, language }</code></td><td>"I need help" in Medical category</td></tr>
+      <tr><td>People</td><td><code>Person { name, relationship, phrases[] }</code></td><td>Papa — Father — custom messages</td></tr>
+      <tr><td>Medical Items</td><td><code>MedicalItem { name, icon, action }</code></td><td>Suction — medical icon — speak alert</td></tr>
+      <tr><td>Home Layout</td><td><code>HomeQuickAction { label, screen, icon }</code></td><td>Keyboard shortcut on home screen</td></tr>
+      <tr><td>Activities</td><td><code>ActivityCategory { name, items[] }</code></td><td>Entertainment — Music, TV, Reading</td></tr>
+      <tr><td>Alert Cards</td><td><code>AlertModeCard { title, message, priority }</code></td><td>Emergency — "I need help NOW" — Critical</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s6-4">6.4 Performance Budget</h3>
+
+  <p>Every component in the system operates under strict latency budgets. These are not aspirational targets — they are hard requirements enforced by timeouts and fallback paths.</p>
+
+  <table>
+    <thead><tr><th>Operation</th><th>Budget</th><th>Enforcement</th></tr></thead>
+    <tbody>
+      <tr><td>Gaze point-to-broadcast</td><td>&lt;5ms</td><td>asyncio event loop, no blocking</td></tr>
+      <tr><td>Word prediction (full pipeline)</td><td>13.5ms mean</td><td>Non-blocking, runs in event loop</td></tr>
+      <tr><td>Neural inference (CIFG-LSTM)</td><td>&lt;30ms</td><td>Hard timeout — falls back to n-gram</td></tr>
+      <tr><td>Datamuse API call</td><td>&lt;300ms</td><td>Background, non-blocking, cached</td></tr>
+      <tr><td>Dwell detection</td><td>400–800ms</td><td>Context-adaptive timing</td></tr>
+      <tr><td>TTS initiation</td><td>Non-blocking</td><td>Runs in background thread</td></tr>
+      <tr><td>ONNX model size</td><td>1.9MB</td><td>INT8 quantization (from 7.2MB)</td></tr>
+      <tr><td>Smart bigrams memory</td><td>36KB</td><td>Pre-loaded dict, O(1) lookup</td></tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       APPENDIX
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 id="appendix"><span class="chapter-number">Appendix</span>Reference Tables</h2>
+
+  <h3 id="app-a">A. Environment Variables &amp; Configuration</h3>
+
+  <table>
+    <thead><tr><th>Config</th><th>Default</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>websocket_host</code></td><td><code>localhost</code></td><td>WebSocket server bind address</td></tr>
+      <tr><td><code>websocket_port</code></td><td><code>8765</code></td><td>WebSocket server port</td></tr>
+      <tr><td><code>tobii_enabled</code></td><td><code>True</code></td><td>Enable eye tracker connection</td></tr>
+      <tr><td><code>tobii_simulated</code></td><td><code>False</code></td><td>Mouse-as-gaze simulation mode</td></tr>
+      <tr><td><code>tts_enabled</code></td><td><code>True</code></td><td>Enable text-to-speech engine</td></tr>
+      <tr><td><code>enable_datamuse</code></td><td><code>False</code></td><td>Enable online word enrichment API</td></tr>
+      <tr><td><code>data_dir</code></td><td><code>./data</code></td><td>Data files directory</td></tr>
+      <tr><td><code>log_sessions</code></td><td><code>True</code></td><td>Enable session activity logging</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="app-b">B. Tech Stack Table</h3>
+
+  <table>
+    <thead><tr><th>Layer</th><th>Technology</th><th>Version</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>UI Framework</td><td>React</td><td>18.2</td><td>Component-based UI rendering</td></tr>
+      <tr><td>Language (FE)</td><td>TypeScript</td><td>5.3</td><td>Type-safe frontend development</td></tr>
+      <tr><td>Build Tool</td><td>Vite</td><td>5.0</td><td>Fast HMR, ES module bundling</td></tr>
+      <tr><td>Desktop Shell</td><td>Electron</td><td>28.0</td><td>Native window, process management</td></tr>
+      <tr><td>Backend</td><td>Python</td><td>3.10+</td><td>Async WebSocket server, ML inference</td></tr>
+      <tr><td>ML Runtime</td><td>ONNX Runtime</td><td>1.16+</td><td>Neural model inference (CPU)</td></tr>
+      <tr><td>TTS</td><td>pyttsx3</td><td>2.90+</td><td>Windows SAPI5 text-to-speech</td></tr>
+      <tr><td>WebSocket</td><td>websockets</td><td>12.0+</td><td>Real-time bidirectional communication</td></tr>
+      <tr><td>Eye Tracker SDK</td><td>.NET / Tobii SDK</td><td>6.0</td><td>Hardware gaze data access</td></tr>
+      <tr><td>Installer</td><td>electron-builder</td><td>24.9</td><td>Windows NSIS installer generation</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="app-c">C. WebSocket Message Reference</h3>
+
+  <table>
+    <thead><tr><th>Message Type</th><th>Direction</th><th>Key Fields</th></tr></thead>
+    <tbody>
+      <tr><td><code>get_predictions</code></td><td>Client → Server</td><td>text, length_hint, top_k, request_id</td></tr>
+      <tr><td><code>predictions</code></td><td>Server → Client</td><td>words[], sentences[], request_id</td></tr>
+      <tr><td><code>speak</code></td><td>Client → Server</td><td>text</td></tr>
+      <tr><td><code>gaze</code></td><td>Server → Client (66Hz)</td><td>x, y, timestamp, locked, zone, confidence</td></tr>
+      <tr><td><code>dwell_complete</code></td><td>Server → Client</td><td>target_id, duration</td></tr>
+      <tr><td><code>set_gaze_enabled</code></td><td>Client → Server</td><td>enabled (boolean)</td></tr>
+      <tr><td><code>start_calibration</code></td><td>Client → Server</td><td>(none)</td></tr>
+      <tr><td><code>add_word</code></td><td>Client → Server</td><td>word</td></tr>
+      <tr><td><code>learn_sentence</code></td><td>Client → Server</td><td>sentence</td></tr>
+      <tr><td><code>get_fatigue</code></td><td>Client → Server</td><td>(none)</td></tr>
+      <tr><td><code>break_needed</code></td><td>Server → Client</td><td>duration, reason</td></tr>
+      <tr><td><code>set_filter_preset</code></td><td>Client → Server</td><td>preset (balanced/sensitive/stable)</td></tr>
+      <tr><td><code>register_targets</code></td><td>Client → Server</td><td>targets[] (id, x, y, width, height)</td></tr>
+      <tr><td><code>ping</code></td><td>Client → Server</td><td>(none) → responds with pong</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="app-d">D. Glossary</h3>
+
+  <table>
+    <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>AAC</strong></td><td>Augmentative and Alternative Communication — tools and strategies for people who cannot speak</td></tr>
+      <tr><td><strong>ALS/MND</strong></td><td>Amyotrophic Lateral Sclerosis / Motor Neuron Disease — progressive neurodegenerative condition</td></tr>
+      <tr><td><strong>CIFG-LSTM</strong></td><td>Coupled Input-Forget Gate LSTM — variant where forget gate = 1 - input gate, reducing parameters ~25%</td></tr>
+      <tr><td><strong>Dwell</strong></td><td>Eye-gaze interaction method: stare at a target for a set duration to "click" it</td></tr>
+      <tr><td><strong>Onset Delay</strong></td><td>Hidden pre-dwell timer (150–450ms) that prevents accidental jitter-triggered selections</td></tr>
+      <tr><td><strong>Magnetism</strong></td><td>Gaze cursor "sticking" to nearby buttons — reduces the precision needed for accurate selection</td></tr>
+      <tr><td><strong>Fixation</strong></td><td>Eye movement state where gaze remains relatively stable on a target (vs. saccade)</td></tr>
+      <tr><td><strong>Saccade</strong></td><td>Rapid eye movement between fixation points — cursor feedback should be suppressed during saccades</td></tr>
+      <tr><td><strong>Kalman Filter</strong></td><td>Adaptive smoothing algorithm that balances responsiveness vs. stability based on gaze state</td></tr>
+      <tr><td><strong>OptiKey Filter</strong></td><td>4-zone gaze filter (free/fixation/lock/edge-hold) with zone-dependent smoothing parameters</td></tr>
+      <tr><td><strong>Gravity Well</strong></td><td>Invisible pull zone around buttons that attracts the gaze cursor, making selection easier</td></tr>
+      <tr><td><strong>SAPI5</strong></td><td>Windows Speech API version 5 — the TTS engine used by pyttsx3 on Windows</td></tr>
+      <tr><td><strong>Datamuse</strong></td><td>Free word-relationship API used for optional online word prediction enrichment</td></tr>
+      <tr><td><strong>ONNX</strong></td><td>Open Neural Network Exchange — cross-platform model format used for the CIFG-LSTM model</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"></div>
+
+  <div style="text-align: center; padding: 3rem 0; color: var(--text-muted);">
+    <div style="font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--navy); margin-bottom: 0.5rem;">GazeConnect Pro</div>
+    <div style="font-size: 0.85rem; line-height: 1.8;">
+      Built for Papa — and for every ALS patient who deserves to communicate freely.<br>
+      Electron 28 &middot; React 18 &middot; TypeScript 5.3 &middot; Python 3.10+ &middot; .NET 6.0 &middot; ONNX Runtime<br>
+      <span style="color: var(--gold);">Codebase Explainer v3.0</span> &middot; Generated from full codebase analysis
+    </div>
+  </div>
+
+</div><!-- .page -->
+
+<!-- ═══════════════════════════════════════════════════════════════
+     JAVASCRIPT: Progress bar, copy buttons, collapsible sections
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+  // Reading progress bar
+  window.addEventListener('scroll', () => {
+    const bar = document.getElementById('progress-bar');
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+    bar.style.width = Math.min(progress, 100) + '%';
+  });
+
+  // Copy buttons for code blocks
+  document.querySelectorAll('pre').forEach(block => {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      const code = block.querySelector('code') || block;
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+      }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = code.textContent;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+      });
+    });
+    block.style.position = 'relative';
+    block.appendChild(btn);
+  });
+
+  // Smooth scroll for TOC links
+  document.querySelectorAll('a[href^="#"]').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+
+</body>
+</html>

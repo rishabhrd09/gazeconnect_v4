@@ -1,0 +1,82 @@
+# ============================================
+# GazeConnect Pro - Git Ignore
+# ============================================
+
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+
+# --- Build outputs ---
+dist/
+dist-electron/
+release/
+output/
+
+# --- Installer build staging ---
+python-dist/
+tobii-dist/
+
+# --- Python ---
+*.pyc
+__pycache__/
+python/.venv/
+python/data/*.log
+python/data/*.txt
+python/data/*.json
+*.spec
+
+# --- .NET build artifacts ---
+tobii-helper/TobiiGazeHelper/bin/
+tobii-helper/TobiiGazeHelper/obj/
+
+# --- Environment & secrets ---
+.env
+.env.local
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+
+# --- IDE ---
+.idea/
+.vscode/
+*.suo
+*.user
+*.sln.docstates
+
+# --- Logs ---
+*.log
+
+# --- Session data (generated at runtime) ---
+/data/
+/survey_data/*.json
+/survey_data/*.txt
+/survey_data/survey_snapshots/
+/survey_data/sessions/
+/python/survey_data/
+output.zip
+
+# --- Claude Code ---
+.claude/
+
+# --- Chat history (runtime user data) ---
+chat_history/
+
+# --- Backup files ---
+*.bak
+
+# --- Windows reserved filenames ---
+nul
+
+# --- Temp ---
+suggested_changes/
+
+# --- Maintenance reports / archives ---
+tools/reports/
+
+# --- Neural Language Model (training-only files, too large for git) ---
+python/ml/trained_models/gazeconnect_lm.pt
+python/ml/trained_models/gazeconnect_lm.onnx

@@ -1,0 +1,861 @@
+﻿diff --git a/src/screens/CompassMapScreen.tsx b/src/screens/CompassMapScreen.tsx
+index 44ffcd6..5dd0f73 100644
+--- a/src/screens/CompassMapScreen.tsx
++++ b/src/screens/CompassMapScreen.tsx
+@@ -45,6 +45,12 @@ import {
+   computeCoveragePercent,
+   getContrastText,
+ } from '../utils/compassMath';
++import { getDirectionLabels } from '../utils/compassDirections';
++import {
++  SplitDirection,
++  WallEdgeType,
++  AdvancedRefinements,
++} from '../types/advancedMap';
+ 
+ // ΓöÇΓöÇΓöÇ Theme ΓÇö AAC Compliant: Matte, High-Contrast, No Glass ΓöÇΓöÇ
+ 
+@@ -86,7 +92,7 @@ interface RoomLibEntry {
+ 
+ const ROOM_LIBRARY: Record<string, RoomLibEntry> = {
+   // Ground Floor Components
+-  porch: { roomLabel: 'Porch / Lobby', shortLabel: 'Porch', color: '#81C784', expandable: false, recommendedCells: 1, typicalSqft: '60-100' },
++  porch: { roomLabel: 'Outer Lobby / Porch / Open Area', shortLabel: 'Outer Lobby', color: '#81C784', expandable: false, recommendedCells: 1, typicalSqft: '60-100' },
+   lawn: { roomLabel: 'Lawn / Garden', shortLabel: 'Lawn', color: '#AED581', expandable: true, recommendedCells: 2, typicalSqft: '100-200' },
+   verandah: { roomLabel: 'Verandah', shortLabel: 'Verandah', color: '#4DB6AC', expandable: false, recommendedCells: 1, typicalSqft: '60-100' },
+   backyard: { roomLabel: 'Backyard', shortLabel: 'Backyard', color: '#66BB6A', expandable: true, recommendedCells: 2, typicalSqft: '80-150' },
+@@ -97,6 +103,7 @@ const ROOM_LIBRARY: Record<string, RoomLibEntry> = {
+   bedroom: { roomLabel: 'Bedroom', shortLabel: 'Bedroom', color: '#7E57C2', expandable: false, recommendedCells: 1, typicalSqft: '100-160' },
+   bathroom: { roomLabel: 'Bathroom', shortLabel: 'Bath', color: '#78909C', expandable: false, recommendedCells: 1, typicalSqft: '30-50' },
+   staircase: { roomLabel: 'Living Lobby + Staircase', shortLabel: 'Stairs', color: '#8D6E63', expandable: true, recommendedCells: 2, typicalSqft: '60-100' },
++  diningStaircase: { roomLabel: 'Dining Hall + Staircase', shortLabel: 'Dining + Stairs', color: '#A1887F', expandable: true, recommendedCells: 2, typicalSqft: '80-130' },
+   dining: { roomLabel: 'Dining Hall', shortLabel: 'Dining', color: '#FFCA28', expandable: false, recommendedCells: 1, typicalSqft: '80-120' },
+   commonBath: { roomLabel: 'Common Bathroom', shortLabel: 'C.Bath', color: '#546E7A', expandable: false, recommendedCells: 1, typicalSqft: '30-50' },
+   icu: { roomLabel: 'Home ICU + Caretaker Unit', shortLabel: 'ICU', color: '#EF5350', expandable: true, recommendedCells: 2, typicalSqft: '180-250' },
+@@ -113,10 +120,10 @@ const ROOM_LIBRARY: Record<string, RoomLibEntry> = {
+   ff_stairLanding: { roomLabel: '1F Stair Landing', shortLabel: '1F Stairs', color: '#8D6E63', expandable: false, recommendedCells: 1, typicalSqft: '40-60' },
+ };
+ 
+-const GF_14_IDS = [
++const GF_IDS = [
+   'porch', 'lawn', 'verandah', 'backyard', 'drawing', 'kitchen', 'living',
+   'masterBed', 'bedroom',
+-  'bathroom', 'staircase', 'dining', 'commonBath', 'icu', 'balcony', 'terrace',
++  'bathroom', 'staircase', 'diningStaircase', 'dining', 'icu', 'balcony', 'terrace',
+ ];
+ const FF_IDS = [
+   'ff_master', 'ff_bed2', 'ff_bed3', 'ff_living', 'ff_bathroom',
+@@ -153,18 +160,6 @@ interface FoundationQuestion {
+   parse?: (v: string) => any;
+ }
+ 
+-// ΓöÇΓöÇΓöÇ Compass Direction Helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+-
+-function getCompassSideLabels(facing: string) {
+-  const map: Record<string, { left: string; right: string }> = {
+-    North: { left: 'West', right: 'East' },
+-    South: { left: 'East', right: 'West' },
+-    East: { left: 'North', right: 'South' },
+-    West: { left: 'South', right: 'North' },
+-  };
+-  return map[facing] || map['South'];
+-}
+-
+ // ΓöÇΓöÇΓöÇ State Types ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ 
+ interface FloorData {
+@@ -244,8 +239,52 @@ function makeRoom(id: string): RoomComponent {
+   return { roomId: id, ...lib };
+ }
+ 
++const VALID_ROOM_IDS = new Set<string>([...GF_IDS, ...FF_IDS]);
++
++function normalizeRoomId(roomId: string | null | undefined): string | null {
++  if (!roomId) return null;
++  if (roomId === 'commonBath') return 'bathroom';
++  return roomId;
++}
++
++function sanitizeRoomQueue(queue: RoomComponent[]): RoomComponent[] {
++  const seen = new Set<string>();
++  const ids = queue
++    .map((r) => normalizeRoomId(r.roomId))
++    .filter((id): id is string => !!id && VALID_ROOM_IDS.has(id))
++    .filter((id) => {
++      if (seen.has(id)) return false;
++      seen.add(id);
++      return true;
++    });
++  return ids.map(makeRoom);
++}
++
++function sanitizePlacements(placements: PlacementRecord[]): PlacementRecord[] {
++  return placements.map((p) => {
++    const normalizedId = normalizeRoomId(p.roomId) || p.roomId;
++    const lib = ROOM_LIBRARY[normalizedId] || ROOM_LIBRARY[p.roomId];
++    return {
++      ...p,
++      roomId: normalizedId,
++      roomLabel: lib?.roomLabel || p.roomLabel,
++    };
++  });
++}
++
++function sanitizeGrid(grid: Record<string, GridCellState>): Record<string, GridCellState> {
++  const next: Record<string, GridCellState> = {};
++  for (const [key, cell] of Object.entries(grid)) {
++    next[key] = {
++      ...cell,
++      roomId: normalizeRoomId(cell.roomId),
++    };
++  }
++  return next;
++}
++
+ function generateGFQueue(): RoomComponent[] {
+-  return GF_14_IDS.map(makeRoom);
++  return GF_IDS.map(makeRoom);
+ }
+ 
+ function generateFFQueue(): RoomComponent[] {
+@@ -299,11 +338,17 @@ function clampRoomIndex(index: number, queueLength: number): number {
+ }
+ 
+ function sanitizeDraftState(draft: CompassState): CompassState {
+-  const queueLength = Array.isArray(draft.componentQueue) ? draft.componentQueue.length : 0;
++  const fallbackQueue = draft.currentFloor === 'first' ? generateFFQueue() : generateGFQueue();
++  const cleanedQueue = Array.isArray(draft.componentQueue) ? sanitizeRoomQueue(draft.componentQueue) : fallbackQueue;
++  const queue = cleanedQueue.length > 0 ? cleanedQueue : fallbackQueue;
++  const queueLength = queue.length;
+   return {
+     ...draft,
+     phase: draft.phase || 'foundation',
+     currentFloor: draft.currentFloor || 'ground',
++    grid: sanitizeGrid(draft.grid),
++    placements: Array.isArray(draft.placements) ? sanitizePlacements(draft.placements) : [],
++    componentQueue: queue,
+     currentIndex: clampRoomIndex(draft.currentIndex ?? 0, queueLength),
+     armed: false,
+     pendingExpansion: null,
+@@ -664,6 +709,16 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+   const [menuReady, setMenuReady] = useState(false);
+   const [confirmReplace, setConfirmReplace] = useState<{ cell: GridCellKey, oldRoomId: string, newRoomId: string } | null>(null);
+   const [confirmGenerate, setConfirmGenerate] = useState(false);
++  const [navHidden, setNavHidden] = useState(false);
++  const [refinementMode, setRefinementMode] = useState(false);
++  const [refinementTool, setRefinementTool] = useState<'overview' | 'split' | 'walls' | 'void'>('overview');
++  const [selectedRefinementCell, setSelectedRefinementCell] = useState<string | null>(null);
++  const [refinements, setRefinements] = useState<AdvancedRefinements>({
++    version: 2, subCellSplits: [], customEdges: [], voidMarkers: [],
++    caregiverAnnotations: [], vastuFlags: [], accessibilityMarkers: [],
++  });
++  const [splitPickingCell, setSplitPickingCell] = useState<string | null>(null);
++  const [splitPickingSide, setSplitPickingSide] = useState<'A' | 'B' | null>(null);
+   const isConfirmationOpen = !!confirmReplace || !!confirmGenerate;
+ 
+   const surveyProcessed = useRef(false);
+@@ -686,14 +741,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+   const cellWFt = Math.round(pw / GRID_COLS);
+   const cellDFt = Math.round(pd / GRID_ROWS);
+   const facing = state.foundation.facing || 'South';
+-  const sideLabels = getCompassSideLabels(facing);
+-  const oppositeFacingMap: Record<string, string> = {
+-    North: 'South',
+-    South: 'North',
+-    East: 'West',
+-    West: 'East',
+-  };
+-  const backDir = oppositeFacingMap[facing] || 'North';
++  const directions = getDirectionLabels(facing);
++  const sideLabels = directions;
++  const backDir = directions.back;
+   const isMultiFloor = state.numFloors === 'Multi-Floor';
+   const viewerSeedNotes = useMemo(() => {
+     const surveyObj = (ws.surveyData || {}) as Record<string, any>;
+@@ -976,6 +1026,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+       plot: { width_ft: pw, depth_ft: pd, facing, type: state.foundation.plotType, num_floors: state.numFloors },
+       cell_size_ft: { width: cellWFt, depth: cellDFt },
+       saved_at: new Date().toISOString(),
++      advanced_refinements: refinements,
+     };
+ 
+     if (state.currentFloor === 'first' && state.groundFloorData) {
+@@ -989,7 +1040,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+     }
+ 
+     const existing = ws.surveyData || {};
+-    ws.saveSurvey({ ...existing, compass_map: payload });
++    ws.saveSurvey({ ...existing, compass_map: payload, source: 'compass-map' });
+     if (typeof ws.snapshotSurvey === 'function') {
+       ws.snapshotSurvey({ ...existing, compass_map: payload, source: 'compass-map' });
+     }
+@@ -1034,10 +1085,85 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+       } : null,
+       state.currentFloor,
+     );
+-    setCompiledPayload(payload);
++    setCompiledPayload({ ...payload, advanced_refinements: refinements } as any);
+     setShowFloorPlanViewer(true);
+     onSpeak('Generating architectural floor plan...');
+-  }, [state, pw, pd, coveragePercent, onSpeak]);
++  }, [state, pw, pd, coveragePercent, onSpeak, refinements]);
++
++  // ΓöÇΓöÇ Refinement Handlers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
++  const handleSplit = useCallback((direction: SplitDirection) => {
++    if (!selectedRefinementCell) return;
++    const cellRoom = state.grid[selectedRefinementCell]?.roomId;
++    const defaultA = cellRoom || 'main';
++    setRefinements(prev => ({
++      ...prev,
++      subCellSplits: [
++        ...prev.subCellSplits.filter(s => s.parentCell !== selectedRefinementCell),
++        { parentCell: selectedRefinementCell, splitDirection: direction, roomA: defaultA, roomB: 'secondary' },
++      ],
++    }));
++    onSpeak(`Cell split ${direction}ly. Assign rooms to each half.`);
++    setSplitPickingCell(selectedRefinementCell);
++    setSplitPickingSide('A');
++  }, [selectedRefinementCell, state.grid, onSpeak]);
++
++  const [wallEdge, setWallEdge] = useState<'top' | 'right' | 'bottom' | 'left'>('right');
++
++  const handleWall = useCallback((wallType: WallEdgeType) => {
++    if (!selectedRefinementCell) return;
++    const edgeId = `edge_${selectedRefinementCell}_${wallEdge}`;
++    setRefinements(prev => ({
++      ...prev,
++      customEdges: [
++        ...prev.customEdges.filter(e => e.id !== edgeId),
++        { id: edgeId, boundary: [selectedRefinementCell, wallEdge], cells: [selectedRefinementCell, selectedRefinementCell], type: wallType },
++      ],
++    }));
++    const typeLabel = wallType.replace(/_/g, ' ');
++    onSpeak(`${typeLabel} set on ${wallEdge} edge`);
++    setSelectedRefinementCell(null);
++  }, [selectedRefinementCell, wallEdge, onSpeak]);
++
++  const handleVoid = useCallback(() => {
++    if (!selectedRefinementCell) return;
++    setRefinements(prev => {
++      const existing = prev.voidMarkers.find(v => v.cell === selectedRefinementCell);
++      if (existing) {
++        return { ...prev, voidMarkers: prev.voidMarkers.filter(v => v.cell !== selectedRefinementCell) };
++      }
++      return { ...prev, voidMarkers: [...prev.voidMarkers, { cell: selectedRefinementCell, type: 'open_to_below' }] };
++    });
++    onSpeak('Void marker toggled');
++    setSelectedRefinementCell(null);
++  }, [selectedRefinementCell, onSpeak]);
++
++  const handleSplitRoomAssign = useCallback((roomId: string) => {
++    if (!splitPickingCell || !splitPickingSide) return;
++    setRefinements(prev => ({
++      ...prev,
++      subCellSplits: prev.subCellSplits.map(s =>
++        s.parentCell === splitPickingCell
++          ? { ...s, [splitPickingSide === 'A' ? 'roomA' : 'roomB']: roomId }
++          : s
++      ),
++    }));
++    if (splitPickingSide === 'A') {
++      setSplitPickingSide('B');
++      onSpeak(`Room A set to ${ROOM_LIBRARY[roomId]?.shortLabel || roomId}. Now pick Room B.`);
++    } else {
++      setSplitPickingCell(null);
++      setSplitPickingSide(null);
++      onSpeak(`Room B set to ${ROOM_LIBRARY[roomId]?.shortLabel || roomId}. Split complete.`);
++    }
++  }, [splitPickingCell, splitPickingSide, onSpeak]);
++
++  // ΓöÇΓöÇ Hydrate refinements from survey data on mount ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
++  useEffect(() => {
++    const compassMap = (ws.surveyData as any)?.compass_map;
++    if (compassMap?.advanced_refinements) {
++      setRefinements(compassMap.advanced_refinements);
++    }
++  }, [ws.surveyData]);
+ 
+   // ΓöÇΓöÇΓöÇ Gaze Toggle ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   // ΓöÇΓöÇΓöÇ RENDER: Foundation Phase ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+@@ -1187,82 +1313,240 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+         display: 'flex', flexDirection: 'column',
+         zIndex: 50,
+         boxShadow: '-4px 0 20px rgba(0,0,0,0.4)',
+-        pointerEvents: isConfirmationOpen ? 'none' : 'auto',
++        pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
+       }}>
+-        {/* BUTTON 0: FLOOR TOGGLE */}
+-        <GazeButton id="strip-floor" gazeEnabled={isGazeEnabled && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+-          onClick={() => {
+-            if (isConfirmationOpen) return;
+-            if (isMultiFloor) {
+-              const next = state.currentFloor === 'ground' ? 'first' : 'ground';
+-              dispatch({ type: 'SWITCH_FLOOR', floor: next });
+-              onSpeak(`Switched to ${next} floor.`);
+-            } else {
+-              dws({ type: 'SET_NUM_FLOORS', value: 'Multi-Floor' });
+-              onSpeak('First floor mapping enabled.');
+-            }
+-          }}
+-          style={stripBtnStyle(true, state.currentFloor === 'ground' ? 'rgba(45,212,191,0.1)' : 'rgba(100,181,246,0.1)')}>
+-          {isMultiFloor ? (
+-            <>
+-              <div style={{ fontSize: '24px', opacity: 0.8 }}>{state.currentFloor === 'ground' ? 'GND' : '1F'}</div>
+-              <div style={{ fontSize: '12px', opacity: 0.5, fontWeight: 600 }}>SWITCH</div>
+-            </>
+-          ) : (
+-            <>
+-              <div style={{ fontSize: '24px', opacity: 0.8 }}>GND</div>
+-              <div style={{ fontSize: '11px', opacity: 0.5, fontWeight: 600, color: THEME.accent }}>+ ADD 1F</div>
+-            </>
+-          )}
+-        </GazeButton>
+-        {/* BUTTON 1: ROOMS (MENU) */}
+-        <GazeButton id="strip-rooms" gazeEnabled={isGazeEnabled && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+-          onClick={() => { setMenuOpen(true); onSpeak('Components menu.'); }}
+-          style={stripBtnStyle(true, 'linear-gradient(180deg, rgba(56,189,248,0.1) 0%, rgba(56,189,248,0.05) 100%)')}>
+-          <div style={{ fontSize: '28px', marginBottom: '-4px' }}>Γÿ░</div>
+-          <div>ROOMS</div>
+-        </GazeButton>
++        {refinementMode ? (
++          <>
++            {/* REFINEMENT MODE BUTTONS */}
++            {/* EXIT REFINE */}
++            <GazeButton id="strip-exit-refine" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
++              onClick={() => { setRefinementMode(false); setSelectedRefinementCell(null); setRefinementTool('overview'); onSpeak('Refinement off.'); }}
++              style={{ ...stripBtnStyle(true, 'rgba(239,83,80,0.15)'), color: '#EF5350' }}>
++              <div style={{ fontSize: '24px' }}>Γ£ò</div>
++              <div>EXIT</div>
++            </GazeButton>
+ 
+-        {/* BUTTON 2: NEXT / KEEP 1 */}
+-        {state.pendingExpansion ? (
+-          <GazeButton id="strip-keep" gazeEnabled={isGazeEnabled && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+-            onClick={() => dws({ type: 'EXPAND_ROOM', direction: 'none' })}
+-            style={{ ...stripBtnStyle(true, 'rgba(234, 179, 8, 0.15)'), color: '#FACC15' }}>
+-            <div style={{ fontSize: '24px' }}>TOP</div>
+-            <div>KEEP 1</div>
+-          </GazeButton>
++            {/* SPLIT TOOL */}
++            <GazeButton id="strip-split" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
++              onClick={() => {
++                if (refinementTool === 'split') { setRefinementTool('overview'); onSpeak('Split tool deselected.'); }
++                else { setRefinementTool('split'); onSpeak(selectedRefinementCell ? 'Choose V-Split or H-Split.' : 'Split tool active. Select a cell first.'); }
++              }}
++              style={{ ...stripBtnStyle(refinementTool === 'split', 'rgba(139,92,246,0.2)'), color: refinementTool === 'split' ? '#C4B5FD' : '#8B5CF6' }}>
++              <div style={{ fontSize: '24px' }}>Γ£é</div>
++              <div>SPLIT</div>
++            </GazeButton>
++
++            {/* Sub-buttons for SPLIT when a cell is selected and split tool is active */}
++            {refinementTool === 'split' && selectedRefinementCell && (
++              <>
++                <GazeButton id="strip-vsplit" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++                  onClick={() => handleSplit('vertical')}
++                  style={{ ...stripBtnStyle(true, 'rgba(139,92,246,0.12)'), color: '#C4B5FD', fontSize: '18px' }}>
++                  <div style={{ fontSize: '20px' }}>Γöâ</div>
++                  <div>V-SPLIT</div>
++                </GazeButton>
++                <GazeButton id="strip-hsplit" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++                  onClick={() => handleSplit('horizontal')}
++                  style={{ ...stripBtnStyle(true, 'rgba(139,92,246,0.12)'), color: '#C4B5FD', fontSize: '18px' }}>
++                  <div style={{ fontSize: '20px' }}>Γöü</div>
++                  <div>H-SPLIT</div>
++                </GazeButton>
++              </>
++            )}
++
++            {/* Split Room Picker */}
++            {splitPickingCell && splitPickingSide && (
++              <div style={{ width: '100%', borderBottom: '1px solid rgba(255,255,255,0.1)', maxHeight: '280px', overflowY: 'auto' }}>
++                <div style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 800, color: '#C4B5FD', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
++                  SET ROOM {splitPickingSide}
++                </div>
++                {(state.currentFloor === 'first' ? FF_IDS : GF_IDS).map(rid => (
++                  <GazeButton key={`pick-${rid}`} id={`pick-${rid}`} gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
++                    onClick={() => handleSplitRoomAssign(rid)}
++                    style={{
++                      width: '100%', borderRadius: 0, border: 'none', margin: 0,
++                      borderBottom: '1px solid rgba(255,255,255,0.05)',
++                      background: 'transparent', color: '#F8FAFC',
++                      fontSize: '13px', fontWeight: 700, padding: '10px 8px',
++                      display: 'flex', alignItems: 'center', gap: '8px',
++                    }}>
++                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: ROOM_LIBRARY[rid]?.color || '#555', flexShrink: 0 }} />
++                    {ROOM_LIBRARY[rid]?.shortLabel || rid}
++                  </GazeButton>
++                ))}
++              </div>
++            )}
++
++            {/* WALLS TOOL */}
++            <GazeButton id="strip-walls" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
++              onClick={() => {
++                if (refinementTool === 'walls') { setRefinementTool('overview'); onSpeak('Wall tool deselected.'); }
++                else { setRefinementTool('walls'); onSpeak(selectedRefinementCell ? 'Choose wall type.' : 'Wall tool active. Select a cell first.'); }
++              }}
++              style={{ ...stripBtnStyle(refinementTool === 'walls', 'rgba(45,212,191,0.15)'), color: refinementTool === 'walls' ? '#6EE7B7' : '#2DD4BF' }}>
++              <div style={{ fontSize: '22px' }}>ΓûÉ</div>
++              <div>WALLS</div>
++            </GazeButton>
++
++            {/* Sub-buttons for WALLS when a cell is selected and walls tool is active */}
++            {refinementTool === 'walls' && selectedRefinementCell && (
++              <>
++                <div style={{ display: 'flex', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
++                  {(['top', 'right', 'bottom', 'left'] as const).map(edge => (
++                    <GazeButton key={`edge-${edge}`} id={`strip-edge-${edge}`} gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
++                      onClick={() => { setWallEdge(edge); onSpeak(`${edge} edge selected`); }}
++                      style={{
++                        flex: 1, borderRadius: 0, border: 'none', margin: 0,
++                        background: wallEdge === edge ? 'rgba(45,212,191,0.2)' : 'transparent',
++                        color: wallEdge === edge ? '#2DD4BF' : '#64748B',
++                        fontSize: '11px', fontWeight: 800, padding: '8px 2px',
++                        display: 'flex', alignItems: 'center', justifyContent: 'center',
++                      }}>
++                      {edge.toUpperCase()}
++                    </GazeButton>
++                  ))}
++                </div>
++                <GazeButton id="strip-wall-full" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++                  onClick={() => handleWall('full_wall')}
++                  style={{ ...stripBtnStyle(true, 'rgba(45,212,191,0.08)'), color: '#6EE7B7', fontSize: '16px' }}>
++                  <div>FULL</div>
++                </GazeButton>
++                <GazeButton id="strip-wall-glass" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++                  onClick={() => handleWall('half_wall_glass')}
++                  style={{ ...stripBtnStyle(true, 'rgba(45,212,191,0.08)'), color: '#6EE7B7', fontSize: '16px' }}>
++                  <div>GLASS</div>
++                </GazeButton>
++                <GazeButton id="strip-wall-arch" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++                  onClick={() => handleWall('open_archway')}
++                  style={{ ...stripBtnStyle(true, 'rgba(45,212,191,0.08)'), color: '#6EE7B7', fontSize: '16px' }}>
++                  <div>ARCH</div>
++                </GazeButton>
++                <GazeButton id="strip-wall-remove" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++                  onClick={() => handleWall('no_wall')}
++                  style={{ ...stripBtnStyle(true, 'rgba(239,83,80,0.08)'), color: '#EF5350', fontSize: '16px' }}>
++                  <div>REMOVE</div>
++                </GazeButton>
++              </>
++            )}
++
++            {/* VOID TOOL */}
++            <GazeButton id="strip-void" gazeEnabled={isGazeEnabled && !!selectedRefinementCell && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++              onClick={() => { if (selectedRefinementCell) handleVoid(); else onSpeak('Select a cell first.'); }}
++              style={{ ...stripBtnStyle(!!selectedRefinementCell, 'rgba(251,191,36,0.12)'), color: selectedRefinementCell ? '#FBBF24' : '#64748B' }}>
++              <div style={{ fontSize: '22px' }}>Γ¼í</div>
++              <div>VOID</div>
++            </GazeButton>
++          </>
+         ) : (
+-          <GazeButton id="strip-next" gazeEnabled={isGazeEnabled && controlsUnlocked && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+-            onClick={() => {
+-              if (isConfirmationOpen) return;
+-              if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
+-              dws({ type: 'NEXT_ROOM' });
+-            }}
+-            style={{
+-              ...stripBtnStyle(controlsUnlocked, 'rgba(45,212,191,0.1)'),
+-              color: controlsUnlocked ? '#2DD4BF' : '#475569'
+-            }}>
+-            <div style={{ fontSize: '28px' }}>ΓåÆ</div>
+-            <div>NEXT</div>
+-          </GazeButton>
++          <>
++            {/* NORMAL PLACEMENT BUTTONS */}
++            {/* BUTTON 0: FLOOR TOGGLE */}
++            <GazeButton id="strip-floor" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
++              onClick={() => {
++                if (isConfirmationOpen) return;
++                if (isMultiFloor) {
++                  const next = state.currentFloor === 'ground' ? 'first' : 'ground';
++                  dispatch({ type: 'SWITCH_FLOOR', floor: next });
++                  onSpeak(`Switched to ${next} floor.`);
++                } else {
++                  dws({ type: 'SET_NUM_FLOORS', value: 'Multi-Floor' });
++                  onSpeak('First floor mapping enabled.');
++                }
++              }}
++              style={stripBtnStyle(true, state.currentFloor === 'ground' ? 'rgba(45,212,191,0.1)' : 'rgba(100,181,246,0.1)')}>
++              {isMultiFloor ? (
++                <>
++                  <div style={{ fontSize: '24px', opacity: 0.8 }}>{state.currentFloor === 'ground' ? 'GND' : '1F'}</div>
++                  <div style={{ fontSize: '12px', opacity: 0.5, fontWeight: 600 }}>SWITCH</div>
++                </>
++              ) : (
++                <>
++                  <div style={{ fontSize: '24px', opacity: 0.8 }}>GND</div>
++                  <div style={{ fontSize: '11px', opacity: 0.5, fontWeight: 600, color: THEME.accent }}>+ ADD 1F</div>
++                </>
++              )}
++            </GazeButton>
++            {/* BUTTON 1: ROOMS (MENU) */}
++            <GazeButton id="strip-rooms" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
++              onClick={() => { setMenuOpen(true); onSpeak('Components menu.'); }}
++              style={stripBtnStyle(true, 'linear-gradient(180deg, rgba(56,189,248,0.1) 0%, rgba(56,189,248,0.05) 100%)')}>
++              <div style={{ fontSize: '28px', marginBottom: '-4px' }}>Γÿ░</div>
++              <div>ROOMS</div>
++            </GazeButton>
++
++            {/* BUTTON 2: NEXT / KEEP 1 */}
++            {state.pendingExpansion ? (
++              <GazeButton id="strip-keep" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
++                onClick={() => dws({ type: 'EXPAND_ROOM', direction: 'none' })}
++                style={{ ...stripBtnStyle(true, 'rgba(234, 179, 8, 0.15)'), color: '#FACC15' }}>
++                <div style={{ fontSize: '24px' }}>TOP</div>
++                <div>KEEP 1</div>
++              </GazeButton>
++            ) : (
++              <GazeButton id="strip-next" gazeEnabled={isGazeEnabled && controlsUnlocked && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
++                onClick={() => {
++                  if (isConfirmationOpen) return;
++                  if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
++                  dws({ type: 'NEXT_ROOM' });
++                }}
++                style={{
++                  ...stripBtnStyle(controlsUnlocked, 'rgba(45,212,191,0.1)'),
++                  color: controlsUnlocked ? '#2DD4BF' : '#475569'
++                }}>
++                <div style={{ fontSize: '28px' }}>ΓåÆ</div>
++                <div>NEXT</div>
++              </GazeButton>
++            )}
++
++            {/* BUTTON 3: GENERATE */}
++            <GazeButton id="strip-generate" gazeEnabled={isGazeEnabled && controlsUnlocked && state.placements.length >= 2 && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++              onClick={() => {
++                if (isConfirmationOpen) return;
++                if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
++                if (state.placements.length < 2) { onSpeak('Place at least 2 rooms.'); return; }
++                setConfirmGenerate(true);
++                onSpeak('Do you really want to generate the floor plan?');
++              }}
++              style={{
++                ...stripBtnStyle(controlsUnlocked && state.placements.length >= 2, 'rgba(16,185,129,0.15)'),
++                borderBottom: 'none',
++                color: (controlsUnlocked && state.placements.length >= 2) ? '#10B981' : '#334155'
++              }}>
++              <div style={{ fontSize: '24px' }}>≡ƒô¥</div>
++              <div style={{ textAlign: 'center', lineHeight: 1.1 }}>GENERATE{'\n'}PLAN</div>
++            </GazeButton>
++          </>
+         )}
+ 
+-        {/* BUTTON 3: GENERATE */}
+-        <GazeButton id="strip-generate" gazeEnabled={isGazeEnabled && controlsUnlocked && state.placements.length >= 2 && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
++        {/* BUTTON 4: REFINE MAP ΓÇö toggles inline refinement mode */}
++        <GazeButton
++          id="strip-refine-map"
++          gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen}
++          gazeEnabledTimestamp={lastEnabledTimestamp}
++          isDarkMode
++          dwellTime={1000}
+           onClick={() => {
+-            if (isConfirmationOpen) return;
+-            if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
+-            if (state.placements.length < 2) { onSpeak('Place at least 2 rooms.'); return; }
+-            setConfirmGenerate(true);
+-            onSpeak('Do you really want to generate the floor plan?');
++            if (refinementMode) {
++              setRefinementMode(false);
++              setSelectedRefinementCell(null);
++              setRefinementTool('overview');
++              onSpeak('Refinement off.');
++            } else {
++              setRefinementMode(true);
++              onSpeak('Refinement mode. Select a cell.');
++            }
+           }}
+           style={{
+-            ...stripBtnStyle(controlsUnlocked && state.placements.length >= 2, 'rgba(16,185,129,0.15)'),
+-            borderBottom: 'none', // Last one
+-            color: (controlsUnlocked && state.placements.length >= 2) ? '#10B981' : '#334155'
+-          }}>
+-          <div style={{ fontSize: '24px' }}>≡ƒô¥</div>
+-          <div style={{ textAlign: 'center', lineHeight: 1.1 }}>GENERATE{'\n'}PLAN</div>
++            ...stripBtnStyle(refinementMode),
++            color: refinementMode ? '#FFFFFF' : '#8B5CF6',
++            border: refinementMode ? '2px solid #8B5CF6' : '1px solid rgba(139,92,246,0.3)',
++            background: refinementMode ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.08)',
++            borderBottom: 'none',
++          }}
++        >
++          <div style={{ fontSize: '18px' }}>Γ£é</div>
++          <span>REFINE MAP</span>
+         </GazeButton>
+       </div>
+     );
+@@ -1276,8 +1560,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+       flex: 1, // Fill available space
+       position: 'relative',
+       overflow: 'hidden',
+-      padding: '20px 440px 100px 40px', // Padded for Strip (200) + Rail (160) + Margins
+-      pointerEvents: isConfirmationOpen ? 'none' : 'auto',
++      padding: '10px 440px 100px 40px', // Padded for Strip (200) + Rail (160) + Margins ΓÇö top reduced, dead zone handles gap
++      pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
+     }}>
+       {/* Plot Area Container */}
+       <div style={{
+@@ -1338,9 +1622,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+               const { row, col } = parseCellKey(cellKey);
+               const isHov = hoveredCell === cellKey;
+ 
+-              const cellGaze = isExpTarget
+-                ? isGazeEnabled && expansionReady && !isConfirmationOpen
+-                : isGazeEnabled && state.phase === 'placement' && state.armed && !state.pendingExpansion && !!currentRoom && !isConfirmationOpen;
++              const cellGaze = refinementMode
++                ? isGazeEnabled && !isConfirmationOpen && !menuOpen
++                : isExpTarget
++                  ? isGazeEnabled && expansionReady && !isConfirmationOpen && !menuOpen
++                  : isGazeEnabled && state.phase === 'placement' && state.armed && !state.pendingExpansion && !!currentRoom && !isConfirmationOpen && !menuOpen;
+ 
+               const getNeighborRoom = (r: number, c: number): string | null => {
+                 if (r < 1 || r > GRID_ROWS || c < 1 || c > GRID_COLS) return null;
+@@ -1356,6 +1642,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+                   onDwellComplete={() => { setHoveredCell(null); cancelCellDwell(); }}
+                   onClick={() => {
+                     if (isConfirmationOpen) return;
++                    // Refinement mode ΓÇö select/deselect cells
++                    if (refinementMode) {
++                      setSelectedRefinementCell(prev => prev === cellKey ? null : cellKey);
++                      return;
++                    }
+                     if (isExpTarget && expDir) { dws({ type: 'EXPAND_ROOM', direction: expDir }); return; }
+                     if (state.phase !== 'placement') return;
+                     if (state.pendingExpansion) { onSpeak('Choose expansion direction.'); return; }
+@@ -1388,6 +1679,78 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+                     neighborN={getNeighborRoom(row + 1, col)} neighborS={getNeighborRoom(row - 1, col)}
+                     neighborE={getNeighborRoom(row, col + 1)} neighborW={getNeighborRoom(row, col - 1)}
+                   />
++                  {/* Refinement visual indicators */}
++                  {refinementMode && (
++                    <>
++                      {/* Selection highlight */}
++                      {selectedRefinementCell === cellKey && (
++                        <div style={{ position: 'absolute', inset: 0, border: '3px solid #2DD4BF', boxShadow: 'inset 0 0 12px rgba(45,212,191,0.35)', zIndex: 15, pointerEvents: 'none', borderRadius: '2px' }} />
++                      )}
++                      {/* Split indicator ΓÇö colored halves + dashed divider */}
++                      {(() => {
++                        const split = refinements.subCellSplits.find(s => s.parentCell === cellKey);
++                        if (!split) return null;
++                        const colorA = ROOM_LIBRARY[split.roomA]?.color || '#8B5CF6';
++                        const colorB = ROOM_LIBRARY[split.roomB]?.color || '#64748B';
++                        const labelA = ROOM_LIBRARY[split.roomA]?.shortLabel || split.roomA;
++                        const labelB = ROOM_LIBRARY[split.roomB]?.shortLabel || split.roomB;
++                        const isVert = split.splitDirection === 'vertical';
++                        return (
++                          <>
++                            {/* Room A tint */}
++                            <div style={{
++                              position: 'absolute', zIndex: 13, pointerEvents: 'none',
++                              ...(isVert
++                                ? { top: 0, bottom: 0, left: 0, width: '50%' }
++                                : { top: 0, left: 0, right: 0, height: '50%' }),
++                              background: `${colorA}33`,
++                              display: 'flex', alignItems: 'center', justifyContent: 'center',
++                            }}>
++                              <span style={{ fontSize: '9px', fontWeight: 800, color: colorA, textShadow: '0 0 4px rgba(0,0,0,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90%', textAlign: 'center' }}>{labelA}</span>
++                            </div>
++                            {/* Room B tint */}
++                            <div style={{
++                              position: 'absolute', zIndex: 13, pointerEvents: 'none',
++                              ...(isVert
++                                ? { top: 0, bottom: 0, right: 0, width: '50%' }
++                                : { bottom: 0, left: 0, right: 0, height: '50%' }),
++                              background: `${colorB}33`,
++                              display: 'flex', alignItems: 'center', justifyContent: 'center',
++                            }}>
++                              <span style={{ fontSize: '9px', fontWeight: 800, color: colorB, textShadow: '0 0 4px rgba(0,0,0,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90%', textAlign: 'center' }}>{labelB}</span>
++                            </div>
++                            {/* Dashed divider line */}
++                            <div style={{
++                              position: 'absolute', zIndex: 14, pointerEvents: 'none',
++                              ...(isVert
++                                ? { top: 0, bottom: 0, left: '50%', width: '2px', borderLeft: '2px dashed #8B5CF6' }
++                                : { left: 0, right: 0, top: '50%', height: '2px', borderTop: '2px dashed #8B5CF6' }),
++                            }} />
++                          </>
++                        );
++                      })()}
++                      {/* Wall edge indicator ΓÇö colored bar on specified edge */}
++                      {refinements.customEdges.filter(e => e.cells[0] === cellKey).map(edge => {
++                        const edgeColor = edge.type === 'full_wall' ? '#2DD4BF' : edge.type === 'half_wall_glass' ? '#10B981' : edge.type === 'open_archway' ? '#FBBF24' : '#EF5350';
++                        const side = edge.boundary[1] || 'right';
++                        const posStyle = side === 'top' ? { top: 0, left: 0, right: 0, height: '3px' }
++                          : side === 'bottom' ? { bottom: 0, left: 0, right: 0, height: '3px' }
++                          : side === 'left' ? { top: 0, left: 0, bottom: 0, width: '3px' }
++                          : { top: 0, right: 0, bottom: 0, width: '3px' };
++                        return <div key={edge.id} style={{ position: 'absolute', ...posStyle, background: edgeColor, zIndex: 14, pointerEvents: 'none' }} />;
++                      })}
++                      {/* Void indicator ΓÇö diagonal stripes + text */}
++                      {refinements.voidMarkers.find(v => v.cell === cellKey) && (
++                        <div style={{
++                          position: 'absolute', inset: 0, zIndex: 14, pointerEvents: 'none',
++                          background: 'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(251,191,36,0.2) 6px, rgba(251,191,36,0.2) 12px)',
++                          display: 'flex', alignItems: 'center', justifyContent: 'center',
++                        }}>
++                          <span style={{ fontSize: '10px', fontWeight: 900, color: '#FBBF24', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '3px' }}>VOID</span>
++                        </div>
++                      )}
++                    </>
++                  )}
+                   {dwellingCell === cellKey && dwellProgress > 0 && (
+                     <div style={{ position: 'absolute', bottom: 0, left: 0, width: `${dwellProgress}%`, height: '4px', background: '#2DD4BF', zIndex: 20 }} />
+                   )}
+@@ -1414,7 +1777,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+             <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${100 / GRID_COLS}%`, padding: '6px' }}>
+               <GazeButton
+                 id="ready-road-left"
+-                gazeEnabled={isGazeEnabled && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
++                gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+                 onClick={() => {
+                   if (isConfirmationOpen) return;
+                   if (state.armed) { dws({ type: 'DISARM_GRID' }); } else { dws({ type: 'ARM_GRID' }); }
+@@ -1442,7 +1805,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+             <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '20%', padding: '6px 8px' }}>
+               <GazeButton
+                 id="save-road"
+-                gazeEnabled={isGazeEnabled && (state.phase === 'placement' || state.phase === 'review') && !isConfirmationOpen}
++                gazeEnabled={isGazeEnabled && (state.phase === 'placement' || state.phase === 'review') && !isConfirmationOpen && !menuOpen}
+                 gazeEnabledTimestamp={lastEnabledTimestamp}
+                 isDarkMode
+                 dwellTime={1000}
+@@ -1628,7 +1991,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+               const isCurr = idx === state.currentIndex;
+               const lib = ROOM_LIBRARY[room.roomId];
+               return (
+-                <GazeButton key={`m-${room.roomId}-${idx}`} id={`m-${room.roomId}-${idx}`} gazeEnabled={isGazeEnabled && menuCardsEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
++                <GazeButton key={`m-${room.roomId}-${idx}`} id={`m-${room.roomId}-${idx}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+                   onClick={() => {
+                     if (!menuCardsEnabled) {
+                       onSpeak('Press READY first, then select a room.');
+@@ -1646,7 +2009,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+                     width: '100%',
+                     height: '100%',
+                     minHeight: 'clamp(108px, 11.5vh, 158px)',
+-                    padding: 'clamp(18px, 2.2vh, 34px) clamp(16px, 1.5vw, 26px)',
++                    padding: 'clamp(12px, 1.6vh, 22px) clamp(12px, 1.1vw, 18px)',
+                     borderRadius: 0,
+                     background: !menuCardsEnabled ? 'rgba(17,24,39,0.65)' : isCurr ? 'rgba(45,212,191,0.18)' : isPlaced ? 'rgba(30,41,59,0.96)' : 'rgba(17,24,39,0.94)',
+                     border: 'none',
+@@ -1660,28 +2023,28 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+                     flexDirection: 'column',
+                     alignItems: 'center',
+                     justifyContent: 'center',
+-                    gap: 'clamp(8px, 1vh, 14px)',
++                    gap: 'clamp(6px, 0.8vh, 10px)',
+                     textAlign: 'center',
+                   }}>
+                   {/* Room name row */}
+-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'clamp(8px, 1vh, 12px)' }}>
+-                    <div style={{ width: 'clamp(18px, 2.2vh, 24px)', height: 'clamp(18px, 2.2vh, 24px)', borderRadius: '5px', background: lib?.color || '#555', flexShrink: 0 }} />
+-                    <span style={{ fontSize: 'clamp(30px, 3.7vh, 50px)', fontWeight: 900, letterSpacing: '0.6px', lineHeight: 1.02, fontFamily: 'system-ui, -apple-system, sans-serif', textAlign: 'center' }}>
++                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'clamp(6px, 0.8vh, 10px)', width: '100%' }}>
++                    <div style={{ width: 'clamp(14px, 1.7vh, 20px)', height: 'clamp(14px, 1.7vh, 20px)', borderRadius: '4px', background: lib?.color || '#555', flexShrink: 0 }} />
++                    <span style={{ fontSize: 'clamp(20px, 2.5vh, 40px)', fontWeight: 900, letterSpacing: '0.4px', lineHeight: 1.06, fontFamily: 'system-ui, -apple-system, sans-serif', textAlign: 'center', width: '100%', overflowWrap: 'anywhere' }}>
+                       {room.roomLabel}
+                     </span>
+                   </div>
+                   {/* Status row */}
+                   <div>
+                     {isCurr ? (
+-                      <span style={{ fontSize: 'clamp(16px, 1.95vh, 26px)', fontWeight: 900, color: THEME.accent }}>
++                      <span style={{ fontSize: 'clamp(13px, 1.55vh, 20px)', fontWeight: 900, color: THEME.accent }}>
+                         {'\u25CF'} CURRENT {pl ? `- ${pl.occupiedCells.length} cell${pl.occupiedCells.length === 1 ? '' : 's'}` : ''}
+                       </span>
+                     ) : isPlaced ? (
+-                      <span style={{ fontSize: 'clamp(16px, 1.95vh, 26px)', fontWeight: 900, color: lib?.color || THEME.success }}>
++                      <span style={{ fontSize: 'clamp(13px, 1.55vh, 20px)', fontWeight: 900, color: lib?.color || THEME.success }}>
+                         {'\u2713'} PLACED {'\u2014'} {pl?.occupiedCells.length || 0} cells
+                       </span>
+                     ) : (
+-                      <span style={{ fontSize: 'clamp(16px, 1.95vh, 26px)', fontWeight: 800, color: '#CBD5E1' }}>
++                      <span style={{ fontSize: 'clamp(13px, 1.55vh, 20px)', fontWeight: 800, color: '#CBD5E1' }}>
+                         UNPLACED
+                       </span>
+                     )}
+@@ -1768,15 +2131,68 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+   // ΓöÇΓöÇΓöÇ MAIN RENDER ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   return (
+     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: THEME.bg, display: 'flex', flexDirection: 'column' }}>
+-      <div style={{ pointerEvents: isConfirmationOpen ? 'none' : 'auto' }}>
+-        <GlobalNavBar currentPage="compass-map" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+-      </div>
+-      {renderContextOverlay()}
++      {!menuOpen && !navHidden && (
++        <div style={{ pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto' }}>
++          <GlobalNavBar currentPage="compass-map" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} compact={true} />
++        </div>
++      )}
++      {/* Dead zone: 30px non-interactive gap between nav bar and content ΓÇö prevents accidental nav clicks when targeting top-row compass cells */}
++      {!menuOpen && !navHidden && (
++        <div
++          data-gaze="false"
++          style={{ height: '30px', pointerEvents: 'none', flexShrink: 0 }}
++        />
++      )}
++      {/* Floating NAV restore button ΓÇö shown when nav is hidden */}
++      {!menuOpen && navHidden && (
++        <GazeButton
++          id="nav-restore"
++          gazeEnabled={isGazeEnabled}
++          gazeEnabledTimestamp={lastEnabledTimestamp}
++          isDarkMode
++          alwaysActive
++          dwellTime={1200}
++          onClick={() => { setNavHidden(false); onSpeak('Navigation restored.'); }}
++          style={{
++            position: 'fixed', top: '14px', right: '16px', zIndex: 100,
++            width: '80px', height: '80px', borderRadius: '50%',
++            background: 'rgba(15, 23, 42, 0.85)',
++            border: '2px solid rgba(45, 212, 191, 0.4)',
++            color: '#2DD4BF', fontSize: '14px', fontWeight: 800,
++            display: 'flex', alignItems: 'center', justifyContent: 'center',
++            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
++          }}
++        >
++          NAV
++        </GazeButton>
++      )}
++      {/* Floating HIDE NAV button ΓÇö shown when nav is visible, same top-right position */}
++      {!menuOpen && !navHidden && (state.phase === 'placement' || state.phase === 'review') && (
++        <GazeButton
++          id="hide-nav-btn"
++          gazeEnabled={isGazeEnabled}
++          gazeEnabledTimestamp={lastEnabledTimestamp}
++          isDarkMode
++          dwellTime={1400}
++          onClick={() => { setNavHidden(true); onSpeak('Navigation hidden. Look at NAV button to restore.'); }}
++          style={{
++            position: 'fixed', top: '14px', right: '16px', zIndex: 100,
++            padding: '6px 14px', borderRadius: '8px',
++            background: 'rgba(15, 23, 42, 0.85)',
++            border: '1px solid rgba(100, 116, 139, 0.3)',
++            color: '#64748B', fontSize: '11px', fontWeight: 600,
++            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
++          }}
++        >
++          HIDE NAV
++        </GazeButton>
++      )}
++      {!menuOpen && renderContextOverlay()}
+ 
+       {state.phase === 'foundation' && renderFoundation()}
+ 
+-      {(state.phase === 'placement' || (state.phase === 'review' && !showFloorTransition)) && (
+-        <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, overflow: 'hidden', position: 'relative', pointerEvents: isConfirmationOpen ? 'none' : 'auto' }}>
++      {!menuOpen && (state.phase === 'placement' || (state.phase === 'review' && !showFloorTransition)) && (
++        <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, overflow: 'hidden', position: 'relative', pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto' }}>
+           {/* LEFT: Plot Canvas + Info Overlays */}
+           <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+             {renderPlotCanvas()}
+@@ -1791,7 +2207,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
+         </div>
+       )}
+ 
+-      {showFloorTransition && renderFloorTransition()}
++      {!menuOpen && showFloorTransition && renderFloorTransition()}
+ 
+       {renderMenu()}
+       {renderConfirmationOverlay()}

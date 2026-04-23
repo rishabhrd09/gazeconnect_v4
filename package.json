@@ -1,0 +1,98 @@
+{
+  "name": "gazeconnect-pro",
+  "version": "4.8.0",
+  "description": "Medical-grade eye-gaze AAC application for ALS patients",
+  "main": "dist-electron/main.js",
+  "author": "GazeConnect Team",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "npm-run-all --parallel dev electron:dev",
+    "build": "tsc && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "electron:dev": "node dev-wait.js && tsc -p tsconfig.electron.json && electron .",
+    "electron:build": "npm run build && npm run build:electron && electron-builder",
+    "preview": "vite preview",
+    "start": "npm-run-all --parallel dev:electron",
+    "start:ui-only": "vite",
+    "floorplan": "python tools/gazeconnect_floorplan_v5.py",
+    "floorplan:sample": "python tools/gazeconnect_floorplan_v5.py --sample --all-styles -o ./output",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.gazeconnect.pro",
+    "productName": "GazeConnect Pro",
+    "copyright": "Copyright © 2025 GazeConnect Team",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python-dist",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "tobii-dist",
+        "to": "tobii-helper",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GazeConnect Pro"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

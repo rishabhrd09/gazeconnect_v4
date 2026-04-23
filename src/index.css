@@ -1,0 +1,98 @@
+/* GazeConnect Pro - Global Styles */
+/* WCAG 2.1 AA Compliant */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  background-color: #0D1117;
+  color: #E6EDF3;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Remove focus outlines for mouse/gaze - add them back for keyboard */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid #58A6FF;
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #161B22;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #30363D;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #484F58;
+}
+
+/* No text selection in AAC mode */
+.aac-mode * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Smooth transitions globally */
+button,
+[role="button"] {
+  transition: transform 100ms ease-out, background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  body {
+    --border-width: 3px;
+  }
+  
+  button,
+  [role="button"] {
+    border-width: 3px !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

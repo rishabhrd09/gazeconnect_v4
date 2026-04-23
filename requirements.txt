@@ -1,0 +1,5 @@
+# GazeConnect Pro - Unified Python dependency entrypoint
+# setup.bat installs this file so one command prepares backend + floorplan stack.
+#
+# Package versions are maintained in python/requirements.txt.
+-r python/requirements.txt

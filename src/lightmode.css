@@ -1,0 +1,707 @@
+/**
+ * GazeConnect Pro - Light Mode (Sarvam Sunrise Palette)
+ * =====================================================
+ * CSS-only overrides scoped to [data-theme="light"].
+ * Uses !important to override inline styles from JSX.
+ *
+ * FROZEN — ONLY these properties may change:
+ *   background / background-color / background-image (gradients)
+ *   color (text only)
+ *   font-family (NOT font-size, NOT font-weight)
+ *   border-color (NOT border-width or border-style)
+ *   box-shadow
+ *   backdrop-filter
+ *   opacity of decorative non-interactive elements
+ *   fill/stroke of decorative SVGs only
+ *
+ * AAC REQUIREMENTS:
+ *   All text contrast >= 4.5:1 against light backgrounds
+ *   Gaze cursor: rgba(28,25,23,0.85) with saffron ring
+ *   Dwell ring: #F97316 saffron on light bg
+ *   No decorative element within 40px of any gaze target
+ *   All decorative SVGs: pointer-events:none, z-index:0
+ *   No new transition longer than 300ms
+ */
+
+/* ═══════════════════════════════════════════════════════
+   CSS CUSTOM PROPERTIES — LIGHT MODE ONLY
+   Dark mode uses hardcoded values in index.css and
+   inline styles. These variables ONLY exist when light.
+   ═══════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  /* Sarvam Sunrise Palette */
+  --lm-saffron:       #F97316;
+  --lm-amber:         #F59E0B;
+  --lm-coral:         #FB7185;
+  --lm-sage:          #34D399;
+  --lm-indigo:        #6366F1;
+
+  /* Surfaces */
+  --lm-surface:       #FEFDFB;
+  --lm-surface-warm:  #FFF8F0;
+  --lm-glass:         rgba(255, 255, 255, 0.82);
+  --lm-glass-warm:    rgba(255, 248, 235, 0.82);
+
+  /* Gradients */
+  --lm-bg-home:       linear-gradient(155deg, #FFF7ED 0%, #FEF3C7 30%, #F3F0FF 65%, #EEF2FF 100%);
+  --lm-bg-hub:        linear-gradient(155deg, #FFF7ED 0%, #FEFCE8 40%, #EDE9FE 100%);
+  --lm-bg-generic:    linear-gradient(155deg, #FDFAF6 0%, #FFF3E0 50%, #F0F4FF 100%);
+
+  /* Card gradients */
+  --lm-card-comm:     linear-gradient(145deg, #FFF7ED, #FDE8D8);
+  --lm-card-keyboard: linear-gradient(145deg, #FEFCE8, #FEF3C7);
+  --lm-card-people:   linear-gradient(145deg, #FFF1F2, #FFE0E4);
+  --lm-card-web:      linear-gradient(145deg, #EEF2FF, #E0E7FF);
+  --lm-card-design:   linear-gradient(145deg, #ECFDF5, #D1FAE5);
+  --lm-card-activities: linear-gradient(145deg, #F0F9FF, #BAE6FD);
+  --lm-card-settings: linear-gradient(145deg, #F8FAFC, #F1F5F9);
+  --lm-card-assist:   linear-gradient(145deg, #FFFBEB, #FDE68A);
+  --lm-card-news:     linear-gradient(145deg, #FFF7ED 0%, #FFEDD5 100%);
+  --lm-card-youtube:  linear-gradient(145deg, #FFF1F2 0%, #FFE4E6 100%);
+  --lm-card-know:     linear-gradient(145deg, #F0FDF4 0%, #DCFCE7 100%);
+  --lm-card-search:   linear-gradient(145deg, #FFFBEB 0%, #FEF9C3 100%);
+  --lm-card-wa:       linear-gradient(145deg, #F0FDF4 0%, #D1FAE5 100%);
+  --lm-card-social:   linear-gradient(145deg, #EEF2FF 0%, #E0E7FF 100%);
+
+  /* Text */
+  --lm-text:          #1C1917;
+  --lm-text-2:        #44403C;
+  --lm-text-3:        #78716C;
+  --lm-text-muted:    #A8A29E;
+  --lm-text-hindi:    #57534E;
+
+  /* Borders */
+  --lm-border:        rgba(28, 25, 23, 0.08);
+  --lm-border-warm:   rgba(249, 115, 22, 0.18);
+  --lm-border-card:   rgba(28, 25, 23, 0.07);
+
+  /* Shadows */
+  --lm-shadow-sm:     0 1px 4px rgba(28,25,23,0.06);
+  --lm-shadow-card:   0 2px 20px rgba(249,115,22,0.09),
+                      0 1px 4px rgba(28,25,23,0.05);
+  --lm-shadow-hover:  0 8px 36px rgba(249,115,22,0.18),
+                      0 2px 8px rgba(28,25,23,0.07);
+  --lm-shadow-float:  0 4px 28px rgba(28,25,23,0.13);
+
+  /* Fonts */
+  --lm-font-en:   'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --lm-font-hi:   'Baloo 2', 'Noto Sans Devanagari', sans-serif;
+  --lm-font-num:  'Orbitron', monospace;
+
+  /* Accent border colors per category */
+  --lm-accent-comm:   rgba(234, 88, 12, 0.20);
+  --lm-accent-key:    rgba(217, 119, 6, 0.20);
+  --lm-accent-people: rgba(225, 29, 72, 0.20);
+  --lm-accent-web:    rgba(99, 102, 241, 0.20);
+  --lm-accent-design: rgba(16, 185, 129, 0.20);
+  --lm-accent-act:    rgba(14, 165, 233, 0.20);
+  --lm-accent-set:    rgba(100, 116, 139, 0.15);
+  --lm-accent-asst:   rgba(245, 158, 11, 0.20);
+  --lm-accent-news:   rgba(234, 88, 12, 0.22);
+  --lm-accent-yt:     rgba(220, 38, 38, 0.22);
+  --lm-accent-know:   rgba(22, 163, 74, 0.22);
+  --lm-accent-search: rgba(217, 119, 6, 0.22);
+  --lm-accent-wa:     rgba(21, 128, 61, 0.22);
+  --lm-accent-social: rgba(99, 102, 241, 0.22);
+
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLOBAL BODY OVERRIDE
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] body,
+html.theme-light body {
+  background-color: #FAF8F5 !important;
+  color: #1C1917 !important;
+}
+
+/* Scrollbar */
+html[data-theme="light"] ::-webkit-scrollbar-track,
+html.theme-light ::-webkit-scrollbar-track {
+  background: #F0EDE8 !important;
+}
+html[data-theme="light"] ::-webkit-scrollbar-thumb,
+html.theme-light ::-webkit-scrollbar-thumb {
+  background: #C8C2BA !important;
+}
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover,
+html.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: #AEA8A0 !important;
+}
+
+/* Focus ring */
+html[data-theme="light"] :focus-visible,
+html.theme-light :focus-visible {
+  outline-color: var(--lm-saffron) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   HOME SCREEN
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .home-screen,
+html.theme-light .home-screen {
+  background: var(--lm-bg-home) !important;
+}
+
+/* GAZECONNECT brand text */
+html[data-theme="light"] .brand-title,
+html.theme-light .brand-title {
+  color: var(--lm-saffron) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+/* Main grid cards */
+html[data-theme="light"] .grid-card,
+html.theme-light .grid-card {
+  box-shadow: var(--lm-shadow-card) !important;
+  border-color: var(--lm-border-card) !important;
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+/* Individual card backgrounds */
+html[data-theme="light"] .grid-card-communication,
+html.theme-light .grid-card-communication {
+  background: var(--lm-card-comm) !important;
+  border-color: var(--lm-accent-comm) !important;
+}
+html[data-theme="light"] .grid-card-keyboard,
+html.theme-light .grid-card-keyboard {
+  background: var(--lm-card-keyboard) !important;
+  border-color: var(--lm-accent-key) !important;
+}
+html[data-theme="light"] .grid-card-people,
+html.theme-light .grid-card-people {
+  background: var(--lm-card-people) !important;
+  border-color: var(--lm-accent-people) !important;
+}
+html[data-theme="light"] .grid-card-web,
+html.theme-light .grid-card-web {
+  background: var(--lm-card-web) !important;
+  border-color: var(--lm-accent-web) !important;
+}
+html[data-theme="light"] .grid-card-design,
+html.theme-light .grid-card-design {
+  background: var(--lm-card-design) !important;
+  border-color: var(--lm-accent-design) !important;
+}
+html[data-theme="light"] .grid-card-activities,
+html.theme-light .grid-card-activities {
+  background: var(--lm-card-activities) !important;
+  border-color: var(--lm-accent-act) !important;
+}
+html[data-theme="light"] .grid-card-settings,
+html.theme-light .grid-card-settings {
+  background: var(--lm-card-settings) !important;
+  border-color: var(--lm-accent-set) !important;
+}
+html[data-theme="light"] .grid-card-assistance,
+html.theme-light .grid-card-assistance {
+  background: var(--lm-card-assist) !important;
+  border-color: var(--lm-accent-asst) !important;
+}
+/* SOS card: NEVER TOUCHED */
+
+/* Card text labels */
+html[data-theme="light"] .grid-card-label,
+html.theme-light .grid-card-label {
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+/* Card dwell hover */
+html[data-theme="light"] .grid-card:hover,
+html.theme-light .grid-card:hover {
+  box-shadow: var(--lm-shadow-hover) !important;
+}
+
+/* Quick access buttons (Pain, Fever, etc.) */
+html[data-theme="light"] .quick-access-btn,
+html.theme-light .quick-access-btn {
+  background: var(--lm-glass-warm) !important;
+  border-color: var(--lm-border-warm) !important;
+  box-shadow: var(--lm-shadow-sm) !important;
+}
+
+html[data-theme="light"] .quick-access-btn:hover,
+html.theme-light .quick-access-btn:hover {
+  box-shadow: var(--lm-shadow-card) !important;
+  background: var(--lm-surface-warm) !important;
+}
+
+/* YES / ENABLEGAZE / NO buttons — colors updated, sizes FROZEN */
+html[data-theme="light"] .yes-btn,
+html.theme-light .yes-btn {
+  background: linear-gradient(135deg, #16A34A, #15803D) !important;
+  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.32) !important;
+  color: #FFFFFF !important;
+}
+
+html[data-theme="light"] .enablegaze-btn,
+html.theme-light .enablegaze-btn {
+  background: linear-gradient(135deg, #F97316, #F59E0B) !important;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.32) !important;
+  color: #FFFFFF !important;
+}
+
+html[data-theme="light"] .no-btn,
+html.theme-light .no-btn {
+  background: linear-gradient(135deg, #DC2626, #B91C1C) !important;
+  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.32) !important;
+  color: #FFFFFF !important;
+}
+
+/* Magnified text overlay (spoken word confirmation) */
+html[data-theme="light"] .magnify-overlay,
+html.theme-light .magnify-overlay {
+  background: rgba(255, 252, 248, 0.95) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  box-shadow: 0 8px 60px rgba(28, 25, 23, 0.15), 0 0 30px rgba(249, 115, 22, 0.1) !important;
+  backdrop-filter: blur(16px) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLOBAL NAV BAR
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .nav-bar-container,
+html.theme-light .nav-bar-container {
+  /* No bg change — inherits from screen */
+}
+
+html[data-theme="light"] .nav-pill,
+html.theme-light .nav-pill {
+  background: var(--lm-glass) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: var(--lm-border) !important;
+  box-shadow: var(--lm-shadow-card) !important;
+}
+
+html[data-theme="light"] .nav-btn,
+html.theme-light .nav-btn {
+  color: var(--lm-text-2) !important;
+  background: transparent !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .nav-btn:hover,
+html.theme-light .nav-btn:hover {
+  background: rgba(249, 115, 22, 0.09) !important;
+  color: var(--lm-saffron) !important;
+}
+
+html[data-theme="light"] .nav-btn-active,
+html.theme-light .nav-btn-active {
+  color: var(--lm-saffron) !important;
+  background: rgba(249, 115, 22, 0.08) !important;
+}
+
+/* Window controls (minimize/close) */
+html[data-theme="light"] .window-control-btn,
+html.theme-light .window-control-btn {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #666 !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   WEB BROWSING HUB SCREEN
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .web-hub-screen,
+html.theme-light .web-hub-screen {
+  background: var(--lm-bg-hub) !important;
+}
+
+html[data-theme="light"] .hub-card,
+html.theme-light .hub-card {
+  box-shadow: var(--lm-shadow-card) !important;
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .hub-card-news,
+html.theme-light .hub-card-news {
+  background: var(--lm-card-news) !important;
+  border-color: var(--lm-accent-news) !important;
+}
+html[data-theme="light"] .hub-card-youtube,
+html.theme-light .hub-card-youtube {
+  background: var(--lm-card-youtube) !important;
+  border-color: var(--lm-accent-yt) !important;
+}
+html[data-theme="light"] .hub-card-knowledge,
+html.theme-light .hub-card-knowledge {
+  background: var(--lm-card-know) !important;
+  border-color: var(--lm-accent-know) !important;
+}
+html[data-theme="light"] .hub-card-search,
+html.theme-light .hub-card-search {
+  background: var(--lm-card-search) !important;
+  border-color: var(--lm-accent-search) !important;
+}
+html[data-theme="light"] .hub-card-whatsapp,
+html.theme-light .hub-card-whatsapp {
+  background: var(--lm-card-wa) !important;
+  border-color: var(--lm-accent-wa) !important;
+}
+html[data-theme="light"] .hub-card-social,
+html.theme-light .hub-card-social {
+  background: var(--lm-card-social) !important;
+  border-color: var(--lm-accent-social) !important;
+}
+
+html[data-theme="light"] .hub-card-label,
+html.theme-light .hub-card-label {
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .hub-card-label-hi,
+html.theme-light .hub-card-label-hi {
+  color: var(--lm-text-hindi) !important;
+  font-family: var(--lm-font-hi) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   KEYBOARD SCREEN
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .keyboard-screen,
+html.theme-light .keyboard-screen {
+  background: var(--lm-bg-generic) !important;
+}
+
+html[data-theme="light"] .keyboard-key,
+html.theme-light .keyboard-key {
+  background: var(--lm-surface) !important;
+  border-color: var(--lm-border) !important;
+  box-shadow: 0 1px 3px rgba(28,25,23,0.08) !important;
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .keyboard-key:hover,
+html.theme-light .keyboard-key:hover {
+  background: linear-gradient(135deg, #FFF7ED, #FFEDD5) !important;
+  border-color: var(--lm-amber) !important;
+  box-shadow: var(--lm-shadow-card) !important;
+}
+
+html[data-theme="light"] .keyboard-prediction-bar,
+html.theme-light .keyboard-prediction-bar {
+  background: var(--lm-glass-warm) !important;
+  backdrop-filter: blur(16px) !important;
+  border-color: var(--lm-border-warm) !important;
+}
+
+html[data-theme="light"] .prediction-word,
+html.theme-light .prediction-word {
+  color: var(--lm-saffron) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .keyboard-text-area,
+html.theme-light .keyboard-text-area {
+  background: var(--lm-surface) !important;
+  color: var(--lm-text) !important;
+  border-color: var(--lm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   DESIGN HOME / FLOOR PLAN / SURVEY / COMPASS
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .design-home-screen,
+html[data-theme="light"] .floor-plan-screen,
+html[data-theme="light"] .survey-screen,
+html[data-theme="light"] .compass-screen,
+html.theme-light .design-home-screen,
+html.theme-light .floor-plan-screen,
+html.theme-light .survey-screen,
+html.theme-light .compass-screen {
+  background: var(--lm-bg-generic) !important;
+}
+
+html[data-theme="light"] .design-card,
+html.theme-light .design-card {
+  background: var(--lm-surface) !important;
+  border-color: var(--lm-border-card) !important;
+  box-shadow: var(--lm-shadow-card) !important;
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .design-card-title,
+html.theme-light .design-card-title {
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .design-card-desc,
+html.theme-light .design-card-desc {
+  color: var(--lm-text-3) !important;
+}
+
+/* Survey option buttons */
+html[data-theme="light"] .survey-option-btn,
+html.theme-light .survey-option-btn {
+  background: var(--lm-surface) !important;
+  border-color: var(--lm-border) !important;
+  color: var(--lm-text) !important;
+  box-shadow: var(--lm-shadow-sm) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .survey-option-btn.selected,
+html.theme-light .survey-option-btn.selected {
+  background: linear-gradient(135deg, #FFF7ED, #FFEDD5) !important;
+  border-color: var(--lm-accent-comm) !important;
+  color: var(--lm-saffron) !important;
+}
+
+/* Compass map cells */
+html[data-theme="light"] .compass-cell,
+html.theme-light .compass-cell {
+  background: var(--lm-surface) !important;
+  border-color: var(--lm-border) !important;
+  color: var(--lm-text-3) !important;
+}
+
+html[data-theme="light"] .compass-cell.occupied,
+html.theme-light .compass-cell.occupied {
+  background: linear-gradient(145deg, #FFF7ED, #FFEDD5) !important;
+  border-color: var(--lm-accent-comm) !important;
+  color: var(--lm-text) !important;
+}
+
+/* Action bar buttons */
+html[data-theme="light"] .survey-action-btn,
+html.theme-light .survey-action-btn {
+  background: var(--lm-glass) !important;
+  border-color: var(--lm-border) !important;
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+  box-shadow: var(--lm-shadow-sm) !important;
+}
+
+html[data-theme="light"] .survey-action-btn.primary,
+html.theme-light .survey-action-btn.primary {
+  background: linear-gradient(135deg, #F97316, #F59E0B) !important;
+  color: #FFFFFF !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.3) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SETTINGS SCREEN
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .settings-screen,
+html.theme-light .settings-screen {
+  background: var(--lm-bg-generic) !important;
+}
+
+html[data-theme="light"] .settings-sidebar,
+html.theme-light .settings-sidebar {
+  background: var(--lm-glass) !important;
+  border-color: var(--lm-border) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html[data-theme="light"] .settings-panel,
+html.theme-light .settings-panel {
+  background: var(--lm-surface) !important;
+  border-color: var(--lm-border) !important;
+  color: var(--lm-text) !important;
+}
+
+html[data-theme="light"] .settings-section-heading,
+html.theme-light .settings-section-heading {
+  color: var(--lm-text-2) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+/* Mouse-only banner */
+html[data-theme="light"] .mouse-only-banner,
+html.theme-light .mouse-only-banner {
+  background: rgba(249, 115, 22, 0.08) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  color: var(--lm-saffron) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PHRASES / MEDICAL / FEELINGS / NEEDS / ACTIVITIES
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .phrases-screen,
+html[data-theme="light"] .medical-screen,
+html[data-theme="light"] .feelings-screen,
+html[data-theme="light"] .needs-screen,
+html[data-theme="light"] .activities-screen,
+html[data-theme="light"] .people-screen,
+html.theme-light .phrases-screen,
+html.theme-light .medical-screen,
+html.theme-light .feelings-screen,
+html.theme-light .needs-screen,
+html.theme-light .activities-screen,
+html.theme-light .people-screen {
+  background: var(--lm-bg-generic) !important;
+}
+
+html[data-theme="light"] .phrase-card,
+html[data-theme="light"] .medical-card,
+html[data-theme="light"] .feeling-card,
+html[data-theme="light"] .need-card,
+html[data-theme="light"] .activity-card,
+html.theme-light .phrase-card,
+html.theme-light .medical-card,
+html.theme-light .feeling-card,
+html.theme-light .need-card,
+html.theme-light .activity-card {
+  background: var(--lm-surface) !important;
+  border-color: var(--lm-border-card) !important;
+  box-shadow: var(--lm-shadow-sm) !important;
+  color: var(--lm-text) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .phrase-card:hover,
+html[data-theme="light"] .medical-card:hover,
+html[data-theme="light"] .feeling-card:hover,
+html[data-theme="light"] .need-card:hover,
+html[data-theme="light"] .activity-card:hover,
+html.theme-light .phrase-card:hover,
+html.theme-light .medical-card:hover,
+html.theme-light .feeling-card:hover,
+html.theme-light .need-card:hover,
+html.theme-light .activity-card:hover {
+  box-shadow: var(--lm-shadow-card) !important;
+}
+
+html[data-theme="light"] .category-sidebar,
+html.theme-light .category-sidebar {
+  background: var(--lm-glass) !important;
+  border-color: var(--lm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIVE CLOCK
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .live-clock-day,
+html.theme-light .live-clock-day {
+  color: rgba(28, 25, 23, 0.42) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+html[data-theme="light"] .live-clock-time,
+html.theme-light .live-clock-time {
+  color: rgba(28, 25, 23, 0.78) !important;
+  font-family: var(--lm-font-num) !important;
+}
+
+html[data-theme="light"] .live-clock-time-shadow,
+html.theme-light .live-clock-time-shadow {
+  text-shadow: none !important;
+}
+
+html[data-theme="light"] .live-clock-ampm,
+html.theme-light .live-clock-ampm {
+  color: var(--lm-saffron) !important;
+  font-family: var(--lm-font-en) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GAZE CURSOR — MUST REMAIN VISIBLE ON LIGHT BACKGROUNDS
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .gaze-cursor-ring,
+html.theme-light .gaze-cursor-ring {
+  border-color: rgba(28, 25, 23, 0.85) !important;
+  background-color: rgba(28, 25, 23, 0.06) !important;
+  box-shadow: 0 0 12px rgba(28, 25, 23, 0.15) !important;
+}
+
+/* Dwell progress ring in light mode: saffron */
+html[data-theme="light"] .gaze-cursor-ring.dwelling,
+html.theme-light .gaze-cursor-ring.dwelling {
+  border-color: #F97316 !important;
+  background-color: rgba(249, 115, 22, 0.08) !important;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.25) !important;
+}
+
+html[data-theme="light"] .gaze-cursor-ring.locked,
+html.theme-light .gaze-cursor-ring.locked {
+  border-color: #0D9488 !important;
+  background-color: rgba(13, 148, 136, 0.08) !important;
+  box-shadow: 0 0 20px rgba(13, 148, 136, 0.25) !important;
+}
+
+/* Dwell SVG ring stroke */
+html[data-theme="light"] .dwell-ring-svg circle,
+html.theme-light .dwell-ring-svg circle {
+  stroke: #F97316 !important;
+}
+
+/* Center dot */
+html[data-theme="light"] .gaze-cursor-dot,
+html.theme-light .gaze-cursor-dot {
+  background-color: rgba(28, 25, 23, 0.85) !important;
+}
+
+html[data-theme="light"] .gaze-cursor-dot.dwelling,
+html.theme-light .gaze-cursor-dot.dwelling {
+  background-color: #F97316 !important;
+}
+
+html[data-theme="light"] .gaze-cursor-dot.locked,
+html.theme-light .gaze-cursor-dot.locked {
+  background-color: #0D9488 !important;
+}
+
+/* Status indicator (top-right) */
+html[data-theme="light"] .gaze-status-indicator,
+html.theme-light .gaze-status-indicator {
+  background-color: rgba(255, 252, 248, 0.92) !important;
+  color: var(--lm-text) !important;
+  border-color: var(--lm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CONNECTION INDICATOR (bottom-right)
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .connection-indicator,
+html.theme-light .connection-indicator {
+  background-color: rgba(255, 252, 248, 0.9) !important;
+  border-color: var(--lm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SARVAM BLOOM DECORATIVE SVG
+   ═══════════════════════════════════════════════════════ */
+
+.sarvam-bloom {
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   THEME TOGGLE PILL (Settings screen)
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] .theme-toggle-pill,
+html.theme-light .theme-toggle-pill {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: var(--lm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   EMERGENCY BUTTON — ALWAYS VISIBLE, NEVER MUTED
+   ═══════════════════════════════════════════════════════ */
+/* Emergency button styles are NOT overridden in light mode.
+   Red emergency styling must remain high-contrast at all times. */

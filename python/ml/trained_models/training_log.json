@@ -1,0 +1,253 @@
+{
+  "config": {
+    "vocab_size": 661,
+    "embed_dim": 128,
+    "hidden_size": 512,
+    "dropout": 0.2,
+    "epochs": 25,
+    "learning_rate": 0.002,
+    "batch_size": 64
+  },
+  "corpus_stats": {
+    "total_sentences": 5623,
+    "unique_sentences": 1049,
+    "unique_words": 688,
+    "categories": 14
+  },
+  "split_stats": {
+    "train_unique_sentences": 938,
+    "val_unique_sentences": 104,
+    "train_weighted_sentences": 5062,
+    "val_weighted_sentences": 561,
+    "overlap_unique_sentences": 0
+  },
+  "param_count": 1792917,
+  "best_val_loss": 3.8186,
+  "training_log": [
+    {
+      "epoch": 1,
+      "train_loss": 4.5175,
+      "train_perplexity": 91.61,
+      "val_loss": 4.188,
+      "val_perplexity": 65.89,
+      "learning_rate": 0.0019,
+      "elapsed_seconds": 10.0
+    },
+    {
+      "epoch": 2,
+      "train_loss": 3.3501,
+      "train_perplexity": 28.5,
+      "val_loss": 3.8186,
+      "val_perplexity": 45.54,
+      "learning_rate": 0.001805,
+      "elapsed_seconds": 10.1
+    },
+    {
+      "epoch": 3,
+      "train_loss": 2.5997,
+      "train_perplexity": 13.46,
+      "val_loss": 3.928,
+      "val_perplexity": 50.81,
+      "learning_rate": 0.001715,
+      "elapsed_seconds": 10.5
+    },
+    {
+      "epoch": 4,
+      "train_loss": 2.1943,
+      "train_perplexity": 8.97,
+      "val_loss": 4.0726,
+      "val_perplexity": 58.71,
+      "learning_rate": 0.001629,
+      "elapsed_seconds": 9.9
+    },
+    {
+      "epoch": 5,
+      "train_loss": 1.9498,
+      "train_perplexity": 7.03,
+      "val_loss": 4.1796,
+      "val_perplexity": 65.34,
+      "learning_rate": 0.001548,
+      "elapsed_seconds": 10.3
+    },
+    {
+      "epoch": 6,
+      "train_loss": 1.7903,
+      "train_perplexity": 5.99,
+      "val_loss": 4.3506,
+      "val_perplexity": 77.52,
+      "learning_rate": 0.00147,
+      "elapsed_seconds": 10.1
+    },
+    {
+      "epoch": 7,
+      "train_loss": 1.6936,
+      "train_perplexity": 5.44,
+      "val_loss": 4.4567,
+      "val_perplexity": 86.21,
+      "learning_rate": 0.001397,
+      "elapsed_seconds": 10.1
+    },
+    {
+      "epoch": 8,
+      "train_loss": 1.6325,
+      "train_perplexity": 5.12,
+      "val_loss": 4.56,
+      "val_perplexity": 95.58,
+      "learning_rate": 0.001327,
+      "elapsed_seconds": 10.3
+    },
+    {
+      "epoch": 9,
+      "train_loss": 1.5843,
+      "train_perplexity": 4.88,
+      "val_loss": 4.6141,
+      "val_perplexity": 100.9,
+      "learning_rate": 0.00126,
+      "elapsed_seconds": 10.5
+    },
+    {
+      "epoch": 10,
+      "train_loss": 1.5601,
+      "train_perplexity": 4.76,
+      "val_loss": 4.6271,
+      "val_perplexity": 102.22,
+      "learning_rate": 0.001197,
+      "elapsed_seconds": 10.2
+    },
+    {
+      "epoch": 11,
+      "train_loss": 1.5387,
+      "train_perplexity": 4.66,
+      "val_loss": 4.7438,
+      "val_perplexity": 114.87,
+      "learning_rate": 0.001138,
+      "elapsed_seconds": 10.4
+    },
+    {
+      "epoch": 12,
+      "train_loss": 1.5203,
+      "train_perplexity": 4.57,
+      "val_loss": 4.7387,
+      "val_perplexity": 114.28,
+      "learning_rate": 0.001081,
+      "elapsed_seconds": 11.3
+    },
+    {
+      "epoch": 13,
+      "train_loss": 1.5084,
+      "train_perplexity": 4.52,
+      "val_loss": 4.761,
+      "val_perplexity": 116.87,
+      "learning_rate": 0.001027,
+      "elapsed_seconds": 10.4
+    },
+    {
+      "epoch": 14,
+      "train_loss": 1.4985,
+      "train_perplexity": 4.48,
+      "val_loss": 4.8058,
+      "val_perplexity": 122.22,
+      "learning_rate": 0.000975,
+      "elapsed_seconds": 11.1
+    },
+    {
+      "epoch": 15,
+      "train_loss": 1.4931,
+      "train_perplexity": 4.45,
+      "val_loss": 4.8956,
+      "val_perplexity": 133.7,
+      "learning_rate": 0.000927,
+      "elapsed_seconds": 10.5
+    },
+    {
+      "epoch": 16,
+      "train_loss": 1.483,
+      "train_perplexity": 4.41,
+      "val_loss": 4.9034,
+      "val_perplexity": 134.74,
+      "learning_rate": 0.00088,
+      "elapsed_seconds": 10.9
+    },
+    {
+      "epoch": 17,
+      "train_loss": 1.4766,
+      "train_perplexity": 4.38,
+      "val_loss": 4.8447,
+      "val_perplexity": 127.07,
+      "learning_rate": 0.000836,
+      "elapsed_seconds": 10.7
+    },
+    {
+      "epoch": 18,
+      "train_loss": 1.4652,
+      "train_perplexity": 4.33,
+      "val_loss": 4.9472,
+      "val_perplexity": 140.78,
+      "learning_rate": 0.000794,
+      "elapsed_seconds": 11.0
+    },
+    {
+      "epoch": 19,
+      "train_loss": 1.4656,
+      "train_perplexity": 4.33,
+      "val_loss": 4.8844,
+      "val_perplexity": 132.21,
+      "learning_rate": 0.000755,
+      "elapsed_seconds": 10.6
+    },
+    {
+      "epoch": 20,
+      "train_loss": 1.4549,
+      "train_perplexity": 4.28,
+      "val_loss": 4.907,
+      "val_perplexity": 135.24,
+      "learning_rate": 0.000717,
+      "elapsed_seconds": 11.1
+    },
+    {
+      "epoch": 21,
+      "train_loss": 1.4572,
+      "train_perplexity": 4.29,
+      "val_loss": 4.9262,
+      "val_perplexity": 137.85,
+      "learning_rate": 0.000681,
+      "elapsed_seconds": 11.1
+    },
+    {
+      "epoch": 22,
+      "train_loss": 1.4493,
+      "train_perplexity": 4.26,
+      "val_loss": 4.8859,
+      "val_perplexity": 132.41,
+      "learning_rate": 0.000647,
+      "elapsed_seconds": 11.7
+    },
+    {
+      "epoch": 23,
+      "train_loss": 1.451,
+      "train_perplexity": 4.27,
+      "val_loss": 4.9677,
+      "val_perplexity": 143.69,
+      "learning_rate": 0.000615,
+      "elapsed_seconds": 10.6
+    },
+    {
+      "epoch": 24,
+      "train_loss": 1.4444,
+      "train_perplexity": 4.24,
+      "val_loss": 4.9734,
+      "val_perplexity": 144.51,
+      "learning_rate": 0.000584,
+      "elapsed_seconds": 10.1
+    },
+    {
+      "epoch": 25,
+      "train_loss": 1.4431,
+      "train_perplexity": 4.23,
+      "val_loss": 4.974,
+      "val_perplexity": 144.61,
+      "learning_rate": 0.000555,
+      "elapsed_seconds": 10.1
+    }
+  ]
+}

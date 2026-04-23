@@ -1,0 +1,317 @@
+{
+  "emergency": {
+    "name": "Emergency & Medical",
+    "phrases": [
+      {
+        "en": "I need help immediately",
+        "hi": "मुझे तुरंत मदद चाहिए"
+      },
+      {
+        "en": "I have pain",
+        "hi": "मुझे दर्द है"
+      },
+      {
+        "en": "I need suction",
+        "hi": "मुझे सक्शन चाहिए"
+      },
+      {
+        "en": "I'm having trouble breathing",
+        "hi": "मुझे सांस लेने में तकलीफ हो रही है"
+      },
+      {
+        "en": "Check my vitals",
+        "hi": "नब्ज़ देखो"
+      },
+      {
+        "en": "I feel dizzy",
+        "hi": "मुझे चक्कर आ रहा है"
+      },
+      {
+        "en": "I need my medicine",
+        "hi": "दवा दो"
+      }
+    ]
+  },
+  "position": {
+    "name": "Position & Bed",
+    "phrases": [
+      {
+        "en": "Turn me on my left side",
+        "hi": "मुझे बाईं ओर घुमाओ"
+      },
+      {
+        "en": "Turn me on my right side",
+        "hi": "मुझे दाईं ओर घुमाओ"
+      },
+      {
+        "en": "Raise my head",
+        "hi": "मेरा सिर उठाओ"
+      },
+      {
+        "en": "Lower my head",
+        "hi": "मेरा सिर नीचे करो"
+      },
+      {
+        "en": "I want to sit up",
+        "hi": "मैं बैठना चाहता हूँ"
+      },
+      {
+        "en": "I want to lie down",
+        "hi": "मैं लेटना चाहता हूँ"
+      },
+      {
+        "en": "Massage hands and legs",
+        "hi": "हाथ-पैर मालिश करो"
+      }
+    ]
+  },
+  "daily_care": {
+    "name": "Daily Care & Comfort",
+    "phrases": [
+      {
+        "en": "I want water",
+        "hi": "पानी दो"
+      },
+      {
+        "en": "I'm hungry",
+        "hi": "भूख लगी है"
+      },
+      {
+        "en": "I need to use the bathroom",
+        "hi": "टॉयलेट जाना है"
+      },
+      {
+        "en": "Turn on the fan",
+        "hi": "पंखा चालू करो"
+      },
+      {
+        "en": "Turn off the light",
+        "hi": "बत्ती बंद करो"
+      },
+      {
+        "en": "I want to sleep",
+        "hi": "नींद आ रही है"
+      },
+      {
+        "en": "Clean my face",
+        "hi": "चेहरा साफ करो"
+      }
+    ]
+  },
+  "feelings": {
+    "name": "Feelings & Emotions",
+    "phrases": [
+      {
+        "en": "I am happy",
+        "hi": "मैं खुश हूँ"
+      },
+      {
+        "en": "I am sad",
+        "hi": "मैं दुखी हूँ"
+      },
+      {
+        "en": "I am in pain",
+        "hi": "मुझे दर्द है"
+      },
+      {
+        "en": "I feel uncomfortable",
+        "hi": "मुझे असहजता है"
+      },
+      {
+        "en": "I am feeling better",
+        "hi": "अब बेहतर है"
+      },
+      {
+        "en": "I am anxious",
+        "hi": "मुझे चिंता है"
+      },
+      {
+        "en": "I am frustrated",
+        "hi": "मैं निराश हूँ"
+      },
+      {
+        "en": "I am bored",
+        "hi": "मैं ऊब गया हूँ"
+      },
+      {
+        "en": "I am grateful",
+        "hi": "मैं आभारी हूँ"
+      },
+      {
+        "en": "I'm cold",
+        "hi": "मुझे ठंड लग रही है"
+      },
+      {
+        "en": "I'm hot",
+        "hi": "मुझे गर्मी लग रही है"
+      },
+      {
+        "en": "I'm tired",
+        "hi": "मैं थक गया हूँ"
+      },
+      {
+        "en": "I am okay",
+        "hi": "मैं ठीक हूँ"
+      },
+      {
+        "en": "I love you",
+        "hi": "मैं तुमसे प्यार करता हूँ"
+      },
+      {
+        "en": "I miss you",
+        "hi": "मैं तुम्हें याद करता हूँ"
+      },
+      {
+        "en": "Pray for me",
+        "hi": "मेरे लिए प्रार्थना करो"
+      },
+      {
+        "en": "I am scared",
+        "hi": "मुझे डर लग रहा है"
+      },
+      {
+        "en": "I feel lonely",
+        "hi": "मुझे अकेलापन लग रहा है"
+      }
+    ]
+  },
+  "communication": {
+    "name": "Communication",
+    "phrases": [
+      {
+        "en": "Yes",
+        "hi": "हाँ"
+      },
+      {
+        "en": "No",
+        "hi": "नहीं"
+      },
+      {
+        "en": "Wait a moment",
+        "hi": "एक पल रुको"
+      },
+      {
+        "en": "Let me think",
+        "hi": "मुझे सोचने दो"
+      },
+      {
+        "en": "I don't understand",
+        "hi": "समझ नहीं आया"
+      },
+      {
+        "en": "Please repeat that",
+        "hi": "कृपया दोहराएं"
+      },
+      {
+        "en": "Thank you",
+        "hi": "धन्यवाद"
+      },
+      {
+        "en": "Sorry",
+        "hi": "माफ़ी"
+      }
+    ]
+  },
+  "people": {
+    "name": "People & Visitors",
+    "phrases": [
+      {
+        "en": "Call Mummy",
+        "hi": "मम्मी को बुलाओ"
+      },
+      {
+        "en": "Call Rishabh",
+        "hi": "ऋषभ को बुलाओ"
+      },
+      {
+        "en": "Where is everyone?",
+        "hi": "सब कहाँ हैं?"
+      },
+      {
+        "en": "Who is there?",
+        "hi": "वहाँ कौन है?"
+      },
+      {
+        "en": "I want to see the family",
+        "hi": "मैं परिवार से मिलना चाहता हूँ"
+      },
+      {
+        "en": "Is the doctor coming?",
+        "hi": "क्या डॉक्टर आ रहे हैं?"
+      },
+      {
+        "en": "When is the nurse coming?",
+        "hi": "नर्स कब आ रही है?"
+      },
+      {
+        "en": "I want to video call",
+        "hi": "मैं वीडियो कॉल करना चाहता हूँ"
+      },
+      {
+        "en": "Who is at the door?",
+        "hi": "दरवाज़े पर कौन है?"
+      },
+      {
+        "en": "Let them in",
+        "hi": "उन्हें अंदर आने दो"
+      },
+      {
+        "en": "I don't want visitors",
+        "hi": "मुझे कोई नहीं चाहिए"
+      },
+      {
+        "en": "Ask them to wait",
+        "hi": "उनसे रुकने को कहो"
+      }
+    ]
+  },
+  "entertainment": {
+    "name": "Entertainment",
+    "phrases": [
+      {
+        "en": "Turn on the TV",
+        "hi": "टीवी चालू करो"
+      },
+      {
+        "en": "Turn off the TV",
+        "hi": "टीवी बंद करो"
+      },
+      {
+        "en": "Change the channel",
+        "hi": "चैनल बदलो"
+      },
+      {
+        "en": "Play some music",
+        "hi": "गाना लगाओ"
+      },
+      {
+        "en": "Play old songs",
+        "hi": "पुराने गाने लगाओ"
+      },
+      {
+        "en": "Play devotional music",
+        "hi": "भजन लगाओ"
+      },
+      {
+        "en": "Volume up",
+        "hi": "आवाज़ बढ़ाओ"
+      },
+      {
+        "en": "Volume down",
+        "hi": "आवाज़ कम करो"
+      },
+      {
+        "en": "Read something to me",
+        "hi": "मुझे कुछ पढ़कर सुनाओ"
+      },
+      {
+        "en": "Play news channel",
+        "hi": "न्यूज़ चैनल लगाओ"
+      },
+      {
+        "en": "Stop the music",
+        "hi": "गाना बंद करो"
+      }
+    ]
+  }
+}
