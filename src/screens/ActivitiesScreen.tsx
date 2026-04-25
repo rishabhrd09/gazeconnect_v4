@@ -63,9 +63,17 @@ const ActivityCategoryButton: React.FC<{
   gazeEnabled: boolean;
   gazeEnabledTimestamp: number;
   textColor: string;
-}> = ({ cat, icon, selectedCategory, onSelect, isDarkMode, gazeEnabled, gazeEnabledTimestamp, textColor }) => {
+  inactiveIconColor?: string;
+  selectedBg?: string;
+}> = ({
+  cat, icon, selectedCategory, onSelect, isDarkMode, gazeEnabled, gazeEnabledTimestamp,
+  textColor, inactiveIconColor: inactiveIconColorOverride, selectedBg: selectedBgOverride,
+}) => {
   const isSelected = selectedCategory === cat.id;
   const Icon = icon;
+  const selectedColor = isDarkMode ? SELECTED_COLOR : lightColors.warning.main;
+  const inactiveIconColor = inactiveIconColorOverride || (isDarkMode ? ACCENT_TEAL : lightColors.text.tertiary);
+  const selectedBg = selectedBgOverride || (isDarkMode ? screenThemes.activities.selectedBg : lightColors.background.tertiary);
   return (
     <GazeButton
       id={`cat-${cat.id}`}
@@ -77,22 +85,22 @@ const ActivityCategoryButton: React.FC<{
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       style={{
         width: '100%',
-        backgroundColor: isSelected ? screenThemes.activities.selectedBg : 'transparent',
-        minHeight: 'clamp(96px, 10.8vh, 124px)',
-        padding: 'clamp(20px, 2.4vh, 28px) clamp(16px, 1.5vw, 24px)',
+        backgroundColor: isSelected ? selectedBg : 'transparent',
+        minHeight: 'clamp(118px, 13.2vh, 150px)',
+        padding: 'clamp(22px, 2.6vh, 30px) clamp(16px, 1.5vw, 24px)',
         border: 'none',
-        borderLeft: isSelected ? `5px solid ${SELECTED_COLOR}` : '5px solid transparent',
+        borderLeft: isSelected ? `5px solid ${selectedColor}` : '5px solid transparent',
         borderRadius: '0 16px 16px 0',
         transition: 'all 180ms ease',
         justifyContent: 'flex-start',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
-        <Icon size={26} color={isSelected ? SELECTED_COLOR : ACCENT_TEAL} />
+        <Icon size={26} color={isSelected ? selectedColor : inactiveIconColor} />
         <span style={{
           fontSize: 'clamp(18px, 1.75vw, 26px)',
           fontWeight: isSelected ? 700 : 600,
-          color: isSelected ? SELECTED_COLOR : textColor,
+          color: isSelected ? selectedColor : textColor,
           fontFamily: ENGLISH_UI_FONT,
           lineHeight: 1.15,
         }}>
@@ -112,13 +120,26 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colors = isDarkMode ? darkColors : lightColors;
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
+  const isWarmMode = isDarkMode && !isLight;
+  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
+  const sidebarBg = isMix ? '#2A241C' : isWarmMode ? SIDEBAR_BG : lightColors.background.secondary;
+  const sidebarBorder = isMix ? 'rgba(139, 111, 73, 0.42)' : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
+  const sidebarShadow = isWarmMode ? '0 8px 22px rgba(0,0,0,0.24)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const mainText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const sidebarText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const inactiveIcon = isMix ? '#B49362' : isWarmMode ? '#8FAE72' : lightColors.text.tertiary;
+  const selectedBg = isMix ? 'rgba(196, 178, 142, 0.22)' : isWarmMode ? screenThemes.activities.selectedBg : lightColors.background.tertiary;
+  const cardBg = isMix ? '#C4B28E' : isWarmMode ? screenThemes.activities.cardBg : colors.background.secondary;
+  const cardBorder = isMix ? '1.5px solid rgba(91,74,51,0.38)' : isWarmMode ? screenThemes.activities.cardBorder : `1.5px solid ${colors.border.light}`;
+  const cardShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
 
   const activeCategory = activityCategories.find(c => c.id === selectedCategory) || activityCategories[0];
   const items = activeCategory?.items || [];
 
   return (
-    <div className={`activities-screen${isLight ? ' theme-light' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: colors.background.primary, padding: '4px 20px 6px 20px', overflow: 'hidden' }}>
+    <div className={`activities-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: pageBg, padding: '4px 20px 6px 20px', overflow: 'hidden' }}>
       {/* GlobalNavBar */}
       <GlobalNavBar currentPage="activities" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
 
@@ -132,11 +153,11 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
         <div style={{
           width: 'clamp(228px, 22vw, 292px)', flexShrink: 0,
           display: 'flex', flexDirection: 'column', gap: '12px',
-          backgroundColor: SIDEBAR_BG, borderRadius: '18px',
+          backgroundColor: sidebarBg, borderRadius: '18px',
           padding: 'clamp(16px, 2vh, 22px) 10px',
           marginLeft: 'clamp(26px, 3.2vw, 52px)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-          border: '1px solid rgba(100, 140, 180, 0.15)',
+          boxShadow: sidebarShadow,
+          border: `1px solid ${sidebarBorder}`,
           alignSelf: 'flex-start',
         }}>
           {activityCategories.map(cat => (
@@ -149,7 +170,9 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
               isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
-              textColor={colors.text.primary}
+              textColor={sidebarText}
+              inactiveIconColor={inactiveIcon}
+              selectedBg={selectedBg}
             />
           ))}
 
@@ -166,9 +189,9 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', paddingLeft: '8px' }}>
             {(() => {
               const ActiveIcon = CATEGORY_ICONS[selectedCategory] || TvIcon;
-              return <ActiveIcon size={34} color={SELECTED_COLOR} />;
+              return <ActiveIcon size={34} color={isWarmMode ? SELECTED_COLOR : lightColors.warning.main} />;
             })()}
-            <h2 style={{ fontSize: 'clamp(28px, 3.2vh, 40px)', fontWeight: 700, color: colors.text.primary, margin: 0, fontFamily: ENGLISH_UI_FONT }}>
+            <h2 style={{ fontSize: 'clamp(28px, 3.2vh, 40px)', fontWeight: 700, color: titleText, margin: 0, fontFamily: ENGLISH_UI_FONT }}>
               {activeCategory?.name}
             </h2>
           </div>
@@ -177,9 +200,9 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
           <div style={{
             flex: 1, display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gridAutoRows: 'minmax(clamp(120px, 14.5vh, 180px), auto)',
-            gap: 'clamp(14px, 2.2vh, 28px)',
-            overflowY: 'auto', alignContent: 'start', padding: '4px 8px clamp(90px, 12vh, 140px) 8px',
+            gridAutoRows: 'minmax(clamp(150px, 17.5vh, 210px), auto)',
+            gap: 'clamp(16px, 2.2vh, 26px)',
+            overflowY: 'auto', alignContent: 'start', padding: '4px 8px clamp(82px, 10vh, 120px) 8px',
           }}>
             {items.map((item, idx) => (
               <GazeButton
@@ -192,12 +215,14 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                 }}
                 isDarkMode={isDarkMode} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
                 style={{
-                  width: '100%', minHeight: 'clamp(120px, 14.5vh, 180px)',
-                  padding: 'clamp(16px, 2vh, 24px) clamp(16px, 1.8vw, 26px)',
-                  background: 'linear-gradient(145deg, rgba(50, 62, 75, 0.65) 0%, rgba(40, 52, 65, 0.55) 100%)',
-                  border: activatedIdx === idx ? '2px solid rgba(45, 212, 191, 0.9)' : '2px solid rgba(90, 110, 130, 0.45)',
-                  borderRadius: '20px',
-                  boxShadow: activatedIdx === idx ? '0 0 18px rgba(45,212,191,0.35)' : '0 6px 18px rgba(0,0,0,0.22)',
+                  width: '100%', minHeight: 'clamp(150px, 17.5vh, 210px)',
+                  padding: 'clamp(18px, 2.4vh, 28px) clamp(16px, 1.8vw, 26px)',
+                  background: cardBg,
+                  border: activatedIdx === idx ? `2px solid ${isMix ? '#8B6F49' : isWarmMode ? '#D6C98E' : colors.accent.main}` : cardBorder,
+                  borderRadius: '16px',
+                  boxShadow: activatedIdx === idx
+                    ? (isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)')
+                    : cardShadow,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0px',
                   transition: 'border 0.15s ease, box-shadow 0.15s ease',
                   transform: activatedIdx === idx ? 'scale(1.02)' : 'scale(1)',
@@ -206,7 +231,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                 <span style={{
                   fontSize: 'clamp(22px, 2.6vh, 36px)',
                   fontWeight: 600,
-                  color: '#FFFFFF',
+                  color: mainText,
                   textAlign: 'center',
                   lineHeight: 1.18,
                   fontFamily: ENGLISH_UI_FONT,

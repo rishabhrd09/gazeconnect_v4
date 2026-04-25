@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import GazeButton from './core/GazeButton';
 import { useGazeControl } from './core/GazeControlToggle';
+import { screenThemes, typography } from '../utils/design';
 import {
   generateFloorPlan,
   checkBackendHealth,
@@ -43,19 +44,18 @@ const ROOM_COLORS: Record<string, string> = {
 // ─── Theme ─────────────────────────────────────────────────
 
 const T = {
-  bg: '#0B1120',
-  panel: '#0F172A',
-  card: '#1E293B',
-  border: 'rgba(100,116,139,0.25)',
-  accent: '#2DD4BF',
-  blue: '#64B5F6',
-  text: '#FFFFFF',
-  sub: '#94A3B8',
-  dim: '#64748B',
-  success: '#10B981',
-  danger: '#EF5350',
-  warn: '#FBBF24',
+  ...screenThemes.floorPlan,
+  panel: screenThemes.floorPlan.panelBg,
+  card: screenThemes.floorPlan.cardBg,
+  blue: screenThemes.floorPlan.accentStrong,
+  text: screenThemes.floorPlan.textMain,
+  sub: screenThemes.floorPlan.textSub,
+  dim: screenThemes.floorPlan.textDim,
+  danger: screenThemes.floorPlan.danger,
+  warn: screenThemes.floorPlan.warning,
 };
+
+const UI_FONT = typography.fontFamily.primary;
 
 const STYLES: FloorPlanStyle[] = ['modern', 'autocad', 'blueprint', 'presentation'];
 
@@ -243,6 +243,7 @@ export function FloorPlanViewerModal({
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       background: 'rgba(0,0,0,0.94)', display: 'flex', flexDirection: 'column',
+      fontFamily: UI_FONT,
     }}>
       {/* ═══ HEADER BAR ═══ */}
       <div style={{
@@ -272,9 +273,10 @@ export function FloorPlanViewerModal({
                 padding: '8px 18px', minHeight: 'clamp(44px, 5.8vh, 60px)',
                 borderRadius: '10px', fontWeight: 800,
                 fontSize: 'clamp(11px, 1.35vh, 14px)', letterSpacing: '0.6px',
-                background: style === s ? `${STYLE_INFO[s].color}20` : T.card,
+                background: style === s ? T.accentSubtle : T.card,
                 border: `2px solid ${style === s ? STYLE_INFO[s].color : T.border}`,
                 color: style === s ? STYLE_INFO[s].color : T.dim,
+                fontFamily: UI_FONT,
               }}>
               {STYLE_INFO[s].icon} {STYLE_INFO[s].label}
             </GazeButton>
@@ -291,9 +293,10 @@ export function FloorPlanViewerModal({
                   padding: '8px 18px', minHeight: 'clamp(44px, 5.8vh, 60px)',
                   borderRadius: '10px', fontWeight: 800,
                   fontSize: 'clamp(11px, 1.35vh, 14px)',
-                  background: floor === f ? 'rgba(45,212,191,0.15)' : T.card,
+                  background: floor === f ? T.accentSubtle : T.card,
                   border: `2px solid ${floor === f ? T.accent : T.border}`,
                   color: floor === f ? T.accent : T.dim,
+                  fontFamily: UI_FONT,
                 }}>
                 {f === 'ground' ? 'GND' : '1F'}
               </GazeButton>
@@ -308,6 +311,7 @@ export function FloorPlanViewerModal({
             padding: '10px 26px', minHeight: 'clamp(48px, 6vh, 64px)',
             borderRadius: '10px', fontWeight: 900, fontSize: 'clamp(15px, 1.7vh, 19px)',
             background: T.card, border: `2px solid ${T.danger}`, color: T.text, marginLeft: '0px',
+            fontFamily: UI_FONT,
           }}>
           ✕ CLOSE
         </GazeButton>
@@ -386,13 +390,14 @@ export function FloorPlanViewerModal({
                 width: '100%',
                 minHeight: '84px',
                 resize: 'vertical',
-                background: '#0B1120',
+                background: T.elevatedBg,
                 color: T.text,
                 border: `1px solid ${T.border}`,
                 borderRadius: '8px',
                 padding: '10px 12px',
                 fontSize: '13px',
                 lineHeight: 1.4,
+                fontFamily: UI_FONT,
               }}
             />
             <GazeButton id="apply-custom-notes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
@@ -408,9 +413,10 @@ export function FloorPlanViewerModal({
                 fontWeight: 800,
                 fontSize: '13px',
                 textTransform: 'uppercase',
-                background: 'rgba(45,212,191,0.12)',
+                background: T.accentSubtle,
                 border: `2px solid ${T.accent}`,
                 color: T.accent,
+                fontFamily: UI_FONT,
               }}>
               APPLY NOTES
             </GazeButton>
@@ -435,7 +441,7 @@ export function FloorPlanViewerModal({
         {/* ── Main Image Area ── */}
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#050A15', overflow: 'auto', position: 'relative',
+          background: T.bg, overflow: 'auto', position: 'relative',
           padding: 'clamp(4px, 0.8vh, 12px)',
         }}>
           {loading && (
@@ -490,7 +496,7 @@ export function FloorPlanViewerModal({
                   maxWidth: '100%', maxHeight: '100%',
                   objectFit: 'contain',
                   borderRadius: '6px',
-                  boxShadow: '0 8px 28px rgba(0,0,0,0.62)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
                 }}
               />
               <GazeButton id="magnify-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
@@ -498,9 +504,9 @@ export function FloorPlanViewerModal({
                 style={{
                   position: 'absolute', bottom: '60px', right: '320px', // Further inward, above the downloads
                   width: '120px', height: '120px', borderRadius: '60px',
-                  background: 'rgba(0,0,0,0.95)', border: `6px solid ${T.accent}`, color: T.accent,
+                  background: T.panel, border: `4px solid ${T.accent}`, color: T.accent,
                   fontSize: '72px', fontWeight: 900,
-                  boxShadow: '0 12px 48px rgba(0,0,0,0.9)',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.24)',
                   cursor: 'pointer', zIndex: 50,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1
                 }}>
@@ -510,10 +516,10 @@ export function FloorPlanViewerModal({
               {/* Downloads — Now floating on the right side */}
               <div style={{
                 position: 'absolute', right: '24px', bottom: '24px',
-                background: 'rgba(11, 17, 32, 0.95)',
+                background: T.panel,
                 border: `2px solid ${T.border}`, borderRadius: '16px',
                 padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.22)',
                 zIndex: 40, width: '220px',
               }}>
                 <div style={{ fontSize: '13px', color: T.dim, fontWeight: 900, letterSpacing: '2px', textAlign: 'center' }}>
@@ -528,6 +534,7 @@ export function FloorPlanViewerModal({
                       background: T.card, border: `3px solid ${T.border}`,
                       color: T.blue, textTransform: 'uppercase' as const,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                      fontFamily: UI_FONT,
                     }}>
                     ⬇ {fmt}
                   </GazeButton>
@@ -542,7 +549,7 @@ export function FloorPlanViewerModal({
       {isFullscreen && imageUrl && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 10000,
-          background: '#050A15', display: 'flex', flexDirection: 'column',
+          background: T.bg, display: 'flex', flexDirection: 'column',
           overflow: 'hidden', // No padding, allow full bleed
         }}>
           <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
@@ -562,9 +569,9 @@ export function FloorPlanViewerModal({
             style={{
               position: 'absolute', bottom: '60px', right: '80px', // Further inward from corner
               width: '140px', height: '140px', borderRadius: '70px',
-              background: 'rgba(15,23,42,0.98)', border: `6px solid ${T.danger}`, color: T.danger,
+              background: T.panel, border: `4px solid ${T.danger}`, color: T.danger,
               fontSize: '84px', fontWeight: 900,
-              boxShadow: '0 24px 80px rgba(0,0,0,0.95)',
+              boxShadow: '0 8px 22px rgba(0,0,0,0.24)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
               zIndex: 10001,
             }}>

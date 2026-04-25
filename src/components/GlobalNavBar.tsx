@@ -15,10 +15,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { darkColors, lightColors } from '../utils/design';
 import { useGazeControl } from './core/GazeControlToggle';
-import { HomeIcon, KeyboardIcon, ChatBubblesIcon, SettingsIcon } from './icons/Icons';
 import { useFocusMode } from '../contexts/FocusModeContext';
-import { useTheme } from '../contexts/ThemeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface GlobalNavBarProps {
     currentPage: string;
@@ -47,6 +46,27 @@ interface GlobalNavBarProps {
     onBack?: () => void;
 }
 
+const navIconStyle: React.CSSProperties = {
+    width: 'clamp(19px, 2.4vh, 26px)',
+    height: 'clamp(19px, 2.4vh, 26px)',
+    flexShrink: 0,
+};
+
+const HomeNavIcon: React.FC = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={navIconStyle}>
+        <path d="M3.5 10.5 12 3.5l8.5 7" />
+        <path d="M5.5 9.5V20h13V9.5" />
+        <path d="M9.5 20v-6h5v6" />
+    </svg>
+);
+
+const KeyboardNavIcon: React.FC = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={navIconStyle}>
+        <rect x="3" y="6" width="18" height="12" rx="2.5" />
+        <path d="M7 10h.01M10.5 10h.01M14 10h.01M17.5 10h.01M7 14h.01M10.5 14h7" />
+    </svg>
+);
+
 const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     currentPage,
     onNavigate,
@@ -65,10 +85,51 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     onBack,
 }) => {
     const colors = isDarkMode ? darkColors : lightColors;
+    const navFontFamily = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
     const { isGazeEnabled, toggleGaze } = useGazeControl();
     const { isFocusMode } = useFocusMode();
-    const { isLight } = useTheme();
     const { data: { settings } } = useCustomization();
+    const { theme } = useTheme();
+    const useHomeNavPalette = currentPage === 'home';
+    const homeNavigationColors = theme === 'mix' ? {
+        ...darkColors.navigation,
+        pillBackground: 'rgba(36, 30, 23, 0.96)',
+        pillBorder: 'rgba(180, 157, 112, 0.34)',
+        pillShadow: '0 8px 22px rgba(0,0,0,0.30)',
+        idleBackground: 'rgba(17, 14, 11, 0.42)',
+        idleText: '#D8C8A8',
+        activeBackground: 'rgba(196, 178, 142, 0.30)',
+        activeBorder: 'rgba(196, 178, 142, 0.46)',
+        activeShadow: 'inset 0 0 0 1px rgba(240, 226, 196, 0.10)',
+        activeText: '#F7E9CB',
+        gazeBackgroundOn: '#3B3123',
+        gazeBackgroundOff: '#191510',
+        gazeBorderOn: '#D6C98E',
+        gazeBorderOff: '#8B6F49',
+        gazeGlow: '0 0 16px rgba(214, 201, 142, 0.16)',
+        gazeTextOn: '#F7E9CB',
+        gazeTextOff: '#EADAB8',
+    } : theme === 'dark' ? {
+        ...darkColors.navigation,
+        pillBackground: 'rgba(27, 28, 24, 0.94)',
+        pillBorder: 'rgba(213, 216, 188, 0.18)',
+        pillShadow: '0 8px 20px rgba(0,0,0,0.28)',
+        idleBackground: 'rgba(9, 10, 8, 0.42)',
+        idleText: '#B8B4A8',
+        activeBackground: 'rgba(213, 216, 188, 0.18)',
+        activeBorder: 'rgba(213, 216, 188, 0.28)',
+        activeShadow: 'inset 0 0 0 1px rgba(236, 237, 227, 0.08)',
+        activeText: '#ECEDE3',
+        gazeBackgroundOn: '#2C2D25',
+        gazeBackgroundOff: '#121914',
+        gazeBorderOn: '#D6C98E',
+        gazeBorderOff: '#676B55',
+        gazeGlow: '0 0 16px rgba(214, 201, 142, 0.16)',
+        gazeTextOn: '#ECEDE3',
+        gazeTextOff: '#D4D0C2',
+    } : lightColors.navigation;
+    const navigationColors = useHomeNavPalette ? homeNavigationColors : colors.navigation;
+    const homeEmergencyStyle = { background: '#7A3030', text: '#FFF1E3', border: 'transparent' };
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)
     const isKbOrSpatial = currentPage === 'keyboard' || currentPage === 'spatial';
@@ -112,21 +173,30 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
         }, 3200);
     }, [onSpeak, settings]);
 
+    const getNavButtonClassName = (screen: string) => {
+        const classes = ['gaze-button', 'nav-btn'];
+        classes.push(`nav-btn-${screen.replace(/_/g, '-').replace(/^--/, '')}`);
+        if (currentPage === screen) classes.push('nav-btn-active');
+        if (screen === '__back__') classes.push('nav-btn-back');
+        return classes.join(' ');
+    };
+
     // Button styles
     const getButtonStyle = (screen: string, isEmergency = false) => {
         const isCurrentPage = currentPage === screen;
+        const isBackButton = screen === '__back__';
 
         if (isEmergency) {
             return {
                 padding: compact
                     ? 'clamp(6px, 1vh, 10px) clamp(14px, 2vw, 24px)'
                     : 'clamp(8px, 1.2vh, 14px) clamp(18px, 2.5vw, 32px)',
-                backgroundColor: 'rgba(140, 50, 50, 0.35)',
-                border: '2px solid rgba(180, 70, 70, 0.50)',
+                backgroundColor: useHomeNavPalette ? homeEmergencyStyle.background : isDarkMode ? 'rgba(140, 50, 50, 0.35)' : lightColors.emergency.main,
+                border: useHomeNavPalette ? `1.5px solid ${homeEmergencyStyle.border}` : isDarkMode ? '2px solid rgba(180, 70, 70, 0.50)' : `1.5px solid ${lightColors.emergency.hover}`,
                 borderRadius: 'clamp(14px, 2vh, 20px)',
-                color: '#D08080',
+                color: useHomeNavPalette ? homeEmergencyStyle.text : isDarkMode ? '#D08080' : lightColors.text.inverse,
                 fontSize: 'clamp(14px, 1.9vh, 19px)',
-                fontWeight: 800 as const,
+                fontWeight: isDarkMode ? 800 as const : 700 as const,
                 cursor: 'pointer',
                 minHeight: isCompassMap ? 'clamp(90px, 11vh, 130px)' : isKbOrSpatial ? '118px' : (compact
                     ? 'clamp(58px, 8vh, 80px)'
@@ -138,15 +208,15 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     : (compact
                         ? 'clamp(160px, 17vw, 220px)'
                         : 'clamp(210px, 22vw, 320px)'),
-                boxShadow: '0 4px 16px rgba(0,0,0,0.30)',
+                boxShadow: isDarkMode ? '0 4px 16px rgba(0,0,0,0.30)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'clamp(6px, 0.8vw, 10px)',
                 justifyContent: 'center',
                 flexDirection: 'row' as const,
-                letterSpacing: '1.5px',
-                fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-                textTransform: 'uppercase' as const,
+                letterSpacing: isDarkMode ? '1.5px' : '0.02em',
+                fontFamily: navFontFamily,
+                textTransform: isDarkMode ? 'uppercase' as const : 'none' as const,
                 transition: 'all 0.2s ease',
             };
         }
@@ -157,10 +227,6 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 : (compact
                     ? 'clamp(12px, 1.8vh, 18px) clamp(16px, 2.2vw, 32px)'
                     : 'clamp(16px, 2.3vh, 26px) clamp(22px, 3.2vw, 42px)'),
-            backgroundColor: isCurrentPage ? (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : colors.background.tertiary,
-            border: 'none',
-            borderRadius: '0',
-            color: isCurrentPage ? colors.accent.main : colors.text.primary,
             fontSize: isCompassMap ? 'clamp(18px, 2.5vh, 25px)' : 'clamp(17px, 2.3vh, 23px)',
             fontWeight: isCurrentPage ? 700 : 600,
             cursor: 'pointer',
@@ -174,12 +240,30 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 : isKbOrSpatial
                     ? (compact ? 'clamp(100px, 10vw, 160px)' : 'clamp(140px, 14vw, 230px)')
                     : (compact ? 'clamp(90px, 9vw, 140px)' : 'clamp(120px, 12vw, 200px)'),
+            background: isCurrentPage
+                ? navigationColors.activeBackground
+                : isBackButton
+                    ? navigationColors.backBackground
+                    : navigationColors.idleBackground,
+            border: `1px solid ${isCurrentPage
+                ? navigationColors.activeBorder
+                : isBackButton
+                    ? navigationColors.backBorder
+                    : 'transparent'}`,
+            boxShadow: isCurrentPage
+                ? navigationColors.activeShadow
+                : isBackButton
+                    ? navigationColors.backShadow
+                    : 'none',
             display: 'flex',
             alignItems: 'center',
             gap: 'clamp(8px, 1.2vw, 12px)',
             justifyContent: 'center',
             opacity: 1,
-            transition: 'background-color 0.2s',
+            borderRadius: '10px',
+            color: isCurrentPage ? navigationColors.activeText : navigationColors.idleText,
+            fontFamily: navFontFamily,
+            transition: 'background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
         };
     };
 
@@ -194,6 +278,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     return (
         <>
             <div
+                className="nav-bar-container"
                 data-gaze-screen={currentPage}
                 style={{
                     display: 'grid',
@@ -210,6 +295,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                         : isKbOrSpatial
                             ? 'clamp(4px, 1vh, 12px)'
                             : 'clamp(14px, 1.8vh, 20px)',
+                    boxShadow: `inset 0 -1px 0 ${navigationColors.containerDivider}`,
                 }}>
 
 
@@ -228,27 +314,54 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             <line x1="12" y1="7" x2="12" y2="13" />
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                         </svg>
-                        <span>EMERGENCY</span>
+                        <span>{isDarkMode ? 'EMERGENCY' : 'Emergency'}</span>
                     </button>
                 </div>
 
                 {/* CENTER CELL - Navigation Pill */}
                 <div style={{ display: 'flex', justifyContent: 'center', ...(currentPage === 'keyboard' ? { marginLeft: 'clamp(-110px, -11vw, -170px)' } : currentPage === 'spatial' ? { marginLeft: 'clamp(-30px, -3vw, -50px)' } : isCompassMap ? { marginLeft: 'clamp(-50px, -5vw, -80px)' } : {}) }}>
-                    {!isNavHidden && (
-                        <div className="nav-pill" style={{
+                    {currentPage === 'home' ? (
+                        <div
+                            aria-hidden="true"
+                            style={{
+                                minHeight: compact ? 'clamp(50px, 7vh, 72px)' : 'clamp(82px, 12vh, 120px)',
+                                minWidth: 'clamp(360px, 34vw, 560px)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 'clamp(10px, 1.1vw, 18px)',
+                                transform: 'translateX(clamp(6px, 0.9vw, 16px))',
+                                color: theme === 'light' ? '#6F6255' : theme === 'mix' ? '#B49362' : '#B4AB96',
+                                fontFamily: navFontFamily,
+                                fontSize: 'clamp(30px, 4.4vh, 54px)',
+                                fontWeight: 850,
+                                letterSpacing: '0.18em',
+                                textTransform: 'uppercase',
+                                lineHeight: 1,
+                                userSelect: 'none',
+                                textShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.26)' : 'none',
+                            }}
+                        >
+                            <span>GAZE</span>
+                            <span>CONNECT</span>
+                        </div>
+                    ) : !isNavHidden && (
+                        <div className={`nav-pill ${isDarkMode ? 'nav-pill-dark' : 'nav-pill-light'}`} style={{
                             display: 'flex',
-                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                            border: `2px solid ${colors.border.main}`,
+                            background: navigationColors.pillBackground,
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            border: `1px solid ${navigationColors.pillBorder}`,
                             borderRadius: '24px',
                             overflow: 'hidden',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                            boxShadow: navigationColors.pillShadow,
                             gap: (isKbOrSpatial || isCompassMap) ? '0px' : '1px',
                         }}>
                             {/* BACK — custom callback (e.g. web browsing panels) */}
                             {onBack && (
                                 <button
                                     onClick={onBack}
-                                    className={`gaze-button nav-btn`}
+                                    className={getNavButtonClassName('__back__')}
                                     data-gaze="true"
                                     data-gaze-context="navigation"
                                     style={{
@@ -265,7 +378,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             {backTarget && !onBack && (
                                 <button
                                     onClick={() => onNavigate(backTarget)}
-                                    className={`gaze-button nav-btn`}
+                                    className={getNavButtonClassName('__back__')}
                                     data-gaze="true"
                                     data-gaze-context="navigation"
                                     style={{
@@ -286,11 +399,12 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             {/* HOME — always shown */}
                             <button
                                 onClick={() => onNavigate('home')}
-                                className={`gaze-button nav-btn${currentPage === 'home' ? ' nav-btn-active' : ''}`}
+                                className={getNavButtonClassName('home')}
                                 data-gaze="true"
                                 data-gaze-context="navigation"
                                 style={{ ...getButtonStyle('home'), ...focusDisabledStyle }}
                             >
+                                <HomeNavIcon />
                                 <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)' }}>🏠</span>
                                 Home
                             </button>
@@ -310,11 +424,12 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     {currentPage === 'spatial' && (
                                         <button
                                             onClick={() => onNavigate('keyboard')}
-                                            className={`gaze-button nav-btn`}
+                                            className={getNavButtonClassName('keyboard')}
                                             data-gaze="true"
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('keyboard'), ...focusDisabledStyle }}
                                         >
+                                            <KeyboardNavIcon />
                                             <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)' }}>⌨️</span>
                                             Keyboard
                                         </button>
@@ -324,7 +439,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     {currentPage === 'keyboard' && showZoneBoardButton && (
                                         <button
                                             onClick={() => onNavigate('spatial')}
-                                            className={`gaze-button nav-btn`}
+                                            className={getNavButtonClassName('spatial')}
                                             data-gaze="true"
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('spatial'), ...focusDisabledStyle }}
@@ -340,7 +455,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     {/* QUICK WORDS */}
                                     <button
                                         onClick={() => onQuickWords ? onQuickWords() : onNavigate('quickwords')}
-                                        className={`gaze-button nav-btn`}
+                                        className="gaze-button nav-btn"
                                         data-gaze="true"
                                         data-gaze-context="navigation"
                                         style={{ ...getButtonStyle('quick-words'), ...focusDisabledStyle }}
@@ -357,11 +472,12 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     {/* KEYBOARD */}
                                     <button
                                         onClick={() => onNavigate('keyboard')}
-                                        className={`gaze-button nav-btn${currentPage === 'keyboard' ? ' nav-btn-active' : ''}`}
+                                        className={getNavButtonClassName('keyboard')}
                                         data-gaze="true"
                                         data-gaze-context="navigation"
                                         style={{ ...getButtonStyle('keyboard'), ...focusDisabledStyle }}
                                     >
+                                        <KeyboardNavIcon />
                                         <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)' }}>⌨️</span>
                                         Keyboard
                                     </button>
@@ -370,7 +486,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     {showZoneBoardButton && (
                                         <button
                                             onClick={() => onNavigate('spatial')}
-                                            className={`gaze-button nav-btn${currentPage === 'spatial' ? ' nav-btn-active' : ''}`}
+                                            className={getNavButtonClassName('spatial')}
                                             data-gaze="true"
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('spatial'), ...focusDisabledStyle }}
@@ -391,7 +507,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             {onRestartCompass && (
                                 <button
                                     onClick={onRestartCompass}
-                                    className={`gaze-button nav-btn`}
+                                    className="gaze-button nav-btn"
                                     data-gaze="true"
                                     data-gaze-context="navigation"
                                     style={{
@@ -424,7 +540,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             {/* Left vertical line */}
                             <div style={{
                                 width: '2.5px', flexShrink: 0, alignSelf: 'center', height: '70%',
-                                backgroundColor: isGazeEnabled ? 'rgba(80, 145, 125, 0.65)' : 'rgba(140,155,170,0.45)',
+                                backgroundColor: isGazeEnabled ? navigationColors.gazeBorderOn : navigationColors.gazeBorderOff,
                                 borderRadius: '2px', pointerEvents: 'none',
                             }} />
                             {/* Selectable button */}
@@ -453,38 +569,45 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     display: 'flex', flexDirection: 'column',
                                     alignItems: 'center', justifyContent: 'center', gap: '2px',
                                     background: isGazeEnabled
-                                        ? 'radial-gradient(circle at 50% 45%, rgba(60, 110, 90, 0.3) 0%, rgba(15,23,42,0.85) 70%)'
-                                        : 'radial-gradient(circle at 50% 45%, rgba(40, 55, 65, 0.4) 0%, rgba(15,23,42,0.9) 70%)',
-                                    border: `2.5px solid ${isGazeEnabled ? 'rgba(80, 145, 125, 0.5)' : 'rgba(100,116,139,0.2)'}`,
+                                        ? (isDarkMode
+                                            ? 'radial-gradient(circle at 50% 45%, rgba(96, 165, 250, 0.24) 0%, rgba(14, 22, 32, 0.92) 72%)'
+                                            : 'radial-gradient(circle at 50% 45%, rgba(212, 202, 184, 0.48) 0%, rgba(253, 252, 250, 0.96) 72%)')
+                                        : (isDarkMode
+                                            ? 'radial-gradient(circle at 50% 45%, rgba(42, 61, 82, 0.45) 0%, rgba(14, 22, 32, 0.94) 72%)'
+                                            : 'radial-gradient(circle at 50% 45%, rgba(232, 223, 208, 0.9) 0%, rgba(255, 255, 255, 0.96) 72%)'),
+                                    border: `2.5px solid ${isGazeEnabled ? navigationColors.gazeBorderOn : navigationColors.gazeBorderOff}`,
                                     transition: 'all 250ms ease',
                                     position: 'relative', overflow: 'hidden', pointerEvents: 'none',
                                 }}>
                                     {/* Mid-ring */}
                                     <div style={{
                                         position: 'absolute', width: '58%', height: '58%', borderRadius: '50%',
-                                        border: `1.5px solid ${isGazeEnabled ? 'rgba(80, 145, 125, 0.2)' : 'rgba(100,116,139,0.1)'}`,
+                                        border: `1.5px solid ${isDarkMode
+                                            ? (isGazeEnabled ? 'rgba(96, 165, 250, 0.2)' : 'rgba(42, 61, 82, 0.28)')
+                                            : (isGazeEnabled ? 'rgba(212, 202, 184, 0.72)' : 'rgba(212, 202, 184, 0.65)')}`,
                                     }} />
                                     {/* Center reticle dot */}
                                     <div style={{
                                         width: '7px', height: '7px', borderRadius: '50%',
-                                        backgroundColor: isGazeEnabled ? 'rgba(80, 145, 125, 0.8)' : '#555',
+                                        backgroundColor: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
                                         transition: 'all 200ms ease', zIndex: 2,
                                     }} />
                                     {/* Label */}
                                     <span style={{
-                                        fontSize: 'clamp(8px, 1vh, 11px)', fontWeight: 700,
-                                        letterSpacing: '1.5px',
-                                        color: isGazeEnabled ? 'rgba(100, 165, 140, 0.7)' : 'rgba(150,150,150,0.45)',
+                                        fontSize: 'clamp(12px, 1.35vh, 15px)', fontWeight: 900,
+                                        letterSpacing: '1.6px',
+                                        color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
                                         textTransform: 'uppercase', zIndex: 2, marginTop: '1px',
+                                        fontFamily: navFontFamily,
                                     }}>
-                                        {isGazeEnabled ? 'ACTIVE' : 'GAZE'}
+                                        {isGazeEnabled ? 'ON' : 'OFF'}
                                     </span>
                                 </div>
                             </button>
                             {/* Right vertical line */}
                             <div style={{
                                 width: '2.5px', flexShrink: 0, alignSelf: 'center', height: '70%',
-                                backgroundColor: isGazeEnabled ? 'rgba(80, 145, 125, 0.65)' : 'rgba(140,155,170,0.45)',
+                                backgroundColor: isGazeEnabled ? navigationColors.gazeBorderOn : navigationColors.gazeBorderOff,
                                 borderRadius: '2px', pointerEvents: 'none',
                             }} />
                         </div>
@@ -501,11 +624,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             data-gaze-dwell-ms={String(isGazeEnabled ? 1150 : 850)}
                             style={{
                                 padding: '0',
-                                backgroundColor: isGazeEnabled ? 'rgba(45, 90, 75, 0.35)' : 'transparent',
-                                border: `3px solid ${isGazeEnabled ? 'rgba(80, 200, 150, 0.75)' : 'rgba(100,116,139,0.3)'}`,
-                                boxShadow: isGazeEnabled ? '0 0 14px rgba(80,200,150,0.20)' : 'none',
+                                backgroundColor: isGazeEnabled ? navigationColors.gazeBackgroundOn : navigationColors.gazeBackgroundOff,
+                                border: `3px solid ${isGazeEnabled ? navigationColors.gazeBorderOn : navigationColors.gazeBorderOff}`,
+                                boxShadow: isGazeEnabled ? navigationColors.gazeGlow : 'none',
                                 borderRadius: '50%',
-                                color: isGazeEnabled ? 'rgba(100, 165, 140, 0.85)' : colors.text.secondary,
+                                color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
                                 width: isKbOrSpatial ? '128px' : 'clamp(104px, 13vh, 128px)',
                                 height: isKbOrSpatial ? '128px' : 'clamp(104px, 13vh, 128px)',
                                 minWidth: isKbOrSpatial ? '128px' : 'clamp(104px, 13vh, 128px)',
@@ -519,21 +642,22 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 marginRight: (currentPage === 'keyboard' || currentPage === 'spatial') ? 'clamp(28px, 3vw, 48px)' : '0px',
                             }}
                         >
-                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                                style={{ width: 'clamp(30px, 4vh, 42px)', height: 'clamp(30px, 4vh, 42px)' }}
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"
+                                style={{ width: 'clamp(34px, 4.4vh, 46px)', height: 'clamp(34px, 4.4vh, 46px)' }}
                             >
                                 <circle cx="12" cy="12" r="10" />
                                 <circle cx="12" cy="12" r="3" fill={isGazeEnabled ? "currentColor" : "none"} />
                             </svg>
                             <span style={{
-                                fontSize: 'clamp(8px, 0.9vh, 10px)',
-                                fontWeight: 700,
-                                letterSpacing: '1.5px',
-                                color: isGazeEnabled ? 'rgba(100,165,140,0.85)' : 'rgba(150,150,150,0.5)',
+                                fontSize: 'clamp(13px, 1.45vh, 16px)',
+                                fontWeight: 900,
+                                letterSpacing: '1.6px',
+                                color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
                                 textTransform: 'uppercase' as const,
                                 marginTop: '3px',
                                 userSelect: 'none' as const,
                                 lineHeight: 1,
+                                fontFamily: navFontFamily,
                             }}>
                                 {isGazeEnabled ? 'ON' : 'OFF'}
                             </span>
@@ -552,8 +676,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 minHeight: isKbOrSpatial ? '118px' : 'clamp(82px, 12vh, 120px)',
                                 ...(isKbOrSpatial ? { height: '118px' } : {}),
                                 borderRadius: '14px',
-                                border: `2px solid ${colors.border.main}`,
-                                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                                border: `2px solid ${navigationColors.auxiliaryBorder}`,
+                                backgroundColor: navigationColors.auxiliaryBackground,
                                 color: colors.text.primary,
                                 fontSize: 'clamp(17px, 2.3vh, 23px)',
                                 fontWeight: 700,
@@ -562,8 +686,9 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: 'clamp(6px, 1vw, 10px)',
-                                transition: 'background-color 0.2s',
+                                transition: 'background-color 0.2s ease, border-color 0.2s ease',
                                 padding: '0 clamp(16px, 2vw, 28px)',
+                                fontFamily: navFontFamily,
                             }}
                         >
                             FULL SCREEN
@@ -580,8 +705,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             data-gaze-context="navigation"
                             style={{
                                 ...getButtonStyle('nav-toggle'),
-                                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                                border: `2px solid ${isNavHidden ? '#2DD4BF' : colors.border.main}`,
+                                background: navigationColors.auxiliaryBackground,
+                                border: `2px solid ${isNavHidden ? colors.accent.main : navigationColors.auxiliaryBorder}`,
                                 borderRadius: '24px',
                                 minHeight: compact ? 'clamp(50px, 7vh, 72px)' : 'clamp(70px, 11vh, 110px)',
                                 minWidth: compact ? 'clamp(110px, 11vw, 150px)' : 'clamp(130px, 13vw, 180px)',
@@ -589,7 +714,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
-                                color: isNavHidden ? '#2DD4BF' : colors.text.primary,
+                                color: isNavHidden ? colors.accent.main : colors.text.primary,
                                 padding: '0 clamp(16px, 2vw, 24px)',
                             }}
                         >
@@ -630,26 +755,42 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     <div style={{
                         padding: 'clamp(28px, 4.5vh, 52px) clamp(56px, 9vw, 130px)',
                         borderRadius: '28px',
-                        background: 'rgba(30, 8, 8, 0.96)',
-                        border: '2px solid rgba(210, 80, 80, 0.50)',
-                        boxShadow: '0 12px 80px rgba(0, 0, 0, 0.75), 0 0 40px rgba(210, 80, 80, 0.18)',
+                        background: isDarkMode ? 'rgba(30, 8, 8, 0.96)' : lightColors.background.elevated,
+                        border: isDarkMode ? '2px solid rgba(210, 80, 80, 0.50)' : `2px solid ${lightColors.emergency.hover}`,
+                        boxShadow: isDarkMode ? '0 12px 80px rgba(0, 0, 0, 0.75), 0 0 40px rgba(210, 80, 80, 0.18)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)',
                     }}>
                         <span style={{
                             fontSize: 'clamp(48px, 8vh, 96px)',
                             fontWeight: 900,
-                            color: '#E07070',
-                            fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-                            letterSpacing: '4px',
+                            color: isDarkMode ? '#E07070' : lightColors.emergency.main,
+                            fontFamily: navFontFamily,
+                            letterSpacing: isDarkMode ? '4px' : '0.02em',
                             textAlign: 'center',
-                            textTransform: 'uppercase',
+                            textTransform: isDarkMode ? 'uppercase' : 'none',
                         }}>
-                            EMERGENCY
+                            {isDarkMode ? 'EMERGENCY' : 'Emergency'}
                         </span>
                     </div>
                 </div>
             )}
 
             <style>{`
+                .nav-btn-home > span:first-of-type,
+                .nav-btn-keyboard > span:first-of-type {
+                    display: none !important;
+                }
+                .nav-pill-dark .nav-btn:hover:not(.nav-btn-active):not(.nav-btn-back) {
+                    background: ${navigationColors.hoverBackground} !important;
+                }
+                .nav-pill-dark .nav-btn.nav-btn-active:hover {
+                    background: ${navigationColors.activeBackground} !important;
+                    border-color: ${navigationColors.activeBorder} !important;
+                    box-shadow: ${navigationColors.activeShadow} !important;
+                }
+                .nav-pill-dark .nav-btn.nav-btn-back:hover {
+                    background: ${navigationColors.backHoverBackground} !important;
+                    border-color: ${navigationColors.backBorder} !important;
+                }
                 @keyframes navbar-emergency-magnify {
                     0% { opacity: 0; transform: scale(0.7); }
                     8% { opacity: 1; transform: scale(1.02); }

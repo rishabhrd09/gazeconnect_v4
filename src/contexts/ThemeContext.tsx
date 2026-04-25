@@ -1,14 +1,14 @@
 /**
- * ThemeContext — Dark/Light theme with maximum cascade coverage
+ * ThemeContext — Dark/Light/Mix theme with maximum cascade coverage
  * ==============================================================
  * Sets data-theme attribute on BOTH html AND body elements.
- * Also sets .theme-light / .theme-dark classes as backup selectors.
+ * Also sets .theme-light / .theme-dark / .theme-mix classes as backup selectors.
  * Persists to localStorage for anti-flash on reload.
  *
  * RULES:
  * - No layout, spacing, content, or functionality changes
  * - Only visual color/font overrides
- * - Gaze cursor and dwell ring must remain visible in both modes
+ * - Gaze cursor and dwell ring must remain visible in all modes
  */
 
 import React, {
@@ -20,18 +20,20 @@ import React, {
   type ReactNode,
 } from 'react';
 
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'mix';
 
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (t: Theme) => void;
   isLight: boolean;
+  isMix: boolean;
 }
 
 export const ThemeContext = createContext<ThemeContextValue>({
   theme: 'dark',
   setTheme: () => {},
   isLight: false,
+  isMix: false,
 });
 
 function applyTheme(theme: Theme) {
@@ -43,15 +45,17 @@ function applyTheme(theme: Theme) {
   // Also set classes as backup selector
   html.classList.toggle('theme-light', theme === 'light');
   html.classList.toggle('theme-dark', theme === 'dark');
+  html.classList.toggle('theme-mix', theme === 'mix');
   body.classList.toggle('theme-light', theme === 'light');
   body.classList.toggle('theme-dark', theme === 'dark');
+  body.classList.toggle('theme-mix', theme === 'mix');
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     try {
       const saved = localStorage.getItem('gc-theme') as Theme;
-      return saved === 'light' ? 'light' : 'dark';
+      return saved === 'light' || saved === 'mix' ? saved : 'dark';
     } catch {
       return 'dark';
     }
@@ -80,6 +84,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       theme,
       setTheme,
       isLight: theme === 'light',
+      isMix: theme === 'mix',
     }}>
       {children}
     </ThemeContext.Provider>

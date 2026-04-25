@@ -59,7 +59,7 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.88)',
+      backgroundColor: isDarkMode ? 'rgba(0,0,0,0.88)' : 'rgba(245, 241, 234, 0.92)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       zIndex: 9999,
     }}>
@@ -80,7 +80,7 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
       </p>
       <button onClick={onDismiss} style={{
         padding: '18px 48px', backgroundColor: colors.accent.main, border: 'none',
-        borderRadius: '12px', color: '#fff', fontSize: '18px', fontWeight: 700,
+        borderRadius: '12px', color: isDarkMode ? '#fff' : colors.text.inverse, fontSize: '18px', fontWeight: 700,
         cursor: 'pointer', minWidth: '180px', minHeight: '64px',
       }}>
         Continue
@@ -209,6 +209,7 @@ const InnerApp: React.FC = () => {
   const { isAlertMode } = useAlertMode();
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [isLiveClockSuppressed, setIsLiveClockSuppressed] = useState(false);
   const [globalText, setGlobalText] = useState(() => {
     try {
       return sessionStorage.getItem(KEYBOARD_TEXT_SESSION_KEY) || '';
@@ -311,6 +312,7 @@ const InnerApp: React.FC = () => {
     switch (currentScreen) {
       case 'keyboard':
         return <KeyboardScreen {...common} onTextChange={handleTextChange} initialText={globalText}
+          onNavHiddenChange={setIsLiveClockSuppressed}
           getPredictions={ws.getPredictions} predictions={ws.predictions}
           sentencePredictions={ws.sentencePredictions}
           expandAbbreviation={ws.expandAbbreviation} abbreviationExpansion={ws.abbreviationExpansion}
@@ -362,7 +364,10 @@ const InnerApp: React.FC = () => {
     return (
       <div style={{
         width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#0D1117', color: '#8B949E', fontSize: '18px',
+        backgroundColor: darkColors.background.primary,
+        color: darkColors.text.secondary,
+        fontSize: '18px',
+        fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, sans-serif",
       }}>
         Loading settings...
       </div>
@@ -376,7 +381,7 @@ const InnerApp: React.FC = () => {
       display: 'flex', flexDirection: 'column',
     }}>
       {/* Live clock — hidden on screens where top-right is crowded */}
-      <LiveClock currentScreen={currentScreen} />
+      <LiveClock currentScreen={currentScreen} suppressed={isLiveClockSuppressed} />
 
       {/* Screen content */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
@@ -403,15 +408,15 @@ const InnerApp: React.FC = () => {
 
       {/* Mouse Only Mode indicator */}
       {isMouseMode && (
-        <div style={{
+        <div className="mouse-only-banner" style={{
           position: 'fixed',
           top: 4,
           right: 120,
           padding: '4px 12px',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
+          backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(183, 142, 73, 0.12)',
+          border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(183, 142, 73, 0.45)',
           borderRadius: '6px',
-          color: '#F59E0B',
+          color: isDarkMode ? '#F59E0B' : '#62584D',
           fontSize: '12px',
           fontWeight: 600,
           zIndex: 99999,
@@ -431,10 +436,10 @@ const InnerApp: React.FC = () => {
           top: 4,
           right: isMouseMode ? 230 : 120,
           padding: '4px 12px',
-          backgroundColor: 'rgba(239, 68, 68, 0.15)',
-          border: '1px solid rgba(239, 68, 68, 0.45)',
+          backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(179, 90, 75, 0.12)',
+          border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(179, 90, 75, 0.45)',
           borderRadius: '6px',
-          color: '#EF4444',
+          color: isDarkMode ? '#EF4444' : '#9E4A3D',
           fontSize: '12px',
           fontWeight: 700,
           zIndex: 99999,

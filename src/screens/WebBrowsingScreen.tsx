@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
-import { screenThemes } from '../utils/design';
+import { screenThemes, typography } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { useGazeBrowser } from '../hooks/useGazeBrowser';
@@ -15,14 +15,25 @@ import { WhatsAppIcon } from '../components/icons/Icons';
 const T = screenThemes.web;
 const GAP = 'clamp(24px, 3vh, 40px)'; // Even larger gap
 const CR = '24px';
-const CBG = 'linear-gradient(145deg,rgba(50,62,75,0.65),rgba(40,52,65,0.55))';
-const CB = '2px solid rgba(90,110,130,0.45)';
-const GL = 'rgba(30,45,60,0.65)';
-const TL = '#2DD4BF';
-const AC = '#58A6FF';
+const FONT_PRIMARY = typography.fontFamily.primary;
+const CBG = T.cardBg;
+const CB = T.cardBorder;
+const GL = T.glass;
+const TL = T.ai;
+const AC = T.accent;
+const DANGER = T.danger;
+const DANGER_BORDER = 'rgba(226, 140, 131, 0.42)';
+const INFO = T.info;
+const INFO_BORDER = 'rgba(150, 196, 232, 0.45)';
+const SOFT_INFO = T.softInfo;
+const SOFT_INFO_BORDER = 'rgba(180, 215, 238, 0.45)';
+const SUCCESS = T.success;
+const SUCCESS_BORDER = 'rgba(156, 197, 177, 0.45)';
+const STATUS = T.status;
+const STATUS_BORDER = 'rgba(126, 195, 221, 0.4)';
 
 const cs: React.CSSProperties = {
-    background: CBG, border: CB, borderRadius: CR, boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+    background: CBG, border: CB, borderRadius: CR, boxShadow: '0 6px 16px rgba(0,0,0,0.18)',
     transition: 'all 0.2s ease', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', cursor: 'pointer',
 };
@@ -30,16 +41,16 @@ const cs: React.CSSProperties = {
 // High-visibility large pill for categories
 const pill = (on: boolean, ac = AC): React.CSSProperties => ({
     padding: 'clamp(20px, 3vh, 32px) clamp(32px, 4vw, 50px)', // Massive touch target
-    fontSize: 'clamp(22px, 2.8vh, 30px)', fontWeight: on ? 700 : 600, fontFamily: "'Inter',sans-serif",
-    color: on ? '#fff' : 'rgba(255,255,255,0.7)', background: on ? `${ac}25` : GL,
-    border: on ? `3px solid ${ac}60` : '3px solid rgba(90,110,130,0.3)', borderRadius: '28px',
+    fontSize: 'clamp(22px, 2.8vh, 30px)', fontWeight: on ? 700 : 600, fontFamily: FONT_PRIMARY,
+    color: on ? T.textMain : T.textSub, background: on ? `${ac}18` : GL,
+    border: on ? `2px solid ${ac}70` : CB, borderRadius: '28px',
     whiteSpace: 'nowrap' as const, minHeight: 'clamp(80px, 10vh, 110px)', width: 'auto', // Override fixed size
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', flexShrink: 0
 });
 const cb: React.CSSProperties = {
     padding: 'clamp(20px, 2.6vh, 30px) clamp(30px, 4vw, 48px)', // Generous padding
-    fontSize: 'clamp(19px, 2.4vh, 26px)', fontWeight: 600, fontFamily: "'Inter',sans-serif",
-    color: '#fff', background: GL, border: '2px solid rgba(90,110,130,0.3)', borderRadius: '20px',
+    fontSize: 'clamp(19px, 2.4vh, 26px)', fontWeight: 600, fontFamily: FONT_PRIMARY,
+    color: T.textMain, background: GL, border: CB, borderRadius: '20px',
     minHeight: 'clamp(70px, 9vh, 100px)', width: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
 };
 
@@ -50,9 +61,9 @@ const BackBtn = ({ onClick, ige, ts, toggleGaze, label = "← Home Grid", showHo
                 style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     height: 'clamp(64px, 8.5vh, 90px)', padding: '0 clamp(40px, 6vw, 80px)',
-                    fontFamily: "'Outfit', system-ui", fontWeight: 700, fontSize: 'clamp(20px, 2.6vh, 28px)',
-                    color: 'rgba(255, 255, 255, 0.95)', background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px',
+                    fontFamily: FONT_PRIMARY, fontWeight: 700, fontSize: 'clamp(20px, 2.6vh, 28px)',
+                    color: T.textMain, background: GL,
+                    border: '1px solid rgba(168, 181, 196, 0.14)', borderRadius: '24px',
                     backdropFilter: 'blur(16px)', letterSpacing: '0.5px',
                     minWidth: 'clamp(260px, 30vw, 380px)', cursor: 'pointer', transition: 'all 0.2s ease', gap: '12px'
                 }}>
@@ -68,13 +79,13 @@ const BackBtn = ({ onClick, ige, ts, toggleGaze, label = "← Home Grid", showHo
             data-gaze-always="true"
             style={{
                 padding: '0',
-                backgroundColor: ige ? 'rgba(45, 212, 191, 0.25)' : 'rgba(255, 255, 255, 0.15)',
-                border: `3px solid ${ige ? '#2DD4BF' : 'rgba(255, 255, 255, 0.6)'}`,
+                backgroundColor: ige ? `${TL}20` : GL,
+                border: `3px solid ${ige ? TL : '#2A3D52'}`,
                 borderRadius: '50%',
-                color: ige ? '#2DD4BF' : '#ffffff',
+                color: ige ? TL : T.textSub,
                 width: centerGaze ? 'clamp(90px, 12vh, 120px)' : 'clamp(75px, 10vh, 100px)',
                 height: centerGaze ? 'clamp(90px, 12vh, 120px)' : 'clamp(75px, 10vh, 100px)',
-                boxShadow: ige ? '0 0 20px rgba(45,212,191,0.3)' : '0 4px 12px rgba(0,0,0,0.3)',
+                boxShadow: ige ? '0 0 20px rgba(95,205,189,0.2)' : '0 8px 18px rgba(0,0,0,0.28)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -426,15 +437,15 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
             }}>
                 <div style={{ display: 'flex', gap: 'clamp(16px,2.5vw,28px)', flexShrink: 0, flexWrap: 'wrap', marginBottom: 'clamp(12px,2vh,20px)' }}>
                     <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); setReaderLiveMode(false); browser.closePage(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#FF8A65', borderColor: 'rgba(255,138,101,0.4)', minWidth: 'clamp(130px,13vw,170px)' }}>✕ Close</GazeButton>
+                        style={{ ...cb, color: DANGER, borderColor: DANGER_BORDER, minWidth: 'clamp(130px,13vw,170px)' }}>✕ Close</GazeButton>
                     <GazeButton id="n-read" onClick={() => onSpeak(`${sel.title}. ${sel.summary || sel.description || ''}`)} gazeEnabled={ige}
                         gazeEnabledTimestamp={ts} isDarkMode style={{ ...cb, color: TL, borderColor: `${TL}50`, minWidth: 'clamp(130px,13vw,170px)' }}>🔊 Read</GazeButton>
                     <GazeButton id="n-reader" onClick={openReaderView} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#90CAF9', borderColor: 'rgba(144,202,249,0.5)', minWidth: 'clamp(160px,16vw,220px)' }}>
+                        style={{ ...cb, color: INFO, borderColor: INFO_BORDER, minWidth: 'clamp(160px,16vw,220px)' }}>
                         📖 Read Full Story
                     </GazeButton>
                     <GazeButton id="n-reader-web" onClick={openReaderFallbackWeb} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#A5D6A7', borderColor: 'rgba(165,214,167,0.5)', minWidth: 'clamp(150px,15vw,220px)' }}>
+                        style={{ ...cb, color: SUCCESS, borderColor: SUCCESS_BORDER, minWidth: 'clamp(150px,15vw,220px)' }}>
                         🌐 Open in Browser
                     </GazeButton>
                     {readerLiveMode && (
@@ -446,22 +457,22 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         <GazeButton id="n-bv-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                             style={{ ...cb, minWidth: 'clamp(100px,10vw,140px)' }}>⬇ Down</GazeButton>
                         <GazeButton id="n-reader-text" onClick={() => { setReaderLiveMode(false); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, color: '#B3E5FC', borderColor: 'rgba(179,229,252,0.45)', minWidth: 'clamp(150px,15vw,220px)' }}>
+                            style={{ ...cb, color: SOFT_INFO, borderColor: SOFT_INFO_BORDER, minWidth: 'clamp(150px,15vw,220px)' }}>
                             📖 Reader View
                         </GazeButton>
                         </>
                     )}
                     <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#E53E3E', borderColor: 'rgba(229,62,62,0.4)', minWidth: 'clamp(110px,11vw,150px)' }}>⏹ Stop</GazeButton>
+                        style={{ ...cb, color: DANGER, borderColor: DANGER_BORDER, minWidth: 'clamp(110px,11vw,150px)' }}>⏹ Stop</GazeButton>
                     <GazeButton id="n-scroll" onClick={() => scrollRef.current?.scrollBy({ top: 280, behavior: 'smooth' })} gazeEnabled={ige}
                         gazeEnabledTimestamp={ts} isDarkMode style={{ ...cb, color: AC, borderColor: `${AC}50`, minWidth: 'clamp(130px,13vw,170px)' }}>⬇ Scroll</GazeButton>
                     {ws.newsCached && (
                         <div style={{
                             ...cb,
                             minHeight: 'clamp(54px,7vh,80px)',
-                            color: '#7DD3FC',
-                            borderColor: 'rgba(125,211,252,0.4)',
-                            background: 'rgba(14,116,144,0.18)',
+                            color: STATUS,
+                            borderColor: STATUS_BORDER,
+                            background: 'rgba(16, 67, 93, 0.22)',
                         }}>📡 Cached</div>
                     )}
                 </div>
@@ -475,12 +486,12 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             alignItems: 'stretch',
                             justifyContent: 'center',
                             padding: 'clamp(12px,1.4vh,16px)',
-                            background: 'linear-gradient(155deg, rgba(30,50,70,0.62), rgba(18,34,52,0.58))',
+                            background: T.cardBg,
                         }}>
                             <div style={{ fontSize: 'clamp(12px,1.35vh,14px)', color: 'rgba(173,194,214,0.75)', marginBottom: '6px', letterSpacing: '0.02em' }}>
                                 CURRENT CATEGORY
                             </div>
-                            <div style={{ fontSize: 'clamp(18px,2vh,22px)', fontWeight: 700, color: '#E6EDF3' }}>
+                            <div style={{ fontSize: 'clamp(18px,2vh,22px)', fontWeight: 700, color: T.textMain }}>
                                 {currentCategory?.icon} {currentCategory?.label || 'Top Stories'}
                             </div>
                         </div>
@@ -508,14 +519,14 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                             justifyContent: 'space-between',
                                             padding: 'clamp(14px,1.7vh,18px)',
                                             minHeight: 'clamp(96px, 10.5vh, 122px)',
-                                            background: sel.title === it.title ? 'linear-gradient(155deg, rgba(63,109,158,0.32), rgba(28,48,75,0.42))' : 'linear-gradient(155deg, rgba(28,40,56,0.62), rgba(20,30,45,0.52))',
-                                            border: sel.title === it.title ? '2px solid rgba(88,166,255,0.65)' : '1px solid rgba(90,110,130,0.38)',
+                                            background: sel.title === it.title ? 'rgba(56, 189, 248, 0.10)' : T.cardBg,
+                                            border: sel.title === it.title ? `2px solid ${AC}90` : CB,
                                         }}
                                     >
                                         <div style={{
                                             fontSize: 'clamp(15px,1.65vh,19px)',
                                             fontWeight: 600,
-                                            color: '#E6EDF3',
+                                            color: T.textMain,
                                             lineHeight: 1.35,
                                             display: '-webkit-box',
                                             WebkitLineClamp: 2,
@@ -566,15 +577,15 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         <div ref={scrollRef} style={{
                             ...cs, flex: 1, alignItems: 'stretch', justifyContent: 'flex-start',
                             padding: 'clamp(28px, 3.8vh, 48px)', overflow: 'auto', minHeight: 0,
-                            background: 'linear-gradient(160deg, rgba(30,42,58,0.72), rgba(20,30,44,0.58))',
+                            background: T.cardBg,
                         }}>
                             <div style={{ width: '100%', maxWidth: 'min(980px, 100%)', margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
                                 <h2 style={{
                                     fontSize: 'clamp(30px, 4vh, 46px)',
                                     fontWeight: 700,
-                                    color: '#E6EDF3',
+                                    color: T.textMain,
                                     margin: 0,
-                                    fontFamily: "'Outfit',sans-serif",
+                                    fontFamily: FONT_PRIMARY,
                                     lineHeight: 1.25,
                                     letterSpacing: '-0.015em',
                                 }}>
@@ -593,11 +604,11 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                     <span>{sel.source || 'News'}</span>
                                     <span>•</span>
                                     <span>{sel.relative_time || 'Recent'}</span>
-                                    {readerData?.cached && <span style={{ color: '#7DD3FC' }}>📡 Reader Cache</span>}
+                                    {readerData?.cached && <span style={{ color: STATUS }}>📡 Reader Cache</span>}
                                     {readerData?.fallback && <span style={{ color: '#FFCC80' }}>Fallback mode</span>}
                                 </div>
 
-                                <div style={{ height: 1, background: 'linear-gradient(to right, rgba(88,166,255,0.55), rgba(88,166,255,0.05))', margin: 'clamp(16px,2vh,22px) 0 clamp(20px,2.4vh,30px)' }} />
+                                <div style={{ height: 1, background: 'rgba(56, 189, 248, 0.18)', margin: 'clamp(16px,2vh,22px) 0 clamp(20px,2.4vh,30px)' }} />
 
                                 {readerLoading && (
                                     <div style={{ fontSize: 'clamp(20px,2.3vh,26px)', color: 'rgba(255,255,255,0.76)', lineHeight: 1.8 }}>
@@ -657,7 +668,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                 <GazeButton id="n-ref" onClick={() => { setIsLoading(true); ws.refreshNews(cat, 9); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{ ...cb, minHeight: 'clamp(80px, 10vh, 110px)' }}>🔄 Refresh</GazeButton>
                 <GazeButton id="n-auto" onClick={startAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                    style={{ ...cb, minHeight: 'clamp(80px, 10vh, 110px)', color: '#A5D6A7', borderColor: 'rgba(165,214,167,0.45)' }}>▶ Auto-Read</GazeButton>
+                    style={{ ...cb, minHeight: 'clamp(80px, 10vh, 110px)', color: SUCCESS, borderColor: SUCCESS_BORDER }}>▶ Auto-Read</GazeButton>
                 <GazeButton id="n-pause" onClick={pauseAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{ ...cb, minHeight: 'clamp(80px, 10vh, 110px)', color: '#F9E79F', borderColor: 'rgba(249,231,159,0.4)' }}>
                     {autoReadPaused ? '⏵ Resume' : '⏸ Pause'}
@@ -668,7 +679,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     <div style={{
                         ...cb,
                         minHeight: 'clamp(80px, 10vh, 110px)',
-                        color: '#7DD3FC',
+                        color: STATUS,
                         borderColor: 'rgba(125,211,252,0.4)',
                         background: 'rgba(14,116,144,0.18)',
                     }}>📡 Cached</div>
@@ -686,10 +697,10 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             alignItems: 'flex-start',
                             opacity: it ? 1 : 0.35,
                             border: autoReadOn && i === activeAutoReadIndex ? `3px solid ${TL}` : CB,
-                            boxShadow: autoReadOn && i === activeAutoReadIndex ? '0 0 18px rgba(45,212,191,0.45)' : cs.boxShadow,
+                            boxShadow: autoReadOn && i === activeAutoReadIndex ? '0 0 0 1px rgba(95,205,189,0.22), 0 6px 16px rgba(0,0,0,0.18)' : cs.boxShadow,
                         }}>
                         <div style={{
-                            fontSize: 'clamp(19px, 2.4vh, 30px)', fontWeight: 700, color: '#E6EDF3', lineHeight: 1.35,
+                            fontSize: 'clamp(19px, 2.4vh, 30px)', fontWeight: 700, color: T.textMain, lineHeight: 1.35,
                             display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden', flex: 1, textAlign: 'left',
                         }}>{it?.title || (isLoading ? 'Loading...' : 'No news available right now')}</div>
                         {it && (
@@ -754,7 +765,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             <div style={{ display: 'flex', gap: 'clamp(12px,1.5vw,20px)', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
                 <GazeButton id="yt-close" onClick={stop} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{
-                        ...cb, color: '#FF8A65', borderColor: 'rgba(255,138,101,0.4)', flex: 1.4, minWidth: 'clamp(150px,15vw,200px)',
+                        ...cb, color: DANGER, borderColor: DANGER_BORDER, flex: 1.4, minWidth: 'clamp(150px,15vw,200px)',
                         fontSize: 'clamp(18px,2.2vh,24px)', padding: 'clamp(14px,1.8vh,22px) clamp(20px,2.5vw,30px)', minHeight: 'clamp(60px, 8vh, 85px)'
                     }}>✕ Close</GazeButton>
                 <GazeButton id="yt-back" onClick={() => browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -794,7 +805,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             </div>
             {/* Now playing label */}
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 'clamp(16px,2vh,20px)', padding: '0 8px', flexShrink: 0, fontWeight: 600 }}>
-                🎬 <b style={{ color: '#E6EDF3' }}>{playing.title}</b> — {playing.ch}
+                🎬 <b style={{ color: T.textMain }}>{playing.title}</b> — {playing.ch}
             </div>
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 {browser.edgeScrollDirection === 'up' && (
@@ -851,7 +862,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         </div>
                         <div style={{ padding: 'clamp(14px,2vh,22px)', flexShrink: 0, width: '100%', textAlign: 'center' }}>
                             <div style={{
-                                fontSize: 'clamp(18px,2.2vh,24px)', fontWeight: 600, color: '#E6EDF3', lineHeight: 1.3,
+                                fontSize: 'clamp(18px,2.2vh,24px)', fontWeight: 600, color: T.textMain, lineHeight: 1.3,
                                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                             }}>{v.title}</div>
                             <div style={{ fontSize: 'clamp(14px,1.8vh,18px)', color: 'rgba(255,255,255,0.45)', marginTop: '8px' }}>{v.ch}</div>
@@ -886,7 +897,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                     gazeEnabledTimestamp={ts} isDarkMode style={{ ...cb, color: TL, borderColor: `${TL}40` }}>🔊 Read</GazeButton>
                 <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
                 <GazeButton id="kb-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                    style={{ ...cb, color: '#E53E3E', borderColor: 'rgba(229,62,62,0.3)' }}>⏹ Stop</GazeButton>
+                    style={{ ...cb, color: DANGER, borderColor: DANGER_BORDER }}>⏹ Stop</GazeButton>
                 <GazeButton id="kb-scr" onClick={() => scrollRef.current?.scrollBy({ top: 250, behavior: 'smooth' })} gazeEnabled={ige}
                     gazeEnabledTimestamp={ts} isDarkMode style={{ ...cb, color: AC, borderColor: `${AC}40` }}>⬇ Scroll</GazeButton>
             </div>
@@ -894,7 +905,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                 ...cs, flex: 1, width: '100%', height: 'auto', alignItems: 'flex-start', justifyContent: 'flex-start',
                 padding: 'clamp(24px,3.5vh,40px)', overflow: 'auto', minHeight: 0
             }}>
-                <h2 style={{ fontSize: 'clamp(22px,3vh,32px)', fontWeight: 700, color: '#E6EDF3', margin: '0 0 10px 0', fontFamily: "'Outfit',sans-serif" }}>{selArt.title}</h2>
+                <h2 style={{ fontSize: 'clamp(22px,3vh,32px)', fontWeight: 700, color: T.textMain, margin: '0 0 10px 0', fontFamily: FONT_PRIMARY }}>{selArt.title}</h2>
                 <div style={{ fontSize: 'clamp(16px,2.2vh,22px)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.75, whiteSpace: 'pre-line' as const }}>{selArt.content}</div>
             </div>
         </div>
@@ -920,7 +931,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                         }}>
                         <span style={{ fontSize: 'clamp(22px,2.8vh,30px)' }}>{c.icon}</span>
                         <div>
-                            <div style={{ fontSize: 'clamp(15px,1.8vh,19px)', fontWeight: 600, color: selCat === c.id ? (c.color || AC) : '#E6EDF3' }}>{c.title}</div>
+                            <div style={{ fontSize: 'clamp(15px,1.8vh,19px)', fontWeight: 600, color: selCat === c.id ? (c.color || AC) : T.textMain }}>{c.title}</div>
                             <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>{c.article_count} articles</div>
                         </div>
                     </GazeButton>
@@ -931,7 +942,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                     <GazeButton key={a.id} id={`ka-${i}`} onClick={() => { setSelArt({ ...a, content: a.summary || 'Loading...' }); ws.getKnowledgeArticle(a.id); }}
                         gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                         style={{ ...cs, justifyContent: 'space-between', alignItems: 'flex-start', padding: 'clamp(16px,2.2vh,26px)' }}>
-                        <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 600, color: '#E6EDF3', lineHeight: 1.35, flex: 1, textAlign: 'left' }}>{a.title}</div>
+                        <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 600, color: T.textMain, lineHeight: 1.35, flex: 1, textAlign: 'left' }}>{a.title}</div>
                         <div style={{
                             fontSize: 'clamp(13px,1.5vh,16px)', color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: '8px', textAlign: 'left',
                             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden'
@@ -1065,7 +1076,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         background: 'rgba(20,30,40,0.7)', borderBottom: '1px solid rgba(90,110,130,0.3)', borderRadius: '16px 16px 0 0',
                     }}>
                         <GazeButton id="bv-close" onClick={closeWebTopic} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, color: '#FF8A65', borderColor: 'rgba(255,138,101,0.4)', flex: 1, minWidth: 'clamp(100px,9vw,140px)', padding: 'clamp(10px,1.5vh,16px) clamp(20px,2vw,30px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>✕ Close</GazeButton>
+                            style={{ ...cb, color: DANGER, borderColor: DANGER_BORDER, flex: 1, minWidth: 'clamp(100px,9vw,140px)', padding: 'clamp(10px,1.5vh,16px) clamp(20px,2vw,30px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>✕ Close</GazeButton>
                         <GazeButton id="bv-click-qs" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                             style={{ ...cb, color: TL, borderColor: `${TL}50`, flex: 1, minWidth: 'clamp(100px,9vw,140px)', padding: 'clamp(10px,1.5vh,16px) clamp(20px,2vw,30px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>👆 Click Here</GazeButton>
                         <GazeButton id="bv-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -1080,11 +1091,11 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                             {browser.canGoBack ? '← Back' : '← Exit'}
                         </GazeButton>
                         <GazeButton id="bv-zoom-in" onClick={() => browser.adjustZoom(0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: '#B3E5FC', borderColor: 'rgba(179,229,252,0.45)', padding: 'clamp(10px,1.5vh,16px) clamp(16px,2vw,24px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>🔍+</GazeButton>
+                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: SOFT_INFO, borderColor: SOFT_INFO_BORDER, padding: 'clamp(10px,1.5vh,16px) clamp(16px,2vw,24px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>🔍+</GazeButton>
                         <GazeButton id="bv-zoom-out" onClick={() => browser.adjustZoom(-0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: '#B3E5FC', borderColor: 'rgba(179,229,252,0.45)', padding: 'clamp(10px,1.5vh,16px) clamp(16px,2vw,24px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>🔍-</GazeButton>
+                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: SOFT_INFO, borderColor: SOFT_INFO_BORDER, padding: 'clamp(10px,1.5vh,16px) clamp(16px,2vw,24px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>🔍-</GazeButton>
                         <GazeButton id="bv-links-toggle" onClick={() => setShowLinksSidebar((s) => !s)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, minWidth: 'clamp(120px,10vw,160px)', color: '#A5D6A7', borderColor: 'rgba(165,214,167,0.45)', padding: 'clamp(10px,1.5vh,16px) clamp(20px,2vw,30px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>
+                            style={{ ...cb, minWidth: 'clamp(120px,10vw,160px)', color: SUCCESS, borderColor: SUCCESS_BORDER, padding: 'clamp(10px,1.5vh,16px) clamp(20px,2vw,30px)', minHeight: 'clamp(50px, 6vh, 70px)' }}>
                             {showLinksSidebar ? '✕ Hide Links' : '📋 Show Links'}
                         </GazeButton>
                     </div>
@@ -1112,7 +1123,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                             gap: 'clamp(8px,1vh,12px)',
                             overflow: 'hidden',
                         }}>
-                            <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 700, color: '#E6EDF3' }}>📋 Page Links</div>
+                            <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 700, color: T.textMain }}>📋 Page Links</div>
                             <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
                                 {browser.pageLinks.length ? browser.pageLinks.map((link, idx) => (
                                     <GazeButton
@@ -1131,7 +1142,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                 )}
                             </div>
                             <GazeButton id="bv-links-refresh" onClick={() => browser.refreshLinks()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                                style={{ ...cb, minHeight: 'clamp(56px,7vh,78px)', color: '#90CAF9', borderColor: 'rgba(144,202,249,0.45)' }}>🔄 Refresh Links</GazeButton>
+                                style={{ ...cb, minHeight: 'clamp(56px,7vh,78px)', color: INFO, borderColor: INFO_BORDER }}>🔄 Refresh Links</GazeButton>
                         </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
@@ -1202,16 +1213,16 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
             }}>
                 <div style={{ display: 'flex', gap: 'clamp(14px,2vw,24px)', flexWrap: 'wrap' }}>
                     <GazeButton id="qs-card-back" onClick={() => { setTopic(null); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#FF8A65', borderColor: 'rgba(255,138,101,0.4)' }}>← Back</GazeButton>
+                        style={{ ...cb, color: DANGER, borderColor: DANGER_BORDER }}>← Back</GazeButton>
                     <GazeButton id="qs-card-refresh" onClick={() => ws.getQuickSnapshot(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#90CAF9', borderColor: 'rgba(144,202,249,0.45)' }}>🔄 Refresh Data</GazeButton>
+                        style={{ ...cb, color: INFO, borderColor: INFO_BORDER }}>🔄 Refresh Data</GazeButton>
                     <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
                     <GazeButton id="qs-card-open-web" onClick={openLiveWebFromCard} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: '#A5D6A7', borderColor: 'rgba(165,214,167,0.45)' }}>🌐 Open Live Web</GazeButton>
+                        style={{ ...cb, color: SUCCESS, borderColor: SUCCESS_BORDER }}>🌐 Open Live Web</GazeButton>
                     <GazeButton id="qs-card-read" onClick={speakCardSummary} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                         style={{ ...cb, color: TL, borderColor: `${TL}50` }}>🔊 Read Answer Aloud</GazeButton>
                     {isCached && (
-                        <div style={{ ...cb, color: '#7DD3FC', borderColor: 'rgba(125,211,252,0.4)', background: 'rgba(14,116,144,0.18)' }}>
+                        <div style={{ ...cb, color: STATUS, borderColor: STATUS_BORDER, background: 'rgba(16, 67, 93, 0.22)' }}>
                             📡 Cached
                         </div>
                     )}
@@ -1226,7 +1237,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     overflow: 'auto',
                     whiteSpace: 'pre-line' as const,
                 }}>
-                    <div style={{ fontSize: 'clamp(30px,4.2vh,46px)', fontWeight: 700, color: '#E6EDF3', marginBottom: '24px' }}>
+                    <div style={{ fontSize: 'clamp(30px,4.2vh,46px)', fontWeight: 700, color: T.textMain, marginBottom: '24px' }}>
                         {topic.icon} {topic.label}
                     </div>
                     <div style={{ fontSize: 'clamp(22px,3vh,34px)', color: 'rgba(255,255,255,0.92)', lineHeight: 1.8 }}>
@@ -1247,8 +1258,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
             flex: 1, display: 'flex', flexDirection: 'column', padding: GAP, gap: GAP, overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)'
         }}>
             <div style={{
-                textAlign: 'center', color: '#E6EDF3', fontSize: 'clamp(22px,3vh,30px)', fontWeight: 700,
-                padding: 'clamp(8px,1.5vh,16px) 0', flexShrink: 0, fontFamily: "'Outfit',sans-serif", letterSpacing: '1.5px',
+                textAlign: 'center', color: T.textMain, fontSize: 'clamp(22px,3vh,30px)', fontWeight: 700,
+                padding: 'clamp(8px,1.5vh,16px) 0', flexShrink: 0, fontFamily: FONT_PRIMARY, letterSpacing: '1.5px',
             }}>🔍 QUICK SEARCH</div>
             <div style={{
                 flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gridTemplateRows: 'repeat(2,1fr)',
@@ -1258,7 +1269,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     <GazeButton key={t.id} id={`qs-${t.id}`} onClick={() => openTopic(t)}
                         gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode style={{ ...cs, gap: 'clamp(12px,2vh,20px)' }}>
                         <span style={{ fontSize: 'clamp(38px,5.5vh,58px)' }}>{t.icon}</span>
-                        <span style={{ fontSize: 'clamp(17px,2.3vh,23px)', fontWeight: 600, color: '#E6EDF3', fontFamily: "'Outfit',sans-serif" }}>{t.label}</span>
+                        <span style={{ fontSize: 'clamp(17px,2.3vh,23px)', fontWeight: 600, color: T.textMain, fontFamily: FONT_PRIMARY }}>{t.label}</span>
                     </GazeButton>
                 ))}
             </div>
@@ -1304,7 +1315,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
             }}>
                 <GazeButton id="bv-close" onClick={close} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{
-                        ...cb, color: '#FF8A65', borderColor: 'rgba(255,138,101,0.4)', flex: 1, minWidth: 'clamp(100px,10vw,140px)',
+                        ...cb, color: DANGER, borderColor: DANGER_BORDER, flex: 1, minWidth: 'clamp(100px,10vw,140px)',
                         fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
                     }}>✕ Close</GazeButton>
                 <GazeButton id="bv-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -1363,8 +1374,8 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
             marginTop: isNavHidden ? '0' : 'clamp(95px,12.5vh,125px)', paddingBottom: 'clamp(20px, 2.5vh, 40px)', transition: 'margin-top 0.3s ease'
         }}>
             <div style={{ ...cs, width: 'clamp(420px,42vw,620px)', height: 'auto', padding: 'clamp(40px,5.5vh,65px)', gap: 'clamp(20px,3.2vh,36px)' }}>
-                <div style={{ color: '#25D366', display: 'flex' }}><WhatsAppIcon size={88} /></div>
-                <h2 style={{ fontSize: 'clamp(24px,3.2vh,34px)', fontWeight: 700, color: '#E6EDF3', margin: 0, fontFamily: "'Outfit',sans-serif" }}>WhatsApp Web</h2>
+                <div style={{ color: T.whatsapp, display: 'flex' }}><WhatsAppIcon size={88} /></div>
+                <h2 style={{ fontSize: 'clamp(24px,3.2vh,34px)', fontWeight: 700, color: T.textMain, margin: 0, fontFamily: FONT_PRIMARY }}>WhatsApp Web</h2>
                 <p style={{ fontSize: 'clamp(15px,2vh,19px)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, margin: 0, textAlign: 'center', maxWidth: '420px' }}>
                     Connect WhatsApp to send messages using eye gaze. Scan a QR code with your phone.
                 </p>
@@ -1420,7 +1431,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                         background: 'rgba(20,30,40,0.7)', borderBottom: '1px solid rgba(90,110,130,0.3)', borderRadius: '16px 16px 0 0',
                     }}>
                         <GazeButton id="soc-close" onClick={() => { browser.closePage(); setTopic(null); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, color: '#FF8A65', borderColor: 'rgba(255,138,101,0.4)', flex: 1, minWidth: 'clamp(100px,9vw,140px)' }}>✕ Close</GazeButton>
+                            style={{ ...cb, color: DANGER, borderColor: DANGER_BORDER, flex: 1, minWidth: 'clamp(100px,9vw,140px)' }}>✕ Close</GazeButton>
                         <GazeButton id="soc-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                             style={{ ...cb, color: TL, borderColor: `${TL}50`, flex: 1, minWidth: 'clamp(100px,9vw,140px)' }}>👆 Click Here</GazeButton>
                         <GazeButton id="soc-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -1435,9 +1446,9 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                             {browser.canGoBack ? '← Back' : '← Exit'}
                         </GazeButton>
                         <GazeButton id="soc-zoom-in" onClick={() => browser.adjustZoom(0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: '#B3E5FC', borderColor: 'rgba(179,229,252,0.45)' }}>🔍+</GazeButton>
+                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: SOFT_INFO, borderColor: SOFT_INFO_BORDER }}>🔍+</GazeButton>
                         <GazeButton id="soc-zoom-out" onClick={() => browser.adjustZoom(-0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: '#B3E5FC', borderColor: 'rgba(179,229,252,0.45)' }}>🔍-</GazeButton>
+                            style={{ ...cb, minWidth: 'clamp(70px,6vw,100px)', color: SOFT_INFO, borderColor: SOFT_INFO_BORDER }}>🔍-</GazeButton>
                     </div>
                 </div>
                 <div style={{ height: '75%', display: 'flex', width: '100%', padding: 'clamp(12px,1.5vh,20px) clamp(16px,2vw,24px)', boxSizing: 'border-box' }}>
@@ -1458,7 +1469,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T.bg, padding: 'clamp(20px, 4vh, 60px)' }}>
-            <h2 style={{ fontSize: 'clamp(32px, 4.5vh, 48px)', color: '#F8FAFC', marginBottom: 'clamp(40px, 6vh, 80px)', fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>
+            <h2 style={{ fontSize: 'clamp(32px, 4.5vh, 48px)', color: T.textMain, marginBottom: 'clamp(40px, 6vh, 80px)', fontFamily: FONT_PRIMARY, fontWeight: 800 }}>
                 Social Media
             </h2>
             <div style={{ display: 'flex', gap: '32px', width: 'clamp(800px, 85vw, 1200px)' }}>
@@ -1467,7 +1478,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                     gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{
                         ...cb, flex: 1, height: 'clamp(160px, 22vh, 220px)', borderRadius: '20px',
-                        fontFamily: "'Outfit', sans-serif", fontSize: 'clamp(26px, 3.2vh, 38px)', fontWeight: 800,
+                        fontFamily: FONT_PRIMARY, fontSize: 'clamp(26px, 3.2vh, 38px)', fontWeight: 800,
                         background: 'rgba(10,102,194,0.15)', border: '3px solid rgba(10,102,194,0.5)', color: '#fff'
                     }}>
                     💼 LinkedIn
@@ -1477,7 +1488,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                     gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{
                         ...cb, flex: 1, height: 'clamp(160px, 22vh, 220px)', borderRadius: '20px',
-                        fontFamily: "'Outfit', sans-serif", fontSize: 'clamp(26px, 3.2vh, 38px)', fontWeight: 800,
+                        fontFamily: FONT_PRIMARY, fontSize: 'clamp(26px, 3.2vh, 38px)', fontWeight: 800,
                         background: 'rgba(234,67,53,0.15)', border: '3px solid rgba(234,67,53,0.5)', color: '#fff'
                     }}>
                     📧 Gmail
@@ -1487,7 +1498,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                     gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                     style={{
                         ...cb, flex: 1, height: 'clamp(160px, 22vh, 220px)', borderRadius: '20px',
-                        fontFamily: "'Outfit', sans-serif", fontSize: 'clamp(26px, 3.2vh, 38px)', fontWeight: 800,
+                        fontFamily: FONT_PRIMARY, fontSize: 'clamp(26px, 3.2vh, 38px)', fontWeight: 800,
                         background: 'rgba(37,211,102,0.15)', border: '3px solid rgba(37,211,102,0.5)', color: '#fff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px'
                     }}>
@@ -1678,7 +1689,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                                     gap: '2px'
                                 }}>
                                     <span style={{
-                                        fontFamily: "'Outfit', system-ui", fontWeight: 700,
+                                        fontFamily: FONT_PRIMARY, fontWeight: 700,
                                         fontSize: 'clamp(22px, 2.8vh, 32px)', color: 'rgba(255, 255, 255, 0.95)',
                                         textAlign: 'center', lineHeight: 1.2, letterSpacing: '0.3px',
                                     }}>

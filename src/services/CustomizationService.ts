@@ -16,6 +16,13 @@ import type {
   AlertModeCard,
 } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
+import {
+  CARE_ACTIVITY_CATEGORIES,
+  CARE_CONTENT_ARCHITECTURE_VERSION,
+  CARE_MEDICAL_SECTIONS,
+  CARE_PHRASE_CATEGORIES,
+  CARE_QUICK_WORDS,
+} from './careContentPresets';
 
 const DEBOUNCE_MS = 500;
 
@@ -26,7 +33,7 @@ export class CustomizationService {
   private loaded = false;
 
   constructor() {
-    this.data = structuredClone(DEFAULT_CUSTOMIZATION);
+    this.data = this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true);
   }
 
   // ============================================
@@ -70,7 +77,7 @@ export class CustomizationService {
       coreWords: (savedQW as any).coreWords ?? defaults.quickWords.coreWords,
     };
 
-    return {
+    const merged: CustomizationData = {
       ...defaults,
       ...saved,
       // Deep merge settings to preserve new settings keys
@@ -89,6 +96,23 @@ export class CustomizationService {
       basicNeeds: saved.basicNeeds ?? defaults.basicNeeds,
       alertModeCards: saved.alertModeCards ?? defaults.alertModeCards,
       version: saved.version ?? defaults.version,
+    };
+
+    return this.applyCareContentArchitecture(merged, (saved.version ?? 1) < CARE_CONTENT_ARCHITECTURE_VERSION);
+  }
+
+  private applyCareContentArchitecture(data: CustomizationData, force: boolean): CustomizationData {
+    if (!force && (data.version ?? 1) >= CARE_CONTENT_ARCHITECTURE_VERSION) {
+      return data;
+    }
+
+    return {
+      ...data,
+      phraseCategories: structuredClone(CARE_PHRASE_CATEGORIES),
+      medicalSections: structuredClone(CARE_MEDICAL_SECTIONS),
+      quickWords: structuredClone(CARE_QUICK_WORDS),
+      activityCategories: structuredClone(CARE_ACTIVITY_CATEGORIES),
+      version: Math.max(data.version ?? 1, CARE_CONTENT_ARCHITECTURE_VERSION),
     };
   }
 
@@ -332,7 +356,7 @@ export class CustomizationService {
   }
 
   resetToDefaults(): void {
-    this.data = structuredClone(DEFAULT_CUSTOMIZATION);
+    this.data = this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true);
     this.scheduleSave();
     this.notify();
   }

@@ -1,19 +1,18 @@
 /**
- * GazeConnect Pro - Assistance (Daily Care) (Formerly Medical Screen)
- * ===================================================================
- * v5.0: Responsive 13"–27" — consistent with Phrases/Activities pattern
- * - Left Sidebar: Category Selection (Urgent, Bed, Daily)
- * - Right Area: Large, spacious buttons for selected category
- * - Gaze toggle centered at bottom of right panel
+ * GazeConnect Pro - Assistance (Daily Care)
+ * =========================================
+ * Two-step gaze flow:
+ * 1. Select one of four large care categories.
+ * 2. Select from full-width phrase/action cards.
  */
 import React, { useState, useCallback } from 'react';
 import { darkColors, lightColors, screenThemes } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
-import { MedicalCrossIcon, BedMechanicIcon, SunIcon } from '../components/icons/Icons';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
+import type { MedicalSection } from '../types/customization';
 
 interface MedicalScreenProps {
   onNavigate: (screen: string) => void;
@@ -24,346 +23,515 @@ interface MedicalScreenProps {
 
 interface MedItem { en: string; hi: string; urgent?: boolean; }
 
-// ============================================
-// STATIC ICON & COLOR MAPPINGS
-// ============================================
+interface CareIconProps {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}
+
+const ClinicalAirwayIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M25 16c-6 7.5-10 18.6-10 30 0 4 2.5 6.1 6.2 5l10.8-3.4V18.5c-2.6 0-4.8-.9-7-2.5Z" />
+    <path d="M39 16c6 7.5 10 18.6 10 30 0 4-2.5 6.1-6.2 5L32 47.6V18.5c2.6 0 4.8-.9 7-2.5Z" />
+    <path d="M32 18.5V10" />
+    <path d="M24 35c3.2-1 5.6-3.2 8-6.8" opacity="0.68" />
+    <path d="M40 35c-3.2-1-5.6-3.2-8-6.8" opacity="0.68" />
+    <path d="M10 13h8l3-5 5 10 4-7h7" />
+    <path d="M41 13h13" opacity="0.72" />
+  </svg>
+);
+
+const PositionCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10 46h37a8 8 0 0 0 8-8v-4" />
+    <path d="M14 39h27a7 7 0 0 0 7-7v-5" />
+    <path d="M17 39 12 21a5.5 5.5 0 0 1 10.5-3.2L28 36" />
+    <path d="M23 29h15a6 6 0 0 1 6 6v4" />
+    <path d="M28 36h18" />
+    <path d="M17 50h32" />
+    <path d="M20 50v5" />
+    <path d="M46 50v5" />
+    <path d="M15 55h8" opacity="0.75" />
+    <path d="M42 55h8" opacity="0.75" />
+    <path d="M48 9h12v12H48z" />
+    <path d="M50.5 15h2.5l1.3-2.6 2 5.2 1.2-2.6H60" />
+    <path d="M60 21v31" />
+    <path d="M56 52h8" />
+  </svg>
+);
+
+const DailyCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="32" cy="32" r="12" />
+    <path d="M32 7v8" />
+    <path d="M32 49v8" />
+    <path d="M7 32h8" />
+    <path d="M49 32h8" />
+    <path d="m14.4 14.4 5.6 5.6" />
+    <path d="m44 44 5.6 5.6" />
+    <path d="m49.6 14.4-5.6 5.6" />
+    <path d="m20 44-5.6 5.6" />
+    <path d="M21 10.5 24 17" opacity="0.72" />
+    <path d="M43 10.5 40 17" opacity="0.72" />
+    <path d="M21 53.5 24 47" opacity="0.72" />
+    <path d="M43 53.5 40 47" opacity="0.72" />
+  </svg>
+);
+
+const SymptomsCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M22 11h20" />
+    <path d="M24 11v-1a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1" />
+    <path d="M17 11h30a4 4 0 0 1 4 4v40a4 4 0 0 1-4 4H17a4 4 0 0 1-4-4V15a4 4 0 0 1 4-4Z" />
+    <path d="M22 24h20" />
+    <path d="M22 34h16" />
+    <path d="M22 44h12" />
+    <circle cx="47" cy="47" r="10" />
+    <path d="m42.5 47 3 3 6-7" />
+  </svg>
+);
+
+const BackOnlyIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 2 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M34 18 20 32l14 14" />
+    <path d="M21 32h24" />
+  </svg>
+);
+
 const SECTION_ICONS: Record<string, React.FC<any>> = {
-  urgent: MedicalCrossIcon,
-  bed: BedMechanicIcon,
-  daily: SunIcon,
+  airway: ClinicalAirwayIcon,
+  urgent: ClinicalAirwayIcon,
+  bed: PositionCareIcon,
+  daily: DailyCareIcon,
+  symptoms: SymptomsCareIcon,
 };
 
 const DEFAULT_SECTION_COLORS: Record<string, string> = {
-  urgent: screenThemes.medical.urgent,
-  bed: screenThemes.medical.bed,
-  daily: screenThemes.medical.daily,
+  airway: '#9F6756',
+  urgent: '#9F6756',
+  bed: '#A8844D',
+  daily: '#B28F52',
+  symptoms: '#A97886',
 };
 
-/** Resolve section color: persisted color > default static map > fallback */
+const ACCESSIBLE_FONT = "'Inter', 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
+
+const ICON_BADGE_BG_DARK: Record<string, string> = {
+  airway: '#27201D',
+  urgent: '#27201D',
+  bed: '#292319',
+  daily: '#28261B',
+  symptoms: '#282023',
+};
+
+const ICON_BADGE_BG_MIX: Record<string, string> = {
+  airway: '#BFA889',
+  urgent: '#BFA889',
+  bed: '#C2AD83',
+  daily: '#C7B487',
+  symptoms: '#BCA0A1',
+};
+
+const ICON_BADGE_BG_LIGHT: Record<string, string> = {
+  airway: '#E6D7CB',
+  urgent: '#E6D7CB',
+  bed: '#E7D9BF',
+  daily: '#E5D9BD',
+  symptoms: '#E5D3D7',
+};
+
 const getSectionColor = (sec: { id: string; color?: string }) =>
   sec.color || DEFAULT_SECTION_COLORS[sec.id] || screenThemes.medical.daily;
 
-// ============================================
-// COMPONENTS
-// ============================================
-
-const SidebarTab: React.FC<{
-  section: { id: string; title: string; titleHi: string; items: any[] };
-  icon: React.FC<any>;
-  isActive: boolean;
-  color: string;
-  isDarkMode: boolean;
-  onClick: () => void;
-  gazeEnabled: boolean;
-  timestamp: number;
-}> = ({ section, icon: Icon, isActive, color, isDarkMode, onClick, gazeEnabled, timestamp }) => {
-  const rawTitle = section.title || '';
-  const titleEn = rawTitle.replace(/[\u0900-\u097F\s]+$/, '').trim();
-  let fallbackHi = '';
-  const match = rawTitle.match(/[\u0900-\u097F\s]+$/);
-  if (match) fallbackHi = match[0].trim();
-
-  let finalHi = section.titleHi || fallbackHi;
-
-  // Apply requested translation overrides
-  if (titleEn.toUpperCase() === 'URGENT') finalHi = 'इमरजेंसी';
-  if (titleEn.toUpperCase().includes('BED')) finalHi = 'बिस्तर / करवट';
-  if (titleEn.toUpperCase() === 'DAILY CARE') finalHi = 'रोज़ देखभाल';
-
-  return (
-    <GazeButton
-      id={`tab-${section.id}`}
-      onClick={onClick}
-      gazeEnabled={gazeEnabled}
-      gazeEnabledTimestamp={timestamp}
-      isDarkMode={isDarkMode}
-      dwellCategory="navigationButton"
-      style={{
-        width: '100%',
-        minHeight: 'clamp(85px, 11vh, 120px)',
-        padding: 'clamp(16px, 2vh, 24px) clamp(16px, 1.5vw, 22px)',
-        border: 'none',
-        borderLeft: isActive ? `4px solid ${color}` : '4px solid transparent',
-        borderRadius: '0 12px 12px 0',
-        backgroundColor: isActive ? `${color}20` : 'transparent',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: '4px', // Increase gap to fit larger text
-        transition: 'all 180ms ease',
-      }}
-    >
-      <Icon size={48} color={isActive ? color : '#888'} style={{ width: 'clamp(32px, 4.5vh, 48px)', height: 'clamp(32px, 4.5vh, 48px)', marginBottom: '4px' }} />
-      <span style={{
-        fontSize: 'clamp(14px, 1.6vw, 20px)', fontWeight: isActive ? 700 : 600,
-        color: isActive ? color : '#888', letterSpacing: '0.5px',
-        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-        lineHeight: 1.1,
-        textAlign: 'center',
-      }}>
-        {titleEn}
-      </span>
-      {finalHi && (
-        <>
-          <div style={{ width: '28px', height: '1.5px', background: isActive ? `${color}40` : 'rgba(136,136,136,0.3)', margin: '4px auto' }} />
-          <span style={{
-            fontSize: 'clamp(16px, 1.8vw, 22px)', fontWeight: 700,
-            color: isActive ? color : '#888',
-            fontFamily: "'Noto Sans Devanagari', sans-serif",
-            lineHeight: 1.2,
-            marginTop: '2px',
-            textAlign: 'center',
-          }}>
-            {finalHi}
-          </span>
-        </>
-      )}
-    </GazeButton>
-  );
-};
+const titleEn = (section: MedicalSection) =>
+  (section.title || '').replace(/[\u0900-\u097F\s]+$/, '').trim();
 
 const PhraseButton: React.FC<{
-  item: MedItem; color: string; isDarkMode: boolean; showHindi: boolean;
-  onActivate: (text: string) => void; gazeEnabled: boolean; timestamp: number;
-}> = ({ item, color, isDarkMode, showHindi, onActivate, gazeEnabled, timestamp }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
-  return (
-    <GazeButton
-      id={`phrase-${item.en}`}
-      onClick={() => onActivate(item.en)}
-      gazeEnabled={gazeEnabled}
-      gazeEnabledTimestamp={timestamp}
-      isDarkMode={isDarkMode}
-      dwellCategory={item.urgent ? "medicalUrgent" : "phraseButton"}
-      style={{
-        width: '100%',
-        minHeight: 'clamp(85px, 11.5vh, 125px)',
-        borderRadius: '18px',
-        background: isDarkMode ? '#1E2630' : '#f5f5f5',
-        border: '2px solid rgba(90, 110, 130, 0.45)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: 'clamp(12px, 1.8vh, 20px)',
-        gap: '8px',
-        textAlign: 'center',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
-      }}
-    >
-      <span style={{
-        fontSize: 'clamp(17px, 1.9vw, 24px)', fontWeight: 600,
-        color: item.urgent ? color : colors.text.primary,
-        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-        lineHeight: 1.35, letterSpacing: '0.1px',
-        textShadow: '0 1px 2px rgba(0,0,0,0.15)',
-      }}>
-        {item.en}
-      </span>
-      {showHindi && item.hi && (
-        <>
-          <div style={{ width: '28px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '4px auto 2px' }} />
-          <span style={{
-            fontSize: 'clamp(18px, 2.0vw, 26px)',
-            fontWeight: 700,
-            color: 'rgba(255, 210, 140, 0.95)',
-            fontFamily: "'Noto Sans Devanagari', sans-serif",
-            marginTop: '2px',
-            lineHeight: 1.5,
-            letterSpacing: '0.02em',
-          }}>
-            {item.hi}
-          </span>
-        </>
-      )}
-    </GazeButton>
-  );
-};
-
-// ============================================
-// MAIN SCREEN
-// ============================================
+  item: MedItem;
+  color: string;
+  isDarkMode: boolean;
+  showHindi: boolean;
+  onActivate: (text: string) => void;
+  gazeEnabled: boolean;
+  timestamp: number;
+  cardBg: string;
+  cardBorder: string;
+  cardText: string;
+  cardShadow: string;
+  dividerColor: string;
+  hindiColor: string;
+}> = ({
+  item, color, isDarkMode, showHindi, onActivate, gazeEnabled, timestamp,
+  cardBg, cardBorder, cardText, cardShadow, dividerColor, hindiColor,
+}) => (
+  <GazeButton
+    id={`phrase-${item.en}`}
+    onClick={() => onActivate(item.en)}
+    gazeEnabled={gazeEnabled}
+    gazeEnabledTimestamp={timestamp}
+    isDarkMode={isDarkMode}
+    dwellCategory={item.urgent ? 'medicalUrgent' : 'phraseButton'}
+    style={{
+      width: '100%',
+      height: '100%',
+      minHeight: 0,
+      borderRadius: '16px',
+      background: cardBg,
+      border: item.urgent ? `1.5px solid ${color}88` : cardBorder,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 'clamp(18px, 2.4vh, 28px) clamp(18px, 2vw, 30px)',
+      gap: '8px',
+      textAlign: 'center',
+      boxShadow: cardShadow,
+    }}
+  >
+    <span style={{
+      fontSize: 'clamp(24px, 2.8vh, 38px)',
+      fontWeight: 780,
+      color: cardText,
+      fontFamily: ACCESSIBLE_FONT,
+      lineHeight: 1.15,
+      letterSpacing: '0',
+      textShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.12)' : 'none',
+    }}>
+      {item.en}
+    </span>
+    {showHindi && item.hi && (
+      <>
+        <div style={{ width: '36px', height: '1.5px', background: dividerColor, borderRadius: '1px', margin: '5px auto 2px' }} />
+        <span style={{
+          fontSize: 'clamp(22px, 2.7vh, 34px)',
+          fontWeight: 800,
+          color: hindiColor,
+          fontFamily: "'Noto Sans Devanagari', sans-serif",
+          lineHeight: 1.25,
+        }}>
+          {item.hi}
+        </span>
+      </>
+    )}
+  </GazeButton>
+);
 
 const MedicalScreen: React.FC<MedicalScreenProps> = ({
   onNavigate, onSpeak, isDarkMode = true, showHindi = false,
 }) => {
   const colors = isDarkMode ? darkColors : lightColors;
-  const [activeSectionIndex, setActiveSectionIndex] = useState(0);
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
   const [lastSpoken, setLastSpoken] = useState('');
-  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
+  const { isLight, isMix } = useTheme();
   const { medicalSections } = useCustomization();
 
-  const activeSection = medicalSections[activeSectionIndex];
-  const ActiveIcon = SECTION_ICONS[activeSection.id] || SunIcon;
-  const activeColor = getSectionColor(activeSection);
+  const isWarmMode = isDarkMode && !isLight;
+  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
+  const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardBg = isMix ? '#C4B28E' : isWarmMode ? screenThemes.medical.cardBg : colors.background.elevated;
+  const cardBorder = isMix ? '1.5px solid rgba(91,74,51,0.38)' : isWarmMode ? screenThemes.medical.cardBorder : `1.5px solid ${colors.border.light}`;
+  const cardText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const dividerColor = isMix ? 'rgba(91,74,51,0.34)' : isWarmMode ? screenThemes.medical.headerDivider : colors.border.light;
+  const hindiColor = isMix ? '#493B2E' : isWarmMode ? screenThemes.phrases.hindiText : colors.text.secondary;
+  const backCardBg = isMix ? '#2B251B' : isWarmMode ? '#181A16' : '#E1D6C2';
+  const backIconColor = isMix ? '#E0C789' : isWarmMode ? '#A9B487' : '#6E7F58';
+  const backCardText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+
+  const activeSection = activeSectionIndex === null ? null : medicalSections[activeSectionIndex];
+  const activeColor = activeSection ? getSectionColor(activeSection) : (isMix ? '#B49362' : '#B9904D');
+  const ActiveIcon = activeSection ? (SECTION_ICONS[activeSection.id] || DailyCareIcon) : DailyCareIcon;
 
   const handleActivate = useCallback((text: string) => {
-    onSpeak(text); setLastSpoken(text);
+    onSpeak(text);
+    setLastSpoken(text);
   }, [onSpeak]);
 
   return (
-    <div className={`medical-screen${isLight ? ' theme-light' : ''}`} style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      backgroundColor: colors.background.primary, overflow: 'hidden',
+    <div className={`medical-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      backgroundColor: pageBg,
+      overflow: 'hidden',
       padding: '4px 20px 6px 20px',
     }}>
       <GlobalNavBar currentPage="medical" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
 
-      {/* LAST SPOKEN INDICATOR */}
       {lastSpoken && (
         <div style={{
-          position: 'absolute', top: '80px', left: '0', right: '0',
-          display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 10
+          position: 'absolute',
+          top: '80px',
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          zIndex: 10,
         }}>
           <div style={{
-            padding: '8px 24px', backgroundColor: colors.success.subtle,
+            padding: '8px 24px',
+            backgroundColor: colors.success.subtle,
             border: `1px solid ${colors.success.main}`,
-            borderRadius: '20px', color: colors.success.main,
-            fontSize: 'clamp(13px, 1.6vh, 18px)', fontWeight: 600,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            borderRadius: '20px',
+            color: colors.success.main,
+            fontSize: 'clamp(13px, 1.6vh, 18px)',
+            fontWeight: 700,
+            boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.2)' : cardShadow,
           }}>
             {lastSpoken}
           </div>
         </div>
       )}
 
-      {/* CONTENT AREA */}
       <div style={{
-        flex: 1, display: 'flex', flexDirection: 'row',
-        gap: 'clamp(24px, 3vw, 40px)',
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
         marginTop: 'clamp(18px, 2.2vh, 30px)',
-        minHeight: 0, padding: '0 8px',
+        padding: '0 clamp(44px, 5vw, 86px) clamp(86px, 10vh, 124px)',
       }}>
-
-        {/* LEFT SIDEBAR - CATEGORIES */}
-        <div style={{
-          width: 'clamp(180px, 18vw, 240px)', flexShrink: 0,
-          display: 'flex', flexDirection: 'column',
-          gap: 'clamp(12px, 2vh, 24px)', // Increased gap to serve as a dead zone
-          backgroundColor: isDarkMode ? '#111820' : 'rgba(0,0,0,0.03)',
-          borderRadius: '16px',
-          padding: 'clamp(12px, 1.5vh, 18px) 8px',
-          marginLeft: '4%',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-          border: '1px solid rgba(100, 140, 180, 0.15)',
-          alignSelf: 'flex-start',
-        }}>
-          {/* Sidebar Header */}
-          <div style={{
-            padding: '8px 16px 14px 16px',
-            borderBottom: '1px solid rgba(100, 140, 180, 0.2)',
-            marginBottom: '6px',
-          }}>
-            <span style={{
-              fontSize: 'clamp(11px, 1vw, 13px)',
-              fontWeight: 600,
-              color: activeColor,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '1.5px',
-              fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+        {activeSectionIndex === null ? (
+          <>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              marginBottom: 'clamp(18px, 2.4vh, 28px)',
             }}>
-              Categories
-            </span>
-          </div>
-
-          {medicalSections.map((sec, idx) => (
-            <SidebarTab
-              key={sec.id}
-              section={sec}
-              icon={SECTION_ICONS[sec.id] || SunIcon}
-              isActive={idx === activeSectionIndex}
-              color={getSectionColor(sec)}
-              isDarkMode={isDarkMode}
-              onClick={() => setActiveSectionIndex(idx)}
-              gazeEnabled={isGazeEnabled}
-              timestamp={lastEnabledTimestamp}
-            />
-          ))}
-        </div>
-
-        {/* RIGHT AREA - GRID WITH HEADER */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          position: 'relative',
-        }}>
-          {/* CATEGORY HEADER */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: 'clamp(14px, 1.8vh, 22px)',
-            paddingLeft: '8px',
-          }}>
-            <ActiveIcon size={28} color={activeColor} style={{ width: 'clamp(22px, 3vh, 28px)', height: 'clamp(22px, 3vh, 28px)' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <DailyCareIcon size={42} color={isMix ? '#B49362' : isWarmMode ? '#B9904D' : lightColors.warning.main} />
               <h2 style={{
-                fontSize: 'clamp(20px, 2vw, 28px)',
-                fontWeight: 700,
-                color: colors.text.primary,
                 margin: 0,
-                fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-                lineHeight: 1.1,
+                color: titleText,
+                fontFamily: ACCESSIBLE_FONT,
+                fontSize: 'clamp(32px, 4vh, 48px)',
+                fontWeight: 820,
+                lineHeight: 1,
               }}>
-                {(() => {
-                  const raw = activeSection.title || '';
-                  return raw.replace(/[\u0900-\u097F\s]+$/, '').trim();
-                })()}
+                Daily Assistance
               </h2>
-              {showHindi && (
-                <>
-                  <div style={{ width: '40px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '2px 0' }} />
-                  <span style={{
-                    fontSize: 'clamp(20px, 2.2vw, 28px)',
-                    fontWeight: 700,
-                    color: 'rgba(255, 210, 140, 0.95)',
-                    fontFamily: "'Noto Sans Devanagari', sans-serif",
-                    lineHeight: 1.2,
-                  }}>
-                    {(() => {
-                      const raw = activeSection.title || '';
-                      const en = raw.replace(/[\u0900-\u097F\s]+$/, '').trim();
-                      let finalHi = activeSection.titleHi || '';
-                      if (!finalHi) {
-                        const m = raw.match(/[\u0900-\u097F\s]+$/);
-                        if (m) finalHi = m[0].trim();
-                      }
-                      if (en.toUpperCase() === 'URGENT') finalHi = 'इमरजेंसी';
-                      if (en.toUpperCase().includes('BED')) finalHi = 'बिस्तर / करवट';
-                      if (en.toUpperCase() === 'DAILY CARE') finalHi = 'रोज़ देखभाल';
-                      return finalHi;
-                    })()}
-                  </span>
-                </>
-              )}
             </div>
-          </div>
 
-          {/* PHRASE GRID */}
-          <div style={{
-            flex: 1,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gridAutoRows: 'minmax(clamp(85px, 11.5vh, 125px), auto)',
-            gap: 'clamp(14px, 2vh, 24px)', // Increased gap to match the larger cards
-            overflowY: 'auto',
-            alignContent: 'start',
-            padding: '4px 8px clamp(90px, 12vh, 140px) 8px',
-          }}>
-            {activeSection.items.map((item) => (
-              <PhraseButton
-                key={item.en}
-                item={item}
-                color={activeColor}
-                isDarkMode={isDarkMode}
-                showHindi={showHindi}
-                onActivate={handleActivate}
+            <div style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              gridAutoRows: 'minmax(clamp(210px, 28vh, 310px), 1fr)',
+              gap: 'clamp(22px, 3vh, 34px)',
+            }}>
+              {medicalSections.map((sec, idx) => {
+                const Icon = SECTION_ICONS[sec.id] || DailyCareIcon;
+                const color = getSectionColor(sec);
+                const badgeBg = isMix
+                  ? ICON_BADGE_BG_MIX[sec.id] || '#BFA889'
+                  : isWarmMode
+                    ? ICON_BADGE_BG_DARK[sec.id] || '#27201D'
+                    : ICON_BADGE_BG_LIGHT[sec.id] || '#E6D7CB';
+                return (
+                  <GazeButton
+                    key={sec.id}
+                    id={`assist-category-${sec.id}`}
+                    onClick={() => setActiveSectionIndex(idx)}
+                    gazeEnabled={isGazeEnabled}
+                    gazeEnabledTimestamp={lastEnabledTimestamp}
+                    isDarkMode={isDarkMode}
+                    dwellCategory="navigationButton"
+                    contentFill
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      minHeight: 'clamp(210px, 28vh, 310px)',
+                      background: cardBg,
+                      border: cardBorder,
+                      borderRadius: '18px',
+                      boxShadow: cardShadow,
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 'clamp(24px, 3vh, 38px) clamp(36px, 4.5vw, 78px)',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{
+                      flex: '0 0 38%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <div style={{
+                        width: 'clamp(112px, 13.5vh, 152px)',
+                        height: 'clamp(112px, 13.5vh, 152px)',
+                        borderRadius: '36px',
+                        border: `1.5px solid ${color}`,
+                        background: badgeBg,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: 'none',
+                      }}>
+                        <Icon size={90} color={color} strokeWidth={1.5} />
+                      </div>
+                    </div>
+                    <div style={{
+                      flex: '1 1 0',
+                      minWidth: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      justifyContent: 'center',
+                      paddingLeft: 'clamp(22px, 3vw, 54px)',
+                      gap: showHindi ? '10px' : 0,
+                    }}>
+                      <span style={{
+                        color: cardText,
+                        fontFamily: ACCESSIBLE_FONT,
+                        fontSize: 'clamp(28px, 3.5vh, 40px)',
+                        fontWeight: 780,
+                        lineHeight: 1.08,
+                        letterSpacing: '0',
+                      }}>
+                        {titleEn(sec)}
+                      </span>
+                      {showHindi && (
+                        <span style={{
+                          color: hindiColor,
+                          fontFamily: "'Noto Sans Devanagari', sans-serif",
+                          fontSize: 'clamp(24px, 3vh, 34px)',
+                          fontWeight: 800,
+                          lineHeight: 1.2,
+                        }}>
+                          {sec.titleHi}
+                        </span>
+                      )}
+                    </div>
+                  </GazeButton>
+                );
+              })}
+            </div>
+          </>
+        ) : activeSection && (
+          <>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'clamp(18px, 2vw, 30px)',
+              marginBottom: 'clamp(18px, 2.3vh, 28px)',
+              paddingLeft: '4px',
+            }}>
+              <ActiveIcon size={44} color={activeColor} strokeWidth={1.55} />
+              <h2 style={{
+                fontSize: 'clamp(30px, 3.8vh, 46px)',
+                fontWeight: 820,
+                color: titleText,
+                margin: 0,
+                fontFamily: ACCESSIBLE_FONT,
+                lineHeight: 1,
+              }}>
+                {titleEn(activeSection)}
+              </h2>
+            </div>
+
+            <div style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
+              gap: 'clamp(16px, 2.2vh, 26px)',
+              overflow: 'hidden',
+              alignContent: 'stretch',
+              padding: '4px 8px 0 8px',
+            }}>
+              <GazeButton
+                id="assist-back-categories-card"
+                onClick={() => setActiveSectionIndex(null)}
                 gazeEnabled={isGazeEnabled}
-                timestamp={lastEnabledTimestamp}
-              />
-            ))}
-          </div>
+                gazeEnabledTimestamp={lastEnabledTimestamp}
+                isDarkMode={isDarkMode}
+                dwellCategory="navigationButton"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  minHeight: 0,
+                  borderRadius: '16px',
+                  background: backCardBg,
+                  border: `1.5px solid ${backIconColor}88`,
+                  boxShadow: isDarkMode ? '0 8px 18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.025)' : cardShadow,
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 'clamp(18px, 2.4vh, 28px) clamp(30px, 3.8vw, 58px)',
+                  fontFamily: ACCESSIBLE_FONT,
+                  textAlign: 'left',
+                }}
+                ariaLabel="Back to Daily Assistance categories"
+                contentFill
+              >
+                <div style={{
+                  flex: '0 0 38%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <div style={{
+                    width: 'clamp(86px, 10vh, 124px)',
+                    height: 'clamp(86px, 10vh, 124px)',
+                    borderRadius: '30px',
+                    border: `1.5px solid ${backIconColor}`,
+                    background: isMix ? '#292318' : isWarmMode ? '#20221B' : '#E6DCC9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <BackOnlyIcon size={72} color={backIconColor} strokeWidth={2.2} />
+                  </div>
+                </div>
+                <div style={{
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  paddingLeft: 'clamp(20px, 3vw, 50px)',
+                }}>
+                  <span style={{
+                    color: backCardText,
+                    fontFamily: ACCESSIBLE_FONT,
+                    fontSize: 'clamp(28px, 3.5vh, 40px)',
+                    fontWeight: 780,
+                    lineHeight: 1.08,
+                  }}>
+                    Back
+                  </span>
+                </div>
+              </GazeButton>
 
-          {/* Gaze toggle provided by GlobalNavBar at fixed bottom-center */}
-        </div>
+              {activeSection.items.slice(0, 8).map((item) => (
+                <PhraseButton
+                  key={item.en}
+                  item={item}
+                  color={activeColor}
+                  isDarkMode={isDarkMode}
+                  showHindi={showHindi}
+                  onActivate={handleActivate}
+                  gazeEnabled={isGazeEnabled}
+                  timestamp={lastEnabledTimestamp}
+                  cardBg={cardBg}
+                  cardBorder={cardBorder}
+                  cardText={cardText}
+                  cardShadow={cardShadow}
+                  dividerColor={dividerColor}
+                  hindiColor={hindiColor}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

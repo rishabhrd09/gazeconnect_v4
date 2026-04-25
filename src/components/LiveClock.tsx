@@ -8,10 +8,11 @@ const HIDDEN_SCREENS = new Set<string>([
 
 interface LiveClockProps {
     currentScreen?: string;
+    suppressed?: boolean;
 }
 
-export function LiveClock({ currentScreen }: LiveClockProps) {
-    const { isLight } = useTheme();
+export function LiveClock({ currentScreen, suppressed = false }: LiveClockProps) {
+    const { theme } = useTheme();
     const [time, setTime] = useState(new Date());
 
     useEffect(() => {
@@ -20,7 +21,7 @@ export function LiveClock({ currentScreen }: LiveClockProps) {
     }, []);
 
     // Hide on screens where it overlaps with nav controls
-    if (currentScreen && HIDDEN_SCREENS.has(currentScreen)) {
+    if (suppressed || (currentScreen && HIDDEN_SCREENS.has(currentScreen))) {
         return null;
     }
 
@@ -52,10 +53,10 @@ export function LiveClock({ currentScreen }: LiveClockProps) {
         }}>
             {/* Day + Date line */}
             <div className="live-clock-day" style={{
-                fontFamily: "'Outfit', system-ui",
-                fontWeight: 600,
+                fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui",
+                fontWeight: 700,
                 fontSize: 'clamp(11px, 1.4vh, 15px)',
-                color: 'rgba(255,255,255,0.38)',
+                color: theme === 'light' ? '#342A20' : theme === 'mix' ? 'rgba(240,226,196,0.46)' : 'rgba(236,237,227,0.42)',
                 letterSpacing: '1.5px',
                 textTransform: 'uppercase',
                 lineHeight: 1,
@@ -67,9 +68,9 @@ export function LiveClock({ currentScreen }: LiveClockProps) {
             {/* Main time display */}
             <div className="live-clock-time" style={{
                 fontFamily: "'Orbitron', monospace",
-                fontWeight: 500,
+                fontWeight: 600,
                 fontSize: 'clamp(32px, 4vh, 52px)',
-                color: 'rgba(255,255,255,0.82)',
+                color: theme === 'light' ? '#1B140E' : theme === 'mix' ? 'rgba(240,226,196,0.86)' : 'rgba(236,237,227,0.84)',
                 letterSpacing: '2px',
                 lineHeight: 1,
                 display: 'flex',
@@ -85,10 +86,10 @@ export function LiveClock({ currentScreen }: LiveClockProps) {
 
                 {/* AM/PM in Outfit */}
                 <span className="live-clock-ampm" style={{
-                    fontFamily: "'Outfit', system-ui",
-                    fontWeight: 700,
+                    fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui",
+                    fontWeight: 600,
                     fontSize: 'clamp(14px, 1.8vh, 20px)',
-                    color: 'rgba(45,212,191,0.65)',
+                    color: theme === 'light' ? '#342A20' : theme === 'mix' ? '#6FB7B1' : '#6FB7B1',
                     letterSpacing: '1px',
                     marginLeft: '4px',
                     alignSelf: 'flex-end',

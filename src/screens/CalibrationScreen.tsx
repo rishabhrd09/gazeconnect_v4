@@ -19,6 +19,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { darkColors, typography } from '../utils/design';
 
 // ============================================
 // TYPES
@@ -74,6 +75,14 @@ const TARGET_DOT_SIZE = 12;       // Inner dot px
 const PROGRESS_RING_SIZE = 100;   // Progress ring px
 const INTRO_DURATION = 3000;      // ms before first target
 const POINT_DONE_DURATION = 600;  // ms for checkmark display
+
+const CAL_BG = darkColors.background.primary;
+const CAL_PANEL = darkColors.background.secondary;
+const CAL_TEXT = darkColors.text.primary;
+const CAL_SUB = darkColors.text.secondary;
+const CAL_DIM = darkColors.text.tertiary;
+const CAL_BORDER = darkColors.border.main;
+const CAL_FONT = typography.fontFamily.primary;
 
 // ============================================
 // COMPONENT
@@ -255,7 +264,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
               <ellipse cx="40" cy="40" rx="35" ry="22" stroke="#00E5A0" strokeWidth="2.5" />
               <circle cx="40" cy="40" r="12" fill="#00E5A0" />
-              <circle cx="40" cy="40" r="5" fill="#0D1117" />
+              <circle cx="40" cy="40" r="5" fill={CAL_BG} />
               <circle cx="44" cy="37" r="2.5" fill="white" opacity="0.8" />
             </svg>
           </div>
@@ -590,12 +599,12 @@ const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'fixed',
     inset: 0,
-    backgroundColor: '#0D1117',
+    backgroundColor: CAL_BG,
     zIndex: 10000,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: "'Segoe UI', 'Inter', system-ui, sans-serif",
+    fontFamily: CAL_FONT,
   },
 
   // --- Intro ---
@@ -610,13 +619,13 @@ const styles: Record<string, React.CSSProperties> = {
   introTitle: {
     fontSize: 32,
     fontWeight: 600,
-    color: '#E6EDF3',
+    color: CAL_TEXT,
     margin: '0 0 12px',
     letterSpacing: '-0.5px',
   },
   introSubtitle: {
     fontSize: 16,
-    color: '#8B949E',
+    color: CAL_SUB,
     lineHeight: 1.6,
     margin: '0 0 32px',
   },
@@ -638,7 +647,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   introHint: {
     fontSize: 13,
-    color: '#484F58',
+    color: CAL_DIM,
     margin: 0,
   },
 
@@ -655,7 +664,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressText: {
     fontSize: 14,
-    color: '#8B949E',
+    color: CAL_SUB,
     fontWeight: 500,
   },
   miniDots: {
@@ -674,7 +683,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: '50%',
     transform: 'translateX(-50%)',
     fontSize: 18,
-    color: '#8B949E',
+    color: CAL_SUB,
     fontWeight: 400,
     textAlign: 'center',
   },
@@ -687,7 +696,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 24,
-    color: '#0D1117',
+    color: CAL_BG,
     fontWeight: 700,
     position: 'absolute',
     left: -24,
@@ -697,10 +706,10 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     top: 24,
     right: 24,
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: CAL_PANEL,
+    border: `1px solid ${CAL_BORDER}`,
     borderRadius: 8,
-    color: '#8B949E',
+    color: CAL_SUB,
     padding: '8px 16px',
     fontSize: 13,
     cursor: 'pointer',
@@ -726,13 +735,13 @@ const styles: Record<string, React.CSSProperties> = {
   resultsTitle: {
     fontSize: 28,
     fontWeight: 600,
-    color: '#E6EDF3',
+    color: CAL_TEXT,
     margin: '0 0 8px',
     letterSpacing: '-0.3px',
   },
   resultsSubtitle: {
     fontSize: 16,
-    color: '#8B949E',
+    color: CAL_SUB,
     margin: '0 0 32px',
   },
   offsetGrid: {
@@ -740,9 +749,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: 320,
     height: 200,
     margin: '0 auto 32px',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: `1px solid ${CAL_BORDER}`,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: CAL_PANEL,
   },
   resultsStats: {
     display: 'flex',
@@ -759,25 +768,25 @@ const styles: Record<string, React.CSSProperties> = {
   },
   statLabel: {
     fontSize: 12,
-    color: '#484F58',
+    color: CAL_DIM,
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
   statValue: {
     fontSize: 24,
     fontWeight: 600,
-    color: '#E6EDF3',
+    color: CAL_TEXT,
     fontVariantNumeric: 'tabular-nums',
   },
   statArrow: {
     fontSize: 20,
-    color: '#484F58',
+    color: CAL_DIM,
   },
   continueButton: {
     background: '#00E5A0',
     border: 'none',
     borderRadius: 12,
-    color: '#0D1117',
+    color: CAL_BG,
     padding: '14px 48px',
     fontSize: 16,
     fontWeight: 600,

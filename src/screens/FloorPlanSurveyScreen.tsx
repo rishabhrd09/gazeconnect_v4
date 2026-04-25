@@ -18,7 +18,7 @@ import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { SURVEY_QUESTIONS, SURVEY_PHASES_V2 } from '../data/surveyQuestions';
 import { SurveyQuestion, PhaseStatus } from '../types/SurveyTypes';
-import { screenThemes } from '../utils/design';
+import { screenThemes, typography } from '../utils/design';
 import { computeCompleteness, formatNotepadSummary } from '../utils/surveyDefaults';
 import { FloorPlanViewerModal } from '../components/FloorPlanViewerModal';
 import { enrichWithSurveyData, CompassMapPayload } from '../utils/floorplanApi';
@@ -28,24 +28,26 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const THEME = {
     ...screenThemes.floorPlan,
-    bg: '#0B1120',
-    panelBg: 'rgba(15, 23, 42, 0.85)',
-    cardBg: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(100, 116, 139, 0.15)',
-    accent: '#64B5F6',
-    accentHover: '#90CAF9',
-    success: '#64B5F6',
-    successSubtle: 'rgba(100, 181, 246, 0.15)',
-    warning: '#F59E0B',
-    warningSubtle: 'rgba(245, 158, 11, 0.15)',
-    danger: '#CF6679',
-    textMain: '#E8EDF5',
-    textSub: '#8896AB',
-    textDim: '#5A6577',
-    phaseComplete: '#E8EDF5',
-    phaseCurrent: '#64B5F6',
-    phasePending: 'rgba(100, 116, 139, 0.3)',
+    bg: screenThemes.floorPlan.bg,
+    panelBg: screenThemes.floorPlan.panelBg,
+    cardBg: screenThemes.floorPlan.cardBg,
+    border: screenThemes.floorPlan.border,
+    accent: screenThemes.floorPlan.accentStrong,
+    accentHover: screenThemes.floorPlan.accent,
+    success: screenThemes.floorPlan.success,
+    successSubtle: screenThemes.floorPlan.successSubtle,
+    warning: screenThemes.floorPlan.warning,
+    warningSubtle: screenThemes.floorPlan.warningSubtle,
+    danger: screenThemes.floorPlan.danger,
+    textMain: screenThemes.floorPlan.textMain,
+    textSub: screenThemes.floorPlan.textSub,
+    textDim: screenThemes.floorPlan.textDim,
+    phaseComplete: screenThemes.floorPlan.textMain,
+    phaseCurrent: screenThemes.floorPlan.accentStrong,
+    phasePending: 'rgba(42, 61, 82, 0.56)',
 };
+
+const UI_FONT = typography.fontFamily.primary;
 
 const AUTO_SAVE_INTERVAL = 30000;
 const STORAGE_KEY = 'gazeconnect_survey_progress';
@@ -190,12 +192,13 @@ const SaveConfirmModal = ({ mode, onClose }: { mode: 'generate' | 'save'; onClos
     <div style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+        background: 'rgba(0,0,0,0.78)',
     }}>
         <div style={{
-            background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${THEME.accent}30`,
+            background: THEME.panelBg, border: `1px solid ${THEME.border}`,
             borderRadius: '20px', padding: 'clamp(24px, 4vh, 48px)', maxWidth: '480px', width: '90%',
-            textAlign: 'center', boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${THEME.accent}10`,
+            textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
+            fontFamily: UI_FONT,
         }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>
                 {mode === 'generate' ? '\u2705' : '\u{1F4BE}'}
@@ -522,6 +525,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             backgroundColor: THEME.bg,
             color: THEME.textMain,
             overflow: 'hidden',
+            fontFamily: UI_FONT,
         }}>
 
             {/* ═══ ROW 1: Global Nav Bar ═══ */}
@@ -568,7 +572,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         : 'clamp(10px, 1.4vh, 16px) clamp(10px, 1.2vw, 18px)',
                                     fontSize: '1.1rem',
                                     fontWeight: 700,
-                                    fontFamily: "'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                                    fontFamily: UI_FONT,
                                     color: isCurrent ? THEME.accent : '#FFFFFF',
                                     background: isCurrent ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
                                     border: 'none',
@@ -582,7 +586,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: isCurrent ? `0 3px 0 0 ${THEME.accent}` : 'none',
+                                    boxShadow: 'none',
                                     opacity: isPast ? 0.75 : 1,
                                 }}
                             >
@@ -1059,26 +1063,26 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         height: 'clamp(100px, 13vh, 165px)',
                         minWidth: 'clamp(100px, 13vh, 165px)',
                         borderRadius: '50%',
-                        background: effectiveGazeActive ? 'rgba(45, 212, 191, 0.15)' : 'rgba(30, 45, 60, 0.65)',
-                        border: `3px solid ${effectiveGazeActive ? '#2DD4BF' : 'rgba(100,116,139,0.3)'}`,
-                        color: effectiveGazeActive ? '#2DD4BF' : '#888',
+                        background: effectiveGazeActive ? THEME.successSubtle : THEME.cardBg,
+                        border: `3px solid ${effectiveGazeActive ? THEME.success : THEME.border}`,
+                        color: effectiveGazeActive ? THEME.success : THEME.textSub,
                         boxShadow: effectiveGazeActive
-                            ? '0 0 35px rgba(45,212,191,0.4), 0 6px 20px rgba(0,0,0,0.3)'
-                            : '0 6px 24px rgba(0,0,0,0.5), 0 0 10px rgba(100,116,139,0.1)',
+                            ? '0 6px 18px rgba(0,0,0,0.18)'
+                            : '0 6px 18px rgba(0,0,0,0.16)',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '5px',
                         transition: 'all 200ms ease',
-                        backdropFilter: 'blur(12px)',
+                        fontFamily: UI_FONT,
                     }}
                 >
                     <div style={{
                         width: 'clamp(9px, 1.3vh, 14px)',
                         height: 'clamp(9px, 1.3vh, 14px)',
                         borderRadius: '50%',
-                        backgroundColor: effectiveGazeActive ? '#2DD4BF' : '#666',
+                        backgroundColor: effectiveGazeActive ? THEME.success : THEME.textDim,
                         marginBottom: '2px',
                     }} />
                     <span style={{ fontSize: 'clamp(11px, 1.4vh, 15px)', fontWeight: 700, lineHeight: 1 }}>
@@ -1206,14 +1210,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                 <div style={{
                     position: 'fixed', inset: 0, zIndex: 9999,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+                    background: 'rgba(0,0,0,0.84)',
                 }}>
                     <div style={{
-                        background: 'rgba(11, 17, 32, 0.98)',
-                        border: `1px solid ${THEME.accent}30`, borderRadius: '20px',
+                        background: THEME.panelBg,
+                        border: `1px solid ${THEME.border}`, borderRadius: '20px',
                         width: '92%', maxWidth: '850px', maxHeight: '88vh',
                         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                        boxShadow: `0 20px 60px rgba(0,0,0,0.6), 0 0 40px ${THEME.accent}08`,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
                     }}>
                         {/* Modal Header */}
                         <div style={{

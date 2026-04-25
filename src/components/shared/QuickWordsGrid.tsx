@@ -15,6 +15,8 @@
 import React, { useMemo, useState, useCallback, useRef } from 'react';
 import GazeButton from '../core/GazeButton';
 import type { QuickWord, QuickWordCategory } from '../../types/customization';
+import { lightColors } from '../../utils/design';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Full-card backgrounds — warm, muted, calming (AAC-optimised palette)
 const CATEGORY_BG: Record<string, string> = {
@@ -48,6 +50,60 @@ const HEADER_COLORS: Record<string, string> = {
   daily: '#7ECEC0',        // Muted warm teal — calm, nurturing
 };
 
+const WARM_DARK_CATEGORY_BG: Record<string, string> = {
+  emergency: '#4B211E',
+  position: '#352B1C',
+  daily: '#16342F',
+};
+
+const WARM_DARK_CATEGORY_BORDERS: Record<string, string> = {
+  emergency: '#8A463D',
+  position: '#6A4D34',
+  daily: '#3F6D62',
+};
+
+const WARM_DARK_HEADER_BG: Record<string, string> = {
+  emergency: '#351715',
+  position: '#241D14',
+  daily: '#102520',
+};
+
+const WARM_DARK_HEADER_COLORS: Record<string, string> = {
+  emergency: '#CFA094',
+  position: '#C69A45',
+  daily: '#8FAE72',
+};
+
+const LIGHT_CATEGORY_BG: Record<string, string> = {
+  emergency: lightColors.emergency.main,
+  position: '#F4ECDE',
+  daily: '#EFF3EA',
+};
+
+const LIGHT_CATEGORY_BORDERS: Record<string, string> = {
+  emergency: lightColors.emergency.hover,
+  position: lightColors.warning.main,
+  daily: lightColors.success.main,
+};
+
+const LIGHT_CARD_TEXT_COLORS: Record<string, string> = {
+  emergency: lightColors.text.inverse,
+  position: lightColors.text.primary,
+  daily: lightColors.text.primary,
+};
+
+const LIGHT_HEADER_BG: Record<string, string> = {
+  emergency: lightColors.emergency.soft,
+  position: '#F7F0E4',
+  daily: '#F4F7F2',
+};
+
+const LIGHT_HEADER_COLORS: Record<string, string> = {
+  emergency: lightColors.emergency.deep,
+  position: lightColors.warning.main,
+  daily: lightColors.success.main,
+};
+
 const CATEGORY_ICONS: Record<string, string> = {
   emergency: '\u26A0',    // Warning triangle
   position: '\u2195',     // Up-down arrows
@@ -78,6 +134,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
   showHindi = false,
   idPrefix = 'qwg',
 }) => {
+  const { isMix } = useTheme();
   const orderedCategories = useMemo(() => {
     return CATEGORY_ORDER
       .map(id => categories.find(c => c.id === id))
@@ -104,11 +161,21 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
       minHeight: 0,
     }}>
       {orderedCategories.map((cat) => {
-        const headerColor = HEADER_COLORS[cat.id] || '#7ECEC0';
-        const headerBg = HEADER_BG[cat.id] || '#091F1F';
-        const cardBg = CATEGORY_BG[cat.id] || CATEGORY_BG.daily;
-        const cardBorder = CATEGORY_BORDERS[cat.id] || CATEGORY_BORDERS.daily;
-        const cardTextColor = CARD_TEXT_COLORS[cat.id] || CARD_TEXT_COLORS.daily;
+        const headerColor = isDarkMode
+          ? (WARM_DARK_HEADER_COLORS[cat.id] || HEADER_COLORS[cat.id] || '#8FAE72')
+          : (LIGHT_HEADER_COLORS[cat.id] || lightColors.text.secondary);
+        const headerBg = isDarkMode
+          ? (WARM_DARK_HEADER_BG[cat.id] || HEADER_BG[cat.id] || '#102520')
+          : (LIGHT_HEADER_BG[cat.id] || lightColors.background.secondary);
+        const cardBg = isDarkMode
+          ? (WARM_DARK_CATEGORY_BG[cat.id] || CATEGORY_BG[cat.id] || CATEGORY_BG.daily)
+          : (LIGHT_CATEGORY_BG[cat.id] || lightColors.background.secondary);
+        const cardBorder = isDarkMode
+          ? (WARM_DARK_CATEGORY_BORDERS[cat.id] || CATEGORY_BORDERS[cat.id] || CATEGORY_BORDERS.daily)
+          : (LIGHT_CATEGORY_BORDERS[cat.id] || lightColors.border.main);
+        const cardTextColor = isDarkMode
+          ? (CARD_TEXT_COLORS[cat.id] || CARD_TEXT_COLORS.daily)
+          : (LIGHT_CARD_TEXT_COLORS[cat.id] || lightColors.text.primary);
 
         const activeWords = cat.words.filter(w => w.enabled).slice(0, MAX_WORDS);
         const categoryName = cat.heading || cat.id.charAt(0).toUpperCase() + cat.id.slice(1);
@@ -121,18 +188,18 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
-              backgroundColor: isDarkMode ? 'rgba(20, 25, 35, 0.45)' : 'rgba(0,0,0,0.04)',
+              backgroundColor: isDarkMode ? (isMix ? 'rgba(42,36,28,0.72)' : 'rgba(27,28,24,0.72)') : lightColors.background.secondary,
               borderRadius: '28px',
               overflow: 'hidden',           // clips the header strip to rounded corners
-              border: `1.5px solid ${cardBorder}50`,
+              border: isDarkMode ? `1.5px solid ${cardBorder}50` : `1.5px solid ${cardBorder}`,
               minWidth: 0,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+              boxShadow: isDarkMode ? '0 8px 32px rgba(0,0,0,0.2)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
             }}
           >
             {/* ── Category Header — "plaque" style anchor ── */}
             <div style={{
               backgroundColor: headerBg,
-              borderBottom: `2px solid ${cardBorder}60`,
+              borderBottom: isDarkMode ? `2px solid ${cardBorder}60` : `2px solid ${cardBorder}`,
               padding: 'clamp(16px, 2.5vh, 28px) clamp(12px, 1.5vw, 24px)',
               minHeight: 'clamp(60px, 7vh, 80px)',
               flexShrink: 0,
@@ -155,20 +222,20 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                   fontSize: 'clamp(18px, 2.2vh, 26px)',
                   fontWeight: 900,
                   color: headerColor,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.12em',
-                  fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-                  textShadow: `0 0 20px ${headerColor}40`,
+                  textTransform: isDarkMode ? 'uppercase' : 'none',
+                  letterSpacing: isDarkMode ? '0.12em' : '0.02em',
+                  fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif",
+                  textShadow: 'none',
                 }}>
                   {categoryName}
                 </h3>
                 {showHindi && (
                   <>
-                    <div style={{ width: '40px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '2px 0' }} />
+                    <div style={{ width: '40px', height: '1.5px', background: isDarkMode ? 'rgba(255,255,255,0.18)' : lightColors.border.light, borderRadius: '1px', margin: '2px 0' }} />
                     <span style={{
                       fontSize: 'clamp(20px, 2.6vh, 32px)',
                       fontWeight: 700,
-                      color: 'rgba(255, 210, 140, 0.95)',
+                      color: isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary,
                       fontFamily: "'Noto Sans Devanagari', 'Mangal', sans-serif",
                       lineHeight: 1.2,
                       letterSpacing: '0.02em',
@@ -210,11 +277,11 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                       backgroundColor: cardBg,
                       borderRadius: '18px',
                       border: isActivated
-                        ? `2.5px solid rgba(255,255,255,0.85)`
+                        ? (isDarkMode ? '2.5px solid rgba(255,255,255,0.85)' : `2px solid ${lightColors.border.strong}`)
                         : `1.5px solid ${cardBorder}`,
                       boxShadow: isActivated
-                        ? '0 0 26px rgba(255,255,255,0.22)'
-                        : '0 4px 16px rgba(0,0,0,0.18)',
+                        ? (isDarkMode ? '0 0 26px rgba(255,255,255,0.22)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)')
+                        : (isDarkMode ? '0 4px 16px rgba(0,0,0,0.18)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)'),
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -234,12 +301,12 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                           : 'clamp(24px, 3vh, 34px)',
                         fontWeight: 800,
                         color: cardTextColor,
-                        fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
+                        fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif",
                         textAlign: 'center',
                         lineHeight: 1.15,
                         letterSpacing: '0.02em',
                         wordBreak: 'break-word',
-                        textShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        textShadow: 'none',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
@@ -254,11 +321,11 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                             ? 'clamp(24px, 3vh, 32px)'
                             : 'clamp(26px, 3.2vh, 36px)',
                           fontWeight: 700,
-                          color: 'rgba(255, 210, 140, 0.95)',
+                          color: isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary,
                           fontFamily: "'Noto Sans Devanagari', 'Mangal', sans-serif",
                           textAlign: 'center',
                           lineHeight: 1.2,
-                          textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                          textShadow: 'none',
                         }}>
                           {word.hi}
                         </span>
@@ -271,9 +338,9 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                   gridColumn: '1 / -1',
                   textAlign: 'center',
                   padding: '20px',
-                  color: 'rgba(255,255,255,0.3)',
+                  color: isDarkMode ? 'rgba(255,255,255,0.3)' : lightColors.text.tertiary,
                   fontStyle: 'italic',
-                  fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
+                  fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif",
                 }}>
                   No words configured.
                 </div>

@@ -56,29 +56,31 @@ import {
   CellRotation,
   CellExpansion,
 } from '../types/advancedMap';
+import { screenThemes, typography } from '../utils/design';
 
 // ─── Theme — AAC Compliant: Matte, High-Contrast, No Glass ──
 
 const THEME = {
-  bg: '#0B1120',
-  panelBg: '#0F172A',
-  cardBg: '#1E293B',
-  border: 'rgba(100, 116, 139, 0.2)',
+  ...screenThemes.floorPlan,
+  panelBg: screenThemes.floorPlan.panelBg,
+  cardBg: screenThemes.floorPlan.cardBg,
   accent: '#2DD4BF',
-  text: '#FFFFFF',
-  textSub: '#94A3B8',
-  textDim: '#64748B',
-  success: '#10B981',
-  danger: '#EF5350',
-  info: '#64B5F6',
-  warning: '#FBBF24',
-  road: '#38BDF8',
-  cellEmpty: 'rgba(30, 41, 59, 0.85)',
-  cellEmptyBorder: 'rgba(148, 163, 184, 0.35)',
-  cellEmptyText: '#FFFFFF',
-  cellArmed: 'rgba(20, 60, 55, 0.9)',
-  cellArmedBorder: 'rgba(45, 212, 191, 0.6)',
+  text: screenThemes.floorPlan.textMain,
+  textSub: screenThemes.floorPlan.textSub,
+  textDim: screenThemes.floorPlan.textDim,
+  success: screenThemes.floorPlan.success,
+  danger: screenThemes.floorPlan.danger,
+  info: screenThemes.floorPlan.accentStrong,
+  warning: screenThemes.floorPlan.warning,
+  road: screenThemes.floorPlan.road,
+  cellEmpty: 'rgba(34, 50, 71, 0.92)',
+  cellEmptyBorder: 'rgba(42, 61, 82, 0.72)',
+  cellEmptyText: screenThemes.floorPlan.textMain,
+  cellArmed: 'rgba(33, 50, 42, 0.96)',
+  cellArmedBorder: 'rgba(156, 197, 177, 0.72)',
 };
+
+const UI_FONT = typography.fontFamily.primary;
 
 const COMPASS_DRAFT_KEY = 'gazeconnect_compass_progress_v1';
 const COMPASS_PRIMARY_BACKUP_KEY = 'compass_persistent_backup';
@@ -733,9 +735,9 @@ const CompassRose: React.FC<{ facing: string }> = ({ facing }) => {
     <div style={{
       position: 'absolute', top: '6px', right: '6px', zIndex: 2,
       width: '40px', height: '40px', borderRadius: '50%',
-      background: '#0F172A', border: '1px solid rgba(100,116,139,0.3)',
+      background: THEME.panelBg, border: `1px solid ${THEME.border}`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '9px', color: '#94A3B8', lineHeight: 1,
+      fontSize: '9px', color: THEME.textSub, lineHeight: 1,
     }}>
       <div style={{ transform: `rotate(${rotMap[facing] || 0}deg)`, textAlign: 'center' }}>
         <div style={{ color: '#EF5350', fontWeight: 700, fontSize: '10px' }}>N</div>
@@ -1778,9 +1780,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const stripBtnStyle = (active: boolean, specialColor?: string) => ({
       flex: 1, width: '100%', borderRadius: 0, margin: 0,
       border: 'none',
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
-      background: active ? (specialColor ? specialColor : 'rgba(255,255,255,0.08)') : 'transparent',
-      color: active ? '#F8FAFC' : '#64748B',
+      borderBottom: `1px solid ${THEME.border}`,
+      background: active ? (specialColor ? specialColor : THEME.accentSubtle) : 'transparent',
+      color: active ? THEME.text : THEME.textDim,
       fontSize: '24px', fontWeight: 900,
       display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
       gap: '8px',
@@ -1793,12 +1795,12 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         right: '48px', // Shifted inward for better reachability
         top: '190px', // Pushed down to reserve space for NAV controls above it
         width: '240px', height: 'calc(100% - 310px)', // Shorter to pull bottom up
-        background: '#111827', // Deep charcoal
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: THEME.panelBg,
+        border: `1px solid ${THEME.border}`,
         borderRadius: '24px', overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
         zIndex: 50,
-        boxShadow: '-4px 0 20px rgba(0,0,0,0.4)',
+        boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
         pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
       }}>
         {refinementMode ? (
@@ -1864,7 +1866,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             {/* BUTTON 1: ROOMS (MENU) */}
             <GazeButton id="strip-rooms" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
               onClick={() => { setMenuOpen(true); onSpeak('Components menu.'); }}
-              style={stripBtnStyle(true, 'linear-gradient(180deg, rgba(56,189,248,0.1) 0%, rgba(56,189,248,0.05) 100%)')}>
+              style={stripBtnStyle(true, THEME.accentSubtle)}>
               <div style={{ fontSize: '28px', marginBottom: '-4px' }}>☰</div>
               <div>ROOMS</div>
             </GazeButton>
@@ -1967,14 +1969,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             Blocks grid clicking until user is ready
         ========================================================= */}
       {!mapRefinementArmed && (state.phase === 'review' || state.phase === 'floor_transition') && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(7, 17, 30, 0.7)', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: '#0D1B2E', padding: '40px 60px', borderRadius: '24px', border: '3px solid rgba(45,212,191,0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30 }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#94A3B8', textAlign: 'center', maxWidth: 400 }}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(7, 17, 30, 0.78)' }}>
+          <div style={{ background: THEME.panelBg, padding: '40px 60px', borderRadius: '24px', border: `2px solid ${THEME.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: THEME.textSub, textAlign: 'center', maxWidth: 400 }}>
               Look at READY to select a room for refinement.
             </div>
             <GazeButton id="map-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1500}
               onClick={() => { setMapRefinementArmed(true); onSpeak('Select a room to refine.'); }}
-              style={{ width: '280px', height: '140px', borderRadius: '24px', background: 'rgba(45,212,191,0.15)', border: `4px solid #2DD4BF`, color: '#2DD4BF', fontSize: '32px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 32px rgba(45,212,191,0.2)' }}>
+              style={{ width: '280px', height: '140px', borderRadius: '24px', background: THEME.successSubtle, border: `4px solid ${THEME.accent}`, color: THEME.accent, fontSize: '32px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>
               READY
             </GazeButton>
           </div>
@@ -1990,10 +1992,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         <div style={{
           flex: 1, width: '100%',
           display: 'flex', flexDirection: 'column',
-          border: state.armed ? '5px solid #2DD4BF' : '5px solid #2E4B3A',
+          border: state.armed ? `5px solid ${THEME.accent}` : `5px solid ${THEME.border}`,
           borderRadius: '12px 12px 0 0',
-          background: 'linear-gradient(180deg, #96C795 0%, #86B983 100%)',
-          boxShadow: state.armed ? '0 0 25px rgba(45,212,191,0.15)' : '0 10px 30px rgba(0,0,0,0.3)', // Subtle glow
+          background: '#8DAE85',
+          boxShadow: state.armed ? '0 8px 20px rgba(0,0,0,0.16)' : '0 8px 20px rgba(0,0,0,0.14)',
           overflow: 'hidden',
           position: 'relative',
           transition: 'all 0.4s ease',
@@ -2003,17 +2005,17 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           {/* Directions Labels */}
           <div style={{
             position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)', zIndex: 3,
-            padding: '4px 10px', borderRadius: '8px', background: 'rgba(15,23,42,0.8)', color: '#F8FAFC',
+            padding: '4px 10px', borderRadius: '8px', background: THEME.panelBg, color: THEME.text,
             fontSize: '12px', fontWeight: 800
           }}>BACK ({backDir})</div>
           <div style={{
             position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', zIndex: 3,
-            padding: '4px 10px', borderRadius: '8px', background: 'rgba(15,23,42,0.8)', color: '#F8FAFC',
+            padding: '4px 10px', borderRadius: '8px', background: THEME.panelBg, color: THEME.text,
             fontSize: '12px', fontWeight: 800
           }}>LEFT ({sideLabels.left})</div>
           <div style={{
             position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', zIndex: 3,
-            padding: '4px 10px', borderRadius: '8px', background: 'rgba(15,23,42,0.8)', color: '#F8FAFC',
+            padding: '4px 10px', borderRadius: '8px', background: THEME.panelBg, color: THEME.text,
             fontSize: '12px', fontWeight: 800
           }}>RIGHT ({sideLabels.right})</div>
 
@@ -2124,7 +2126,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     width: '100%', height: '100%', border: 'none', background: 'transparent',
                     display: 'flex', overflow: 'hidden', padding: 0,
                     position: 'relative',
-                    ...(isHov && cellGaze ? { transform: 'scale(1.02)', zIndex: 10, boxShadow: '0 0 15px rgba(45,212,191,0.5)' } : {})
+                    ...(isHov && cellGaze ? { transform: 'scale(1.01)', zIndex: 10, boxShadow: '0 6px 16px rgba(0,0,0,0.18)' } : {})
                   }}
                 >
                   <ArchitecturalCell
@@ -2145,7 +2147,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     <>
                       {/* Selection highlight */}
                       {selectedRefinementCell === cellKey && (
-                        <div style={{ position: 'absolute', inset: 0, border: '3px solid #2DD4BF', boxShadow: 'inset 0 0 12px rgba(45,212,191,0.35)', zIndex: 15, pointerEvents: 'none', borderRadius: '2px' }} />
+                        <div style={{ position: 'absolute', inset: 0, border: `3px solid ${THEME.accent}`, zIndex: 15, pointerEvents: 'none', borderRadius: '2px' }} />
                       )}
                       {/* Split indicator — colored halves + dashed divider with percentage */}
                       {(() => {
@@ -2403,8 +2405,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       const oldLib = ROOM_LIBRARY[confirmReplace.oldRoomId];
       const newLib = ROOM_LIBRARY[confirmReplace.newRoomId];
       return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', pointerEvents: 'auto' }}>
-          <div style={{ background: '#0F172A', border: `3px solid ${THEME.border}`, borderRadius: '24px', padding: '60px', maxWidth: '1000px', width: '90%', textAlign: 'center', boxShadow: '0 40px 80px rgba(0,0,0,0.8)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.84)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <div style={{ background: THEME.panelBg, border: `3px solid ${THEME.border}`, borderRadius: '24px', padding: '60px', maxWidth: '1000px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
             <div style={{ fontSize: '36px', fontWeight: 900, color: '#FFFFFF', marginBottom: '32px' }}>Replace Room?</div>
             <div style={{ fontSize: '28px', color: '#CBD5E1', marginBottom: '50px', lineHeight: 1.5 }}>
               Do you really want to replace <span style={{ color: oldLib?.color || '#fff', fontWeight: 700 }}>{oldLib?.roomLabel}</span> with <span style={{ color: newLib?.color || '#fff', fontWeight: 700 }}>{newLib?.roomLabel}</span>?
@@ -2431,8 +2433,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
     if (confirmGenerate) {
       return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(15px)', pointerEvents: 'auto' }}>
-          <div style={{ background: '#020617', border: `6px solid ${THEME.border}`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 50px 100px rgba(0,0,0,0.9)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <div style={{ background: THEME.panelBg, border: `4px solid ${THEME.border}`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
             <div style={{ fontSize: '90px', marginBottom: '30px' }}>⚠️</div>
             <div style={{ fontSize: '42px', fontWeight: 900, color: '#FFFFFF', marginBottom: '32px' }}>Finalize Floor Plan?</div>
             <div style={{ fontSize: '28px', color: '#E2E8F0', marginBottom: '50px', lineHeight: 1.6 }}>
@@ -2461,8 +2463,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     }
     if (showRestoreConfirm) {
       return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(15px)', pointerEvents: 'auto' }}>
-          <div style={{ background: '#020617', border: `6px solid #3B82F6`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 50px 100px rgba(0,0,0,0.9)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <div style={{ background: THEME.panelBg, border: `4px solid ${THEME.info}`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
             <div style={{ fontSize: '90px', marginBottom: '30px' }}>🕒</div>
             <div style={{ fontSize: '42px', fontWeight: 900, color: '#FFFFFF', marginBottom: '32px' }}>Restore Previous Session?</div>
             <div style={{ fontSize: '28px', color: '#E2E8F0', marginBottom: '50px', lineHeight: 1.6 }}>
@@ -2511,8 +2513,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
     if (showRestartConfirm) {
       return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(15px)', pointerEvents: 'auto' }}>
-          <div style={{ background: '#020617', border: `6px solid ${THEME.danger}`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 50px 100px rgba(0,0,0,0.9)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <div style={{ background: THEME.panelBg, border: `4px solid ${THEME.danger}`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
             <div style={{ fontSize: '90px', marginBottom: '30px' }}>⚠️</div>
             <div style={{ fontSize: '42px', fontWeight: 900, color: '#FFFFFF', marginBottom: '32px' }}>Restart Mapping Completely?</div>
             <div style={{ fontSize: '28px', color: '#E2E8F0', marginBottom: '50px', lineHeight: 1.6 }}>
@@ -2549,9 +2551,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const menuNavSize = 'clamp(126px, 14.2vh, 176px)';
 
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#0F172A', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: THEME.panelBg, display: 'flex', flexDirection: 'column' }}>
         {/* Header — Solid matte */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: 'clamp(12px, 1.8vh, 22px) clamp(20px, 2.5vw, 36px)', borderBottom: `2px solid ${THEME.border}`, background: '#0F172A' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: 'clamp(12px, 1.8vh, 22px) clamp(20px, 2.5vw, 36px)', borderBottom: `2px solid ${THEME.border}`, background: THEME.panelBg }}>
           {/* Left: Title + info */}
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '16px' }}>
             <span style={{ fontSize: 'clamp(22px, 3vh, 32px)', fontWeight: 900, color: '#FFFFFF', letterSpacing: '1.5px' }}>
@@ -2589,7 +2591,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         )}
 
         {/* Instruction */}
-        <div style={{ padding: 'clamp(10px, 1.2vh, 16px) clamp(20px, 2.5vw, 36px) 0', background: '#0F172A' }}>
+        <div style={{ padding: 'clamp(10px, 1.2vh, 16px) clamp(20px, 2.5vw, 36px) 0', background: THEME.panelBg }}>
           <div style={{ fontSize: 'clamp(12px, 1.3vh, 15px)', color: THEME.textSub, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
             {menuCardsEnabled ? 'Select any room to load it for placement' : 'Press ready to unlock room selection'}
           </div>
@@ -2673,12 +2675,12 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         </div>
 
         {/* Footer — Solid matte */}
-        <div style={{ marginTop: 'clamp(52px, 6vh, 90px)', padding: '0 clamp(20px, 2.5vw, 36px) clamp(16px, 2.4vh, 34px)', background: '#0F172A', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ marginTop: 'clamp(52px, 6vh, 90px)', padding: '0 clamp(20px, 2.5vw, 36px) clamp(16px, 2.4vh, 34px)', background: THEME.panelBg, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(30px, 4vw, 72px)' }}>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <GazeButton id="back-map" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={700}
                 onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}
-                style={{ width: menuNavSize, height: menuNavSize, minHeight: menuNavSize, borderRadius: '50%', fontWeight: 900, fontSize: 'clamp(18px, 2.2vh, 28px)', background: 'rgba(30,41,59,0.95)', border: '3px solid #2DD4BF', color: '#2DD4BF', letterSpacing: '0.7px', whiteSpace: 'pre-line', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.05 }}>
+                style={{ width: menuNavSize, height: menuNavSize, minHeight: menuNavSize, borderRadius: '50%', fontWeight: 900, fontSize: 'clamp(18px, 2.2vh, 28px)', background: THEME.cardBg, border: `3px solid ${THEME.accent}`, color: THEME.accent, letterSpacing: '0.7px', whiteSpace: 'pre-line', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.05 }}>
                 BACK{'\n'}TO MAP
               </GazeButton>
             </div>
@@ -2689,9 +2691,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   height: menuNavSize,
                   minHeight: menuNavSize,
                   borderRadius: '50%',
-                  background: isGazeEnabled ? 'rgba(45,212,191,0.15)' : 'rgba(30,41,59,0.95)',
-                  border: `3px solid ${isGazeEnabled ? '#2DD4BF' : 'rgba(100,116,139,0.45)'}`,
-                  color: isGazeEnabled ? '#2DD4BF' : '#94A3B8',
+                  background: isGazeEnabled ? THEME.successSubtle : THEME.cardBg,
+                  border: `3px solid ${isGazeEnabled ? THEME.accent : THEME.border}`,
+                  color: isGazeEnabled ? THEME.accent : THEME.textSub,
                   fontSize: 'clamp(14px, 1.65vh, 20px)',
                   fontWeight: 900,
                   display: 'flex',
@@ -2719,10 +2721,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   borderRadius: '50%',
                   fontWeight: 900,
                   fontSize: 'clamp(22px, 2.7vh, 34px)',
-                  background: menuReady ? 'rgba(45,212,191,0.28)' : 'rgba(30,41,59,0.95)',
-                  border: '3px solid #2DD4BF',
-                  color: menuReady ? '#FFFFFF' : '#2DD4BF',
-                  boxShadow: menuReady ? '0 0 28px rgba(45,212,191,0.32)' : 'none',
+                  background: menuReady ? THEME.successSubtle : THEME.cardBg,
+                  border: `3px solid ${THEME.accent}`,
+                  color: menuReady ? THEME.text : THEME.accent,
+                  boxShadow: menuReady ? '0 8px 18px rgba(0,0,0,0.18)' : 'none',
                   letterSpacing: '0.7px',
                   display: 'flex',
                   alignItems: 'center',
@@ -2746,7 +2748,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const renderRightActionRail = () => null;
 
   return (
-    <div className={`compass-screen${isLight ? ' theme-light' : ''}`} style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: THEME.bg, display: 'flex', flexDirection: 'column' }}>
+    <div className={`compass-screen${isLight ? ' theme-light' : ''}`} style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: THEME.bg, display: 'flex', flexDirection: 'column', fontFamily: UI_FONT }}>
       {!menuOpen && !navHidden && (
         <div style={{ pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto' }}>
           <GlobalNavBar
@@ -2781,14 +2783,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             width: '240px',
             minHeight: 'clamp(72px, 9vh, 100px)',
             borderRadius: '14px',
-            background: 'rgba(15, 23, 42, 0.9)',
-            border: '2px solid rgba(45, 212, 191, 0.4)',
-            color: '#2DD4BF',
+            background: THEME.panelBg,
+            border: `2px solid ${THEME.border}`,
+            color: THEME.accent,
             fontSize: 'clamp(16px, 2.2vh, 22px)',
             fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: 'clamp(6px, 1vw, 10px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.16)',
             padding: '0 clamp(16px, 2vw, 28px)',
           }}
         >
@@ -2810,14 +2812,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             width: '240px',
             minHeight: 'clamp(72px, 9vh, 100px)',
             borderRadius: '14px',
-            background: 'rgba(15, 23, 42, 0.9)',
-            border: '2px solid rgba(100, 116, 139, 0.3)',
+            background: THEME.panelBg,
+            border: `2px solid ${THEME.border}`,
             color: THEME.text,
             fontSize: 'clamp(16px, 2.2vh, 22px)',
             fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: 'clamp(6px, 1vw, 10px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.16)',
             padding: '0 clamp(16px, 2vw, 28px)',
           }}
         >
@@ -3025,13 +3027,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     </div>
 
                     {/* Prominent Overlay READY Button */}
-                    <div style={{ position: 'absolute', inset: -20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.4)', borderRadius: 24, zIndex: 10 }}>
-                      <div style={{ fontSize: 28, fontWeight: 900, color: '#F8FAFC', textAlign: 'center', maxWidth: 600, textShadow: '0 4px 12px rgba(0,0,0,0.8)', marginBottom: 30 }}>
+                    <div style={{ position: 'absolute', inset: -20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(19,30,46,0.72)', borderRadius: 24, zIndex: 10 }}>
+                      <div style={{ fontSize: 28, fontWeight: 900, color: THEME.text, textAlign: 'center', maxWidth: 600, marginBottom: 30 }}>
                         Look at READY to enable tools.
                       </div>
                       <GazeButton id="ce-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
                         onClick={() => { setRefinementArmed(true); triggerReadingCooldown(); onSpeak('Tools enabled.'); }}
-                        style={{ width: '280px', height: '140px', borderRadius: '24px', background: '#0F172A', border: `4px solid #2DD4BF`, color: '#2DD4BF', fontSize: '32px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(45,212,191,0.4)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                        style={{ width: '280px', height: '140px', borderRadius: '24px', background: THEME.panelBg, border: `4px solid ${THEME.accent}`, color: THEME.accent, fontSize: '32px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>
                         READY
                       </GazeButton>
                     </div>
@@ -3080,7 +3082,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                         </div>
 
                         {/* LIVE PREVIEW BOX */}
-                        <div style={{ width: '400px', height: '240px', background: '#0F172A', border: '4px solid #334155', borderRadius: '16px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4 }}>
+                        <div style={{ width: '400px', height: '240px', background: THEME.panelBg, border: `4px solid ${THEME.border}`, borderRadius: '16px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4 }}>
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 20 }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} ({subRoomAPct || 50}%)
                           </div>
@@ -3101,7 +3103,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                         <div style={{ fontSize: 16, color: '#94A3B8' }}>Room for {splitDirection === 'vertical' ? 'RIGHT' : 'BOTTOM'} half ({100 - (subRoomAPct || 50)}%)</div>
 
                         {/* LIVE PREVIEW BOX - B */}
-                        <div style={{ width: '400px', height: '140px', background: '#0F172A', border: '4px solid #334155', borderRadius: '16px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0 }}>
+                        <div style={{ width: '400px', height: '140px', background: THEME.panelBg, border: `4px solid ${THEME.border}`, borderRadius: '16px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0 }}>
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 16 }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} ({subRoomAPct || 50}%)
                           </div>
@@ -3120,7 +3122,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                         <div style={{ fontSize: 16, color: '#94A3B8' }}>Review & Confirm Your Split</div>
 
                         {/* FINAL PREVIEW BOX */}
-                        <div style={{ width: '500px', height: '300px', background: '#0F172A', border: '5px solid #475569', borderRadius: '24px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0, boxShadow: '0 0 30px rgba(0,0,0,0.5)' }}>
+                        <div style={{ width: '500px', height: '300px', background: THEME.panelBg, border: `5px solid ${THEME.border}`, borderRadius: '24px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0, boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 22, textAlign: 'center', padding: '10px' }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} <br />({subRoomAPct || 50}%)
                           </div>
@@ -3276,12 +3278,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         >
           <div style={{
             display: 'flex', alignItems: 'center', gap: '16px',
-            background: 'rgba(11, 17, 32, 0.92)',
-            backdropFilter: 'blur(12px)',
+            background: THEME.panelBg,
             border: `2px solid ${roomToast.color}55`,
             borderRadius: '20px',
             padding: 'clamp(24px, 3.5vh, 40px) clamp(36px, 5vw, 64px)',
-            boxShadow: `0 12px 40px rgba(0,0,0,0.6), 0 0 24px ${roomToast.color}18`,
+            boxShadow: '0 8px 22px rgba(0,0,0,0.22)',
           }}>
             <div style={{
               width: '30px', height: '30px', borderRadius: '7px',

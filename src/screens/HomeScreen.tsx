@@ -3,7 +3,7 @@
  * Responsive: 13"-27" screens via clamp()/min() - identical on 23" (1920x1080)
  */
 import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { screenThemes } from '../utils/design';
+import { lightColors, mixColors, screenThemes } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useCustomization } from '../contexts/CustomizationContext';
@@ -39,6 +39,46 @@ type HomeTile = {
   cardClass: string;
 };
 
+type HomeThemePalette = {
+  bg: string;
+  cardBg: string;
+  cardBorder: string;
+  cardShadow: string;
+  tileSurfaces: Record<string, string>;
+  icon: string;
+  badgeIcon: string;
+  text: string;
+  subtleText: string;
+  mutedText: string;
+  brand: string;
+  dockSeparator: string;
+  quickPhrasesBg: string;
+  quickPhrasesBorder: string;
+  quickPhrasesText: string;
+  quickPhrasesShadow: string;
+  emergencyBg: string;
+  emergencyHover: string;
+  emergencyText: string;
+  emergencySoft: string;
+  placeholderBg: string;
+  placeholderBorder: string;
+  dividerBackground: string;
+};
+
+const HOME_BADGE_FILLS: Record<string, string> = {
+  kb: '#6FB7B1',
+  ph: '#8FAE72',
+  ac: '#C69A45',
+  pp: '#C7838F',
+  med: '#9C98C6',
+  st: '#BBAE9D',
+  web: '#A77AC1',
+  fp: '#C9A852',
+};
+
+const HOME_BADGE_ICON = '#201A15';
+const MIX_HOME_BADGE_ICON = '#23180C';
+
 const PANEL_GAP = 'clamp(12px, 2.2vh, 26px)';
 
 const vDividerStyle: React.CSSProperties = {
@@ -47,7 +87,7 @@ const vDividerStyle: React.CSSProperties = {
   alignSelf: 'stretch',
   marginLeft: 'clamp(18px, 2vw, 30px)',
   marginRight: 'clamp(18px, 2vw, 30px)',
-  background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.03) 12%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.03) 88%, transparent 100%)',
+  background: 'linear-gradient(180deg, transparent 0%, rgba(213,216,188,0.04) 12%, rgba(213,216,188,0.10) 50%, rgba(213,216,188,0.04) 88%, transparent 100%)',
 };
 
 
@@ -61,7 +101,7 @@ const EMERGENCY_OVAL_VISUALS: Record<string, EmergencyOvalVisual> = {
   checko2: {
     color: '#7AB8E8',
     border: 'rgba(80,140,210,0.65)',
-    bgOverride: 'linear-gradient(145deg, rgba(12,18,36,0.95) 0%, rgba(8,14,28,0.98) 100%)',
+    bgOverride: '#101B2B',
   },
 };
 
@@ -97,7 +137,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { homeQuickActions, data: { quickWords, homeEmergencyCards } } = useCustomization();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
 
   const [activatedText, setActivatedText] = useState<string | null>(null);
   const [activatedBtnId, setActivatedBtnId] = useState<string | null>(null);
@@ -120,8 +160,105 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current); };
   }, []);
 
-  const THEME = screenThemes.home;
+  const THEME: HomeThemePalette = isLight ? {
+    bg: lightColors.background.primary,
+    cardBg: lightColors.background.secondary,
+    cardBorder: `1.5px solid ${lightColors.border.light}`,
+    cardShadow: '0 8px 18px rgba(82, 66, 45, 0.16), 0 1px 2px rgba(82, 66, 45, 0.10)',
+    tileSurfaces: {
+      kb: lightColors.background.secondary,
+      ph: lightColors.background.secondary,
+      ac: lightColors.background.secondary,
+      pp: lightColors.background.secondary,
+      med: lightColors.background.secondary,
+      st: lightColors.background.secondary,
+      web: lightColors.background.secondary,
+      fp: lightColors.background.secondary,
+    },
+    icon: lightColors.icon.primary,
+    badgeIcon: HOME_BADGE_ICON,
+    text: lightColors.text.primary,
+    subtleText: lightColors.text.secondary,
+    mutedText: lightColors.text.tertiary,
+    brand: lightColors.text.tertiary,
+    dockSeparator: lightColors.border.light,
+    quickPhrasesBg: lightColors.background.secondary,
+    quickPhrasesBorder: lightColors.border.light,
+    quickPhrasesText: lightColors.text.primary,
+    quickPhrasesShadow: '0 8px 18px rgba(82, 66, 45, 0.16), 0 1px 2px rgba(82, 66, 45, 0.10)',
+    emergencyBg: lightColors.emergency.main,
+    emergencyHover: lightColors.emergency.hover,
+    emergencyText: lightColors.text.inverse,
+    emergencySoft: lightColors.emergency.soft,
+    placeholderBg: lightColors.background.tertiary,
+    placeholderBorder: lightColors.border.light,
+    dividerBackground: 'linear-gradient(180deg, transparent 0%, rgba(203, 188, 166, 0.42) 50%, transparent 100%)',
+  } : isMix ? {
+    bg: mixColors.home.root,
+    cardBg: '#C4B28E',
+    cardBorder: `1.5px solid ${mixColors.home.cardBorder}`,
+    cardShadow: mixColors.home.cardShadow,
+    tileSurfaces: mixColors.home.tileSurfaces,
+    icon: mixColors.home.text,
+    badgeIcon: MIX_HOME_BADGE_ICON,
+    text: mixColors.home.text,
+    subtleText: mixColors.home.subtleText,
+    mutedText: mixColors.home.mutedText,
+    brand: mixColors.home.brand,
+    dockSeparator: mixColors.home.dockSeparator,
+    quickPhrasesBg: mixColors.home.quickPhrasesBg,
+    quickPhrasesBorder: mixColors.home.quickPhrasesBorder,
+    quickPhrasesText: mixColors.home.quickPhrasesText,
+    quickPhrasesShadow: mixColors.home.quickPhrasesShadow,
+    emergencyBg: mixColors.home.emergencyBg,
+    emergencyHover: mixColors.home.emergencyHover,
+    emergencyText: lightColors.text.inverse,
+    emergencySoft: mixColors.home.emergencySoft,
+    placeholderBg: mixColors.home.placeholderBg,
+    placeholderBorder: mixColors.home.placeholderBorder,
+    dividerBackground: mixColors.home.dividerBackground,
+  } : {
+    bg: screenThemes.home.bg,
+    cardBg: screenThemes.home.cardBg,
+    cardBorder: screenThemes.home.cardBorder,
+    cardShadow: '0 8px 20px rgba(0,0,0,0.28)',
+    tileSurfaces: {
+      kb: screenThemes.home.cardBg,
+      ph: screenThemes.home.cardBg,
+      ac: screenThemes.home.cardBg,
+      pp: screenThemes.home.cardBg,
+      med: screenThemes.home.cardBg,
+      st: screenThemes.home.cardBg,
+      web: screenThemes.home.cardBg,
+      fp: screenThemes.home.cardBg,
+    },
+    icon: screenThemes.home.text,
+    badgeIcon: HOME_BADGE_ICON,
+    text: screenThemes.home.text,
+    subtleText: '#C8C5B8',
+    mutedText: '#A9A392',
+    brand: screenThemes.home.brand,
+    dockSeparator: screenThemes.home.dockSeparator,
+    quickPhrasesBg: screenThemes.home.quickPhrasesBg,
+    quickPhrasesBorder: screenThemes.home.quickPhrasesBorder,
+    quickPhrasesText: screenThemes.home.quickPhrasesText,
+    quickPhrasesShadow: '0 8px 18px rgba(0,0,0,0.24)',
+    emergencyBg: screenThemes.home.red,
+    emergencyHover: '#7A3A34',
+    emergencyText: '#FFF1E3',
+    emergencySoft: '#CFA094',
+    placeholderBg: 'rgba(236,237,227,0.035)',
+    placeholderBorder: 'rgba(213,216,188,0.14)',
+    dividerBackground: typeof vDividerStyle.background === 'string'
+      ? vDividerStyle.background
+      : 'linear-gradient(180deg, transparent 0%, rgba(168,181,196,0.04) 12%, rgba(168,181,196,0.12) 50%, rgba(168,181,196,0.04) 88%, transparent 100%)',
+  };
   const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Inter', 'Segoe UI', system-ui, sans-serif";
+  const themeClass = isLight ? ' theme-light' : isMix ? ' theme-mix' : '';
+  const dividerStyle = (isLight || isMix) ? {
+    ...vDividerStyle,
+    background: THEME.dividerBackground,
+  } : vDividerStyle;
 
   const buttonBaseStyle = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -134,24 +271,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     flexDirection: 'column' as const,
     width: '100%', height: '100%',
     minHeight: 'clamp(100px, 12vh, 140px)',
-    background: '#1E2630',
-    border: '2px solid rgba(90, 110, 130, 0.3)',
+    background: THEME.cardBg,
+    border: THEME.cardBorder,
     borderRadius: '28px',
-    boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+    boxShadow: THEME.cardShadow,
   };
 
   const gridItems: HomeTile[] = [
-    { id: 'kb', label: 'Keyboard', labelHi: 'कीबोर्ड', icon: KeyboardIcon, color: THEME.tealIcon, screen: 'keyboard', cardClass: 'grid-card-keyboard' },
-    { id: 'ph', label: 'Phrases\n& Chat', labelHi: 'बातचीत', icon: ChatBubblesIcon, color: THEME.tealIcon, screen: 'phrases', cardClass: 'grid-card-communication' },
-    { id: 'ac', label: 'Activities', labelHi: 'मनोरंजन', icon: TVIcon, color: THEME.tealIcon, screen: 'activities', cardClass: 'grid-card-activities' },
-    { id: 'pp', label: 'People', labelHi: 'परिवार', icon: FamilyIcon, color: THEME.tealIcon, screen: 'people', cardClass: 'grid-card-people' },
-    { id: 'med', label: 'Assistance', labelHi: 'देखभाल', subLabel: 'Daily Care', icon: BellIcon, color: THEME.tealIcon, screen: 'medical', cardClass: 'grid-card-assistance' },
-    { id: 'st', label: 'Settings', labelHi: 'सेटिंग', icon: SettingsIcon, color: THEME.tealIcon, screen: 'settings', cardClass: 'grid-card-settings' },
+    { id: 'kb', label: 'Keyboard', labelHi: 'कीबोर्ड', icon: KeyboardIcon, color: HOME_BADGE_FILLS.kb, screen: 'keyboard', cardClass: 'grid-card-keyboard' },
+    { id: 'ph', label: 'Phrases\n& Chat', labelHi: 'बातचीत', icon: ChatBubblesIcon, color: HOME_BADGE_FILLS.ph, screen: 'phrases', cardClass: 'grid-card-communication' },
+    { id: 'ac', label: 'Activities', labelHi: 'मनोरंजन', icon: TVIcon, color: HOME_BADGE_FILLS.ac, screen: 'activities', cardClass: 'grid-card-activities' },
+    { id: 'pp', label: 'People', labelHi: 'परिवार', icon: FamilyIcon, color: HOME_BADGE_FILLS.pp, screen: 'people', cardClass: 'grid-card-people' },
+    { id: 'med', label: 'Assistance', labelHi: 'देखभाल', subLabel: 'Daily Care', icon: BellIcon, color: HOME_BADGE_FILLS.med, screen: 'medical', cardClass: 'grid-card-assistance' },
+    { id: 'st', label: 'Settings', labelHi: 'सेटिंग', icon: SettingsIcon, color: HOME_BADGE_FILLS.st, screen: 'settings', cardClass: 'grid-card-settings' },
   ];
 
   const rightPanelTiles: HomeTile[] = [
-    { id: 'web', label: 'Web Browsing', labelHi: 'वेब ब्राउज़िंग', icon: GlobalIcon, color: THEME.tealIcon, screen: 'web', cardClass: 'grid-card-web' },
-    { id: 'fp', label: 'Design Home', labelHi: 'घर का नक्शा', icon: GridIcon, color: THEME.tealIcon, screen: 'floor-plan', cardClass: 'grid-card-design' },
+    { id: 'web', label: 'Web Browsing', labelHi: 'वेब ब्राउज़िंग', icon: GlobalIcon, color: HOME_BADGE_FILLS.web, screen: 'web', cardClass: 'grid-card-web' },
+    { id: 'fp', label: 'Design Home', labelHi: 'घर का नक्शा', icon: GridIcon, color: HOME_BADGE_FILLS.fp, screen: 'floor-plan', cardClass: 'grid-card-design' },
   ];
 
   const iconStyle = {
@@ -163,14 +300,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     height: 'clamp(38px, 5.5vh, 66px)',
   };
 
+  const iconBadgeStyle = {
+    width: 'clamp(56px, 7.2vh, 76px)',
+    height: 'clamp(56px, 7.2vh, 76px)',
+    borderRadius: '999px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 'clamp(10px, 2vh, 18px)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+  };
+
   const labelStyle = {
     display: 'block',
     fontSize: 'clamp(19px, 2.7vh, 27px)',
-    fontWeight: 600,
-    color: '#FFF',
-    letterSpacing: 'clamp(0.5px, 0.1vw, 1px)',
-    textTransform: 'uppercase' as const,
-    fontFamily: "'Outfit', sans-serif",
+    fontWeight: (isLight || isMix) ? 600 : 700,
+    color: THEME.text,
+    letterSpacing: (isLight || isMix) ? '0.02em' : 'clamp(0.5px, 0.1vw, 1px)',
+    textTransform: 'none' as const,
+    fontFamily: ENGLISH_UI_FONT,
     whiteSpace: 'pre-wrap' as const,
     lineHeight: '1.2',
     textAlign: 'center' as const,
@@ -195,7 +343,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
   return (
-    <div className={`home-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`home-screen${themeClass}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -204,10 +352,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       position: 'relative',
     }}>
       <div style={{
-        position: 'absolute', top: '25px', left: '35px', zIndex: 1000, opacity: 0.6, pointerEvents: 'none',
+        position: 'absolute', top: '25px', left: '35px', zIndex: 1000, opacity: 0.82, pointerEvents: 'none',
       }}>
-        <span className="brand-title" style={{ fontSize: '14px', fontWeight: 600, color: '#6E7681', fontFamily: "'Inter', sans-serif", letterSpacing: '2px' }}>
-          GAZECONNECT
+        <span className="brand-title" style={{ fontSize: '14px', fontWeight: (isLight || isMix) ? 400 : 700, color: THEME.brand, fontFamily: ENGLISH_UI_FONT, letterSpacing: (isLight || isMix) ? '0.02em' : '2.6px', fontStyle: (isLight || isMix) ? 'italic' : 'normal' }}>
+          {(isLight || isMix) ? 'GazeConnect' : 'GAZECONNECT'}
         </span>
       </div>
 
@@ -250,19 +398,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* LEFT PANEL — Hybrid Dock: muted solid emergency + dark glass navigation */}
           {(() => {
             // Priority-driven color coding with user-selectable color schemes
-            const HIGH_COLOR_MAP = {
-              red: { bg: 'linear-gradient(145deg, #6B3E3E 0%, #583333 100%)', shadow: '#6B3E3E' },
-              crimson: { bg: 'linear-gradient(145deg, #5C3454 0%, #4D2B47 100%)', shadow: '#5C3454' },
-              muted_red: { bg: 'linear-gradient(145deg, #563636 0%, #472D2D 100%)', shadow: '#563636' },
-              muted_crimson: { bg: 'linear-gradient(145deg, #4A2B42 0%, #3D2438 100%)', shadow: '#4A2B42' },
+            const HIGH_COLOR_MAP = isLight ? {
+              red: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              crimson: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_red: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_crimson: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+            } : isMix ? {
+              red: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              crimson: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              muted_red: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              muted_crimson: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+            } : {
+              red: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              crimson: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_red: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_crimson: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
             };
-            const MEDIUM_COLOR_MAP = {
-              blue: { bg: 'linear-gradient(145deg, #3E5B6B 0%, #334D5C 100%)', shadow: '#3E5B6B' },
-              golden: { bg: 'linear-gradient(145deg, #6B5B3E 0%, #5C4D33 100%)', shadow: '#6B5B3E' },
-              teal: { bg: 'linear-gradient(145deg, #3E6B58 0%, #335C4A 100%)', shadow: '#3E6B58' },
-              muted_blue: { bg: 'linear-gradient(145deg, #344E5C 0%, #2C4250 100%)', shadow: '#344E5C' },
-              muted_golden: { bg: 'linear-gradient(145deg, #5C5036 0%, #4D442E 100%)', shadow: '#5C5036' },
-              muted_teal: { bg: 'linear-gradient(145deg, #355C4C 0%, #2D4E40 100%)', shadow: '#355C4C' },
+            const MEDIUM_COLOR_MAP = isLight ? {
+              blue: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              golden: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              teal: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_blue: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_golden: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_teal: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+            } : isMix ? {
+              blue: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              golden: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              teal: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              muted_blue: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              muted_golden: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+              muted_teal: { bg: mixColors.home.emergencyBg, shadow: mixColors.home.emergencyHover },
+            } : {
+              blue: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              golden: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              teal: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_blue: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_golden: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
+              muted_teal: { bg: THEME.emergencyBg, shadow: THEME.emergencyHover },
             };
             const highColorKey = quickWords?.highColor ?? 'red';
             const mediumColorKey = quickWords?.mediumColor ?? 'blue';
@@ -270,7 +442,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               high: HIGH_COLOR_MAP[highColorKey],
               medium: MEDIUM_COLOR_MAP[mediumColorKey],
             };
-            const NAV_BG = '#1A202C';
+            const NAV_BG = THEME.quickPhrasesBg;
             const DOCK_LABELS = [
               ...prioritizedEmergencyWords.map((word) => {
                 const priority = word.priority ?? 'high';
@@ -321,7 +493,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   <div style={{
                     width: '100%',
                     height: '1px',
-                    background: 'rgba(255, 255, 255, 0.15)',
+                    background: THEME.dockSeparator,
                   }} />
                 </div>
                 {DOCK_LABELS.map((item, i) => {
@@ -341,8 +513,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           width: '100%',
                           height: '100%',
                           borderRadius: '32px',
-                          background: 'rgba(30, 35, 45, 0.35)',
-                          border: '1.5px dashed rgba(255, 255, 255, 0.1)',
+                          background: THEME.placeholderBg,
+                          border: `1.5px dashed ${THEME.placeholderBorder}`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -360,7 +532,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         if (item.spoken === '__quick_words__') { onNavigate('quickwords'); return; }
                         handleQuickcall(item.spoken, btnId, bgShadow!);
                       }}
-                      className={`quickcall-btn${isLight ? ' theme-light' : ''}`}
+                      className={`quickcall-btn${themeClass}`}
                       isDarkMode={isDarkMode}
                       gazeEnabled={isGazeEnabled}
                       gazeEnabledTimestamp={lastEnabledTimestamp}
@@ -373,10 +545,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         justifySelf: isNav ? 'center' : undefined,
                         borderRadius: isNav ? '999px' : '28px',
                         background: isNav ? NAV_BG : bg,
-                        border: isNav ? `1px solid rgba(255, 255, 255, 0.08)` : 'none',
+                        border: isNav ? `1px solid ${THEME.quickPhrasesBorder}` : ((isLight || isMix) ? THEME.cardBorder : 'none'),
                         boxShadow: isActivated
-                          ? isNav ? '0 0 20px rgba(45, 55, 72, 0.6)' : `0 0 16px ${bgShadow}40`
-                          : 'none',
+                          ? isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 0 0 1px rgba(56, 189, 248, 0.12), 0 6px 16px rgba(0, 0, 0, 0.2)') : ((isLight || isMix) ? THEME.cardShadow : `0 6px 16px rgba(0,0,0,0.16), 0 0 0 1px ${bgShadow}28`)
+                          : isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : ((isLight || isMix) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)'),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -392,29 +564,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
                           <span style={{
                             fontSize: i < 4 ? 'clamp(24px, 3vh, 32px)' : 'clamp(22px, 2.8vh, 32px)',
-                            fontWeight: i < 4 ? 900 : 700,
-                            color: '#FFFFFF',
+                            fontWeight: i < 4 ? ((isLight || isMix) ? 600 : 900) : ((isLight || isMix) ? 600 : 700),
+                            color: isNav ? THEME.quickPhrasesText : THEME.emergencyText,
                             lineHeight: 1.1,
                             textAlign: 'center',
-                            fontFamily: "'Outfit', sans-serif",
+                            fontFamily: ENGLISH_UI_FONT,
                             whiteSpace: 'pre-wrap',
-                            letterSpacing: i < 4 ? '1.5px' : '0.5px',
-                            textTransform: i < 4 ? 'uppercase' : 'none',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                            letterSpacing: (isLight || isMix) ? '0.01em' : (i < 4 ? '0.6px' : '0.2px'),
+                            textTransform: 'none',
+                            textShadow: (isLight || isMix) ? 'none' : '0 1px 3px rgba(0,0,0,0.22)',
                           }}>
                             {item.text}
                           </span>
-                          {showHindi && item.textHi && (
+                              {showHindi && item.textHi && (
                             <>
                               <div style={{
-                                width: '28px', height: '1px', background: 'rgba(255,255,255,0.2)',
+                                width: '28px', height: '1px', background: isLight ? lightColors.emergency.soft : isMix ? THEME.emergencySoft : 'rgba(255,255,255,0.2)',
                                 borderRadius: '1px',
                                 margin: i >= 4 ? '10px auto 6px' : '10px auto 6px'
                               }} />
                               <span style={{
                                 fontSize: i < 4 ? 'clamp(24px, 3.2vh, 34px)' : 'clamp(24px, 3vh, 34px)',
                                 fontWeight: 700,
-                                color: 'rgba(255, 210, 140, 0.95)',
+                                color: isLight ? (isNav ? lightColors.text.secondary : lightColors.emergency.soft) : isMix ? (isNav ? THEME.subtleText : THEME.emergencySoft) : 'rgba(255, 210, 140, 0.95)',
                                 fontFamily: "'Noto Sans Devanagari', sans-serif",
                                 textAlign: 'center',
                                 lineHeight: 1.45,
@@ -429,9 +601,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           <span style={{
                             fontSize: 'clamp(20px, 2.5vh, 28px)',
                             fontWeight: 300,
-                            color: isActivated ? '#91CBE4' : 'rgba(255,255,255,0.5)',
+                            color: isActivated
+                              ? (isLight ? lightColors.text.secondary : isMix ? THEME.subtleText : screenThemes.home.teal)
+                              : (isLight ? lightColors.text.tertiary : THEME.mutedText),
                             lineHeight: 1,
-                            textShadow: isActivated ? '0 0 12px rgba(145,203,228,0.6)' : 'none',
+                            textShadow: 'none',
                             transition: 'all 0.2s ease',
                           }}>＋ →</span>
                         )}
@@ -443,7 +617,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             );
           })()}
 
-          <div style={vDividerStyle} />
+          <div style={dividerStyle} />
 
           <div style={{
             flex: '2 1 0',
@@ -459,7 +633,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <GazeButton
                 key={tile.id}
                 id={tile.id}
-                className={`grid-card ${tile.cardClass}${isLight ? ' theme-light' : ''}`}
+                className={`grid-card ${tile.cardClass}${themeClass}`}
                 onClick={() => onNavigate(tile.screen)}
                 isDarkMode={isDarkMode}
                 gazeEnabled={isGazeEnabled}
@@ -467,23 +641,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 dwellCategory="homeScreenTile"
                 style={{
                   ...cardStyle,
+                  background: THEME.tileSurfaces[tile.id] ?? THEME.cardBg,
                   flexDirection: 'column',
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
               >
-                <tile.icon size={52} color={tile.color} strokeWidth={2.5} style={iconStyle} />
+                <div style={{ ...iconBadgeStyle, background: HOME_BADGE_FILLS[tile.id] ?? tile.color }}>
+                  <tile.icon size={34} color={THEME.badgeIcon} strokeWidth={2.4} />
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', marginTop: 'clamp(4px, 1vh, 12px)' }}>
                   <span className="grid-card-label" style={labelStyle}>
                     {tile.label}
                   </span>
                   {showHindi && tile.labelHi ? (
                     <>
-                      <div style={{ width: '32px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '2px', margin: '6px auto 4px' }} />
+                      <div style={{ width: '32px', height: '1.5px', background: isLight ? lightColors.border.light : isMix ? mixColors.home.dockSeparator : 'rgba(255,255,255,0.18)', borderRadius: '2px', margin: '6px auto 4px' }} />
                       <span style={{
                         fontSize: 'clamp(22px, 3vh, 32px)',
                         fontWeight: 700,
-                        color: 'rgba(255, 210, 140, 0.95)',
+                        color: isLight ? lightColors.text.secondary : isMix ? THEME.subtleText : 'rgba(255, 210, 140, 0.95)',
                         fontFamily: "'Noto Sans Devanagari', sans-serif",
                         textAlign: 'center',
                         lineHeight: 1.4,
@@ -497,10 +674,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     <span style={{
                       fontSize: 'clamp(12px, 1.6vh, 17px)',
                       fontWeight: 400,
-                      color: THEME.tealIcon,
+                      color: isLight ? THEME.subtleText : isMix ? THEME.subtleText : screenThemes.home.tealIcon,
                       opacity: 0.7,
                       letterSpacing: 'clamp(0.3px, 0.05vw, 0.8px)',
-                      fontFamily: "'Outfit', sans-serif",
+                      fontFamily: ENGLISH_UI_FONT,
                       textAlign: 'center' as const,
                     }}>
                       {tile.subLabel}
@@ -511,7 +688,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             ))}
           </div>
 
-          <div style={vDividerStyle} />
+          <div style={dividerStyle} />
 
           <div style={{
             flex: '1 1 0',
@@ -527,7 +704,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <GazeButton
                 key={tile.id}
                 id={tile.id}
-                className={`grid-card ${tile.cardClass}${isLight ? ' theme-light' : ''}`}
+                className={`grid-card ${tile.cardClass}${themeClass}`}
                 onClick={() => onNavigate(tile.screen)}
                 isDarkMode={isDarkMode}
                 gazeEnabled={isGazeEnabled}
@@ -535,23 +712,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 dwellCategory="homeScreenTile"
                 style={{
                   ...cardStyle,
+                  background: THEME.tileSurfaces[tile.id] ?? THEME.cardBg,
                   flexDirection: 'column',
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
               >
-                <tile.icon size={52} color={tile.color} strokeWidth={2.5} style={iconStyle} />
+                <div style={{ ...iconBadgeStyle, background: HOME_BADGE_FILLS[tile.id] ?? tile.color }}>
+                  <tile.icon size={34} color={THEME.badgeIcon} strokeWidth={2.4} />
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', marginTop: 'clamp(4px, 1vh, 12px)' }}>
                   <span className="grid-card-label" style={labelStyle}>
                     {tile.label}
                   </span>
                   {showHindi && tile.labelHi && (
                     <>
-                      <div style={{ width: '32px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '2px', margin: '6px auto 4px' }} />
+                      <div style={{ width: '32px', height: '1.5px', background: isLight ? lightColors.border.light : isMix ? mixColors.home.dockSeparator : 'rgba(255,255,255,0.18)', borderRadius: '2px', margin: '6px auto 4px' }} />
                       <span style={{
                         fontSize: 'clamp(22px, 3vh, 32px)',
                         fontWeight: 700,
-                        color: 'rgba(255, 210, 140, 0.95)',
+                        color: isLight ? lightColors.text.secondary : isMix ? THEME.subtleText : 'rgba(255, 210, 140, 0.95)',
                         fontFamily: "'Noto Sans Devanagari', sans-serif",
                         textAlign: 'center',
                         lineHeight: 1.4,
@@ -591,19 +771,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           <div style={{
             padding: 'clamp(28px, 4.5vh, 52px) clamp(56px, 9vw, 130px)',
             borderRadius: '28px',
-            background: 'rgba(8, 12, 22, 0.96)',
-            border: `2px solid ${activatedColor}50`,
-            boxShadow: `0 12px 80px rgba(0, 0, 0, 0.75), 0 0 40px ${activatedColor}18`,
+            background: isLight ? lightColors.background.elevated : isMix ? 'rgba(20, 17, 15, 0.96)' : 'rgba(8, 12, 22, 0.96)',
+            border: isLight ? `2px solid ${lightColors.border.main}` : `2px solid ${activatedColor}50`,
+            boxShadow: isLight ? '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)' : isMix ? `0 12px 52px rgba(0, 0, 0, 0.60), 0 0 22px ${activatedColor}14` : `0 12px 80px rgba(0, 0, 0, 0.75), 0 0 40px ${activatedColor}18`,
             backdropFilter: 'none',
           }}>
             <span style={{
               fontSize: 'clamp(48px, 8vh, 96px)',
-              fontWeight: 800,
-              color: activatedColor,
-              fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-              letterSpacing: '3px',
+              fontWeight: (isLight || isMix) ? 600 : 800,
+              color: isLight ? lightColors.text.primary : isMix ? (activatedColor || THEME.text) : activatedColor,
+              fontFamily: ENGLISH_UI_FONT,
+              letterSpacing: (isLight || isMix) ? '0.02em' : '3px',
               textAlign: 'center',
-              textTransform: 'uppercase',
+              textTransform: 'none',
             }}>
               {activatedText}
             </span>

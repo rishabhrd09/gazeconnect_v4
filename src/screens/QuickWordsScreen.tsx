@@ -36,8 +36,10 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
 }) => {
   const { data: { quickWords } } = useCustomization();
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
   const colors = isDarkMode ? darkColors : lightColors;
+  const isWarmMode = isDarkMode && !isLight;
+  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : lightColors.background.primary;
 
   const categories = quickWords?.categories ?? [];
 
@@ -55,11 +57,11 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
   }, [injectMode, onWordInject, onNavigate, returnScreen, onSpeak]);
 
   return (
-    <div className={`quickwords-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`quickwords-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      backgroundColor: '#080F14',
+      backgroundColor: pageBg,
       overflow: 'hidden',
       padding: '4px 20px 12px 20px',
     }}>
@@ -75,14 +77,14 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
         }}>
           <span style={{
             padding: 'clamp(10px, 1.2vh, 14px) clamp(24px, 3vw, 40px)',
-            backgroundColor: 'rgba(126, 206, 192, 0.12)',
-            border: '1.5px solid rgba(126, 206, 192, 0.35)',
+            backgroundColor: isLight ? 'rgba(122, 156, 181, 0.10)' : isMix ? 'rgba(53, 44, 33, 0.88)' : 'rgba(111, 183, 177, 0.10)',
+            border: isLight ? `1.5px solid ${lightColors.border.main}` : isMix ? '1.5px solid rgba(139,111,73,0.42)' : '1.5px solid rgba(111, 183, 177, 0.30)',
             borderRadius: '20px',
-            color: '#7ECEC0',
+            color: isLight ? lightColors.text.primary : isMix ? '#F0E2C4' : '#6FB7B1',
             fontSize: 'clamp(16px, 2vh, 22px)',
             fontWeight: 700,
-            letterSpacing: '0.06em',
-            fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
+            letterSpacing: isLight ? '0.02em' : '0.06em',
+            fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif",
           }}>
             TAP A WORD TO INSERT INTO TEXT
           </span>
@@ -101,17 +103,17 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
         }}>
           <div style={{
             padding: 'clamp(28px, 4vh, 48px) clamp(48px, 6vw, 80px)',
-            backgroundColor: 'rgba(16, 185, 129, 0.14)',
-            border: '2px solid rgba(16, 185, 129, 0.45)',
+            backgroundColor: isLight ? lightColors.background.elevated : isMix ? 'rgba(53,44,33,0.96)' : 'rgba(32,34,30,0.96)',
+            border: isLight ? `2px solid ${lightColors.border.main}` : isMix ? '2px solid rgba(139,111,73,0.50)' : '2px solid rgba(143,174,114,0.45)',
             borderRadius: '28px',
-            color: '#10B981',
+            color: isLight ? lightColors.text.primary : isMix ? '#F0E2C4' : '#8FAE72',
             fontSize: 'clamp(36px, 5vh, 56px)',
-            fontWeight: 800,
-            fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-            backdropFilter: 'blur(16px)',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+            fontWeight: isLight ? 600 : 800,
+            fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif",
+            backdropFilter: 'none',
+            boxShadow: isLight ? '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)' : '0 8px 40px rgba(0,0,0,0.5)',
             whiteSpace: 'nowrap',
-            letterSpacing: '0.03em',
+            letterSpacing: isLight ? '0.02em' : '0.03em',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -124,7 +126,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
               <div style={{
                 fontSize: 'clamp(28px, 4vh, 44px)',
                 fontFamily: "'Noto Sans Devanagari', 'Mangal', sans-serif",
-                color: 'rgba(16, 185, 129, 0.85)',
+                color: isLight ? lightColors.text.secondary : isMix ? '#CFA094' : '#D79A83',
                 fontWeight: 700,
               }}>
                 {lastSpoken.hi}
