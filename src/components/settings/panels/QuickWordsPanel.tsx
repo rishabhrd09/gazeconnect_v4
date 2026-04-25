@@ -318,7 +318,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
         color: colors.text.secondary,
         lineHeight: 1.5,
       }}>
-        The Quick Words screen shows 3 columns — one per category. Each category can have up to {MAX_WORDS_PER_CATEGORY} words.
+        The Quick Words screen shows 3 columns - one per category. Each category can have up to {MAX_WORDS_PER_CATEGORY} words.
         Toggle words <strong>ON/OFF</strong> to control which appear on the screen.
       </div>
 

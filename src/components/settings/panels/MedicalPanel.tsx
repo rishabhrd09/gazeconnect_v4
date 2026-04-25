@@ -16,22 +16,24 @@ interface MedicalPanelProps {
 }
 
 const MAX_SECTIONS = 8;
-const MAX_ITEMS_PER_SECTION = 15;
+const MAX_ITEMS_PER_SECTION = 8;
 
 // Fallback colors per built-in section id
 const DEFAULT_SECTION_COLORS: Record<string, string> = {
-  urgent: screenThemes.medical.urgent,
-  bed: screenThemes.medical.bed,
-  daily: screenThemes.medical.daily,
+  airway: '#9F6756',
+  urgent: '#9F6756',
+  bed: '#A8844D',
+  daily: '#B28F52',
+  symptoms: '#A97886',
 };
 
 const COLOR_PRESETS = [
-  { value: '#FF8A65', label: 'Coral' },
-  { value: '#4299E1', label: 'Blue' },
-  { value: '#4DB6AC', label: 'Teal' },
-  { value: '#C99A5A', label: 'Amber' },
-  { value: '#8B7BAE', label: 'Purple' },
-  { value: '#4CAF7D', label: 'Green' },
+  { value: '#9F6756', label: 'Muted Terracotta' },
+  { value: '#A8844D', label: 'Warm Umber' },
+  { value: '#B28F52', label: 'Muted Gold' },
+  { value: '#A97886', label: 'Muted Rose' },
+  { value: '#8FAE72', label: 'Soft Olive' },
+  { value: '#6FB7B1', label: 'Soft Teal' },
 ];
 
 const getSectionColor = (sec: MedicalSection) =>
@@ -190,7 +192,7 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
 
 const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
   const colors = isDarkMode ? darkColors : lightColors;
-  const { medicalSections, updateMedicalSection } = useCustomization();
+  const { medicalSections, updateMedicalSection, removeMedicalSection } = useCustomization();
 
   // Local editable copy for batch save
   const [editSections, setEditSections] = useState<MedicalSection[]>(() => structuredClone(medicalSections));
@@ -348,15 +350,18 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
       }
     }
 
-    // Persist via context
+    for (const existing of medicalSections) {
+      if (!editSections.find(sec => sec.id === existing.id)) {
+        removeMedicalSection(existing.id);
+      }
+    }
+
     for (const sec of editSections) {
       updateMedicalSection(sec.id, sec);
     }
-    // Remove deleted sections — find sections in original but not in editSections
-    // (updateMedicalSection doesn't handle deletes; need dedicated removal)
-    // For now, just update all; the service handles upsert
+
     setToast({ msg: 'All changes saved', type: 'success' });
-  }, [editSections, updateMedicalSection]);
+  }, [editSections, medicalSections, removeMedicalSection, updateMedicalSection]);
 
   const urgentColor = screenThemes.medical.urgent;
 
@@ -413,6 +418,18 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
             Save All Changes
           </button>
         </div>
+      </div>
+
+      <div style={{
+        padding: '10px 14px',
+        borderRadius: 8,
+        background: `${colors.accent.main}10`,
+        border: `1px solid ${colors.accent.main}30`,
+        fontSize: 13,
+        color: colors.text.secondary,
+        lineHeight: 1.5,
+      }}>
+        Patient screens show one Back card plus the first {MAX_ITEMS_PER_SECTION} items in each section. The built-in Medical / Urgent section keeps that patient-facing title for clarity.
       </div>
 
       {/* New section form */}

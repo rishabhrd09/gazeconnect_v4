@@ -15,8 +15,8 @@ interface PhrasesPanelProps {
   isDarkMode: boolean;
 }
 
-const MAX_CATEGORIES = 10;
-const MAX_PHRASES_PER_CAT = 15;
+const MAX_CATEGORIES = 3;
+const MAX_PHRASES_PER_CAT = 9;
 
 // ============================================
 // SCOPED CSS
@@ -367,6 +367,18 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
             Save All Changes
           </button>
         </div>
+      </div>
+
+      <div style={{
+        padding: '10px 14px',
+        borderRadius: 8,
+        background: `${colors.accent.main}10`,
+        border: `1px solid ${colors.accent.main}30`,
+        fontSize: 13,
+        color: colors.text.secondary,
+        lineHeight: 1.5,
+      }}>
+        Patient screen shows Communication, Feelings &amp; Emotions, and People &amp; Visitors. Each category displays up to {MAX_PHRASES_PER_CAT} phrases.
       </div>
 
       {/* New category inline input */}

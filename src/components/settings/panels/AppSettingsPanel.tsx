@@ -422,7 +422,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
         <h3 style={sectionHeading}>Appearance</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
 
-          {/* Theme Toggle — Dark / Mix / Light pill */}
+          {/* Theme toggle */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -438,10 +438,10 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
               </div>
               <div style={{ fontSize: '12px', color: colors.text.secondary, marginTop: '2px' }}>
                 {theme === 'light'
-                  ? `☀️ Light mode${settings.showHindi ? ' \u00B7 \u0932\u093E\u0907\u091F \u092E\u094B\u0921' : ''}`
+                  ? `Light mode${settings.showHindi ? ' \u00B7 \u0932\u093E\u0907\u091F \u092E\u094B\u0921' : ''}`
                   : theme === 'mix'
-                    ? `◐ Mix mode${settings.showHindi ? ' \u00B7 \u092E\u093F\u0915\u094D\u0938 \u092E\u094B\u0921' : ''}`
-                    : `🌙 Dark mode${settings.showHindi ? ' \u00B7 \u0921\u093E\u0930\u094D\u0915 \u092E\u094B\u0921' : ''}`}
+                    ? `Mix mode${settings.showHindi ? ' \u00B7 \u092E\u093F\u0915\u094D\u0938 \u092E\u094B\u0921' : ''}`
+                    : `Dark mode${settings.showHindi ? ' \u00B7 \u0921\u093E\u0930\u094D\u0915 \u092E\u094B\u0921' : ''}`}
               </div>
             </div>
 
@@ -474,7 +474,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                   transition: 'background 200ms, color 200ms',
                 }}
               >
-                🌙 Dark
+                Dark
               </button>
 
               <button
@@ -497,7 +497,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                   transition: 'background 200ms, color 200ms',
                 }}
               >
-                ◐ Mix
+                Mix
               </button>
 
               <button
@@ -520,7 +520,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                   transition: 'background 200ms, color 200ms',
                 }}
               >
-                ☀️ Light
+                Light
               </button>
             </div>
           </div>

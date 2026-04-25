@@ -49,6 +49,7 @@ interface CustomizationContextValue {
 
   // Medical operations
   updateMedicalSection: (id: string, section: MedicalSection) => void;
+  removeMedicalSection: (id: string) => void;
 
   // Home operations
   updateHomeQuickActions: (actions: HomeQuickActions) => void;
@@ -130,6 +131,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
   const removePhraseCategory = useCallback((id: string) => customizationService.removePhraseCategory(id), []);
 
   const updateMedicalSection = useCallback((id: string, sec: MedicalSection) => customizationService.updateMedicalSection(id, sec), []);
+  const removeMedicalSection = useCallback((id: string) => customizationService.removeMedicalSection(id), []);
 
   const updateHomeQuickActions = useCallback((actions: HomeQuickActions) => customizationService.updateHomeQuickActions(actions), []);
   const updateHomeEmergencyCards = useCallback((cards: HomeEmergencyCard[]) => customizationService.updateHomeEmergencyCards(cards), []);
@@ -168,7 +170,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     settings: data.settings,
     addPerson, removePerson, updatePeople, resetPeople,
     updatePhraseCategory, addPhraseCategory, removePhraseCategory,
-    updateMedicalSection,
+    updateMedicalSection, removeMedicalSection,
     updateHomeQuickActions,
     updateHomeEmergencyCards,
     updateQuickWords,

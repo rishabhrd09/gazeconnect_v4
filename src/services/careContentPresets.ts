@@ -122,8 +122,8 @@ export const CARE_MEDICAL_SECTIONS: MedicalSection[] = [
 
 export const CARE_QUICK_WORDS: QuickWordsConfig = {
   enabled: true,
-  highColor: 'muted_red',
-  mediumColor: 'muted_golden',
+  highColor: 'muted_maroon',
+  mediumColor: 'warm_teal',
   coreWords: [
     { en: 'Yes', hi: 'हां', enabled: true },
     { en: 'No', hi: 'नहीं', enabled: true },

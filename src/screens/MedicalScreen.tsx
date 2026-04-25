@@ -5,7 +5,7 @@
  * 1. Select one of four large care categories.
  * 2. Select from full-width phrase/action cards.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { darkColors, lightColors, screenThemes } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import GazeButton from '../components/core/GazeButton';
@@ -31,13 +31,12 @@ interface CareIconProps {
 
 const ClinicalAirwayIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M25 16c-6 7.5-10 18.6-10 30 0 4 2.5 6.1 6.2 5l10.8-3.4V18.5c-2.6 0-4.8-.9-7-2.5Z" />
-    <path d="M39 16c6 7.5 10 18.6 10 30 0 4-2.5 6.1-6.2 5L32 47.6V18.5c2.6 0 4.8-.9 7-2.5Z" />
-    <path d="M32 18.5V10" />
-    <path d="M24 35c3.2-1 5.6-3.2 8-6.8" opacity="0.68" />
-    <path d="M40 35c-3.2-1-5.6-3.2-8-6.8" opacity="0.68" />
-    <path d="M10 13h8l3-5 5 10 4-7h7" />
-    <path d="M41 13h13" opacity="0.72" />
+    <path d="M25.5 18c-5.9 7.1-9.2 16.8-9.2 27.4 0 4 2.5 6.2 6.2 5.1l9.5-3.1V20.5c-2.4 0-4.5-.8-6.5-2.5Z" />
+    <path d="M38.5 18c5.9 7.1 9.2 16.8 9.2 27.4 0 4-2.5 6.2-6.2 5.1L32 47.4V20.5c2.4 0 4.5-.8 6.5-2.5Z" />
+    <path d="M32 20.5V10.5" />
+    <path d="M24.5 36c2.9-1 5.2-3.1 7.5-6.4" opacity="0.68" />
+    <path d="M39.5 36c-2.9-1-5.2-3.1-7.5-6.4" opacity="0.68" />
+    <path d="M44 17h5l2-4 3.8 9 2-5H61" opacity="0.82" />
   </svg>
 );
 
@@ -143,8 +142,10 @@ const ICON_BADGE_BG_LIGHT: Record<string, string> = {
 const getSectionColor = (sec: { id: string; color?: string }) =>
   sec.color || DEFAULT_SECTION_COLORS[sec.id] || screenThemes.medical.daily;
 
-const titleEn = (section: MedicalSection) =>
-  (section.title || '').replace(/[\u0900-\u097F\s]+$/, '').trim();
+const titleEn = (section: MedicalSection) => {
+  if (section.id === 'airway' || section.id === 'urgent') return 'Medical / Urgent';
+  return (section.title || '').replace(/[\u0900-\u097F\s]+$/, '').trim();
+};
 
 const PhraseButton: React.FC<{
   item: MedItem;
@@ -222,6 +223,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   const colors = isDarkMode ? darkColors : lightColors;
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
   const [lastSpoken, setLastSpoken] = useState('');
+  const lastSpokenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { isLight, isMix } = useTheme();
   const { medicalSections } = useCustomization();
@@ -243,9 +245,15 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   const activeColor = activeSection ? getSectionColor(activeSection) : (isMix ? '#B49362' : '#B9904D');
   const ActiveIcon = activeSection ? (SECTION_ICONS[activeSection.id] || DailyCareIcon) : DailyCareIcon;
 
+  useEffect(() => () => {
+    if (lastSpokenTimerRef.current) clearTimeout(lastSpokenTimerRef.current);
+  }, []);
+
   const handleActivate = useCallback((text: string) => {
     onSpeak(text);
     setLastSpoken(text);
+    if (lastSpokenTimerRef.current) clearTimeout(lastSpokenTimerRef.current);
+    lastSpokenTimerRef.current = setTimeout(() => setLastSpoken(''), 4200);
   }, [onSpeak]);
 
   return (
@@ -261,24 +269,30 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
 
       {lastSpoken && (
         <div style={{
-          position: 'absolute',
-          top: '80px',
-          left: 0,
-          right: 0,
+          position: 'fixed',
+          inset: 0,
           display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           pointerEvents: 'none',
-          zIndex: 10,
+          zIndex: 9000,
+          background: isDarkMode ? 'rgba(0, 0, 0, 0.18)' : 'rgba(43, 38, 34, 0.08)',
         }}>
           <div style={{
-            padding: '8px 24px',
-            backgroundColor: colors.success.subtle,
-            border: `1px solid ${colors.success.main}`,
-            borderRadius: '20px',
-            color: colors.success.main,
-            fontSize: 'clamp(13px, 1.6vh, 18px)',
-            fontWeight: 700,
-            boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.2)' : cardShadow,
+            minWidth: 'clamp(460px, 46vw, 820px)',
+            maxWidth: 'min(86vw, 980px)',
+            padding: 'clamp(30px, 4.5vh, 54px) clamp(46px, 6vw, 92px)',
+            backgroundColor: isMix ? '#2B251B' : isWarmMode ? 'rgba(32,34,30,0.98)' : lightColors.background.elevated,
+            border: isMix ? '2px solid rgba(180,147,98,0.48)' : isWarmMode ? '2px solid rgba(143,174,114,0.42)' : `2px solid ${lightColors.border.main}`,
+            borderRadius: '28px',
+            color: isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : lightColors.text.primary,
+            fontSize: 'clamp(42px, 6vh, 72px)',
+            fontWeight: 820,
+            lineHeight: 1.12,
+            textAlign: 'center',
+            fontFamily: ACCESSIBLE_FONT,
+            boxShadow: isDarkMode ? '0 18px 70px rgba(0,0,0,0.58)' : '0 12px 34px rgba(139,121,104,0.16)',
+            letterSpacing: '0',
           }}>
             {lastSpoken}
           </div>

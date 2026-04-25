@@ -244,6 +244,17 @@ function setMouseOnlyMode(enabled: boolean): void {
   console.log('Mouse Only Mode:', isMouseOnlyMode ? 'ON' : 'OFF');
 }
 
+function setAlertModeActive(enabled: boolean): void {
+  isAlertModeActive = enabled;
+  if (isAlertModeActive && isFocusModeActive) {
+    isFocusModeActive = false;
+    mainWindow?.webContents.send('focus-mode-changed', false);
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('alert-mode-changed', isAlertModeActive);
+  }
+}
+
 function quitAppNow(): void {
   isQuitting = true;
   app.quit();
@@ -617,14 +628,7 @@ function createWindow(): void {
         type: 'checkbox',
         checked: isAlertModeActive,
         click: (menuItem) => {
-          isAlertModeActive = menuItem.checked;
-          if (isAlertModeActive && isFocusModeActive) {
-            isFocusModeActive = false;
-            mainWindow?.webContents.send('focus-mode-changed', false);
-          }
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('alert-mode-changed', isAlertModeActive);
-          }
+          setAlertModeActive(menuItem.checked);
         },
       },
       {
@@ -1409,6 +1413,10 @@ function setupIpcHandlers(): void {
 
   // Mouse Only Mode: renderer can query current state
   ipcMain.handle('mouse-only-mode:get', () => isMouseOnlyMode);
+  ipcMain.handle('alert-mode:set', (_event: any, enabled: boolean) => {
+    setAlertModeActive(Boolean(enabled));
+    return isAlertModeActive;
+  });
 
   // Chat history — auto-save keyboard display text to chat_history/chat_YYYY-MM-DD.txt
   const chatHistoryDir = !app.isPackaged

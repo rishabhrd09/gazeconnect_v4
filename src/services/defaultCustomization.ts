@@ -301,8 +301,8 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   // ============================================
   quickWords: {
     enabled: true,
-    highColor: 'muted_red',
-    mediumColor: 'muted_blue',
+    highColor: 'muted_maroon',
+    mediumColor: 'warm_teal',
     coreWords: [
       { en: 'Yes', hi: 'हाँ', enabled: true },
       { en: 'No', hi: 'नहीं', enabled: true },
@@ -568,6 +568,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     gazeOffsetX: 0,
     gazeOffsetY: 0,
     gazeDebugOverlay: false,
+    homeEmergencyLaunchMode: 'cards',
   },
 
   // ============================================

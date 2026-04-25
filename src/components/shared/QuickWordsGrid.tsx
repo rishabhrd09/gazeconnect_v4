@@ -74,6 +74,29 @@ const WARM_DARK_HEADER_COLORS: Record<string, string> = {
   daily: '#8FAE72',
 };
 
+const MIX_PANEL_BG = '#241E16';
+const MIX_PANEL_BORDER = '#6A4D34';
+const MIX_WORD_CARD_BG = '#C9B890';
+const MIX_WORD_TEXT = '#23180C';
+
+const MIX_CATEGORY_BORDERS: Record<string, string> = {
+  emergency: '#9C5A4E',
+  position: '#8B6F49',
+  daily: '#667A59',
+};
+
+const MIX_HEADER_BG: Record<string, string> = {
+  emergency: '#42201D',
+  position: '#332719',
+  daily: '#173028',
+};
+
+const MIX_HEADER_COLORS: Record<string, string> = {
+  emergency: '#E3B2A6',
+  position: '#D6B36A',
+  daily: '#A7BE86',
+};
+
 const LIGHT_CATEGORY_BG: Record<string, string> = {
   emergency: lightColors.emergency.main,
   position: '#F4ECDE',
@@ -161,19 +184,29 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
       minHeight: 0,
     }}>
       {orderedCategories.map((cat) => {
-        const headerColor = isDarkMode
+        const headerColor = isMix
+          ? (MIX_HEADER_COLORS[cat.id] || '#D6B36A')
+          : isDarkMode
           ? (WARM_DARK_HEADER_COLORS[cat.id] || HEADER_COLORS[cat.id] || '#8FAE72')
           : (LIGHT_HEADER_COLORS[cat.id] || lightColors.text.secondary);
-        const headerBg = isDarkMode
+        const headerBg = isMix
+          ? (MIX_HEADER_BG[cat.id] || '#332719')
+          : isDarkMode
           ? (WARM_DARK_HEADER_BG[cat.id] || HEADER_BG[cat.id] || '#102520')
           : (LIGHT_HEADER_BG[cat.id] || lightColors.background.secondary);
-        const cardBg = isDarkMode
+        const cardBg = isMix
+          ? MIX_WORD_CARD_BG
+          : isDarkMode
           ? (WARM_DARK_CATEGORY_BG[cat.id] || CATEGORY_BG[cat.id] || CATEGORY_BG.daily)
           : (LIGHT_CATEGORY_BG[cat.id] || lightColors.background.secondary);
-        const cardBorder = isDarkMode
+        const cardBorder = isMix
+          ? (MIX_CATEGORY_BORDERS[cat.id] || MIX_PANEL_BORDER)
+          : isDarkMode
           ? (WARM_DARK_CATEGORY_BORDERS[cat.id] || CATEGORY_BORDERS[cat.id] || CATEGORY_BORDERS.daily)
           : (LIGHT_CATEGORY_BORDERS[cat.id] || lightColors.border.main);
-        const cardTextColor = isDarkMode
+        const cardTextColor = isMix
+          ? MIX_WORD_TEXT
+          : isDarkMode
           ? (CARD_TEXT_COLORS[cat.id] || CARD_TEXT_COLORS.daily)
           : (LIGHT_CARD_TEXT_COLORS[cat.id] || lightColors.text.primary);
 
@@ -188,18 +221,18 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
-              backgroundColor: isDarkMode ? (isMix ? 'rgba(42,36,28,0.72)' : 'rgba(27,28,24,0.72)') : lightColors.background.secondary,
+              backgroundColor: isMix ? MIX_PANEL_BG : isDarkMode ? 'rgba(27,28,24,0.72)' : lightColors.background.secondary,
               borderRadius: '28px',
               overflow: 'hidden',           // clips the header strip to rounded corners
-              border: isDarkMode ? `1.5px solid ${cardBorder}50` : `1.5px solid ${cardBorder}`,
+              border: isMix ? `1.5px solid ${MIX_PANEL_BORDER}` : isDarkMode ? `1.5px solid ${cardBorder}50` : `1.5px solid ${cardBorder}`,
               minWidth: 0,
-              boxShadow: isDarkMode ? '0 8px 32px rgba(0,0,0,0.2)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
+              boxShadow: isMix ? '0 8px 24px rgba(0,0,0,0.26)' : isDarkMode ? '0 8px 32px rgba(0,0,0,0.2)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
             }}
           >
             {/* ── Category Header — "plaque" style anchor ── */}
             <div style={{
               backgroundColor: headerBg,
-              borderBottom: isDarkMode ? `2px solid ${cardBorder}60` : `2px solid ${cardBorder}`,
+              borderBottom: isMix ? `2px solid ${cardBorder}` : isDarkMode ? `2px solid ${cardBorder}60` : `2px solid ${cardBorder}`,
               padding: 'clamp(16px, 2.5vh, 28px) clamp(12px, 1.5vw, 24px)',
               minHeight: 'clamp(60px, 7vh, 80px)',
               flexShrink: 0,
@@ -277,10 +310,10 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                       backgroundColor: cardBg,
                       borderRadius: '18px',
                       border: isActivated
-                        ? (isDarkMode ? '2.5px solid rgba(255,255,255,0.85)' : `2px solid ${lightColors.border.strong}`)
+                        ? (isMix ? `2.5px solid ${MIX_PANEL_BORDER}` : isDarkMode ? '2.5px solid rgba(255,255,255,0.85)' : `2px solid ${lightColors.border.strong}`)
                         : `1.5px solid ${cardBorder}`,
                       boxShadow: isActivated
-                        ? (isDarkMode ? '0 0 26px rgba(255,255,255,0.22)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)')
+                        ? (isMix ? '0 0 0 3px rgba(240,226,196,0.18), 0 10px 24px rgba(0,0,0,0.26)' : isDarkMode ? '0 0 26px rgba(255,255,255,0.22)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)')
                         : (isDarkMode ? '0 4px 16px rgba(0,0,0,0.18)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)'),
                       display: 'flex',
                       flexDirection: 'column',
@@ -321,7 +354,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                             ? 'clamp(24px, 3vh, 32px)'
                             : 'clamp(26px, 3.2vh, 36px)',
                           fontWeight: 700,
-                          color: isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary,
+                          color: isMix ? '#4B3520' : isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary,
                           fontFamily: "'Noto Sans Devanagari', 'Mangal', sans-serif",
                           textAlign: 'center',
                           lineHeight: 1.2,

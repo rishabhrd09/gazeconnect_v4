@@ -56,7 +56,7 @@ const SECTIONS: SidebarSection[] = [
   { id: 'medical', label: 'Medical', icon: MedicalCrossIcon },
   { id: 'home', label: 'Home Layout', icon: HomeIcon },
   { id: 'quickwords', label: 'Quick Words', icon: ChatBubblesIcon },
-  { id: 'alertmode', label: '🚨 Alert Mode', icon: SettingsIcon },
+  { id: 'alertmode', label: 'Alert Mode', icon: SettingsIcon },
   { id: 'activities', label: 'Activities', icon: TVIcon },
 ];
 
@@ -109,8 +109,11 @@ function validateBackupJSON(data: any): { valid: boolean; error?: string } {
   if (data.settings !== undefined && typeof data.settings !== 'object') {
     return { valid: false, error: 'Invalid format: "settings" should be an object.' };
   }
-  const knownKeys = ['people', 'phraseCategories', 'medicalSections', 'homeQuickActions',
-    'activityCategories', 'feelings', 'basicNeeds', 'settings', 'version'];
+  const knownKeys = [
+    'people', 'phraseCategories', 'medicalSections', 'quickWords',
+    'homeQuickActions', 'homeEmergencyCards', 'activityCategories', 'aacCategories',
+    'feelings', 'basicNeeds', 'alertModeCards', 'settings', 'version',
+  ];
   const hasKnownKey = knownKeys.some(k => k in data);
   if (!hasKnownKey) {
     return { valid: false, error: 'File does not appear to be a GazeConnect backup.' };
@@ -438,7 +441,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           border: `1px solid ${colors.border.main}`,
           minHeight: 0,
         }} className="settings-panel">
-          {/* Mouse-Only Banner */}
+          {/* Mouse-only banner */}
           <div className="mouse-only-banner" style={{
             padding: '8px 16px',
             backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -451,7 +454,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             gap: '8px',
             marginBottom: '16px',
           }}>
-            🖱️ Mouse-Only Page — Use mouse click to change settings. Navigation bar above remains gaze-enabled.
+            Mouse-only page - use mouse click to change settings. Navigation bar above remains gaze-enabled.
           </div>
           {renderPanel()}
         </div>
@@ -478,7 +481,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       {showResetConfirm && (
         <ConfirmDialog
           title="Reset EVERYTHING to Factory Defaults?"
-          message="This will permanently erase all your customizations — people, phrases, medical items, home layout, activities, and settings — and restore factory defaults. This cannot be undone."
+          message="This will permanently erase all your customizations - people, phrases, medical items, home layout, activities, and settings - and restore factory defaults. This cannot be undone."
           confirmLabel="Reset Everything"
           onConfirm={handleReset}
           onCancel={() => setShowResetConfirm(false)}

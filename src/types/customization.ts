@@ -84,8 +84,28 @@ export interface HomeEmergencyCard {
 }
 
 export type QuickWordPriority = 'high' | 'medium';
-export type QuickWordHighColor = 'red' | 'crimson' | 'muted_red' | 'muted_crimson';
-export type QuickWordMediumColor = 'blue' | 'golden' | 'teal' | 'muted_blue' | 'muted_golden' | 'muted_teal';
+export type QuickWordHighColor =
+  | 'red'
+  | 'crimson'
+  | 'muted_red'
+  | 'muted_crimson'
+  | 'alert_maroon'
+  | 'muted_maroon'
+  | 'deep_maroon'
+  | 'warm_maroon'
+  | 'terracotta';
+export type QuickWordMediumColor =
+  | 'blue'
+  | 'golden'
+  | 'teal'
+  | 'muted_blue'
+  | 'muted_golden'
+  | 'muted_teal'
+  | 'warm_teal'
+  | 'deep_teal'
+  | 'alert_maroon'
+  | 'warm_maroon'
+  | 'soft_umber';
 
 export interface QuickWord {
   en: string;
@@ -112,8 +132,8 @@ export interface QuickWordsConfig {
   enabled: boolean;
   categories: QuickWordCategory[];
   coreWords: CoreWord[];
-  highColor?: QuickWordHighColor;      // 'red' (default) or 'crimson'
-  mediumColor?: QuickWordMediumColor;  // 'blue' (default), 'golden', or 'teal'
+  highColor?: QuickWordHighColor;
+  mediumColor?: QuickWordMediumColor;
 }
 
 // ============================================
@@ -175,6 +195,7 @@ export interface AppSettings {
   gazeOffsetX: number;             // Manual X offset correction in px (-100 to +100, default 0)
   gazeOffsetY: number;             // Manual Y offset correction in px (-100 to +100, default 0)
   gazeDebugOverlay: boolean;       // Show gaze debug overlay (default false)
+  homeEmergencyLaunchMode?: 'cards' | 'alert'; // Home left panel: four emergency cards or one Alert Mode launcher
 }
 
 // ============================================

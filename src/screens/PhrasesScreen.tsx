@@ -89,11 +89,11 @@ const PhrasesCategoryButton: React.FC<{
       style={{
         width: '100%',
         backgroundColor: isSelected ? selectedBg : 'transparent',
-        minHeight: 'clamp(96px, 10.8vh, 124px)',
-        padding: 'clamp(20px, 2.4vh, 28px) clamp(16px, 1.5vw, 24px)',
+        minHeight: 'clamp(132px, 15vh, 168px)',
+        padding: 'clamp(24px, 3vh, 34px) clamp(20px, 1.8vw, 30px)',
         border: 'none',
-        borderLeft: isSelected ? `5px solid ${selectedColor}` : '5px solid transparent',
-        borderRadius: '0 16px 16px 0',
+        borderLeft: isSelected ? `6px solid ${selectedColor}` : '6px solid transparent',
+        borderRadius: '0 18px 18px 0',
         transition: 'all 180ms ease',
         justifyContent: 'flex-start',
       }}
@@ -102,17 +102,17 @@ const PhrasesCategoryButton: React.FC<{
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 'clamp(10px, 1vw, 14px)',
+        gap: 'clamp(14px, 1.25vw, 22px)',
         width: '100%',
       }}>
         <Icon
-          size={30}
+          size={34}
           color={isSelected ? selectedColor : inactiveIconColor}
         />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
           <span style={{
-            fontSize: 'clamp(18px, 1.7vw, 24px)',
-            fontWeight: isSelected ? 700 : 600,
+            fontSize: 'clamp(22px, 1.9vw, 30px)',
+            fontWeight: isSelected ? 800 : 720,
             color: isSelected ? selectedColor : textColor,
             fontFamily: ENGLISH_UI_FONT,
             lineHeight: 1.15,
@@ -128,7 +128,7 @@ const PhrasesCategoryButton: React.FC<{
                 borderRadius: '1px', margin: '4px 0 2px',
               }} />
               <span style={{
-                fontSize: 'clamp(18px, 1.7vw, 24px)',
+                fontSize: 'clamp(20px, 1.8vw, 28px)',
                 fontWeight: 700,
                 color: isSelected ? (isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary) : (isDarkMode ? 'rgba(255, 210, 140, 0.70)' : lightColors.text.tertiary),
                 fontFamily: "'Noto Sans Devanagari', sans-serif",
@@ -189,6 +189,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   const displayedPhrases: { en: string; hi: string }[] = isRecentSelected
     ? recentPhrases
     : (selectedCategoryData?.phrases ?? []);
+  const visiblePhrases = displayedPhrases.slice(0, 9);
 
   const handlePhraseClick = useCallback((phrase: { en: string; hi?: string }, idx: number) => {
     onSpeak(phrase.en);
@@ -236,15 +237,15 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
 
         {/* ===== LEFT SIDEBAR ===== */}
         <div className="category-sidebar" style={{
-          width: 'clamp(228px, 21vw, 292px)',
+          width: 'clamp(312px, 19vw, 368px)',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: 'clamp(12px, 1.5vh, 18px)',
           backgroundColor: sidebarBg,
           borderRadius: '18px',
-          padding: 'clamp(14px, 1.8vh, 22px) 10px',
-          marginLeft: 'clamp(28px, 3.2vw, 56px)',
+          padding: 'clamp(16px, 2vh, 24px) 10px',
+          marginLeft: 'clamp(22px, 2.4vw, 44px)',
           boxShadow: sidebarShadow,
           border: `1px solid ${sidebarBorder}`,
           alignSelf: 'flex-start',
@@ -280,18 +281,18 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
               style={{
                 width: '100%',
                 backgroundColor: isRecentSelected ? selectedBg : 'transparent',
-                minHeight: 'clamp(96px, 10.8vh, 124px)',
-                padding: 'clamp(20px, 2.4vh, 28px) clamp(16px, 1.5vw, 24px)',
+                minHeight: 'clamp(132px, 15vh, 168px)',
+                padding: 'clamp(24px, 3vh, 34px) clamp(20px, 1.8vw, 30px)',
                 border: 'none',
-                borderLeft: isRecentSelected ? `5px solid ${isWarmMode ? SELECTED_COLOR : lightColors.warning.main}` : '5px solid transparent',
-                borderRadius: '0 16px 16px 0',
+                borderLeft: isRecentSelected ? `6px solid ${isWarmMode ? SELECTED_COLOR : lightColors.warning.main}` : '6px solid transparent',
+                borderRadius: '0 18px 18px 0',
                 transition: 'all 180ms ease',
                 justifyContent: 'flex-start',
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'clamp(10px, 1vw, 14px)', width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'clamp(14px, 1.25vw, 22px)', width: '100%' }}>
                 {/* Clock icon */}
-                <svg width={30} height={30} viewBox="0 0 24 24" fill="none"
+                <svg width={34} height={34} viewBox="0 0 24 24" fill="none"
                   stroke={isRecentSelected ? (isWarmMode ? SELECTED_COLOR : lightColors.warning.main) : inactiveIcon} strokeWidth="1.8"
                   strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
@@ -299,8 +300,8 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 </svg>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
                   <span style={{
-                    fontSize: 'clamp(18px, 1.7vw, 24px)',
-                    fontWeight: isRecentSelected ? 700 : 600,
+                    fontSize: 'clamp(22px, 1.9vw, 30px)',
+                    fontWeight: isRecentSelected ? 800 : 720,
                     color: isRecentSelected ? (isWarmMode ? SELECTED_COLOR : lightColors.warning.main) : sidebarText,
                     fontFamily: ENGLISH_UI_FONT,
                     lineHeight: 1.15,
@@ -404,11 +405,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
             flex: 1,
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gridAutoRows: 'minmax(clamp(120px, 14.5vh, 180px), auto)',
+            gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
             gap: 'clamp(14px, 2.2vh, 28px)',
-            overflowY: 'auto',
+            overflow: 'hidden',
             alignContent: 'start',
-            padding: '4px 8px clamp(90px, 12vh, 140px) 8px',
+            padding: '4px 8px clamp(78px, 9vh, 108px) 8px',
           }}>
             {displayedPhrases.length === 0 && isRecentSelected ? (
               // Empty state for Recent tab
@@ -425,7 +426,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   Phrases you speak will appear here
                 </span>
               </div>
-            ) : displayedPhrases.map((phrase, index) => (
+            ) : visiblePhrases.map((phrase, index) => (
               <GazeButton
                 key={index}
                 id={`phrase-${index}`}
@@ -439,7 +440,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 style={{
                   width: '100%',
                   height: 'auto',
-                  minHeight: 'clamp(120px, 14.5vh, 180px)',
+                  minHeight: 0,
                   padding: 'clamp(18px, 2.2vh, 26px) clamp(18px, 2vw, 28px)',
                   background: phraseCardBg,
                   border: activatedIdx === index ? `2px solid ${isMix ? '#8B6F49' : isWarmMode ? '#D6C98E' : colors.accent.main}` : phraseCardBorder,

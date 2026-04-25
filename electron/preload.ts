@@ -82,6 +82,10 @@ const api = {
     get: () => ipcRenderer.invoke('mouse-only-mode:get'),
   },
 
+  alertMode: {
+    set: (enabled: boolean) => ipcRenderer.invoke('alert-mode:set', enabled),
+  },
+
   // Gaze-controlled BrowserView for web browsing
   webview: {
     open: (url: string, bounds: { x: number; y: number; width: number; height: number }) =>

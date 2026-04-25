@@ -9,6 +9,7 @@ import { useGazeControl } from '../components/core/GazeControlToggle';
 
 interface AlertModeScreenProps {
     onSpeak: (text: string) => void;
+    onHome: () => void;
     isDarkMode?: boolean;
 }
 
@@ -91,7 +92,15 @@ const ConfirmOverlay: React.FC<{
 
 // ── Main Screen ───────────────────────────────────────────────────
 
-const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak }) => {
+const HomeIcon: React.FC<{ size?: number; color?: string }> = ({ size = 34, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 10.4 12 4l8 6.4" stroke={color} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6.5 9.6V20h11V9.6" stroke={color} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M10 20v-5.5h4V20" stroke={color} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
+const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) => {
     const { data } = useCustomization();
     const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
     const [confirming, setConfirming] = useState<{ label: string; idx: number } | null>(null);
@@ -142,6 +151,46 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak }) => {
                         animation: 'alertDot 2s ease-in-out infinite 1s',
                     }} />
                 </div>
+
+                {/* Home escape target */}
+                <GazeButton
+                    id="alert-mode-home"
+                    onClick={onHome}
+                    isDarkMode={true}
+                    gazeEnabled={isGazeEnabled}
+                    gazeEnabledTimestamp={lastEnabledTimestamp}
+                    dwellCategory="homeScreenTile"
+                    style={{
+                        position: 'absolute',
+                        left: 'clamp(18px, 2.6vw, 54px)',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 'clamp(132px, 10.5vw, 190px)',
+                        height: 'clamp(132px, 17vh, 190px)',
+                        borderRadius: 28,
+                        background: '#171B18',
+                        border: '1.5px solid rgba(206,196,184,0.22)',
+                        color: '#CEC4B8',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.34)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 12,
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit','Inter',system-ui,sans-serif",
+                    }}
+                >
+                    <HomeIcon size={46} color="#CEC4B8" />
+                    <span style={{
+                        fontSize: 'clamp(17px, 2.1vh, 24px)',
+                        fontWeight: 850,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                    }}>
+                        Home
+                    </span>
+                </GazeButton>
 
                 {/* Title */}
                 <div style={{ marginBottom: 'clamp(18px, 2.6vh, 36px)', textAlign: 'center' }}>

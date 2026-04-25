@@ -129,7 +129,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
         gazeTextOff: '#D4D0C2',
     } : lightColors.navigation;
     const navigationColors = useHomeNavPalette ? homeNavigationColors : colors.navigation;
-    const homeEmergencyStyle = { background: '#7A3030', text: '#FFF1E3', border: 'transparent' };
+    const homeEmergencyStyle = { background: '#4A2023', text: '#F0A5A5', border: '#8A3B38' };
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)
     const isKbOrSpatial = currentPage === 'keyboard' || currentPage === 'spatial';

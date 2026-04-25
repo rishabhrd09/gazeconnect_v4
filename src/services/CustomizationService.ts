@@ -244,9 +244,21 @@ export class CustomizationService {
 
   // --- Medical Sections ---
   updateMedicalSection(sectionId: string, section: MedicalSection): void {
+    const exists = this.data.medicalSections.some(s => s.id === sectionId);
     this.data = {
       ...this.data,
-      medicalSections: this.data.medicalSections.map(s => s.id === sectionId ? section : s),
+      medicalSections: exists
+        ? this.data.medicalSections.map(s => s.id === sectionId ? section : s)
+        : [...this.data.medicalSections, section],
+    };
+    this.scheduleSave();
+    this.notify();
+  }
+
+  removeMedicalSection(sectionId: string): void {
+    this.data = {
+      ...this.data,
+      medicalSections: this.data.medicalSections.filter(s => s.id !== sectionId),
     };
     this.scheduleSave();
     this.notify();

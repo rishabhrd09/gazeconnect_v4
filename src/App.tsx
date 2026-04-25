@@ -206,7 +206,7 @@ const InnerApp: React.FC = () => {
   const { isGazeEnabled, disableGaze, signalNavigation, isMouseMode } = useGazeControl();
   const { settings, isLoaded } = useCustomization();
   const { isFocusMode } = useFocusMode();
-  const { isAlertMode } = useAlertMode();
+  const { isAlertMode, disableAlertMode } = useAlertMode();
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isLiveClockSuppressed, setIsLiveClockSuppressed] = useState(false);
@@ -284,6 +284,13 @@ const InnerApp: React.FC = () => {
       if (ws.isConnected && ws.speak) ws.speak(text);
     }
   }, [ttsRate, ttsVolume, ttsLanguage, ws]);
+
+  const handleAlertModeHome = useCallback(() => {
+    setQuickWordsReturnScreen(null);
+    setCurrentScreen('home');
+    ws.setScreen('home');
+    disableAlertMode();
+  }, [disableAlertMode, ws]);
   const handleTextChange = useCallback((text: string) => setGlobalText(text), []);
 
   // Quick Words injection: appends a word to the global text (used by QuickWordsScreen in inject mode)
@@ -356,7 +363,7 @@ const InnerApp: React.FC = () => {
 
   // Alert Mode: unconditionally render the lock screen
   if (isAlertMode) {
-    return <AlertModeScreen onSpeak={handleSpeak} isDarkMode={isDarkMode} />;
+    return <AlertModeScreen onSpeak={handleSpeak} onHome={handleAlertModeHome} isDarkMode={isDarkMode} />;
   }
 
   // Show loading screen while settings are being loaded from disk
