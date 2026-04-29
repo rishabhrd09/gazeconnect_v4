@@ -105,13 +105,17 @@ export type QuickWordMediumColor =
   | 'deep_teal'
   | 'alert_maroon'
   | 'warm_maroon'
+  | 'muted_crimson'
   | 'soft_umber';
 
 export interface QuickWord {
+  id?: string;
   en: string;
   hi: string;
   enabled: boolean;
   priority: QuickWordPriority;
+  phrases?: Phrase[];
+  relatedWordIds?: string[];
 }
 
 export interface CoreWord {

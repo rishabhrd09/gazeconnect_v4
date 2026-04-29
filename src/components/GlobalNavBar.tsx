@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { darkColors, lightColors } from '../utils/design';
+import { darkColors, lightColors, typography } from '../utils/design';
 import { useGazeControl } from './core/GazeControlToggle';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
@@ -86,6 +86,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
 }) => {
     const colors = isDarkMode ? darkColors : lightColors;
     const navFontFamily = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
+    const emergencyFontFamily = `'Arial Black', ${typography.fontFamily.primary}`;
     const { isGazeEnabled, toggleGaze } = useGazeControl();
     const { isFocusMode } = useFocusMode();
     const { data: { settings } } = useCustomization();
@@ -127,9 +128,31 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
         gazeGlow: '0 0 16px rgba(214, 201, 142, 0.16)',
         gazeTextOn: '#ECEDE3',
         gazeTextOff: '#D4D0C2',
-    } : lightColors.navigation;
+    } : {
+        ...lightColors.navigation,
+        pillBackground: 'rgba(232, 215, 186, 0.92)',
+        pillBorder: 'rgba(122, 99, 71, 0.22)',
+        pillShadow: '0 8px 16px rgba(122, 99, 71, 0.10)',
+        idleBackground: 'rgba(240, 228, 203, 0.86)',
+        idleText: '#7A6347',
+        activeBackground: 'rgba(196, 179, 146, 0.28)',
+        activeBorder: 'rgba(122, 99, 71, 0.28)',
+        activeShadow: 'inset 0 0 0 1px rgba(255, 248, 236, 0.18)',
+        activeText: '#5A4530',
+        gazeBackgroundOn: '#D9C8A6',
+        gazeBackgroundOff: '#D9C8A6',
+        gazeBorderOn: '#7A6347',
+        gazeBorderOff: '#7A6347',
+        gazeGlow: '0 0 0 1px rgba(122, 99, 71, 0.10), 0 6px 14px rgba(122, 99, 71, 0.10)',
+        gazeTextOn: '#5A4530',
+        gazeTextOff: '#5A4530',
+        auxiliaryBackground: 'rgba(236, 223, 195, 0.92)',
+        auxiliaryBorder: 'rgba(122, 99, 71, 0.24)',
+    };
     const navigationColors = useHomeNavPalette ? homeNavigationColors : colors.navigation;
-    const homeEmergencyStyle = { background: '#4A2023', text: '#F0A5A5', border: '#8A3B38' };
+    const homeEmergencyStyle = theme === 'light'
+        ? { background: '#7A363A', text: '#FBE9DE', border: 'rgba(122, 54, 58, 0.6)' }
+        : { background: '#4A2023', text: '#F0A5A5', border: '#8A3B38' };
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)
     const isKbOrSpatial = currentPage === 'keyboard' || currentPage === 'spatial';
@@ -195,8 +218,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 border: useHomeNavPalette ? `1.5px solid ${homeEmergencyStyle.border}` : isDarkMode ? '2px solid rgba(180, 70, 70, 0.50)' : `1.5px solid ${lightColors.emergency.hover}`,
                 borderRadius: 'clamp(14px, 2vh, 20px)',
                 color: useHomeNavPalette ? homeEmergencyStyle.text : isDarkMode ? '#D08080' : lightColors.text.inverse,
-                fontSize: 'clamp(14px, 1.9vh, 19px)',
-                fontWeight: isDarkMode ? 800 as const : 700 as const,
+                fontSize: 'clamp(16px, 2vh, 21px)',
+                fontWeight: 900 as const,
                 cursor: 'pointer',
                 minHeight: isCompassMap ? 'clamp(90px, 11vh, 130px)' : isKbOrSpatial ? '118px' : (compact
                     ? 'clamp(58px, 8vh, 80px)'
@@ -211,11 +234,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 boxShadow: isDarkMode ? '0 4px 16px rgba(0,0,0,0.30)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 'clamp(6px, 0.8vw, 10px)',
+                gap: 'clamp(8px, 1vw, 12px)',
                 justifyContent: 'center',
                 flexDirection: 'row' as const,
-                letterSpacing: isDarkMode ? '1.5px' : '0.02em',
-                fontFamily: navFontFamily,
+                letterSpacing: isDarkMode ? '1.8px' : '0.05em',
+                fontFamily: emergencyFontFamily,
                 textTransform: isDarkMode ? 'uppercase' as const : 'none' as const,
                 transition: 'all 0.2s ease',
             };
@@ -295,7 +318,10 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                         : isKbOrSpatial
                             ? 'clamp(4px, 1vh, 12px)'
                             : 'clamp(14px, 1.8vh, 20px)',
-                    boxShadow: `inset 0 -1px 0 ${navigationColors.containerDivider}`,
+                    borderBottom: `1px solid ${navigationColors.containerDivider}`,
+                    boxShadow: isDarkMode
+                        ? '0 16px 24px -28px rgba(0,0,0,0.62)'
+                        : '0 12px 18px -22px rgba(82, 66, 45, 0.18)',
                 }}>
 
 
@@ -309,12 +335,21 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                         data-gaze-context="emergency"
                         style={getButtonStyle('__emergency__', true)}
                     >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'clamp(22px, 3vh, 32px)', height: 'clamp(22px, 3vh, 32px)', flexShrink: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'clamp(24px, 3.2vh, 36px)', height: 'clamp(24px, 3.2vh, 36px)', flexShrink: 0 }}>
                             <circle cx="12" cy="12" r="10" />
                             <line x1="12" y1="7" x2="12" y2="13" />
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                         </svg>
-                        <span>{isDarkMode ? 'EMERGENCY' : 'Emergency'}</span>
+                        <span style={{
+                            fontFamily: emergencyFontFamily,
+                            fontSize: 'clamp(18px, 2.35vh, 24px)',
+                            fontWeight: 900,
+                            letterSpacing: isDarkMode ? '0.14em' : '0.08em',
+                            lineHeight: 1,
+                            whiteSpace: 'nowrap',
+                        }}>
+                            {isDarkMode ? 'EMERGENCY' : 'Emergency'}
+                        </span>
                     </button>
                 </div>
 
@@ -331,11 +366,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 justifyContent: 'center',
                                 gap: 'clamp(10px, 1.1vw, 18px)',
                                 transform: 'translateX(clamp(6px, 0.9vw, 16px))',
-                                color: theme === 'light' ? '#6F6255' : theme === 'mix' ? '#B49362' : '#B4AB96',
+                                color: theme === 'light' ? '#7A6347' : theme === 'mix' ? '#B49362' : '#B4AB96',
                                 fontFamily: navFontFamily,
-                                fontSize: 'clamp(30px, 4.4vh, 54px)',
+                                fontSize: theme === 'light' ? 'clamp(28px, 4vh, 48px)' : 'clamp(30px, 4.4vh, 54px)',
                                 fontWeight: 850,
-                                letterSpacing: '0.18em',
+                                letterSpacing: theme === 'light' ? '0.14em' : '0.18em',
                                 textTransform: 'uppercase',
                                 lineHeight: 1,
                                 userSelect: 'none',
@@ -646,7 +681,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 style={{ width: 'clamp(34px, 4.4vh, 46px)', height: 'clamp(34px, 4.4vh, 46px)' }}
                             >
                                 <circle cx="12" cy="12" r="10" />
-                                <circle cx="12" cy="12" r="3" fill={isGazeEnabled ? "currentColor" : "none"} />
+                                <circle cx="12" cy="12" r="3" fill={isGazeEnabled ? navigationColors.gazeBorderOn : "none"} />
                             </svg>
                             <span style={{
                                 fontSize: 'clamp(13px, 1.45vh, 16px)',
@@ -763,10 +798,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             fontSize: 'clamp(48px, 8vh, 96px)',
                             fontWeight: 900,
                             color: isDarkMode ? '#E07070' : lightColors.emergency.main,
-                            fontFamily: navFontFamily,
-                            letterSpacing: isDarkMode ? '4px' : '0.02em',
+                            fontFamily: emergencyFontFamily,
+                            letterSpacing: isDarkMode ? '0.16em' : '0.08em',
                             textAlign: 'center',
                             textTransform: isDarkMode ? 'uppercase' : 'none',
+                            lineHeight: 1,
                         }}>
                             {isDarkMode ? 'EMERGENCY' : 'Emergency'}
                         </span>

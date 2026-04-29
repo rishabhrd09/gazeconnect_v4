@@ -12,7 +12,12 @@ import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { BellIcon } from '../components/icons/Icons';
 import type { MedicalSection } from '../types/customization';
+import medicalUrgentIcon from '../assets/daily-assistance/medical-urgent.png';
+import bedPositionIcon from '../assets/daily-assistance/bed-position.png';
+import dailyCareIcon from '../assets/daily-assistance/daily-care.png';
+import symptomsIcon from '../assets/daily-assistance/symptoms.png';
 
 interface MedicalScreenProps {
   onNavigate: (screen: string) => void;
@@ -26,74 +31,121 @@ interface MedItem { en: string; hi: string; urgent?: boolean; }
 interface CareIconProps {
   size?: number;
   color?: string;
+  secondaryColor?: string;
   strokeWidth?: number;
 }
 
-const ClinicalAirwayIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
-  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M25.5 18c-5.9 7.1-9.2 16.8-9.2 27.4 0 4 2.5 6.2 6.2 5.1l9.5-3.1V20.5c-2.4 0-4.5-.8-6.5-2.5Z" />
-    <path d="M38.5 18c5.9 7.1 9.2 16.8 9.2 27.4 0 4-2.5 6.2-6.2 5.1L32 47.4V20.5c2.4 0 4.5-.8 6.5-2.5Z" />
-    <path d="M32 20.5V10.5" />
-    <path d="M24.5 36c2.9-1 5.2-3.1 7.5-6.4" opacity="0.68" />
-    <path d="M39.5 36c-2.9-1-5.2-3.1-7.5-6.4" opacity="0.68" />
-    <path d="M44 17h5l2-4 3.8 9 2-5H61" opacity="0.82" />
+const ClinicalAirwayIcon: React.FC<CareIconProps> = ({
+  size = 64,
+  color = '#855E5A',
+  secondaryColor = '#8A6B3A',
+  strokeWidth = 2.2,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="none"
+    aria-hidden="true"
+    style={{ display: 'block' }}
+  >
+    <g
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M32 10v12" />
+      <path d="M32 22c-2.7 3.3-5.6 5.7-9 7.4" />
+      <path d="M32 22c2.7 3.3 5.6 5.7 9 7.4" />
+      <path d="M27.5 16.2c-6.1 4.9-9.3 13.8-9 22 .2 4.7 2.9 6.8 6.5 5.1l7-3.1V18.8c-1.7-.1-3.2-.9-4.5-2.6Z" />
+      <path d="M36.5 16.2c6.1 4.9 9.3 13.8 9 22-.2 4.7-2.9 6.8-6.5 5.1l-7-3.1V18.8c1.7-.1 3.2-.9 4.5-2.6Z" />
+      <path d="M25.5 27.8v8.8" />
+      <path d="M25.5 31.2l-3.8 2.8" />
+      <path d="M25.5 31.2l3.2 2.3" />
+      <path d="M38.5 27.8v8.8" />
+      <path d="M38.5 31.2l3.8 2.8" />
+      <path d="M38.5 31.2l-3.2 2.3" />
+    </g>
+    <path
+      d="M43.8 34h4.2l1.4-2.8 2.3 5.6 1.8-3.9H59"
+      stroke={secondaryColor}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
-const PositionCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
-  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M10 46h37a8 8 0 0 0 8-8v-4" />
-    <path d="M14 39h27a7 7 0 0 0 7-7v-5" />
-    <path d="M17 39 12 21a5.5 5.5 0 0 1 10.5-3.2L28 36" />
-    <path d="M23 29h15a6 6 0 0 1 6 6v4" />
-    <path d="M28 36h18" />
-    <path d="M17 50h32" />
-    <path d="M20 50v5" />
-    <path d="M46 50v5" />
-    <path d="M15 55h8" opacity="0.75" />
-    <path d="M42 55h8" opacity="0.75" />
-    <path d="M48 9h12v12H48z" />
-    <path d="M50.5 15h2.5l1.3-2.6 2 5.2 1.2-2.6H60" />
-    <path d="M60 21v31" />
-    <path d="M56 52h8" />
+const PositionCareIcon: React.FC<CareIconProps> = ({
+  size = 64,
+  color = '#7E6540',
+  strokeWidth = 2.35,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    style={{ display: 'block' }}
+  >
+    <path d="M10 18v30" />
+    <path d="M13 43.5h39" />
+    <path d="M14.5 38.8h31" />
+    <path d="M18 43.5v5.2" />
+    <path d="M45 43.5v5.2" />
+    <circle cx="18" cy="50.8" r="1.7" />
+    <circle cx="45" cy="50.8" r="1.7" />
+    <path d="M17.5 31.5l8.5-8.3h11.2l8.3 8.3" />
+    <path d="M26 23.2h11.2" />
+    <circle cx="18.2" cy="21.5" r="3.3" />
+    <path d="M21.2 25.2l6.3 6.1h10.8" />
+    <path d="M38.3 31.3l5.7 4.1" />
+    <path d="M12.5 38.8v-3.8" opacity="0.72" />
+    <path d="M46 38.8v-3.8" opacity="0.72" />
+    <path d="M56 18.5v18" />
+    <path d="m52.8 21.8 3.2-3.3 3.2 3.3" />
+    <path d="m52.8 33.2 3.2 3.3 3.2-3.3" />
   </svg>
 );
 
-const DailyCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
+const DailyCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 2.4 }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="32" cy="32" r="12" />
-    <path d="M32 7v8" />
-    <path d="M32 49v8" />
-    <path d="M7 32h8" />
-    <path d="M49 32h8" />
-    <path d="m14.4 14.4 5.6 5.6" />
-    <path d="m44 44 5.6 5.6" />
-    <path d="m49.6 14.4-5.6 5.6" />
-    <path d="m20 44-5.6 5.6" />
-    <path d="M21 10.5 24 17" opacity="0.72" />
-    <path d="M43 10.5 40 17" opacity="0.72" />
-    <path d="M21 53.5 24 47" opacity="0.72" />
-    <path d="M43 53.5 40 47" opacity="0.72" />
+    <circle cx="32" cy="32" r="11.5" />
+    <path d="M32 8.5v7" />
+    <path d="M32 48.5v7" />
+    <path d="M8.5 32h7" />
+    <path d="M48.5 32h7" />
+    <path d="m15.4 15.4 5 5" />
+    <path d="m43.6 43.6 5 5" />
+    <path d="m48.6 15.4-5 5" />
+    <path d="m20.4 43.6-5 5" />
+    <path d="M23.4 10.8 26 16.5" />
+    <path d="M40.6 10.8 38 16.5" />
+    <path d="M23.4 53.2 26 47.5" />
+    <path d="M40.6 53.2 38 47.5" />
   </svg>
 );
 
-const SymptomsCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 1.7 }) => (
+const SymptomsCareIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 2.4 }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M22 11h20" />
-    <path d="M24 11v-1a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1" />
-    <path d="M17 11h30a4 4 0 0 1 4 4v40a4 4 0 0 1-4 4H17a4 4 0 0 1-4-4V15a4 4 0 0 1 4-4Z" />
-    <path d="M22 24h20" />
-    <path d="M22 34h16" />
-    <path d="M22 44h12" />
-    <circle cx="47" cy="47" r="10" />
-    <path d="m42.5 47 3 3 6-7" />
+    <rect x="17" y="12" width="30" height="42" rx="5.5" />
+    <path d="M25 12v-1.5A3.5 3.5 0 0 1 28.5 7h7a3.5 3.5 0 0 1 3.5 3.5V12" />
+    <path d="M24 27h5l2.4-6.2 4.4 15 3.1-8.8H45" />
+    <path d="M24 42h18" />
+    <path d="M24 49h12" />
   </svg>
 );
 
 const BackOnlyIcon: React.FC<CareIconProps> = ({ size = 64, color = 'currentColor', strokeWidth = 2 }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M34 18 20 32l14 14" />
-    <path d="M21 32h24" />
+    <path d="M36.5 18.5 23 32l13.5 13.5" />
+    <path d="M24.5 32H49" />
   </svg>
 );
 
@@ -105,51 +157,71 @@ const SECTION_ICONS: Record<string, React.FC<any>> = {
   symptoms: SymptomsCareIcon,
 };
 
-const DEFAULT_SECTION_COLORS: Record<string, string> = {
-  airway: '#9F6756',
-  urgent: '#9F6756',
-  bed: '#A8844D',
-  daily: '#B28F52',
-  symptoms: '#A97886',
+const LANDING_SECTION_ICON_ASSETS: Record<string, string> = {
+  airway: medicalUrgentIcon,
+  urgent: medicalUrgentIcon,
+  bed: bedPositionIcon,
+  daily: dailyCareIcon,
+  symptoms: symptomsIcon,
 };
 
-const ACCESSIBLE_FONT = "'Inter', 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
-
-const ICON_BADGE_BG_DARK: Record<string, string> = {
-  airway: '#27201D',
-  urgent: '#27201D',
-  bed: '#292319',
-  daily: '#28261B',
-  symptoms: '#282023',
+const getLandingIconSize = (sectionId: string) => {
+  if (sectionId === 'bed') return 220;
+  if (sectionId === 'airway' || sectionId === 'urgent') return 136;
+  return 132;
 };
 
-const ICON_BADGE_BG_MIX: Record<string, string> = {
-  airway: '#BFA889',
-  urgent: '#BFA889',
-  bed: '#C2AD83',
-  daily: '#C7B487',
-  symptoms: '#BCA0A1',
+const getLandingIconMaxSize = (sectionId: string) => {
+  if (sectionId === 'bed') return 'clamp(170px, 17vh, 220px)';
+  return 'clamp(132px, 13vh, 180px)';
 };
 
-const ICON_BADGE_BG_LIGHT: Record<string, string> = {
-  airway: '#E6D7CB',
-  urgent: '#E6D7CB',
-  bed: '#E7D9BF',
-  daily: '#E5D9BD',
-  symptoms: '#E5D3D7',
-};
+const ACCESSIBLE_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 
-const getSectionColor = (sec: { id: string; color?: string }) =>
-  sec.color || DEFAULT_SECTION_COLORS[sec.id] || screenThemes.medical.daily;
+const DAILY_ASSISTANCE_ICON_COLORS = {
+  dark: {
+    airway: '#5A7D75',
+    urgent: '#5A7D75',
+    bed: '#9C7A4E',
+    daily: '#B08A45',
+    symptoms: '#789D91',
+  },
+  mix: {
+    airway: '#496D64',
+    urgent: '#496D64',
+    bed: '#765431',
+    daily: '#876116',
+    symptoms: '#4E7B70',
+  },
+  light: {
+    airway: '#50746B',
+    urgent: '#50746B',
+    bed: '#785F3F',
+    daily: '#8F6F36',
+    symptoms: '#5F8278',
+  },
+} as const;
+
+const getLandingSectionColor = (id: string, isMix: boolean, isWarmMode: boolean) => {
+  const mode = isMix ? 'mix' : isWarmMode ? 'dark' : 'light';
+  return DAILY_ASSISTANCE_ICON_COLORS[mode][id as keyof typeof DAILY_ASSISTANCE_ICON_COLORS.dark] || DAILY_ASSISTANCE_ICON_COLORS[mode].daily;
+};
 
 const titleEn = (section: MedicalSection) => {
   if (section.id === 'airway' || section.id === 'urgent') return 'Medical / Urgent';
   return (section.title || '').replace(/[\u0900-\u097F\s]+$/, '').trim();
 };
 
+const landingTitleEn = (section: MedicalSection) => {
+  if (section.id === 'airway' || section.id === 'urgent') return 'Medical / Urgent';
+  if (section.id === 'bed') return 'Bed & Position';
+  if (section.id === 'daily') return 'Daily Care';
+  if (section.id === 'symptoms') return 'Symptoms';
+  return titleEn(section);
+};
+
 const PhraseButton: React.FC<{
   item: MedItem;
-  color: string;
   isDarkMode: boolean;
   showHindi: boolean;
   onActivate: (text: string) => void;
@@ -162,7 +234,7 @@ const PhraseButton: React.FC<{
   dividerColor: string;
   hindiColor: string;
 }> = ({
-  item, color, isDarkMode, showHindi, onActivate, gazeEnabled, timestamp,
+  item, isDarkMode, showHindi, onActivate, gazeEnabled, timestamp,
   cardBg, cardBorder, cardText, cardShadow, dividerColor, hindiColor,
 }) => (
   <GazeButton
@@ -176,27 +248,28 @@ const PhraseButton: React.FC<{
       width: '100%',
       height: '100%',
       minHeight: 0,
-      borderRadius: '16px',
+      borderRadius: '18px',
       background: cardBg,
-      border: item.urgent ? `1.5px solid ${color}88` : cardBorder,
+      border: cardBorder,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 'clamp(18px, 2.4vh, 28px) clamp(18px, 2vw, 30px)',
+      padding: 'clamp(20px, 2.6vh, 30px) clamp(22px, 2.4vw, 38px)',
       gap: '8px',
       textAlign: 'center',
       boxShadow: cardShadow,
     }}
   >
     <span style={{
-      fontSize: 'clamp(24px, 2.8vh, 38px)',
-      fontWeight: 780,
+      fontSize: item.en.length > 34 ? 'clamp(24px, 2.7vh, 32px)' : 'clamp(27px, 3vh, 36px)',
+      fontWeight: 760,
       color: cardText,
       fontFamily: ACCESSIBLE_FONT,
-      lineHeight: 1.15,
+      lineHeight: 1.12,
       letterSpacing: '0',
-      textShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.12)' : 'none',
+      textShadow: isDarkMode ? '0 1px 1px rgba(0,0,0,0.10)' : 'none',
+      overflowWrap: 'anywhere',
     }}>
       {item.en}
     </span>
@@ -229,21 +302,23 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   const { medicalSections } = useCustomization();
 
   const isWarmMode = isDarkMode && !isLight;
-  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
-  const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardBg = isMix ? '#C4B28E' : isWarmMode ? screenThemes.medical.cardBg : colors.background.elevated;
-  const cardBorder = isMix ? '1.5px solid rgba(91,74,51,0.38)' : isWarmMode ? screenThemes.medical.cardBorder : `1.5px solid ${colors.border.light}`;
-  const cardText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const pageBg = isMix ? '#120E0B' : isWarmMode ? '#131412' : colors.background.primary;
+  const titleText = isMix ? '#FFF0D2' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardBg = isMix ? '#B6A17A' : isWarmMode ? screenThemes.medical.cardBg : colors.background.elevated;
+  const cardBorder = isMix ? '1.5px solid rgba(70,52,32,0.56)' : isWarmMode ? screenThemes.medical.cardBorder : `1.5px solid ${colors.border.light}`;
+  const cardText = isMix ? '#180F08' : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const cardShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const sectionCardBg = isMix ? '#B6A17A' : isWarmMode ? 'rgba(27, 31, 27, 0.92)' : '#EFE7DA';
+  const sectionBackCardBg = isMix ? '#28321F' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#DCE2C8';
+  const sectionCardBorder = '1.5px solid transparent';
+  const sectionCardShadow = isWarmMode
+    ? 'inset 0 1px 0 rgba(255,255,255,0.025), 0 9px 22px rgba(0,0,0,0.20)'
+    : '0 6px 16px rgba(95, 76, 52, 0.10), 0 1px 2px rgba(95, 76, 52, 0.06)';
   const dividerColor = isMix ? 'rgba(91,74,51,0.34)' : isWarmMode ? screenThemes.medical.headerDivider : colors.border.light;
   const hindiColor = isMix ? '#493B2E' : isWarmMode ? screenThemes.phrases.hindiText : colors.text.secondary;
-  const backCardBg = isMix ? '#2B251B' : isWarmMode ? '#181A16' : '#E1D6C2';
-  const backIconColor = isMix ? '#E0C789' : isWarmMode ? '#A9B487' : '#6E7F58';
-  const backCardText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const backIconColor = isMix ? '#9BA76D' : isWarmMode ? '#879464' : '#5C6B47';
 
   const activeSection = activeSectionIndex === null ? null : medicalSections[activeSectionIndex];
-  const activeColor = activeSection ? getSectionColor(activeSection) : (isMix ? '#B49362' : '#B9904D');
-  const ActiveIcon = activeSection ? (SECTION_ICONS[activeSection.id] || DailyCareIcon) : DailyCareIcon;
 
   useEffect(() => () => {
     if (lastSpokenTimerRef.current) clearTimeout(lastSpokenTimerRef.current);
@@ -315,7 +390,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               gap: '14px',
               marginBottom: 'clamp(18px, 2.4vh, 28px)',
             }}>
-              <DailyCareIcon size={42} color={isMix ? '#B49362' : isWarmMode ? '#B9904D' : lightColors.warning.main} />
+              <BellIcon size={42} color={getLandingSectionColor('daily', isMix, isWarmMode)} strokeWidth={2.1} />
               <h2 style={{
                 margin: 0,
                 color: titleText,
@@ -337,13 +412,11 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               gap: 'clamp(22px, 3vh, 34px)',
             }}>
               {medicalSections.map((sec, idx) => {
-                const Icon = SECTION_ICONS[sec.id] || DailyCareIcon;
-                const color = getSectionColor(sec);
-                const badgeBg = isMix
-                  ? ICON_BADGE_BG_MIX[sec.id] || '#BFA889'
-                  : isWarmMode
-                    ? ICON_BADGE_BG_DARK[sec.id] || '#27201D'
-                    : ICON_BADGE_BG_LIGHT[sec.id] || '#E6D7CB';
+                const color = getLandingSectionColor(sec.id, isMix, isWarmMode);
+                const landingIconSrc = LANDING_SECTION_ICON_ASSETS[sec.id] || dailyCareIcon;
+                const landingIconSize = getLandingIconSize(sec.id);
+                const landingIconMaxSize = getLandingIconMaxSize(sec.id);
+
                 return (
                   <GazeButton
                     key={sec.id}
@@ -355,40 +428,64 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                     dwellCategory="navigationButton"
                     contentFill
                     style={{
+                      position: 'relative',
+                      overflow: 'hidden',
                       width: '100%',
                       height: '100%',
                       minHeight: 'clamp(210px, 28vh, 310px)',
                       background: cardBg,
                       border: cardBorder,
-                      borderRadius: '18px',
+                      borderRadius: '22px',
                       boxShadow: cardShadow,
                       display: 'flex',
                       flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      justifyContent: 'flex-start',
                       padding: 'clamp(24px, 3vh, 38px) clamp(36px, 4.5vw, 78px)',
                       textAlign: 'left',
                     }}
                   >
                     <div style={{
-                      flex: '0 0 38%',
+                      position: 'absolute',
+                      left: 'clamp(34px, 3.2vw, 52px)',
+                      top: 'clamp(34px, 4vh, 54px)',
+                      bottom: 'clamp(34px, 4vh, 54px)',
+                      width: '2px',
+                      borderRadius: '999px',
+                      background: color,
+                      opacity: 0.62,
+                    }} />
+                    <div style={{
+                      flex: '0 0 34%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      paddingLeft: 'clamp(34px, 3.6vw, 60px)',
+                      background: 'transparent',
+                      border: 'none',
+                      boxShadow: 'none',
                     }}>
-                      <div style={{
-                        width: 'clamp(112px, 13.5vh, 152px)',
-                        height: 'clamp(112px, 13.5vh, 152px)',
-                        borderRadius: '36px',
-                        border: `1.5px solid ${color}`,
-                        background: badgeBg,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: 'none',
-                      }}>
-                        <Icon size={90} color={color} strokeWidth={1.5} />
-                      </div>
+                      <img
+                        src={landingIconSrc}
+                        alt=""
+                        aria-hidden="true"
+                        draggable={false}
+                        style={{
+                          width: landingIconSize,
+                          height: landingIconSize,
+                          maxWidth: landingIconMaxSize,
+                          maxHeight: landingIconMaxSize,
+                          objectFit: 'contain',
+                          display: 'block',
+                          userSelect: 'none',
+                          pointerEvents: 'none',
+                          mixBlendMode: 'normal',
+                          filter: isMix ? 'brightness(0.72) contrast(1.28) saturate(1.18)' : 'none',
+                          background: 'transparent',
+                          border: 'none',
+                          boxShadow: 'none',
+                        }}
+                      />
                     </div>
                     <div style={{
                       flex: '1 1 0',
@@ -397,18 +494,18 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                       flexDirection: 'column',
                       alignItems: 'flex-start',
                       justifyContent: 'center',
-                      paddingLeft: 'clamp(22px, 3vw, 54px)',
+                      paddingLeft: 'clamp(10px, 1.6vw, 28px)',
                       gap: showHindi ? '10px' : 0,
                     }}>
                       <span style={{
                         color: cardText,
                         fontFamily: ACCESSIBLE_FONT,
-                        fontSize: 'clamp(28px, 3.5vh, 40px)',
-                        fontWeight: 780,
+                        fontSize: 'clamp(30px, 3.7vh, 43px)',
+                        fontWeight: 820,
                         lineHeight: 1.08,
                         letterSpacing: '0',
                       }}>
-                        {titleEn(sec)}
+                        {landingTitleEn(sec)}
                       </span>
                       {showHindi && (
                         <span style={{
@@ -433,17 +530,17 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: 'clamp(18px, 2vw, 30px)',
-              marginBottom: 'clamp(18px, 2.3vh, 28px)',
+              marginBottom: 'clamp(14px, 1.8vh, 22px)',
               paddingLeft: '4px',
             }}>
-              <ActiveIcon size={44} color={activeColor} strokeWidth={1.55} />
               <h2 style={{
-                fontSize: 'clamp(30px, 3.8vh, 46px)',
+                fontSize: 'clamp(34px, 4.1vh, 48px)',
                 fontWeight: 820,
                 color: titleText,
                 margin: 0,
                 fontFamily: ACCESSIBLE_FONT,
-                lineHeight: 1,
+                lineHeight: 1.02,
+                letterSpacing: '0',
               }}>
                 {titleEn(activeSection)}
               </h2>
@@ -455,10 +552,10 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               display: 'grid',
               gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
-              gap: 'clamp(16px, 2.2vh, 26px)',
+              gap: 'clamp(18px, 2.35vh, 28px)',
               overflow: 'hidden',
               alignContent: 'stretch',
-              padding: '4px 8px 0 8px',
+              padding: '2px 8px 0 8px',
             }}>
               <GazeButton
                 id="assist-back-categories-card"
@@ -468,18 +565,19 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                 isDarkMode={isDarkMode}
                 dwellCategory="navigationButton"
                 style={{
+                  position: 'relative',
+                  overflow: 'hidden',
                   width: '100%',
                   height: '100%',
                   minHeight: 0,
-                  borderRadius: '16px',
-                  background: backCardBg,
-                  border: `1.5px solid ${backIconColor}88`,
-                  boxShadow: isDarkMode ? '0 8px 18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.025)' : cardShadow,
+                  borderRadius: '18px',
+                  background: sectionBackCardBg,
+                  border: sectionCardBorder,
+                  boxShadow: sectionCardShadow,
                   display: 'flex',
-                  flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 'clamp(18px, 2.4vh, 28px) clamp(30px, 3.8vw, 58px)',
+                  padding: 'clamp(18px, 2.4vh, 28px) clamp(32px, 3.2vw, 56px)',
                   fontFamily: ACCESSIBLE_FONT,
                   textAlign: 'left',
                 }}
@@ -487,41 +585,14 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                 contentFill
               >
                 <div style={{
-                  flex: '0 0 38%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <div style={{
-                    width: 'clamp(86px, 10vh, 124px)',
-                    height: 'clamp(86px, 10vh, 124px)',
-                    borderRadius: '30px',
-                    border: `1.5px solid ${backIconColor}`,
-                    background: isMix ? '#292318' : isWarmMode ? '#20221B' : '#E6DCC9',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <BackOnlyIcon size={72} color={backIconColor} strokeWidth={2.2} />
-                  </div>
-                </div>
-                <div style={{
-                  flex: '1 1 0',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  paddingLeft: 'clamp(20px, 3vw, 50px)',
+                  justifyContent: 'center',
+                  transform: 'translateX(clamp(38px, 4.8vw, 82px))',
+                  opacity: 0.96,
                 }}>
-                  <span style={{
-                    color: backCardText,
-                    fontFamily: ACCESSIBLE_FONT,
-                    fontSize: 'clamp(28px, 3.5vh, 40px)',
-                    fontWeight: 780,
-                    lineHeight: 1.08,
-                  }}>
-                    Back
-                  </span>
+                  <BackOnlyIcon size={150} color={backIconColor} strokeWidth={4.15} />
                 </div>
               </GazeButton>
 
@@ -529,16 +600,15 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                 <PhraseButton
                   key={item.en}
                   item={item}
-                  color={activeColor}
                   isDarkMode={isDarkMode}
                   showHindi={showHindi}
                   onActivate={handleActivate}
                   gazeEnabled={isGazeEnabled}
                   timestamp={lastEnabledTimestamp}
-                  cardBg={cardBg}
-                  cardBorder={cardBorder}
+                  cardBg={sectionCardBg}
+                  cardBorder={sectionCardBorder}
                   cardText={cardText}
-                  cardShadow={cardShadow}
+                  cardShadow={sectionCardShadow}
                   dividerColor={dividerColor}
                   hindiColor={hindiColor}
                 />

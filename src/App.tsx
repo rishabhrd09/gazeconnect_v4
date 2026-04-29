@@ -23,6 +23,7 @@ import { DwellTimeProvider, useDwellTime } from './contexts/DwellTimeContext';
 import { FocusModeProvider, useFocusMode } from './contexts/FocusModeContext';
 import { AlertModeProvider, useAlertMode } from './contexts/AlertModeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { useTheme } from './contexts/ThemeContext';
 import SarvamBloom from './components/SarvamBloom';
 import './lightmode.css';
 
@@ -207,6 +208,7 @@ const InnerApp: React.FC = () => {
   const { settings, isLoaded } = useCustomization();
   const { isFocusMode } = useFocusMode();
   const { isAlertMode, disableAlertMode } = useAlertMode();
+  const { theme } = useTheme();
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isLiveClockSuppressed, setIsLiveClockSuppressed] = useState(false);
@@ -381,6 +383,58 @@ const InnerApp: React.FC = () => {
     );
   }
 
+  const isQuickWordsScreen = currentScreen === 'quickwords';
+  const isHomeWarmLight = currentScreen === 'home' && theme === 'light';
+  const connectionIndicatorStyle: React.CSSProperties = isHomeWarmLight ? {
+    position: 'fixed',
+    bottom: 10,
+    right: 12,
+    padding: '4px 10px',
+    backgroundColor: 'rgba(90,140,100,0.14)',
+    border: '1px solid #5A8C64',
+    borderRadius: '999px',
+    color: '#5A8C64',
+    fontSize: '10px',
+    fontWeight: 650,
+    letterSpacing: '0.03em',
+    zIndex: 100,
+    boxShadow: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  } : isQuickWordsScreen ? {
+    position: 'fixed',
+    bottom: 12,
+    right: 14,
+    padding: '4px 12px',
+    backgroundColor: ws.isConnected
+      ? (isDarkMode ? 'rgba(23, 31, 25, 0.94)' : 'rgba(238, 245, 240, 0.96)')
+      : (isDarkMode ? 'rgba(42, 26, 26, 0.94)' : 'rgba(248, 239, 237, 0.97)'),
+    border: `1px solid ${ws.isConnected
+      ? (isDarkMode ? 'rgba(113, 153, 118, 0.58)' : 'rgba(110, 140, 92, 0.48)')
+      : (isDarkMode ? 'rgba(167, 107, 98, 0.54)' : 'rgba(158, 74, 61, 0.42)')}`,
+    borderRadius: '999px',
+    color: ws.isConnected
+      ? (isDarkMode ? '#9FB89E' : '#5D7B52')
+      : (isDarkMode ? '#C99990' : '#9E4A3D'),
+    fontSize: '10px',
+    fontWeight: 650,
+    letterSpacing: '0.03em',
+    zIndex: 100,
+    boxShadow: 'none',
+  } : {
+    position: 'fixed',
+    bottom: 6,
+    right: 10,
+    padding: '3px 10px',
+    backgroundColor: ws.isConnected ? colors.success.subtle : colors.emergency.subtle,
+    border: `1px solid ${ws.isConnected ? colors.success.main : colors.emergency.main}`,
+    borderRadius: '6px',
+    color: ws.isConnected ? colors.success.main : colors.emergency.main,
+    fontSize: '11px',
+    zIndex: 100,
+  };
+
   return (
     <div style={{
       width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: colors.background.primary,
@@ -398,18 +452,13 @@ const InnerApp: React.FC = () => {
       </div>
 
       {/* Persistent Emergency Button — always visible, all screens */}
-      {currentScreen !== 'home' && (
+      {currentScreen !== 'home' && currentScreen !== 'quickwords' && (
         <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} emergencyDwellTime={emergencyDwellTime || 1200} />
       )}
 
       {/* Connection indicator */}
-      <div className="connection-indicator" style={{
-        position: 'fixed', bottom: 6, right: 10,
-        padding: '3px 10px', backgroundColor: ws.isConnected ? colors.success.subtle : colors.emergency.subtle,
-        border: `1px solid ${ws.isConnected ? colors.success.main : colors.emergency.main}`,
-        borderRadius: '6px', color: ws.isConnected ? colors.success.main : colors.emergency.main,
-        fontSize: '11px', zIndex: 100,
-      }}>
+      <div className="connection-indicator" style={connectionIndicatorStyle}>
+        {isHomeWarmLight && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5A8C64', flexShrink: 0 }} />}
         {ws.isConnected ? 'Connected' : 'Connecting...'}
       </div>
 

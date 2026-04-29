@@ -412,8 +412,8 @@ const KeyBtn: React.FC<{
     fontFamily: "'Noto Sans Devanagari', sans-serif",
     fontWeight: 700,
     fontSize: isMatra
-      ? 'clamp(26px, 3.0vw, 42px)'
-      : (isAction ? 'clamp(16px, 1.6vw, 21px)' : 'clamp(26px, 3.0vw, 44px)'),
+      ? 'clamp(32px, 3.65vw, 52px)'
+      : (isAction ? 'clamp(21px, 2.15vw, 28px)' : 'clamp(34px, 3.8vw, 56px)'),
     letterSpacing: '0.5px',
     color: isMatra
       ? (isDarkMode ? 'rgba(180, 220, 255, 0.90)' : lightColors.text.secondary)
@@ -435,8 +435,8 @@ const KeyBtn: React.FC<{
         backgroundColor: flash ? `${dwellColor}30` : bg,
         border: `2px solid ${border}`, borderRadius: '10px',
         color: textColor,
-        fontSize: isAction ? 'clamp(14px, 1.4vw, 19px)' : 'clamp(22px, 2.4vw, 36px)',
-        fontWeight: isAction ? 700 : 600,
+        fontSize: isAction ? 'clamp(19px, 1.9vw, 26px)' : 'clamp(32px, 3.25vw, 48px)',
+        fontWeight: isAction ? 760 : 720,
         letterSpacing: isAction ? '0' : '0.5px',
         cursor: 'pointer',
         transform: flash ? 'scale(0.95)' : hovered ? 'scale(1.02)' : 'scale(1)',
@@ -475,8 +475,8 @@ const Predictions: React.FC<{
     : 'Start typing for predictions...';
 
   const predWordSize = isHindiMode
-    ? (compact ? 'clamp(23px, 2.5vw, 29px)' : 'clamp(24px, 2.7vw, 32px)')
-    : (compact ? 'clamp(26px, 2.8vw, 32px)' : 'clamp(30px, 3.4vw, 40px)');
+    ? (compact ? 'clamp(30px, 3.2vw, 40px)' : 'clamp(32px, 3.45vw, 44px)')
+    : (compact ? 'clamp(34px, 3.55vw, 44px)' : 'clamp(38px, 4.1vw, 54px)');
 
   const predWordFont = isHindiMode ? "'Noto Sans Devanagari', sans-serif" : UI_FONT;
   const predWordColor = isHindiMode
@@ -547,7 +547,7 @@ const Predictions: React.FC<{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           backgroundColor: keyboardTheme.predictionBg,
           color: isHindiMode ? (_isDarkMode ? 'rgba(234, 198, 136, 0.58)' : lightColors.text.tertiary) : keyboardTheme.keyTextMuted,
-          fontSize: isHindiMode ? 'clamp(17px, 1.9vw, 22px)' : 'clamp(20px, 2.3vw, 26px)',
+          fontSize: isHindiMode ? 'clamp(24px, 2.6vw, 32px)' : 'clamp(28px, 2.95vw, 38px)',
           fontFamily: predWordFont,
           lineHeight: isHindiMode ? 1.6 : 1.4,
           fontWeight: 500,
@@ -1060,9 +1060,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         >
           <span style={{
             color: keyboardTheme.keyText,
-            fontSize: 'clamp(38px, 4.8vh, 52px)',
+            fontSize: 'clamp(45px, 5.25vh, 62px)',
             fontWeight: 700,
-            lineHeight: '1.18',
+            lineHeight: '1.14',
             textAlign: 'left',
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
@@ -1285,7 +1285,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                               border: `2px solid ${numActive ? keyboardAccent : keyboardTheme.keyBorder}`,
                               borderRadius: '10px',
                               color: numActive ? keyboardAccent : keyboardTheme.keyTextMuted,
-                              fontSize: 'clamp(16px, 1.8vw, 22px)',
+                              fontSize: 'clamp(22px, 2.35vw, 32px)',
                               fontWeight: 700,
                               letterSpacing: '1px',
                               cursor: 'pointer',
@@ -1469,7 +1469,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                         backgroundColor: keyboardTheme.predictionBg,
                         border: 'none', borderRadius: 0,
                         color: isDarkMode ? '#EAC688' : lightColors.text.primary,
-                        fontSize: 'clamp(20px, 2.3vw, 28px)',
+                        fontSize: 'clamp(30px, 3.1vw, 44px)',
                         fontWeight: 700,
                         display: 'flex', alignItems: 'center',
                         justifyContent: 'center',
@@ -1524,7 +1524,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                         style={{
                           width: '100%', height: '100%', backgroundColor: keyboardTheme.predictionBg,
                           border: 'none', borderRadius: 0, color: keyboardTheme.keyText,
-                          fontSize: 'clamp(22px, 2.5vw, 30px)', fontWeight: 700,
+                          fontSize: 'clamp(32px, 3.25vw, 46px)', fontWeight: 760,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center',
                           transition: 'background-color 150ms',
@@ -1597,7 +1597,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                 setNavHidden(true);
                 setWordLengthHint(null);
               }}
-              onQuickWords={() => setQuickWordsOpen(true)}
+              onQuickWords={() => onNavigate('quickwords')}
             />
           </div>
         )
@@ -1659,7 +1659,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                 backgroundColor: keyboardTheme.predictionBg,
                 border: `2px solid ${isDarkMode ? `${screenThemes.keyboard.deleteWordColor}55` : lightColors.border.main}`,
                 color: isDarkMode ? '#EAC688' : lightColors.text.primary,
-                fontSize: 'clamp(24px, 3vw, 36px)',
+                fontSize: 'clamp(34px, 3.7vw, 52px)',
                 fontWeight: 600, textAlign: 'center',
                 cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1682,7 +1682,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               backgroundColor: keyboardTheme.keyBg,
               border: `1px solid ${keyboardTheme.keyBorder}`,
               color: keyboardTheme.keyTextMuted,
-              fontSize: 'clamp(17px, 1.9vw, 22px)',
+              fontSize: 'clamp(24px, 2.6vw, 34px)',
               fontWeight: 600, cursor: 'pointer',
               fontFamily: UI_FONT,
             }}

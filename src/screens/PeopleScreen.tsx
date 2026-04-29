@@ -3,8 +3,8 @@
  * Responsive: 13"–27" screens via clamp() — identical on 23" (1920×1080)
  */
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { darkColors, lightColors, dwellTiming, screenThemes } from '../utils/design';
-import { GazeControlToggle, useGazeControl, GAZE_ENABLE_COOLDOWN_MS } from '../components/core/GazeControlToggle';
+import { darkColors, lightColors, dwellTiming, mixColors, screenThemes } from '../utils/design';
+import { useGazeControl, GAZE_ENABLE_COOLDOWN_MS } from '../components/core/GazeControlToggle';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useCustomization } from '../contexts/CustomizationContext';
@@ -15,8 +15,8 @@ interface Props { onNavigate: (s: string) => void; onSpeak: (t: string) => void;
 
 const PersonBtn: React.FC<{
   person: Person; isSelected: boolean; isDarkMode: boolean;
-  onSelect: () => void; onSpeak: (t: string) => void; gazeEnabled: boolean; lastEnabledTimestamp: number;
-}> = ({ person, isSelected, isDarkMode, onSelect, onSpeak, gazeEnabled, lastEnabledTimestamp }) => {
+  onSelect: () => void; gazeEnabled: boolean; lastEnabledTimestamp: number;
+}> = ({ person, isSelected, isDarkMode, onSelect, gazeEnabled, lastEnabledTimestamp }) => {
   const { isLight, isMix } = useTheme();
   const [hovered, setHovered] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -26,16 +26,15 @@ const PersonBtn: React.FC<{
   const dwellMs = dwellTiming.contexts.phrases;
   const colors = isDarkMode ? darkColors : lightColors;
   const isWarmMode = isDarkMode && !isLight;
-  const accent = '#C7838F';
-  const cardBg = isMix ? '#C4B28E' : isWarmMode ? '#20221E' : colors.background.secondary;
-  const cardText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardSubtle = isMix ? '#493B2E' : isWarmMode ? '#C8C5B8' : colors.text.secondary;
+  const accent = isMix ? '#628780' : isWarmMode ? '#7FA39B' : '#4F6E68';
+  const cardBg = isMix ? mixColors.home.tileSurfaces.pp : isWarmMode ? '#20221E' : colors.background.secondary;
+  const cardText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const cardBorder = isSelected
     ? accent
     : hovered
       ? accent
       : isMix
-        ? 'rgba(91,74,51,0.42)'
+        ? mixColors.home.cardBorder
         : isWarmMode
           ? 'rgba(213,216,188,0.14)'
           : colors.border.main;
@@ -53,25 +52,25 @@ const PersonBtn: React.FC<{
     if (!gazeEnabled) return;
     if (lastEnabledTimestamp && Date.now() - lastEnabledTimestamp < GAZE_ENABLE_COOLDOWN_MS) return;
     setHovered(true); sRef.current = Date.now(); tRef.current = requestAnimationFrame(tick);
-    dRef.current = setTimeout(() => { onSpeak(`Call ${person.name}`); onSelect(); }, dwellMs);
+    dRef.current = setTimeout(() => { onSelect(); }, dwellMs);
   };
   const leave = () => { setHovered(false); setProgress(0); clear(); };
   useEffect(() => () => clear(), []);
 
   return (
     <button onMouseEnter={enter} onMouseLeave={leave}
-      onClick={() => { onSpeak(`Call ${person.name}`); onSelect(); }}
+      onClick={onSelect}
       data-gaze="true"
       data-gaze-context="phraseButton"
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         minHeight: 'clamp(148px, 17vh, 190px)',
         padding: 'clamp(18px, 2.4vh, 28px) clamp(14px, 1.5vw, 22px)',
-        backgroundColor: isSelected ? (isMix ? 'rgba(199,131,143,0.26)' : isWarmMode ? 'rgba(199,131,143,0.16)' : colors.accent.subtle) : cardBg,
+        backgroundColor: isSelected ? (isMix ? 'rgba(98,135,128,0.24)' : isWarmMode ? 'rgba(127,163,155,0.16)' : 'rgba(79,110,104,0.12)') : cardBg,
         border: `1.5px solid ${cardBorder}`,
         borderRadius: '16px', cursor: 'pointer', transition: 'all 100ms', overflow: 'hidden',
         transform: hovered ? 'scale(1.03)' : 'scale(1)',
-        boxShadow: isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
+        boxShadow: isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
       }}>
       {hovered && <div style={{ position: 'absolute', bottom: 0, left: 0, height: 4, width: `${progress * 100}%`, backgroundColor: accent }} />}
       <div style={{
@@ -89,7 +88,6 @@ const PersonBtn: React.FC<{
         </span>
       </div>
       <span style={{ fontSize: 'clamp(18px, 2.3vh, 26px)', fontWeight: 800, color: cardText, textAlign: 'center', lineHeight: 1.12 }}>{person.name}</span>
-      <span style={{ fontSize: 'clamp(13px, 1.6vh, 17px)', color: cardSubtle, marginTop: '4px', textAlign: 'center' }}>{person.role}</span>
     </button>
   );
 };
@@ -97,23 +95,24 @@ const PersonBtn: React.FC<{
 const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true, showHindi = false }) => {
   const colors = isDarkMode ? darkColors : lightColors;
   const [selected, setSelected] = useState<string | null>(null);
-  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
+  const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { isLight, isMix } = useTheme();
   const { people: PEOPLE } = useCustomization();
-  const defaultPerson = PEOPLE.find(p => p.role === 'Caretaker') || PEOPLE.find(p => p.role === 'Nurse') || PEOPLE[0];
+  const fallbackPerson: Person = { name: 'Rishabh', nameHi: 'Rishabh', role: '', phrases: [] };
   const isWarmMode = isDarkMode && !isLight;
   const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
-  const phraseBg = isMix ? '#C4B28E' : isWarmMode ? '#20221E' : colors.background.secondary;
-  const phraseBorder = isMix ? 'rgba(91,74,51,0.42)' : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
-  const phraseText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseBg = isMix ? mixColors.home.tileSurfaces.pp : isWarmMode ? '#20221E' : colors.background.secondary;
+  const phraseBorder = isMix ? mixColors.home.cardBorder : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
+  const phraseText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const phraseHindi = isMix ? '#493B2E' : isWarmMode ? '#C8C5B8' : colors.text.secondary;
-  const phraseHover = isMix ? '#8B6F49' : isWarmMode ? '#C7838F' : colors.accent.main;
+  const phraseHover = isMix ? '#628780' : isWarmMode ? '#7FA39B' : '#4F6E68';
+  const selectedPerson = PEOPLE.find(p => p.name === selected) ?? PEOPLE[0] ?? fallbackPerson;
 
   useEffect(() => {
-    if (!selected && defaultPerson) {
-      setSelected(defaultPerson.name);
+    if (!selected || !PEOPLE.some(p => p.name === selected)) {
+      setSelected((PEOPLE[0] ?? fallbackPerson).name);
     }
-  }, [defaultPerson, selected]);
+  }, [PEOPLE, selected]);
 
   return (
     <div className={`people-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: pageBg, padding: '8px', gap: 'clamp(8px, 1vh, 14px)', overflow: 'hidden' }}>
@@ -134,35 +133,61 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
       }}>
         {PEOPLE.map(p => (
           <PersonBtn key={p.name} person={p} isSelected={selected === p.name}
-            isDarkMode={isDarkMode} onSelect={() => setSelected(p.name)} onSpeak={onSpeak} gazeEnabled={isGazeEnabled} lastEnabledTimestamp={lastEnabledTimestamp} />
+            isDarkMode={isDarkMode} onSelect={() => setSelected(p.name)} gazeEnabled={isGazeEnabled} lastEnabledTimestamp={lastEnabledTimestamp} />
         ))}
       </div>
 
-      {selected && (
+      {selectedPerson && (
         <div style={{
-          flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gridAutoRows: 'minmax(clamp(138px, 16vh, 190px), auto)',
-          gap: 'clamp(14px, 2vh, 24px)', padding: 'clamp(8px, 1.2vh, 16px) clamp(12px, 1.4vw, 24px) clamp(90px, 11vh, 130px)', overflow: 'auto',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          padding: 'clamp(8px, 1.2vh, 16px) clamp(12px, 1.4vw, 24px) clamp(90px, 11vh, 130px)',
         }}>
-          {PEOPLE.find(p => p.name === selected)?.phrases.map(ph => (
-            <button key={ph.en} onClick={() => onSpeak(ph.en)}
-              data-gaze="true"
-              data-gaze-context="phraseButton"
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = phraseHover)}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = phraseBorder)}
-              style={{
-                padding: 'clamp(18px, 2.4vh, 28px) clamp(18px, 2vw, 28px)', backgroundColor: phraseBg,
-                border: `1.5px solid ${phraseBorder}`, borderRadius: '16px',
-                color: phraseText, fontSize: 'clamp(18px, 2.3vh, 26px)', fontWeight: 700, cursor: 'pointer',
-                minHeight: 'clamp(138px, 16vh, 190px)', textAlign: 'center', transition: 'all 80ms',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1.18,
-                boxShadow: isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
+          <GazeButton
+            id={`selected-person-display-${selectedPerson.name}`}
+            onClick={() => onSpeak(selectedPerson.name)}
+            isDarkMode={isDarkMode}
+            gazeEnabled={isGazeEnabled}
+            gazeEnabledTimestamp={lastEnabledTimestamp}
+            dwellCategory="phraseButton"
+            style={{
+              width: '100%',
+              minHeight: 'clamp(138px, 18vh, 210px)',
+              padding: 'clamp(24px, 3vh, 36px) clamp(20px, 2vw, 32px)',
+              backgroundColor: phraseBg,
+              border: `1.5px solid ${phraseHover}`,
+              borderRadius: '18px',
+              color: phraseText,
+              textAlign: 'center',
+              boxShadow: isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'clamp(6px, 1vh, 12px)',
+            }}
+          >
+            <span style={{
+              fontSize: 'clamp(34px, 4.4vh, 54px)',
+              fontWeight: 800,
+              color: phraseText,
+              lineHeight: 1.08,
+            }}>
+              {selectedPerson.name}
+            </span>
+            {showHindi && (
+              <div style={{
+                fontSize: 'clamp(22px, 2.5vh, 32px)',
+                fontWeight: 700,
+                color: phraseHindi,
+                fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif",
+                lineHeight: 1.2,
               }}>
-              {ph.en}
-              {showHindi && <div style={{ fontSize: 'clamp(20px, 2.4vh, 30px)', fontWeight: 700, color: phraseHindi, marginTop: '10px', fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif", lineHeight: 1.3 }}>{ph.hi}</div>}
-            </button>
-          ))}
+                {selectedPerson.nameHi}
+              </div>
+            )}
+          </GazeButton>
         </div>
       )}
 

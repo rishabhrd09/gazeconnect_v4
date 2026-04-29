@@ -205,13 +205,9 @@ const HIGH_COLOR_OPTIONS: Array<{
   swatch: string;
   border: string;
 }> = [
-  { key: 'alert_maroon', label: 'Alert Maroon', swatch: '#4A2023', border: '#8A3B38' },
-  { key: 'muted_maroon', label: 'Muted Maroon (Recommended)', swatch: '#8A3B38', border: '#A65A52' },
-  { key: 'deep_maroon', label: 'Deep Maroon', swatch: '#6F2F34', border: '#8D4548' },
-  { key: 'warm_maroon', label: 'Warm Maroon', swatch: '#91483F', border: '#AB5D52' },
-  { key: 'terracotta', label: 'Muted Terracotta', swatch: '#9B4F43', border: '#B86455' },
-  { key: 'muted_crimson', label: 'Muted Crimson', swatch: '#7A3A4A', border: '#955064' },
+  { key: 'alert_maroon', label: 'Alert Maroon (Recommended)', swatch: '#4A2023', border: '#8A3B38' },
   { key: 'muted_red', label: 'Warm Red', swatch: '#8A3B38', border: '#A65A52' },
+  { key: 'muted_crimson', label: 'Muted Crimson', swatch: '#7A3A4A', border: '#955064' },
 ];
 
 const MEDIUM_COLOR_OPTIONS: Array<{
@@ -220,25 +216,20 @@ const MEDIUM_COLOR_OPTIONS: Array<{
   swatch: string;
   border: string;
 }> = [
-  { key: 'warm_teal', label: 'Warm Muted Teal (Recommended)', swatch: '#3E6B60', border: '#5B8A7F' },
-  { key: 'muted_teal', label: 'Muted Teal', swatch: '#315B53', border: '#47766C' },
-  { key: 'deep_teal', label: 'Deep Teal', swatch: '#264A45', border: '#3C6A63' },
-  { key: 'alert_maroon', label: 'Alert Maroon', swatch: '#4A2023', border: '#8A3B38' },
-  { key: 'warm_maroon', label: 'Warm Muted Maroon', swatch: '#7C3F3A', border: '#9A554D' },
-  { key: 'muted_golden', label: 'Muted Golden', swatch: '#6A5532', border: '#8A7147' },
-  { key: 'soft_umber', label: 'Soft Umber', swatch: '#5B4631', border: '#765E43' },
-  { key: 'muted_blue', label: 'Steel Blue', swatch: '#3E5661', border: '#55717D' },
+  { key: 'alert_maroon', label: 'Alert Maroon (Recommended)', swatch: '#4A2023', border: '#8A3B38' },
+  { key: 'warm_maroon', label: 'Warm Red', swatch: '#8A3B38', border: '#A65A52' },
+  { key: 'muted_crimson', label: 'Muted Crimson', swatch: '#7A3A4A', border: '#955064' },
 ];
 
 const getHighColorPreview = (key?: QuickWordHighColor) => (
   HIGH_COLOR_OPTIONS.find(option => option.key === key)
-  ?? HIGH_COLOR_OPTIONS.find(option => option.key === 'muted_maroon')
+  ?? HIGH_COLOR_OPTIONS.find(option => option.key === 'alert_maroon')
   ?? HIGH_COLOR_OPTIONS[0]
 );
 
 const getMediumColorPreview = (key?: QuickWordMediumColor) => (
   MEDIUM_COLOR_OPTIONS.find(option => option.key === key)
-  ?? MEDIUM_COLOR_OPTIONS.find(option => option.key === 'warm_teal')
+  ?? MEDIUM_COLOR_OPTIONS.find(option => option.key === 'alert_maroon')
   ?? MEDIUM_COLOR_OPTIONS[0]
 );
 
@@ -790,7 +781,7 @@ const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
           {([
-            { key: 'cards' as HomeEmergencyLaunchMode, title: 'Four Emergency Cards', desc: 'TT Suction, Ambu bag, Oral Suction, and other quick calls.' },
+            { key: 'cards' as HomeEmergencyLaunchMode, title: 'Four Emergency Cards', desc: 'TT Suction, Ambu Bag, Oral Suction, and other quick calls.' },
             { key: 'alert' as HomeEmergencyLaunchMode, title: 'Alert Mode Launcher', desc: 'One large card that opens the existing Alert Mode care-action screen.' },
           ]).map(option => {
             const selected = editLaunchMode === option.key;

@@ -8,7 +8,7 @@
  * - Enhanced aesthetic styling
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { darkColors, lightColors, screenThemes } from '../utils/design';
+import { darkColors, lightColors, mixColors, screenThemes } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -20,10 +20,12 @@ import {
 import { useCustomization } from '../contexts/CustomizationContext';
 
 // Colors from design.ts screenThemes
-const SELECTED_COLOR = screenThemes.phrases.selectedColor;
+const SELECTED_COLOR = '#B88A37';
 const SIDEBAR_BG = screenThemes.phrases.sidebarBg;
 const ACCENT_TEAL = screenThemes.phrases.accentTeal;
-const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Inter', 'Segoe UI', system-ui, sans-serif";
+const CATEGORY_NAME_COLOR = '#6F7650';
+const PAGE_ICON_COLOR = '#A99673';
+const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 const HINDI_UI_FONT = "'Noto Sans Devanagari', 'Mukta', 'Mangal', 'Segoe UI', sans-serif";
 
 // Custom Basic Needs icon - Hand with heart (caring needs)
@@ -57,6 +59,15 @@ interface PhrasesScreenProps {
 
 type CategoryKey = string;
 
+const isPrimaryPhraseCategory = (cat: { id: string; name: string }) => {
+  const id = cat.id.toLowerCase();
+  const name = cat.name.toLowerCase();
+  const isCommunication = id === 'communication' || name.includes('communication');
+  const isFeelings = id === 'feelings' || name.includes('feeling') || name.includes('emotion');
+
+  return isCommunication || isFeelings;
+};
+
 // Extracted to module scope to avoid re-creation on every render
 const PhrasesCategoryButton: React.FC<{
   category: { id: string; name: string; nameHi?: string; phrases: { en: string; hi: string }[] };
@@ -75,7 +86,8 @@ const PhrasesCategoryButton: React.FC<{
   gazeEnabledTimestamp, textColor, inactiveIconColor: inactiveIconColorOverride, selectedBg: selectedBgOverride,
 }) => {
   const selectedColor = isDarkMode ? SELECTED_COLOR : lightColors.warning.main;
-  const inactiveIconColor = inactiveIconColorOverride || (isDarkMode ? ACCENT_TEAL : lightColors.text.tertiary);
+  const categoryNameColor = isDarkMode ? CATEGORY_NAME_COLOR : textColor;
+  const inactiveIconColor = inactiveIconColorOverride || (isDarkMode ? PAGE_ICON_COLOR : lightColors.text.tertiary);
   const selectedBg = selectedBgOverride || (isDarkMode ? screenThemes.phrases.selectedBg : lightColors.background.tertiary);
   return (
     <GazeButton
@@ -89,34 +101,36 @@ const PhrasesCategoryButton: React.FC<{
       style={{
         width: '100%',
         backgroundColor: isSelected ? selectedBg : 'transparent',
-        minHeight: 'clamp(132px, 15vh, 168px)',
-        padding: 'clamp(24px, 3vh, 34px) clamp(20px, 1.8vw, 30px)',
+        minHeight: 'clamp(190px, 23vh, 260px)',
+        padding: 'clamp(28px, 3.8vh, 44px) clamp(24px, 2.2vw, 36px)',
         border: 'none',
-        borderLeft: isSelected ? `6px solid ${selectedColor}` : '6px solid transparent',
-        borderRadius: '0 18px 18px 0',
+        borderLeft: 'none',
+        borderRadius: '18px',
         transition: 'all 180ms ease',
-        justifyContent: 'flex-start',
+        justifyContent: 'center',
       }}
     >
       <div style={{
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 'clamp(14px, 1.25vw, 22px)',
+        justifyContent: 'center',
+        gap: 'clamp(22px, 2vw, 34px)',
         width: '100%',
       }}>
         <Icon
-          size={34}
-          color={isSelected ? selectedColor : inactiveIconColor}
+          size={48}
+          color={isDarkMode ? PAGE_ICON_COLOR : (isSelected ? selectedColor : inactiveIconColor)}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
           <span style={{
-            fontSize: 'clamp(22px, 1.9vw, 30px)',
+            fontSize: 'clamp(28px, 2.25vw, 38px)',
             fontWeight: isSelected ? 800 : 720,
-            color: isSelected ? selectedColor : textColor,
+            color: categoryNameColor,
             fontFamily: ENGLISH_UI_FONT,
             lineHeight: 1.15,
             letterSpacing: '0.2px',
+            textAlign: 'center',
           }}>
             {category.name}
           </span>
@@ -157,18 +171,19 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
   const { isLight, isMix } = useTheme();
   const isWarmMode = isDarkMode && !isLight;
+  const primaryPhraseCategories = phraseCategories.filter(isPrimaryPhraseCategory);
   const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
   const sidebarBg = isMix ? '#2A241C' : isWarmMode ? SIDEBAR_BG : lightColors.background.secondary;
   const sidebarBorder = isMix ? 'rgba(139, 111, 73, 0.42)' : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
   const sidebarShadow = isWarmMode ? '0 8px 22px rgba(0,0,0,0.24)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
   const selectedBg = isMix ? 'rgba(196, 178, 142, 0.22)' : isWarmMode ? screenThemes.phrases.selectedBg : lightColors.background.tertiary;
-  const inactiveIcon = isMix ? '#B49362' : isWarmMode ? ACCENT_TEAL : lightColors.text.tertiary;
+  const inactiveIcon = isMix || isWarmMode ? PAGE_ICON_COLOR : lightColors.text.tertiary;
   const sidebarText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const phraseCardBg = isMix ? '#C4B28E' : isWarmMode ? screenThemes.phrases.cardBg : colors.background.secondary;
-  const phraseCardBorder = isMix ? '1.5px solid rgba(91,74,51,0.38)' : isWarmMode ? screenThemes.phrases.cardBorder : `1.5px solid ${colors.border.light}`;
-  const phraseText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const phraseShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const phraseCardBg = isMix ? mixColors.home.tileSurfaces.ph : isWarmMode ? screenThemes.phrases.cardBg : colors.background.secondary;
+  const phraseCardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? screenThemes.phrases.cardBorder : `1.5px solid ${colors.border.light}`;
+  const phraseText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseShadow = isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
   const [activatedIdx, setActivatedIdx] = useState<number | null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -185,7 +200,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   const isRecentSelected = selectedCategory === 'recent';
   const selectedCategoryData = isRecentSelected
     ? null
-    : (phraseCategories.find(c => c.id === selectedCategory) || phraseCategories[0]);
+    : (primaryPhraseCategories.find(c => c.id === selectedCategory) || primaryPhraseCategories[0] || phraseCategories[0]);
   const displayedPhrases: { en: string; hi: string }[] = isRecentSelected
     ? recentPhrases
     : (selectedCategoryData?.phrases ?? []);
@@ -237,7 +252,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
 
         {/* ===== LEFT SIDEBAR ===== */}
         <div className="category-sidebar" style={{
-          width: 'clamp(312px, 19vw, 368px)',
+          width: 'clamp(348px, 22vw, 420px)',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -252,6 +267,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
         }}>
           {/* Sidebar Header */}
           <div style={{
+            display: 'none',
             padding: '8px 16px 14px 16px',
             borderBottom: `1px solid ${sidebarBorder}`,
             marginBottom: '6px',
@@ -281,11 +297,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
               style={{
                 width: '100%',
                 backgroundColor: isRecentSelected ? selectedBg : 'transparent',
-                minHeight: 'clamp(132px, 15vh, 168px)',
+                minHeight: 'clamp(140px, 16vh, 180px)',
                 padding: 'clamp(24px, 3vh, 34px) clamp(20px, 1.8vw, 30px)',
                 border: 'none',
-                borderLeft: isRecentSelected ? `6px solid ${isWarmMode ? SELECTED_COLOR : lightColors.warning.main}` : '6px solid transparent',
-                borderRadius: '0 18px 18px 0',
+                borderLeft: 'none',
+                borderRadius: '18px',
                 transition: 'all 180ms ease',
                 justifyContent: 'flex-start',
               }}
@@ -293,7 +309,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'clamp(14px, 1.25vw, 22px)', width: '100%' }}>
                 {/* Clock icon */}
                 <svg width={34} height={34} viewBox="0 0 24 24" fill="none"
-                  stroke={isRecentSelected ? (isWarmMode ? SELECTED_COLOR : lightColors.warning.main) : inactiveIcon} strokeWidth="1.8"
+                  stroke={isRecentSelected ? (isDarkMode ? PAGE_ICON_COLOR : lightColors.warning.main) : inactiveIcon} strokeWidth="1.8"
                   strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
@@ -325,15 +341,13 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
           )}
 
           {/* Regular Category Buttons */}
-          {phraseCategories.filter(cat => {
-            const id = cat.id.toLowerCase();
-            const name = cat.name.toLowerCase();
-            const isCommunication = id === 'communication' || name.includes('communication');
-            const isFeelings = id === 'feelings' || name.includes('feeling') || name.includes('emotion');
-            const isPeople = id === 'people' || name.includes('people') || name.includes('visitor');
-
-            return isCommunication || isFeelings || isPeople;
-          }).map(cat => {
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'clamp(34px, 5.4vh, 68px)',
+            width: '100%',
+          }}>
+          {primaryPhraseCategories.map(cat => {
             const categoryHindiNames: Record<string, string> = {
               emergency: 'इमरजेंसी',
               medical: 'दवा-दारू',
@@ -349,7 +363,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 key={cat.id}
                 category={{ ...cat, nameHi: categoryHindiNames[cat.id] }}
                 icon={CATEGORY_ICONS[cat.id] || MessageIcon}
-                isSelected={selectedCategory === cat.id}
+                isSelected={selectedCategoryData?.id === cat.id}
                 onSelect={() => setSelectedCategory(cat.id)}
                 isDarkMode={isDarkMode}
                 showHindi={showHindi}
@@ -361,6 +375,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
               />
             );
           })}
+          </div>
         </div>
 
         {/* ===== RIGHT SIDE — Phrase Cards ===== */}
@@ -382,12 +397,12 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
             {isRecentSelected ? (
               // Recent tab header
               <svg width={34} height={34} viewBox="0 0 24 24" fill="none"
-                  stroke={isWarmMode ? SELECTED_COLOR : lightColors.warning.main} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  stroke={isDarkMode ? PAGE_ICON_COLOR : lightColors.warning.main} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
             ) : (
-              React.createElement(CATEGORY_ICONS[selectedCategoryData!.id] || MessageIcon, { size: 34, color: isWarmMode ? SELECTED_COLOR : lightColors.warning.main })
+              React.createElement(CATEGORY_ICONS[selectedCategoryData!.id] || MessageIcon, { size: 34, color: isDarkMode ? PAGE_ICON_COLOR : lightColors.warning.main })
             )}
             <h2 style={{
               fontSize: 'clamp(28px, 3.2vh, 40px)',
@@ -418,7 +433,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 height: '100%', gap: '16px', opacity: 0.5,
               }}>
                 <svg width={48} height={48} viewBox="0 0 24 24" fill="none"
-                  stroke={isDarkMode ? ACCENT_TEAL : lightColors.text.tertiary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  stroke={isDarkMode ? PAGE_ICON_COLOR : lightColors.text.tertiary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
@@ -444,8 +459,8 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   padding: 'clamp(18px, 2.2vh, 26px) clamp(18px, 2vw, 28px)',
                   background: phraseCardBg,
                   border: activatedIdx === index ? `2px solid ${isMix ? '#8B6F49' : isWarmMode ? '#D6C98E' : colors.accent.main}` : phraseCardBorder,
-                  borderRadius: '20px',
-                  boxShadow: activatedIdx === index ? (isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)') : phraseShadow,
+                  borderRadius: '22px',
+                  boxShadow: activatedIdx === index ? (isMix ? mixColors.home.cardShadow : isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)') : phraseShadow,
                   transition: 'border 0.15s ease, box-shadow 0.15s ease',
                   transform: activatedIdx === index ? 'scale(1.02)' : 'scale(1)',
                 }}
@@ -473,11 +488,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   {/* Hindi text - Beautiful, clear Devanagari font */}
                   {showHindi && phrase.hi && (
                     <>
-                      <div style={{ width: '36px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
+                      <div style={{ width: '36px', height: '1.5px', background: isMix ? 'rgba(122,99,71,0.30)' : 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
                       <span style={{
                         fontSize: 'clamp(22px, 2.6vh, 34px)',
                         fontWeight: 700,
-                        color: 'rgba(255, 210, 140, 0.95)',
+                        color: isMix ? mixColors.home.subtleText : 'rgba(255, 210, 140, 0.95)',
                         lineHeight: 1.5,
                         fontFamily: "'Noto Sans Devanagari', sans-serif",
                         letterSpacing: '0.02em',

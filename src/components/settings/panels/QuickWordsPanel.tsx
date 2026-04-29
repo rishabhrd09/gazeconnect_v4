@@ -13,7 +13,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
-import { DEFAULT_CUSTOMIZATION } from '../../../services/defaultCustomization';
+import { CARE_QUICK_WORDS } from '../../../services/careContentPresets';
 import type { QuickWord, QuickWordPriority, QuickWordCategory } from '../../../types/customization';
 
 interface QuickWordsPanelProps {
@@ -260,7 +260,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
   }, [editCategories, data.quickWords, updateQuickWords]);
 
   const handleReset = useCallback(() => {
-    const defaults = DEFAULT_CUSTOMIZATION.quickWords.categories;
+    const defaults = CARE_QUICK_WORDS.categories;
     setEditCategories(structuredClone(defaults));
     setShowResetConfirm(false);
     setToast({ msg: 'Reset all categories to defaults', type: 'success' });

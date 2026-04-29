@@ -121,6 +121,7 @@ const QuickWordsOverlay: React.FC<QuickWordsOverlayProps> = ({
         gazeEnabledTimestamp={gazeEnabledTimestamp}
         showHindi={showHindi}
         idPrefix="qwo"
+        presentation="overlay"
       />
     </div>
   );

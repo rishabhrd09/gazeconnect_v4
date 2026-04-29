@@ -55,12 +55,13 @@ const COMMON_WORDS_BY_LENGTH: Record<number, string[]> = {
 const normalizeWord = (value: string): string => value.trim().toLowerCase();
 
 const UI_FONT = typography.fontFamily.primary;
-const BORDER_COLOR = darkColors.border.main;
-const DISPLAY_BG = darkColors.background.secondary;
-const SUGGESTION_BG = screenThemes.keyboard.predictionBg;
-const TEXT_MAIN = darkColors.text.primary;
-const TEXT_SUB = darkColors.text.secondary;
-const TEXT_DIM = darkColors.text.tertiary;
+const KEYBOARD_THEME = screenThemes.keyboard;
+const BORDER_COLOR = KEYBOARD_THEME.keyBorder;
+const DISPLAY_BG = KEYBOARD_THEME.textAreaBg;
+const SUGGESTION_BG = KEYBOARD_THEME.predictionBg;
+const TEXT_MAIN = KEYBOARD_THEME.keyText;
+const TEXT_SUB = KEYBOARD_THEME.keyTextMuted;
+const TEXT_DIM = KEYBOARD_THEME.keyTextMuted;
 const CARET_COLOR = darkColors.accent.main;
 
 // --- COMPONENTS ---
@@ -75,7 +76,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
   gazeEnabledTimestamp,
   emptyLabel,
   height = '140px',
-  fontSize = '36px',
+  fontSize = 'clamp(30px, 3.35vh, 42px)',
   style,
 }) => {
   return (
@@ -83,7 +84,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, width: '100%', overflow: 'hidden', ...style }}>
       {/* Title (Small Label) */}
       <div style={{
-        color: TEXT_DIM, fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', paddingLeft: '4px',
+        color: TEXT_DIM, fontWeight: 760, fontSize: 'clamp(14px, 1.45vh, 18px)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '4px',
         fontFamily: UI_FONT,
       }}>{title}</div>
 
@@ -101,7 +102,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
         }}
       >
         {words.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', backgroundColor: SUGGESTION_BG, color: TEXT_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 500, fontFamily: UI_FONT }}>
+          <div style={{ gridColumn: '1 / -1', backgroundColor: SUGGESTION_BG, color: TEXT_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(23px, 2.55vh, 32px)', fontWeight: 650, fontFamily: UI_FONT }}>
             {emptyLabel}
           </div>
         ) : (
@@ -118,7 +119,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
                 backgroundColor: SUGGESTION_BG,
                 border: 'none',
                 color: TEXT_MAIN,
-                fontWeight: 700,
+                fontWeight: 720,
                 fontSize: fontSize,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontFamily: UI_FONT,
@@ -312,7 +313,7 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
-      backgroundColor: darkColors.background.primary,
+      backgroundColor: KEYBOARD_THEME.shellBg,
       padding: '4px', // Minimal padding
       gap: '0px', // NO GAP
       boxSizing: 'border-box', overflow: 'hidden'
@@ -340,7 +341,7 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
         width: '100%', height: '114px',
         backgroundColor: DISPLAY_BG,
         borderRadius: '0', // Connected look
-        border: `3px solid ${BORDER_COLOR}`,
+        border: `2px solid ${BORDER_COLOR}`,
         borderTop: 'none', // Merge with top
         borderBottom: 'none', // Merge with bottom
         overflow: 'hidden',
@@ -353,14 +354,14 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
         <div
           ref={displayRef}
           style={{
-            flex: 1, padding: '8px 24px 6px',
+            flex: 1, padding: '4px 26px 3px',
             overflowY: 'hidden', display: 'flex', alignItems: 'flex-start',
             scrollBehavior: 'smooth',
           }}
         >
           <span style={{
             color: TEXT_MAIN,
-            fontSize: '42px', fontWeight: 700, lineHeight: '1.18',
+            fontSize: 'clamp(41px, 4.95vh, 58px)', fontWeight: 700, lineHeight: '1.16',
             textAlign: 'left', wordBreak: 'break-word', whiteSpace: 'pre-wrap', width: '100%',
             fontFamily: UI_FONT,
           }}>
@@ -374,7 +375,7 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
           id="spatial-action-btn"
           gazeEnabled={isGazeEnabled}
           gazeEnabledTimestamp={lastEnabledTimestamp}
-          onClick={() => setQuickWordsOpen(true)}
+          onClick={() => onNavigate('quickwords')}
           dwellCategory="standardButton"
           style={{
             width: '98px', height: '100%', borderRadius: 0,
@@ -433,7 +434,7 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
         gazeEnabledTimestamp={lastEnabledTimestamp}
         emptyLabel="General words..."
         height="90px"
-        fontSize="36px"
+        fontSize="clamp(30px, 3.35vh, 42px)"
       />
 
       {/* 5. BOTTOM NAV BAR — uses GlobalNavBar matching keyboard screen style */}
@@ -444,7 +445,7 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
           onSpeak={onSpeak}
           isDarkMode={true}
           showZoneBoardButton={false}
-          onQuickWords={() => setQuickWordsOpen(true)}
+          onQuickWords={() => onNavigate('quickwords')}
         />
       </div>
 

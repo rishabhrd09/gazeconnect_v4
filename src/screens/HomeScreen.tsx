@@ -13,7 +13,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import {
   BellIcon, KeyboardIcon,
   FamilyIcon, SettingsIcon,
-  GridIcon, TVIcon, ChatBubblesIcon, GlobalIcon,
+  GridIcon, TVIcon, GlobalIcon,
 } from '../components/icons/Icons';
 
 interface HomeScreenProps {
@@ -38,6 +38,41 @@ type HomeTile = {
   color: string;
   screen: string;
   cardClass: string;
+};
+
+const HomePhrasesIcon: React.FC<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+  style?: React.CSSProperties;
+}> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => {
+  const bubbleStrokeWidth = Math.max(1.55, strokeWidth * 0.86);
+  const waveformStrokeWidth = Math.max(1.1, strokeWidth * 0.42);
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={style}
+      aria-hidden="true"
+    >
+      <path
+        strokeWidth={bubbleStrokeWidth}
+        d="M5.25 4.8h13.5a3.35 3.35 0 0 1 3.35 3.35v4.75a3.35 3.35 0 0 1-3.35 3.35h-6.85l-4.35 3.35v-3.35h-2.3a3.35 3.35 0 0 1-3.35-3.35V8.15A3.35 3.35 0 0 1 5.25 4.8Z"
+      />
+      <g strokeWidth={waveformStrokeWidth}>
+        <line x1="8.3" y1="10.25" x2="8.3" y2="12.9" />
+        <line x1="10.75" y1="9.55" x2="10.75" y2="13.6" />
+        <line x1="13.25" y1="9.95" x2="13.25" y2="13.2" />
+        <line x1="15.7" y1="10.45" x2="15.7" y2="12.7" />
+      </g>
+    </svg>
+  );
 };
 
 type HomeThemePalette = {
@@ -66,46 +101,70 @@ type HomeThemePalette = {
   dividerBackground: string;
 };
 
-const HOME_BADGE_FILLS: Record<string, string> = {
-  kb: '#6FB7B1',
-  ph: '#8FAE72',
-  ac: '#C69A45',
-  pp: '#C7838F',
-  med: '#9C98C6',
-  st: '#BBAE9D',
-  web: '#A77AC1',
-  fp: '#C9A852',
+const HOME_BADGE_FILLS_DARK: Record<string, string> = {
+  kb: '#7CAFA8',
+  ph: '#B8A987',
+  ac: '#B8A987',
+  pp: '#789A92',
+  med: '#5A7D75',
+  st: '#BFAF9A',
+  web: '#6E9692',
+  fp: '#66724A',
+};
+
+const HOME_BADGE_FILLS_LIGHT: Record<string, string> = {
+  kb: '#35534F',
+  ph: '#6F4D18',
+  ac: '#73511B',
+  pp: '#3F5D59',
+  med: '#50746B',
+  st: '#514432',
+  web: '#486B67',
+  fp: '#35534F',
+};
+
+const HOME_BADGE_FILLS_MIX: Record<string, string> = {
+  kb: '#2F5C57',
+  ph: '#6F4D18',
+  ac: '#73511B',
+  pp: '#3B625C',
+  med: '#496D64',
+  st: '#4A3A28',
+  web: '#3D6B65',
+  fp: '#66724A',
 };
 
 const HOME_BADGE_ICON = '#201A15';
 const MIX_HOME_BADGE_ICON = '#23180C';
+const USE_FILLED_HOME_ICON_BADGES = false;
 
 const PANEL_GAP = 'clamp(12px, 2.2vh, 26px)';
 
 const HIGH_PRIORITY_HOME_COLORS: Record<string, { bg: string; shadow: string }> = {
-  red: { bg: '#984A40', shadow: '#B15D50' },
-  crimson: { bg: '#7A3A4A', shadow: '#955064' },
   alert_maroon: { bg: '#4A2023', shadow: '#8A3B38' },
   muted_red: { bg: '#8A3B38', shadow: '#A65A52' },
   muted_crimson: { bg: '#7A3A4A', shadow: '#955064' },
-  muted_maroon: { bg: '#8A3B38', shadow: '#A65A52' },
-  deep_maroon: { bg: '#6F2F34', shadow: '#8D4548' },
-  warm_maroon: { bg: '#91483F', shadow: '#AB5D52' },
-  terracotta: { bg: '#9B4F43', shadow: '#B86455' },
+  muted_maroon: { bg: '#7A3A4A', shadow: '#955064' },
+  warm_maroon: { bg: '#8A3B38', shadow: '#A65A52' },
+  red: { bg: '#8A3B38', shadow: '#A65A52' },
+  crimson: { bg: '#7A3A4A', shadow: '#955064' },
+  deep_maroon: { bg: '#4A2023', shadow: '#8A3B38' },
+  terracotta: { bg: '#8A3B38', shadow: '#A65A52' },
 };
 
 const MEDIUM_PRIORITY_HOME_COLORS: Record<string, { bg: string; shadow: string }> = {
-  blue: { bg: '#3E5661', shadow: '#55717D' },
-  golden: { bg: '#6A5532', shadow: '#8A7147' },
-  teal: { bg: '#315B53', shadow: '#47766C' },
-  muted_blue: { bg: '#3E5661', shadow: '#55717D' },
-  muted_golden: { bg: '#6A5532', shadow: '#8A7147' },
-  muted_teal: { bg: '#315B53', shadow: '#47766C' },
-  warm_teal: { bg: '#3E6B60', shadow: '#5B8A7F' },
-  deep_teal: { bg: '#264A45', shadow: '#3C6A63' },
   alert_maroon: { bg: '#4A2023', shadow: '#8A3B38' },
-  warm_maroon: { bg: '#7C3F3A', shadow: '#9A554D' },
-  soft_umber: { bg: '#5B4631', shadow: '#765E43' },
+  warm_maroon: { bg: '#8A3B38', shadow: '#A65A52' },
+  muted_crimson: { bg: '#7A3A4A', shadow: '#955064' },
+  blue: { bg: '#7A3A4A', shadow: '#955064' },
+  golden: { bg: '#8A3B38', shadow: '#A65A52' },
+  teal: { bg: '#7A3A4A', shadow: '#955064' },
+  muted_blue: { bg: '#7A3A4A', shadow: '#955064' },
+  muted_golden: { bg: '#8A3B38', shadow: '#A65A52' },
+  muted_teal: { bg: '#7A3A4A', shadow: '#955064' },
+  warm_teal: { bg: '#8A3B38', shadow: '#A65A52' },
+  deep_teal: { bg: '#4A2023', shadow: '#8A3B38' },
+  soft_umber: { bg: '#8A3B38', shadow: '#A65A52' },
 };
 
 const vDividerStyle: React.CSSProperties = {
@@ -194,45 +253,45 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   }, []);
 
   const THEME: HomeThemePalette = isLight ? {
-    bg: lightColors.background.primary,
-    cardBg: lightColors.background.secondary,
-    cardBorder: `1.5px solid ${lightColors.border.light}`,
-    cardShadow: '0 8px 18px rgba(82, 66, 45, 0.16), 0 1px 2px rgba(82, 66, 45, 0.10)',
+    bg: '#E6D7BA',
+    cardBg: '#C4B392',
+    cardBorder: '1.5px solid rgba(122, 99, 71, 0.32)',
+    cardShadow: '0 10px 20px rgba(122, 99, 71, 0.12), 0 2px 5px rgba(122, 99, 71, 0.08)',
     tileSurfaces: {
-      kb: lightColors.background.secondary,
-      ph: lightColors.background.secondary,
-      ac: lightColors.background.secondary,
-      pp: lightColors.background.secondary,
-      med: lightColors.background.secondary,
-      st: lightColors.background.secondary,
-      web: lightColors.background.secondary,
-      fp: lightColors.background.secondary,
+      kb: '#B5AA91',
+      ph: '#B7AE8D',
+      ac: '#C0AC83',
+      pp: '#BEA58F',
+      med: '#B3A999',
+      st: '#B9AC90',
+      web: '#B8AA98',
+      fp: '#B5AA91',
     },
-    icon: lightColors.icon.primary,
-    badgeIcon: HOME_BADGE_ICON,
-    text: lightColors.text.primary,
-    subtleText: lightColors.text.secondary,
-    mutedText: lightColors.text.tertiary,
-    brand: lightColors.text.tertiary,
-    dockSeparator: lightColors.border.light,
-    quickPhrasesBg: lightColors.background.secondary,
-    quickPhrasesBorder: lightColors.border.light,
-    quickPhrasesText: lightColors.text.primary,
-    quickPhrasesShadow: '0 8px 18px rgba(82, 66, 45, 0.16), 0 1px 2px rgba(82, 66, 45, 0.10)',
-    emergencyBg: lightColors.emergency.main,
-    emergencyHover: lightColors.emergency.hover,
-    emergencyText: lightColors.text.inverse,
-    emergencySoft: lightColors.emergency.soft,
-    placeholderBg: lightColors.background.tertiary,
-    placeholderBorder: lightColors.border.light,
-    dividerBackground: 'linear-gradient(180deg, transparent 0%, rgba(203, 188, 166, 0.42) 50%, transparent 100%)',
+    icon: '#3B2D20',
+    badgeIcon: '#3B2D20',
+    text: '#3B2D20',
+    subtleText: '#6E5A42',
+    mutedText: '#7A6347',
+    brand: 'rgba(90, 69, 48, 0.70)',
+    dockSeparator: 'rgba(122, 99, 71, 0.28)',
+    quickPhrasesBg: 'rgba(122, 99, 71, 0.10)',
+    quickPhrasesBorder: 'rgba(122, 99, 71, 0.32)',
+    quickPhrasesText: '#5A4530',
+    quickPhrasesShadow: '0 8px 16px rgba(122, 99, 71, 0.10), 0 1px 2px rgba(122, 99, 71, 0.08)',
+    emergencyBg: '#7A363A',
+    emergencyHover: '#6D3034',
+    emergencyText: '#FBE9DE',
+    emergencySoft: '#FBE9DE',
+    placeholderBg: 'rgba(122, 99, 71, 0.08)',
+    placeholderBorder: 'rgba(122, 99, 71, 0.18)',
+    dividerBackground: 'linear-gradient(180deg, transparent 0%, rgba(122,99,71,0.28) 50%, transparent 100%)',
   } : isMix ? {
     bg: mixColors.home.root,
-    cardBg: '#C4B28E',
+    cardBg: mixColors.home.tileSurfaces.kb,
     cardBorder: `1.5px solid ${mixColors.home.cardBorder}`,
     cardShadow: mixColors.home.cardShadow,
     tileSurfaces: mixColors.home.tileSurfaces,
-    icon: mixColors.home.text,
+    icon: '#3B2D20',
     badgeIcon: MIX_HOME_BADGE_ICON,
     text: mixColors.home.text,
     subtleText: mixColors.home.subtleText,
@@ -286,7 +345,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       ? vDividerStyle.background
       : 'linear-gradient(180deg, transparent 0%, rgba(168,181,196,0.04) 12%, rgba(168,181,196,0.12) 50%, rgba(168,181,196,0.04) 88%, transparent 100%)',
   };
-  const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Inter', 'Segoe UI', system-ui, sans-serif";
+  const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
   const themeClass = isLight ? ' theme-light' : isMix ? ' theme-mix' : '';
   const dividerStyle = (isLight || isMix) ? {
     ...vDividerStyle,
@@ -306,22 +365,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     minHeight: 'clamp(100px, 12vh, 140px)',
     background: THEME.cardBg,
     border: THEME.cardBorder,
-    borderRadius: '28px',
+    borderRadius: '24px',
     boxShadow: THEME.cardShadow,
   };
 
   const gridItems: HomeTile[] = [
-    { id: 'kb', label: 'Keyboard', labelHi: 'कीबोर्ड', icon: KeyboardIcon, color: HOME_BADGE_FILLS.kb, screen: 'keyboard', cardClass: 'grid-card-keyboard' },
-    { id: 'ph', label: 'Phrases\n& Chat', labelHi: 'बातचीत', icon: ChatBubblesIcon, color: HOME_BADGE_FILLS.ph, screen: 'phrases', cardClass: 'grid-card-communication' },
-    { id: 'ac', label: 'Activities', labelHi: 'मनोरंजन', icon: TVIcon, color: HOME_BADGE_FILLS.ac, screen: 'activities', cardClass: 'grid-card-activities' },
-    { id: 'pp', label: 'People', labelHi: 'परिवार', icon: FamilyIcon, color: HOME_BADGE_FILLS.pp, screen: 'people', cardClass: 'grid-card-people' },
-    { id: 'med', label: 'Assistance', labelHi: 'देखभाल', subLabel: 'Daily Care', icon: BellIcon, color: HOME_BADGE_FILLS.med, screen: 'medical', cardClass: 'grid-card-assistance' },
-    { id: 'st', label: 'Settings', labelHi: 'सेटिंग', icon: SettingsIcon, color: HOME_BADGE_FILLS.st, screen: 'settings', cardClass: 'grid-card-settings' },
+    { id: 'kb', label: 'Keyboard', labelHi: 'कीबोर्ड', icon: KeyboardIcon, color: HOME_BADGE_FILLS_DARK.kb, screen: 'keyboard', cardClass: 'grid-card-keyboard' },
+    { id: 'ph', label: 'Phrases', labelHi: 'बातचीत', icon: HomePhrasesIcon, color: HOME_BADGE_FILLS_DARK.ph, screen: 'phrases', cardClass: 'grid-card-communication' },
+    { id: 'ac', label: 'Activities', labelHi: 'मनोरंजन', icon: TVIcon, color: HOME_BADGE_FILLS_DARK.ac, screen: 'activities', cardClass: 'grid-card-activities' },
+    { id: 'pp', label: 'People', labelHi: 'परिवार', icon: FamilyIcon, color: HOME_BADGE_FILLS_DARK.pp, screen: 'people', cardClass: 'grid-card-people' },
+    { id: 'med', label: 'Assistance', labelHi: 'देखभाल', subLabel: 'Daily Care', icon: BellIcon, color: HOME_BADGE_FILLS_DARK.med, screen: 'medical', cardClass: 'grid-card-assistance' },
+    { id: 'st', label: 'Settings', labelHi: 'सेटिंग', icon: SettingsIcon, color: HOME_BADGE_FILLS_DARK.st, screen: 'settings', cardClass: 'grid-card-settings' },
   ];
 
   const rightPanelTiles: HomeTile[] = [
-    { id: 'web', label: 'Web Browsing', labelHi: 'वेब ब्राउज़िंग', icon: GlobalIcon, color: HOME_BADGE_FILLS.web, screen: 'web', cardClass: 'grid-card-web' },
-    { id: 'fp', label: 'Design Home', labelHi: 'घर का नक्शा', icon: GridIcon, color: HOME_BADGE_FILLS.fp, screen: 'floor-plan', cardClass: 'grid-card-design' },
+    { id: 'web', label: 'Web Browsing', labelHi: 'वेब ब्राउज़िंग', icon: GlobalIcon, color: HOME_BADGE_FILLS_DARK.web, screen: 'web', cardClass: 'grid-card-web' },
+    { id: 'fp', label: 'Design Home', labelHi: 'घर का नक्शा', icon: GridIcon, color: HOME_BADGE_FILLS_DARK.fp, screen: 'floor-plan', cardClass: 'grid-card-design' },
   ];
 
   const iconStyle = {
@@ -348,22 +407,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     ...iconBadgeStyle,
     background: 'transparent',
     boxShadow: 'none',
-    marginBottom: 'clamp(8px, 1.5vh, 14px)',
-  } : iconBadgeStyle;
+    marginBottom: 'clamp(8px, 1.35vh, 13px)',
+  } : USE_FILLED_HOME_ICON_BADGES ? iconBadgeStyle : {
+    ...iconBadgeStyle,
+    width: 'auto',
+    height: 'auto',
+    borderRadius: 0,
+    background: 'transparent',
+    boxShadow: 'none',
+    marginBottom: 'clamp(8px, 1.35vh, 13px)',
+  };
 
-  const homeTileIconColor = isMix ? THEME.icon : THEME.badgeIcon;
-  const homeTileIconSize = isMix ? 40 : 34;
+  const homeTileIconSize = (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 64 : 52;
+  const homeTileIconColors = isLight
+    ? HOME_BADGE_FILLS_LIGHT
+    : isMix
+      ? HOME_BADGE_FILLS_MIX
+      : HOME_BADGE_FILLS_DARK;
 
   const labelStyle = {
     display: 'block',
-    fontSize: 'clamp(19px, 2.7vh, 27px)',
-    fontWeight: (isLight || isMix) ? 600 : 700,
+    fontSize: (isLight || isMix) ? 'clamp(24px, 3.15vh, 34px)' : 'clamp(21px, 2.95vh, 30px)',
+    fontWeight: (isLight || isMix) ? 700 : 700,
     color: THEME.text,
-    letterSpacing: (isLight || isMix) ? '0.02em' : 'clamp(0.5px, 0.1vw, 1px)',
+    letterSpacing: (isLight || isMix) ? '0.01em' : 'clamp(0.5px, 0.1vw, 1px)',
     textTransform: 'none' as const,
     fontFamily: ENGLISH_UI_FONT,
     whiteSpace: 'pre-wrap' as const,
-    lineHeight: '1.2',
+    lineHeight: (isLight || isMix) ? '1.16' : '1.2',
     textAlign: 'center' as const,
   };
 
@@ -396,29 +467,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const selectedHighColor = quickWords?.highColor ?? 'muted_maroon';
   const selectedMediumColor = quickWords?.mediumColor ?? 'warm_teal';
   const getEmergencyPriorityColor = useCallback((priority?: 'high' | 'medium') => {
+    if (isLight) {
+      return { bg: '#7A363A', shadow: '#5A2528' };
+    }
     if (priority === 'medium') {
       return MEDIUM_PRIORITY_HOME_COLORS[selectedMediumColor] ?? MEDIUM_PRIORITY_HOME_COLORS.warm_teal;
     }
     return HIGH_PRIORITY_HOME_COLORS[selectedHighColor] ?? HIGH_PRIORITY_HOME_COLORS.muted_maroon;
-  }, [selectedHighColor, selectedMediumColor]);
+  }, [isLight, selectedHighColor, selectedMediumColor]);
 
   return (
     <div className={`home-screen${themeClass}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      backgroundColor: THEME.bg,
+      background: isLight
+        ? 'radial-gradient(circle at 50% 8%, #F0E4CB 0%, #E6D7BA 46%, #DDC9A6 100%)'
+        : THEME.bg,
       overflow: 'hidden',
       position: 'relative',
     }}>
-      <div style={{
-        position: 'absolute', top: '25px', left: '35px', zIndex: 1000, opacity: 0.82, pointerEvents: 'none',
-      }}>
-        <span className="brand-title" style={{ fontSize: '14px', fontWeight: (isLight || isMix) ? 400 : 700, color: THEME.brand, fontFamily: ENGLISH_UI_FONT, letterSpacing: (isLight || isMix) ? '0.02em' : '2.6px', fontStyle: (isLight || isMix) ? 'italic' : 'normal' }}>
-          {(isLight || isMix) ? 'GazeConnect' : 'GAZECONNECT'}
-        </span>
-      </div>
-
       <GlobalNavBar currentPage="home" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
 
       <div style={{
@@ -539,7 +607,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         style={{
                           width: '100%',
                           height: '100%',
-                          borderRadius: '32px',
+                          borderRadius: '24px',
                           background: THEME.placeholderBg,
                           border: `1.5px dashed ${THEME.placeholderBorder}`,
                           display: 'flex',
@@ -572,12 +640,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         gridColumn: (isNav || isAlertModeCard) ? '1 / -1' : undefined,
                         justifySelf: isNav ? 'center' : undefined,
                         alignSelf: isAlertModeCard ? 'center' : undefined,
-                        borderRadius: isNav ? '999px' : '28px',
+                        borderRadius: isNav ? '999px' : '24px',
                         background: isNav ? NAV_BG : bg,
-                        border: isNav ? `1px solid ${THEME.quickPhrasesBorder}` : ((isLight || isMix) ? THEME.cardBorder : 'none'),
+                        border: isNav
+                          ? `1px solid ${THEME.quickPhrasesBorder}`
+                          : (isLight
+                            ? '1.5px solid rgba(74, 28, 32, 0.45)'
+                            : ((isLight || isMix) ? THEME.cardBorder : 'none')),
                         boxShadow: isActivated
-                          ? isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 0 0 1px rgba(56, 189, 248, 0.12), 0 6px 16px rgba(0, 0, 0, 0.2)') : ((isLight || isMix) ? THEME.cardShadow : `0 6px 16px rgba(0,0,0,0.16), 0 0 0 1px ${bgShadow}28`)
-                          : isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : ((isLight || isMix) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)'),
+                          ? isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 0 0 1px rgba(56, 189, 248, 0.12), 0 6px 16px rgba(0, 0, 0, 0.2)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 18px rgba(90, 37, 40, 0.18)' : ((isLight || isMix) ? THEME.cardShadow : `0 6px 16px rgba(0,0,0,0.16), 0 0 0 1px ${bgShadow}28`))
+                          : isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 16px rgba(90, 37, 40, 0.14)' : ((isLight || isMix) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)')),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -601,7 +673,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                             whiteSpace: 'pre-wrap',
                             letterSpacing: (isLight || isMix) ? '0.01em' : (!isNav ? '0.6px' : '0.2px'),
                             textTransform: 'none',
-                            textShadow: (isLight || isMix) ? 'none' : '0 1px 3px rgba(0,0,0,0.22)',
+                            textShadow: 'none',
                           }}>
                             {item.text}
                           </span>
@@ -629,10 +701,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         {isNav && (
                           <span style={{
                             fontSize: 'clamp(20px, 2.5vh, 28px)',
-                            fontWeight: isMix ? 650 : 300,
+                            fontWeight: isLight ? 500 : isMix ? 650 : 300,
                             color: isActivated
-                              ? (isLight ? lightColors.text.secondary : isMix ? THEME.subtleText : screenThemes.home.teal)
-                              : (isLight ? lightColors.text.tertiary : isMix ? '#F0E2C4' : THEME.mutedText),
+                              ? (isLight ? THEME.subtleText : isMix ? THEME.subtleText : screenThemes.home.teal)
+                              : (isLight ? THEME.mutedText : isMix ? '#F0E2C4' : THEME.mutedText),
                             opacity: isMix ? 0.9 : 1,
                             lineHeight: 1,
                             textShadow: 'none',
@@ -676,13 +748,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
-              >
-                <div style={{
-                  ...homeTileIconBadgeStyle,
-                  background: isMix ? 'transparent' : (HOME_BADGE_FILLS[tile.id] ?? tile.color),
-                }}>
-                  <tile.icon size={homeTileIconSize} color={homeTileIconColor} strokeWidth={2.4} />
-                </div>
+                >
+                  <div style={{
+                    ...homeTileIconBadgeStyle,
+                    background: (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 'transparent' : (homeTileIconColors[tile.id] ?? tile.color),
+                  }}>
+                      <tile.icon
+                        size={tile.id === 'ph' ? homeTileIconSize + 14 : homeTileIconSize}
+                        color={(isMix || !USE_FILLED_HOME_ICON_BADGES) ? (homeTileIconColors[tile.id] ?? tile.color) : THEME.badgeIcon}
+                        strokeWidth={tile.id === 'ph' ? ((isLight || isMix) ? 2.7 : 2.45) : ((isLight || isMix) ? 3.1 : 2.65)}
+                        style={tile.id === 'ph' ? { transform: 'translateY(1px)' } : undefined}
+                      />
+                  </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', marginTop: 'clamp(4px, 1vh, 12px)' }}>
                   <span className="grid-card-label" style={labelStyle}>
                     {tile.label}
@@ -705,11 +782,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     </>
                   ) : tile.subLabel ? (
                     <span style={{
-                      fontSize: 'clamp(12px, 1.6vh, 17px)',
-                      fontWeight: 400,
-                      color: isLight ? THEME.subtleText : isMix ? THEME.subtleText : screenThemes.home.tealIcon,
-                      opacity: 0.7,
-                      letterSpacing: 'clamp(0.3px, 0.05vw, 0.8px)',
+                      fontSize: 'clamp(13px, 1.75vh, 18px)',
+                      fontWeight: 600,
+                      color: isLight ? '#6E5A42' : isMix ? THEME.subtleText : screenThemes.home.tealIcon,
+                      opacity: isLight ? 1 : 0.7,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase' as const,
                       fontFamily: ENGLISH_UI_FONT,
                       textAlign: 'center' as const,
                     }}>
@@ -750,13 +828,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
-              >
-                <div style={{
-                  ...homeTileIconBadgeStyle,
-                  background: isMix ? 'transparent' : (HOME_BADGE_FILLS[tile.id] ?? tile.color),
-                }}>
-                  <tile.icon size={homeTileIconSize} color={homeTileIconColor} strokeWidth={2.4} />
-                </div>
+                >
+                  <div style={{
+                    ...homeTileIconBadgeStyle,
+                    background: (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 'transparent' : (homeTileIconColors[tile.id] ?? tile.color),
+                  }}>
+                        <tile.icon
+                          size={tile.id === 'ph' ? homeTileIconSize + 12 : homeTileIconSize}
+                          color={(isMix || !USE_FILLED_HOME_ICON_BADGES) ? (homeTileIconColors[tile.id] ?? tile.color) : THEME.badgeIcon}
+                          strokeWidth={tile.id === 'ph' ? ((isLight || isMix) ? 2.9 : 2.6) : ((isLight || isMix) ? 3.1 : 2.65)}
+                          style={tile.id === 'ph' ? { transform: 'translateY(1px)' } : undefined}
+                        />
+                  </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', marginTop: 'clamp(4px, 1vh, 12px)' }}>
                   <span className="grid-card-label" style={labelStyle}>
                     {tile.label}

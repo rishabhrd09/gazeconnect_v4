@@ -29,6 +29,7 @@ import {
   cellsToBoundingRect,
 } from '../utils/compassMath';
 import { getDirectionLabels } from '../utils/compassDirections';
+import { typography } from '../utils/design';
 import type {
   AdvancedPhase,
   AdvancedRefinements,
@@ -38,6 +39,7 @@ import type {
 import { useTheme } from '../contexts/ThemeContext';
 
 const COMPASS_DRAFT_KEY = 'gazeconnect_compass_progress_v1';
+const EMERGENCY_FONT = `'Arial Black', ${typography.fontFamily.primary}`;
 
 const THEME = {
   bg: '#07111E',
@@ -676,7 +678,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         {/* Emergency */}
         <GazeButton id="adv-emergency" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
           alwaysActive onClick={() => onSpeak('I need help immediately!')}
-          style={{ height: 52, width: '100%', borderRadius: 8, background: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.5)', color: '#F87171', fontSize: 14, fontWeight: 800, letterSpacing: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          style={{ height: 58, width: '100%', borderRadius: 8, background: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.5)', color: '#F87171', fontSize: 16, fontWeight: 900, letterSpacing: '0.12em', fontFamily: EMERGENCY_FONT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           EMERGENCY
         </GazeButton>
 

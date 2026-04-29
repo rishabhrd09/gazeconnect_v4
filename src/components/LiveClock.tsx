@@ -1,103 +1,129 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-/** Clock now sits at bottom-left — no overlap with nav, visible on all screens */
-const HIDDEN_SCREENS = new Set<string>([
-    // No screens hidden — bottom-left position is clear on all layouts
-]);
+const HIDDEN_SCREENS = new Set<string>(['quickwords']);
+const UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 
 interface LiveClockProps {
-    currentScreen?: string;
-    suppressed?: boolean;
+  currentScreen?: string;
+  suppressed?: boolean;
 }
 
 export function LiveClock({ currentScreen, suppressed = false }: LiveClockProps) {
-    const { theme } = useTheme();
-    const [time, setTime] = useState(new Date());
+  const { theme } = useTheme();
+  const [time, setTime] = useState(new Date());
+  const isQuickWordsScreen = currentScreen === 'quickwords';
+  const isHomeWarmLight = currentScreen === 'home' && theme === 'light';
 
-    useEffect(() => {
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    // Hide on screens where it overlaps with nav controls
-    if (suppressed || (currentScreen && HIDDEN_SCREENS.has(currentScreen))) {
-        return null;
-    }
+  if (suppressed || (currentScreen && HIDDEN_SCREENS.has(currentScreen))) {
+    return null;
+  }
 
-    const hours = time.getHours();
-    const minutes = time.getMinutes().toString().padStart(2, '0');
-    const seconds = time.getSeconds().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const h12 = (hours % 12 || 12).toString().padStart(2, '0');
+  const hours = time.getHours();
+  const minutes = time.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = (hours % 12 || 12).toString().padStart(2, '0');
 
-    // Day of week
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = days[time.getDay()];
-    const dateStr = time.toLocaleDateString('en-IN', {
-        day: 'numeric', month: 'short'
-    });
+  const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][time.getDay()];
+  const dateStr = time.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
-    return (
-        <div style={{
-            position: 'fixed',
-            bottom: 'clamp(8px, 1.2vh, 18px)',
-            left: 'clamp(60px, 5vw, 100px)',
-            zIndex: 9998,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            gap: '2px',
-            pointerEvents: 'none',
-            userSelect: 'none',
+  const dayColor = isHomeWarmLight
+    ? 'rgba(122, 99, 71, 0.55)'
+    : theme === 'light'
+    ? '#5A4A3B'
+    : theme === 'mix'
+      ? 'rgba(240,226,196,0.48)'
+      : 'rgba(236,237,227,0.42)';
+
+  const timeColor = isHomeWarmLight
+    ? 'rgba(59, 45, 32, 0.55)'
+    : theme === 'light'
+    ? '#1B140E'
+    : theme === 'mix'
+      ? 'rgba(240,226,196,0.88)'
+      : 'rgba(236,237,227,0.84)';
+
+  const ampmColor = isHomeWarmLight
+    ? 'rgba(59, 45, 32, 0.55)'
+    : theme === 'light'
+    ? '#6D5945'
+    : theme === 'mix'
+      ? '#B49362'
+      : '#9FB19A';
+
+  const dayColorSoft = theme === 'light'
+    ? 'rgba(90, 74, 59, 0.78)'
+    : theme === 'mix'
+      ? 'rgba(120, 100, 72, 0.76)'
+      : 'rgba(196, 198, 187, 0.64)';
+
+  const timeColorSoft = theme === 'light'
+    ? 'rgba(27, 20, 14, 0.92)'
+    : theme === 'mix'
+      ? 'rgba(238, 223, 196, 0.82)'
+      : 'rgba(230, 233, 221, 0.76)';
+
+  const ampmColorSoft = theme === 'light'
+    ? 'rgba(109, 89, 69, 0.82)'
+    : theme === 'mix'
+      ? '#9E7B4B'
+      : '#A8B29A';
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: isQuickWordsScreen ? 'clamp(12px, 1.5vh, 18px)' : 'clamp(10px, 1.4vh, 20px)',
+      left: isQuickWordsScreen ? 'clamp(68px, 5.2vw, 108px)' : 'clamp(62px, 5vw, 102px)',
+      zIndex: 9998,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: isQuickWordsScreen ? '2px' : '4px',
+      pointerEvents: 'none',
+      userSelect: 'none',
+    }}>
+      <div style={{
+        fontFamily: UI_FONT,
+        fontWeight: 700,
+        fontSize: isQuickWordsScreen ? 'clamp(10px, 1.2vh, 12px)' : 'clamp(11px, 1.35vh, 14px)',
+        color: isQuickWordsScreen ? dayColorSoft : dayColor,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        lineHeight: 1,
+      }}>
+        {dayName} - {dateStr}
+      </div>
+
+      <div style={{
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: isQuickWordsScreen ? '4px' : '6px',
+        lineHeight: 1,
+      }}>
+        <span style={{
+          fontFamily: UI_FONT,
+          fontWeight: isQuickWordsScreen ? 680 : 700,
+          fontSize: isQuickWordsScreen ? 'clamp(24px, 3vh, 36px)' : 'clamp(30px, 3.8vh, 46px)',
+          color: isQuickWordsScreen ? timeColorSoft : timeColor,
+          letterSpacing: '0',
         }}>
-            {/* Day + Date line */}
-            <div className="live-clock-day" style={{
-                fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui",
-                fontWeight: 700,
-                fontSize: 'clamp(11px, 1.4vh, 15px)',
-                color: theme === 'light' ? '#342A20' : theme === 'mix' ? 'rgba(240,226,196,0.46)' : 'rgba(236,237,227,0.42)',
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase',
-                lineHeight: 1,
-                paddingRight: '3px',
-            }}>
-                {dayName} · {dateStr}
-            </div>
-
-            {/* Main time display */}
-            <div className="live-clock-time" style={{
-                fontFamily: "'Orbitron', monospace",
-                fontWeight: 600,
-                fontSize: 'clamp(32px, 4vh, 52px)',
-                color: theme === 'light' ? '#1B140E' : theme === 'mix' ? 'rgba(240,226,196,0.86)' : 'rgba(236,237,227,0.84)',
-                letterSpacing: '2px',
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: '4px',
-            }}>
-                {/* HH:MM in Orbitron */}
-                <span className="live-clock-time-shadow" style={{
-                    textShadow: '0 0 20px rgba(45,212,191,0.25)',
-                }}>
-                    {h12}:{minutes}
-                </span>
-
-                {/* AM/PM in Outfit */}
-                <span className="live-clock-ampm" style={{
-                    fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui",
-                    fontWeight: 600,
-                    fontSize: 'clamp(14px, 1.8vh, 20px)',
-                    color: theme === 'light' ? '#342A20' : theme === 'mix' ? '#6FB7B1' : '#6FB7B1',
-                    letterSpacing: '1px',
-                    marginLeft: '4px',
-                    alignSelf: 'flex-end',
-                    marginBottom: '3px',
-                }}>
-                    {ampm}
-                </span>
-            </div>
-        </div>
-    );
+          {h12}:{minutes}
+        </span>
+        <span style={{
+          fontFamily: UI_FONT,
+          fontWeight: 700,
+          fontSize: isQuickWordsScreen ? 'clamp(12px, 1.45vh, 15px)' : 'clamp(14px, 1.7vh, 18px)',
+          color: isQuickWordsScreen ? ampmColorSoft : ampmColor,
+          letterSpacing: '0.04em',
+        }}>
+          {ampm}
+        </span>
+      </div>
+    </div>
+  );
 }

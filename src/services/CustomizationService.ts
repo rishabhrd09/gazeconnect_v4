@@ -13,7 +13,7 @@ import type {
   CustomizationData, Person, PhraseCategory,
   MedicalSection, HomeQuickActions, HomeEmergencyCard,
   ActivityCategory, AACCategory, Phrase, AppSettings, QuickWordsConfig,
-  AlertModeCard,
+  AlertModeCard, QuickWord,
 } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
 import {
@@ -25,6 +25,127 @@ import {
 } from './careContentPresets';
 
 const DEBOUNCE_MS = 500;
+const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
+const MEDICAL_LABEL_UPDATES: Record<string, { en: string; hi: string }> = {
+  'Check tube / mask position': { en: 'Check TT cuff / balloon pressure', hi: 'टीटी कफ / बैलून प्रेशर चेक करें' },
+  'Wet my mouth': { en: 'Oral Care / Clean Teeth', hi: 'मुंह / दांत साफ करो' },
+  'Remove Urine Pot': { en: 'Fan', hi: 'पंखा' },
+  'Adjust Fan / AC': { en: 'AC', hi: 'AC' },
+};
+const QUICK_WORD_PHRASE_OMISSIONS: Record<string, Set<string>> = {
+  medical_tt_suction: new Set(['Tube needs suction']),
+  medical_breathing_ambu: new Set(['My breathing is getting worse']),
+  medical_bp_pulse: new Set([
+    'Please check blood pressure now',
+    'Please check oxygen and pulse now',
+  ]),
+};
+const QUICK_WORD_PHRASE_REPLACEMENTS: Record<string, Record<string, Phrase>> = {
+  medical_oral_suction: {
+    'Please clear my mouth now': {
+      en: 'Do oral care and clean my teeth',
+      hi: 'ओरल केयर करें और मेरे दांत साफ करें',
+    },
+  },
+};
+const SEVERE_PAIN_PHRASES: Phrase[] = [
+  { en: 'Back pain / headache', hi: 'पीठ दर्द / सिर दर्द' },
+  { en: 'Throat pain', hi: 'गले में दर्द' },
+  { en: 'Pain in hands and legs', hi: 'हाथ-पैर में दर्द' },
+  { en: 'Stomach pain', hi: 'पेट दर्द' },
+];
+const CHEST_NEBULIZATION_PHRASES: Phrase[] = [
+  { en: 'I have chest discomfort', hi: 'मेरी छाती में तकलीफ है' },
+  { en: 'My chest feels tight / chest congestion', hi: 'मेरी छाती भारी लग रही है / छाती में जकड़न' },
+  { en: 'Give nebulization', hi: 'नेबुलाइजेशन दें' },
+];
+const DAILY_FAN_PHRASES: Phrase[] = [
+  { en: 'Turn the fan on', hi: 'पंखा चालू करें' },
+  { en: 'Turn the fan off', hi: 'पंखा बंद करें' },
+  { en: 'Increase the fan', hi: 'पंखा तेज करें' },
+  { en: 'Reduce the fan', hi: 'पंखा धीमा करें' },
+];
+const DAILY_AC_PHRASES: Phrase[] = [
+  { en: 'Turn on the AC', hi: 'एसी चालू करें' },
+  { en: 'Turn off the AC', hi: 'एसी बंद करें' },
+  { en: 'Increase AC cooling', hi: 'एसी कूलिंग बढ़ाएं' },
+  { en: 'Reduce AC cooling', hi: 'एसी कूलिंग कम करें' },
+];
+const DAILY_TOILET_PHRASES: Phrase[] = [
+  { en: 'I need the urine pot now', hi: 'मुझे अभी यूरिन पॉट चाहिए' },
+  { en: 'Remove the urine pot', hi: 'यूरिन पॉट हटा दें' },
+];
+const POSITION_HEAD_UP_PHRASES: Phrase[] = [
+  { en: 'Raise bed angle', hi: 'बेड एंगल ऊपर करें' },
+  { en: 'Raise the backrest', hi: 'बैकरेस्ट ऊपर करें' },
+  { en: 'Shift me up', hi: 'मुझे ऊपर खिसकाएं' },
+  { en: 'Adjust bed angle to sitting position', hi: 'बेड एंगल बैठने की स्थिति में करें' },
+];
+const POSITION_HEAD_DOWN_PHRASES: Phrase[] = [
+  { en: 'Lower bed angle', hi: 'बेड एंगल नीचे करें' },
+  { en: 'Lower the backrest', hi: 'बैकरेस्ट नीचे करें' },
+  { en: 'Shift me up', hi: 'मुझे ऊपर खिसकाएं' },
+  { en: 'Adjust bed angle to sitting position', hi: 'बेड एंगल बैठने की स्थिति में करें' },
+];
+const POSITION_WORD_UPDATES: Record<string, { en: string; hi: string; phrases: Phrase[] }> = {
+  position_head_up: {
+    en: 'Head Up',
+    hi: 'सिर ऊपर',
+    phrases: POSITION_HEAD_UP_PHRASES,
+  },
+  position_head_down: {
+    en: 'Head Down',
+    hi: 'सिर नीचे',
+    phrases: POSITION_HEAD_DOWN_PHRASES,
+  },
+};
+const DIRECT_QUICK_WORD_UPDATES: Record<string, { en: string; hi: string }> = {
+  position_turn_left: { en: 'Turn Left / Left Karvat', hi: '' },
+  position_turn_right: { en: 'Turn Right / Right Karvat', hi: '' },
+  daily_water: { en: 'Water', hi: 'पानी' },
+};
+
+const stripPoliteness = (text: string, language: 'en' | 'hi') => {
+  if (language === 'hi') {
+    return text.replace(/^कृपया\s+/, '');
+  }
+
+  const withoutLeadingPlease = text.replace(/^please\s+/i, '');
+  const withoutTrailingPlease = withoutLeadingPlease.replace(/\s+please$/i, '');
+  if (withoutTrailingPlease === text) return text;
+  return withoutTrailingPlease.charAt(0).toUpperCase() + withoutTrailingPlease.slice(1);
+};
+
+const normalizePhrasePoliteness = (phrase: Phrase): Phrase => {
+  const en = stripPoliteness(phrase.en, 'en');
+  const hi = stripPoliteness(phrase.hi, 'hi');
+  return en === phrase.en && hi === phrase.hi ? phrase : { ...phrase, en, hi };
+};
+
+const phrasesMatch = (first: Phrase[] | undefined, second: Phrase[]) => {
+  if (!first || first.length !== second.length) return false;
+  return second.every((phrase, index) => first[index]?.en === phrase.en && first[index]?.hi === phrase.hi);
+};
+
+const clonePhrases = (phrases: Phrase[]) => phrases.map(phrase => ({ ...phrase }));
+
+const relatedIdsMatch = (first: string[] | undefined, second: string[]) => {
+  if (!first || first.length !== second.length) return false;
+  return second.every((id, index) => first[index] === id);
+};
+
+const normalizeQuickWordRelatedIds = (word: QuickWord): QuickWord => {
+  if (!word.relatedWordIds?.length) return word;
+
+  const relatedWordIds = word.relatedWordIds
+    .filter(id => word.id !== 'medical_severe_pain' || (id !== 'daily_pain' && id !== 'daily_ac'))
+    .map(id => id === 'daily_pain' ? 'daily_ac' : id);
+  const uniqueRelatedWordIds = Array.from(new Set(relatedWordIds));
+
+  return relatedIdsMatch(word.relatedWordIds, uniqueRelatedWordIds)
+    ? word
+    : { ...word, relatedWordIds: uniqueRelatedWordIds };
+};
 
 export class CustomizationService {
   private data: CustomizationData;
@@ -33,7 +154,9 @@ export class CustomizationService {
   private loaded = false;
 
   constructor() {
-    this.data = this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true);
+    this.data = this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
+      this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true)
+    )));
   }
 
   // ============================================
@@ -77,6 +200,14 @@ export class CustomizationService {
       coreWords: (savedQW as any).coreWords ?? defaults.quickWords.coreWords,
     };
 
+    const shouldMigratePeople =
+      Array.isArray(saved.people) &&
+      saved.people.length > 0 &&
+      saved.people.some(person =>
+        LEGACY_PEOPLE_NAMES.has(person.name)
+        || ['Son', 'Daughter', 'Wife', 'Husband', 'Friend'].includes(person.role)
+      );
+
     const merged: CustomizationData = {
       ...defaults,
       ...saved,
@@ -85,7 +216,7 @@ export class CustomizationService {
       // Deep merge quickWords to preserve coreWords and other new fields
       quickWords: mergedQuickWords,
       // Ensure arrays default to defaults if not present in saved data
-      people: saved.people ?? defaults.people,
+      people: shouldMigratePeople ? defaults.people : (saved.people ?? defaults.people),
       phraseCategories: saved.phraseCategories ?? defaults.phraseCategories,
       medicalSections: saved.medicalSections ?? defaults.medicalSections,
       homeQuickActions: saved.homeQuickActions ?? defaults.homeQuickActions,
@@ -98,7 +229,176 @@ export class CustomizationService {
       version: saved.version ?? defaults.version,
     };
 
-    return this.applyCareContentArchitecture(merged, (saved.version ?? 1) < CARE_CONTENT_ARCHITECTURE_VERSION);
+    return this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
+      this.applyCareContentArchitecture(merged, (saved.version ?? 1) < CARE_CONTENT_ARCHITECTURE_VERSION)
+    )));
+  }
+
+  private applyMedicalLabelUpdates(data: CustomizationData): CustomizationData {
+    let didUpdate = false;
+
+    const medicalSections = data.medicalSections.map(section => {
+      let sectionUpdated = false;
+      const items = section.items.map(item => {
+        const update = MEDICAL_LABEL_UPDATES[item.en];
+        if (!update) return item;
+
+        didUpdate = true;
+        sectionUpdated = true;
+        return { ...item, ...update };
+      });
+
+      return sectionUpdated ? { ...section, items } : section;
+    });
+
+    return didUpdate ? { ...data, medicalSections } : data;
+  }
+
+  private applyPhraseCategoryUpdates(data: CustomizationData): CustomizationData {
+    const phraseCategories = data.phraseCategories.map(category => {
+      let categoryUpdated = false;
+      const phrases = category.phrases.map(phrase => {
+        const normalized = normalizePhrasePoliteness(phrase);
+        if (normalized !== phrase) categoryUpdated = true;
+        return normalized;
+      });
+
+      return categoryUpdated ? { ...category, phrases } : category;
+    });
+
+    const didUpdate = phraseCategories.some((category, index) => category !== data.phraseCategories[index]);
+    return didUpdate ? { ...data, phraseCategories } : data;
+  }
+
+  private applyQuickWordPhraseUpdates(data: CustomizationData): CustomizationData {
+    const categories = data.quickWords.categories.map(category => {
+      let categoryUpdated = false;
+      const words = category.words.map(word => {
+        if (word.id === 'daily_fan_ac') {
+          const relatedWordIds = ['daily_ac', 'daily_blanket', 'daily_water'];
+          const didChange = word.en !== 'Fan'
+            || word.hi !== 'पंखा'
+            || !phrasesMatch(word.phrases, DAILY_FAN_PHRASES)
+            || !relatedIdsMatch(word.relatedWordIds, relatedWordIds);
+
+          if (!didChange) return word;
+
+          categoryUpdated = true;
+          return {
+            ...word,
+            en: 'Fan',
+            hi: 'पंखा',
+            relatedWordIds,
+            phrases: clonePhrases(DAILY_FAN_PHRASES),
+          };
+        }
+
+        if (word.id === 'daily_pain' || word.id === 'daily_ac') {
+          const relatedWordIds = ['daily_fan_ac', 'daily_blanket', 'daily_water'];
+          const didChange = word.id !== 'daily_ac'
+            || word.en !== 'AC'
+            || word.hi !== 'एसी'
+            || !phrasesMatch(word.phrases, DAILY_AC_PHRASES)
+            || !relatedIdsMatch(word.relatedWordIds, relatedWordIds);
+
+          if (!didChange) return word;
+
+          categoryUpdated = true;
+          return {
+            ...word,
+            id: 'daily_ac',
+            en: 'AC',
+            hi: 'एसी',
+            relatedWordIds,
+            phrases: clonePhrases(DAILY_AC_PHRASES),
+          };
+        }
+
+        if (word.id === 'daily_toilet') {
+          const relatedWordIds = ['daily_ac', 'daily_water', 'daily_blanket'];
+          const didChange = !phrasesMatch(word.phrases, DAILY_TOILET_PHRASES)
+            || !relatedIdsMatch(word.relatedWordIds, relatedWordIds);
+
+          if (!didChange) return word;
+
+          categoryUpdated = true;
+          return {
+            ...word,
+            relatedWordIds,
+            phrases: clonePhrases(DAILY_TOILET_PHRASES),
+          };
+        }
+
+        const positionUpdate = word.id ? POSITION_WORD_UPDATES[word.id] : undefined;
+        if (positionUpdate) {
+          const didChange = word.en !== positionUpdate.en
+            || word.hi !== positionUpdate.hi
+            || !phrasesMatch(word.phrases, positionUpdate.phrases);
+
+          if (!didChange) return word;
+
+          categoryUpdated = true;
+          return {
+            ...word,
+            en: positionUpdate.en,
+            hi: positionUpdate.hi,
+            phrases: clonePhrases(positionUpdate.phrases),
+          };
+        }
+
+        const directUpdate = word.id ? DIRECT_QUICK_WORD_UPDATES[word.id] : undefined;
+        if (directUpdate) {
+          const didChange = word.en !== directUpdate.en
+            || word.hi !== directUpdate.hi
+            || Boolean(word.phrases?.length);
+
+          if (!didChange) return word;
+
+          categoryUpdated = true;
+          const { phrases: _phrases, ...wordWithoutPhrases } = word;
+          return { ...wordWithoutPhrases, ...directUpdate };
+        }
+
+        if (word.id === 'medical_severe_pain') {
+          const normalizedWord = normalizeQuickWordRelatedIds(word);
+          if (phrasesMatch(normalizedWord.phrases, SEVERE_PAIN_PHRASES) && normalizedWord === word) return word;
+
+          categoryUpdated = true;
+          return { ...normalizedWord, phrases: clonePhrases(SEVERE_PAIN_PHRASES) };
+        }
+
+        if (word.id === 'medical_chest_nebulization') {
+          if (phrasesMatch(word.phrases, CHEST_NEBULIZATION_PHRASES)) return word;
+
+          categoryUpdated = true;
+          return { ...word, phrases: clonePhrases(CHEST_NEBULIZATION_PHRASES) };
+        }
+
+        const omissions = word.id ? QUICK_WORD_PHRASE_OMISSIONS[word.id] : undefined;
+        const replacements = word.id ? QUICK_WORD_PHRASE_REPLACEMENTS[word.id] : undefined;
+        const normalizedWord = normalizeQuickWordRelatedIds(word);
+        const wordPhrases = normalizedWord.phrases;
+        if (!wordPhrases?.length) {
+          if (normalizedWord !== word) categoryUpdated = true;
+          return normalizedWord;
+        }
+
+        const phrases = wordPhrases
+          .filter(phrase => !omissions?.has(phrase.en))
+          .map(phrase => normalizePhrasePoliteness(replacements?.[phrase.en] ?? phrase));
+        const didChangePhrases = phrases.length !== wordPhrases.length
+          || phrases.some((phrase, index) => phrase !== wordPhrases[index]);
+        if (!didChangePhrases && normalizedWord === word) return word;
+
+        categoryUpdated = true;
+        return { ...normalizedWord, phrases };
+      });
+
+      return categoryUpdated ? { ...category, words } : category;
+    });
+
+    const didUpdate = categories.some((category, index) => category !== data.quickWords.categories[index]);
+    return didUpdate ? { ...data, quickWords: { ...data.quickWords, categories } } : data;
   }
 
   private applyCareContentArchitecture(data: CustomizationData, force: boolean): CustomizationData {

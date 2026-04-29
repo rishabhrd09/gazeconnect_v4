@@ -8,7 +8,7 @@
  * - Clear, Large Fonts
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { darkColors, lightColors, screenThemes } from '../utils/design';
+import { darkColors, lightColors, mixColors, screenThemes } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -43,7 +43,7 @@ const AlexaIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, col
 const SELECTED_COLOR = screenThemes.activities.selectedColor;
 const SIDEBAR_BG = screenThemes.activities.sidebarBg;
 const ACCENT_TEAL = screenThemes.activities.accentTeal;
-const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Inter', 'Segoe UI', system-ui, sans-serif";
+const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 const HINDI_UI_FONT = "'Noto Sans Devanagari', 'Mukta', 'Mangal', 'Segoe UI', sans-serif";
 
 // Icon mapping for activity categories
@@ -124,14 +124,14 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
   const isWarmMode = isDarkMode && !isLight;
   const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
   const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardBg = isMix ? '#C4B28E' : isWarmMode ? screenThemes.activities.cardBg : colors.background.secondary;
-  const cardText = isMix ? '#23180C' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardBorder = isMix ? '1.5px solid rgba(91,74,51,0.42)' : isWarmMode ? screenThemes.activities.cardBorder : `1.5px solid ${colors.border.light}`;
-  const categoryCardBg = isMix ? '#C4B28E' : isWarmMode ? '#20221E' : colors.background.secondary;
-  const categoryBorder = isMix ? '1.5px solid rgba(91,74,51,0.42)' : isWarmMode ? '1.5px solid rgba(213,216,188,0.16)' : `1.5px solid ${colors.border.light}`;
+  const cardBg = isMix ? mixColors.home.tileSurfaces.ac : isWarmMode ? screenThemes.activities.cardBg : colors.background.secondary;
+  const cardText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? screenThemes.activities.cardBorder : `1.5px solid ${colors.border.light}`;
+  const categoryCardBg = isMix ? mixColors.home.tileSurfaces.ac : isWarmMode ? '#20221E' : colors.background.secondary;
+  const categoryBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? '1.5px solid rgba(213,216,188,0.16)' : `1.5px solid ${colors.border.light}`;
   const categoryAccent = isMix ? '#6A4D34' : isWarmMode ? SELECTED_COLOR : lightColors.warning.main;
-  const categoryText = isMix ? '#23180C' : titleText;
-  const cardShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const categoryText = isMix ? mixColors.home.text : titleText;
+  const cardShadow = isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
 
   const activeCategory = selectedCategory
     ? (activityCategories.find(c => c.id === selectedCategory) || null)
@@ -263,11 +263,9 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
           <div style={{
             flex: 1,
             minHeight: 0,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-            gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
-            gap: 'clamp(16px, 2.1vh, 26px)',
-            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'clamp(16px, 2vh, 22px)',
           }}>
             <GazeButton
               id="act-back"
@@ -278,38 +276,38 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
               style={{
-                width: '100%',
-                height: '100%',
-                minHeight: 0,
+                alignSelf: 'flex-start',
+                width: 'clamp(220px, 22vw, 300px)',
+                height: 'clamp(84px, 10vh, 108px)',
                 background: isMix ? '#2B251B' : isWarmMode ? '#20221E' : lightColors.background.secondary,
-                border: isMix ? '1.5px solid rgba(180,147,98,0.52)' : isWarmMode ? '1.5px solid rgba(143,174,114,0.42)' : `1.5px solid ${lightColors.border.main}`,
-                borderRadius: '18px',
+                border: isMix ? '1.5px solid rgba(124,100,69,0.52)' : isWarmMode ? '1.5px solid rgba(143,174,114,0.32)' : `1.5px solid ${lightColors.border.main}`,
+                borderRadius: '20px',
                 boxShadow: cardShadow,
                 display: 'grid',
-                gridTemplateColumns: '38% 62%',
+                gridTemplateColumns: '64px 1fr',
                 alignItems: 'center',
-                padding: 'clamp(18px, 2.4vh, 30px) clamp(22px, 2vw, 36px)',
-                columnGap: 'clamp(14px, 1.6vw, 26px)',
+                padding: '0 22px',
+                columnGap: '14px',
               }}
             >
               <div style={{
-                width: 'clamp(58px, 5.2vw, 92px)',
-                height: 'clamp(58px, 5.2vw, 92px)',
-                borderRadius: '22px',
+                width: 50,
+                height: 50,
+                borderRadius: '16px',
                 border: `1.5px solid ${isMix ? '#D9C894' : isWarmMode ? '#8FAE72' : lightColors.border.strong}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 justifySelf: 'center',
               }}>
-                <svg width="54%" height="54%" viewBox="0 0 24 24" fill="none" stroke={isMix ? '#F0E2C4' : isWarmMode ? '#DDE4D0' : lightColors.text.primary} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="56%" height="56%" viewBox="0 0 24 24" fill="none" stroke={isMix ? '#F0E2C4' : isWarmMode ? '#DDE4D0' : lightColors.text.primary} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 12H5" />
                   <path d="M12 19l-7-7 7-7" />
                 </svg>
               </div>
               <span style={{
-                fontSize: 'clamp(28px, 3.2vh, 44px)',
-                fontWeight: 820,
+                fontSize: 'clamp(24px, 2.7vh, 34px)',
+                fontWeight: 760,
                 color: isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary,
                 textAlign: 'left',
                 fontFamily: ENGLISH_UI_FONT,
@@ -318,7 +316,16 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
               </span>
             </GazeButton>
 
-            {items.slice(0, 11).map((item, idx) => (
+            <div style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
+              gap: 'clamp(16px, 2.1vh, 26px)',
+              overflow: 'hidden',
+            }}>
+              {items.slice(0, 9).map((item, idx) => (
               <GazeButton
                 key={idx}
                 id={`act-${selectedCategory}-${idx}`}
@@ -335,9 +342,9 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                   padding: 'clamp(18px, 2.4vh, 30px) clamp(16px, 1.8vw, 28px)',
                   background: cardBg,
                   border: activatedIdx === idx ? `2px solid ${isMix ? '#8B6F49' : isWarmMode ? '#D6C98E' : colors.accent.main}` : cardBorder,
-                  borderRadius: '18px',
+                  borderRadius: '20px',
                   boxShadow: activatedIdx === idx
-                    ? (isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)')
+                    ? (isMix ? mixColors.home.cardShadow : isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)')
                     : cardShadow,
                   display: 'flex',
                   flexDirection: 'column',
@@ -375,8 +382,9 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                     </span>
                   </>
                 )}
-              </GazeButton>
-            ))}
+                </GazeButton>
+              ))}
+            </div>
           </div>
         )}
       </div>
