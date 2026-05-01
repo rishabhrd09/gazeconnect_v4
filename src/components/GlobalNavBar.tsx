@@ -47,8 +47,8 @@ interface GlobalNavBarProps {
 }
 
 const navIconStyle: React.CSSProperties = {
-    width: 'clamp(19px, 2.4vh, 26px)',
-    height: 'clamp(19px, 2.4vh, 26px)',
+    width: 'clamp(22px, 2.8vh, 32px)',
+    height: 'clamp(22px, 2.8vh, 32px)',
     flexShrink: 0,
 };
 
@@ -156,6 +156,16 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)
     const isKbOrSpatial = currentPage === 'keyboard' || currentPage === 'spatial';
+    const standardNavTargetHeight = compact ? 'clamp(60px, 8.2vh, 88px)' : 'clamp(94px, 12.8vh, 134px)';
+    const standardNavTextSize = compact ? 'clamp(18px, 2.35vh, 24px)' : 'clamp(19px, 2.55vh, 27px)';
+    const standardNavIconSize = compact ? 'clamp(18px, 2.35vh, 25px)' : 'clamp(20px, 2.65vh, 29px)';
+    const standardGazeToggleSize = compact ? 'clamp(106px, 12.6vh, 132px)' : 'clamp(112px, 13.8vh, 140px)';
+    const keyboardNavTargetHeight = 'clamp(140px, 14.5vh, 154px)';
+    const keyboardGazeToggleSize = 'clamp(146px, 15vh, 160px)';
+    const keyboardNavTextSize = 'clamp(20px, 2.6vh, 28px)';
+    const keyboardNavIconSize = 'clamp(20px, 2.65vh, 28px)';
+    const compassNavTargetHeight = 'clamp(96px, 12vh, 140px)';
+    const compassNavTextSize = 'clamp(19px, 2.65vh, 27px)';
     // Compass map screen gets extra-tall, wide buttons with dead zones
     const isCompassMap = currentPage === 'compass-map';
 
@@ -212,20 +222,18 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
         if (isEmergency) {
             return {
                 padding: compact
-                    ? 'clamp(6px, 1vh, 10px) clamp(14px, 2vw, 24px)'
-                    : 'clamp(8px, 1.2vh, 14px) clamp(18px, 2.5vw, 32px)',
+                    ? 'clamp(8px, 1.1vh, 12px) clamp(16px, 2vw, 26px)'
+                    : 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 34px)',
                 backgroundColor: useHomeNavPalette ? homeEmergencyStyle.background : isDarkMode ? 'rgba(140, 50, 50, 0.35)' : lightColors.emergency.main,
                 border: useHomeNavPalette ? `1.5px solid ${homeEmergencyStyle.border}` : isDarkMode ? '2px solid rgba(180, 70, 70, 0.50)' : `1.5px solid ${lightColors.emergency.hover}`,
                 borderRadius: 'clamp(14px, 2vh, 20px)',
                 color: useHomeNavPalette ? homeEmergencyStyle.text : isDarkMode ? '#D08080' : lightColors.text.inverse,
-                fontSize: 'clamp(16px, 2vh, 21px)',
+                fontSize: isKbOrSpatial ? 'clamp(18px, 2.35vh, 24px)' : standardNavTextSize,
                 fontWeight: 900 as const,
                 cursor: 'pointer',
-                minHeight: isCompassMap ? 'clamp(90px, 11vh, 130px)' : isKbOrSpatial ? '118px' : (compact
-                    ? 'clamp(58px, 8vh, 80px)'
-                    : 'clamp(82px, 12vh, 120px)'),
-                ...(isKbOrSpatial ? { height: '118px' } : {}),
-                ...(isCompassMap ? { height: 'clamp(90px, 11vh, 130px)' } : {}),
+                minHeight: isCompassMap ? compassNavTargetHeight : isKbOrSpatial ? keyboardNavTargetHeight : standardNavTargetHeight,
+                ...(isKbOrSpatial ? { height: keyboardNavTargetHeight } : {}),
+                ...(isCompassMap ? { height: compassNavTargetHeight } : {}),
                 minWidth: isCompassMap
                     ? 'clamp(140px, 14vw, 220px)'
                     : (compact
@@ -250,19 +258,17 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 : (compact
                     ? 'clamp(12px, 1.8vh, 18px) clamp(16px, 2.2vw, 32px)'
                     : 'clamp(16px, 2.3vh, 26px) clamp(22px, 3.2vw, 42px)'),
-            fontSize: isCompassMap ? 'clamp(18px, 2.5vh, 25px)' : 'clamp(17px, 2.3vh, 23px)',
+            fontSize: isCompassMap ? compassNavTextSize : isKbOrSpatial ? keyboardNavTextSize : standardNavTextSize,
             fontWeight: isCurrentPage ? 700 : 600,
             cursor: 'pointer',
-            minHeight: isCompassMap ? 'clamp(90px, 11vh, 130px)' : isKbOrSpatial ? '118px' : (compact
-                ? 'clamp(50px, 7vh, 72px)'
-                : 'clamp(82px, 12vh, 120px)'),
-            ...(isKbOrSpatial ? { height: '118px' } : {}),
-            ...(isCompassMap ? { height: 'clamp(90px, 11vh, 130px)' } : {}),
+            minHeight: isCompassMap ? compassNavTargetHeight : isKbOrSpatial ? keyboardNavTargetHeight : standardNavTargetHeight,
+            ...(isKbOrSpatial ? { height: keyboardNavTargetHeight } : {}),
+            ...(isCompassMap ? { height: compassNavTargetHeight } : {}),
             minWidth: isCompassMap
                 ? 'clamp(120px, 11vw, 190px)'
                 : isKbOrSpatial
-                    ? (compact ? 'clamp(100px, 10vw, 160px)' : 'clamp(140px, 14vw, 230px)')
-                    : (compact ? 'clamp(90px, 9vw, 140px)' : 'clamp(120px, 12vw, 200px)'),
+                    ? (compact ? 'clamp(110px, 10.5vw, 170px)' : 'clamp(150px, 14.5vw, 244px)')
+                    : (compact ? 'clamp(98px, 9.5vw, 152px)' : 'clamp(132px, 12.5vw, 218px)'),
             background: isCurrentPage
                 ? navigationColors.activeBackground
                 : isBackButton
@@ -305,13 +311,14 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 data-gaze-screen={currentPage}
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr auto 1fr',
+                    gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
                     alignItems: 'center',
+                    columnGap: isKbOrSpatial ? 'clamp(30px, 3.6vw, 68px)' : 'clamp(18px, 2.4vw, 44px)',
                     padding: compact
-                        ? 'clamp(8px, 1.2vh, 14px) clamp(16px, 2vw, 30px) clamp(10px, 1.5vh, 18px)'
+                        ? 'clamp(9px, 1.3vh, 16px) clamp(16px, 2vw, 30px) clamp(12px, 1.6vh, 20px)'
                         : isKbOrSpatial
-                            ? 'clamp(6px, 1vh, 10px) clamp(20px, 2.5vw, 36px) clamp(10px, 1.5vh, 16px)'
-                            : 'clamp(10px, 1.5vh, 16px) clamp(20px, 2.5vw, 36px) clamp(14px, 2vh, 24px)',
+                            ? 'clamp(8px, 1.1vh, 12px) clamp(20px, 2.5vw, 36px) clamp(12px, 1.6vh, 18px)'
+                            : 'clamp(12px, 1.7vh, 18px) clamp(20px, 2.5vw, 36px) clamp(16px, 2.2vh, 26px)',
                     marginBottom: '0px',
                     marginTop: compact
                         ? 'clamp(6px, 1vh, 14px)'
@@ -325,7 +332,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 }}>
 
 
-                <div style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: currentPage === 'keyboard' ? 'clamp(30px, 4vw, 60px)' : currentPage === 'home' ? 'clamp(120px, 14vw, 220px)' : 'clamp(80px, 10vw, 160px)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-start', minWidth: 0, paddingLeft: currentPage === 'keyboard' ? 'clamp(8px, 1.4vw, 24px)' : currentPage === 'home' ? 'clamp(96px, 12vw, 200px)' : 'clamp(72px, 9vw, 148px)' }}>
                     {/* EMERGENCY — rounded rect with icon + text label (AAC compliant) */}
                     <button
                         onClick={handleEmergency}
@@ -335,14 +342,14 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                         data-gaze-context="emergency"
                         style={getButtonStyle('__emergency__', true)}
                     >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'clamp(24px, 3.2vh, 36px)', height: 'clamp(24px, 3.2vh, 36px)', flexShrink: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'clamp(28px, 3.55vh, 40px)', height: 'clamp(28px, 3.55vh, 40px)', flexShrink: 0 }}>
                             <circle cx="12" cy="12" r="10" />
                             <line x1="12" y1="7" x2="12" y2="13" />
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                         </svg>
                         <span style={{
                             fontFamily: emergencyFontFamily,
-                            fontSize: 'clamp(18px, 2.35vh, 24px)',
+                            fontSize: 'clamp(20px, 2.6vh, 28px)',
                             fontWeight: 900,
                             letterSpacing: isDarkMode ? '0.14em' : '0.08em',
                             lineHeight: 1,
@@ -354,7 +361,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 </div>
 
                 {/* CENTER CELL - Navigation Pill */}
-                <div style={{ display: 'flex', justifyContent: 'center', ...(currentPage === 'keyboard' ? { marginLeft: 'clamp(-110px, -11vw, -170px)' } : currentPage === 'spatial' ? { marginLeft: 'clamp(-30px, -3vw, -50px)' } : isCompassMap ? { marginLeft: 'clamp(-50px, -5vw, -80px)' } : {}) }}>
+                <div style={{ display: 'flex', justifyContent: 'center', minWidth: 0, ...(currentPage === 'keyboard' ? { marginLeft: 'clamp(-96px, -6vw, -64px)' } : currentPage === 'spatial' ? { marginLeft: 'clamp(-42px, -3vw, -22px)' } : isCompassMap ? { marginLeft: 'clamp(-72px, -4vw, -36px)' } : {}) }}>
                     {currentPage === 'home' ? (
                         <div
                             aria-hidden="true"
@@ -404,7 +411,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         ...focusDisabledStyle,
                                     }}
                                 >
-                                    <span style={{ fontSize: 'clamp(14px, 2vh, 20px)' }}>←</span>
+                                    <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>←</span>
                                     Back
                                 </button>
                             )}
@@ -421,7 +428,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         ...focusDisabledStyle,
                                     }}
                                 >
-                                    <span style={{ fontSize: 'clamp(14px, 2vh, 20px)' }}>←</span>
+                                    <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>←</span>
                                     Back
                                 </button>
                             )}
@@ -440,7 +447,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 style={{ ...getButtonStyle('home'), ...focusDisabledStyle }}
                             >
                                 <HomeNavIcon />
-                                <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)' }}>🏠</span>
+                                <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>🏠</span>
                                 Home
                             </button>
 
@@ -465,7 +472,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                             style={{ ...getButtonStyle('keyboard'), ...focusDisabledStyle }}
                                         >
                                             <KeyboardNavIcon />
-                                            <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)' }}>⌨️</span>
+                                            <span style={{ fontSize: keyboardNavIconSize }}>⌨️</span>
                                             Keyboard
                                         </button>
                                     )}
@@ -479,7 +486,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('spatial'), ...focusDisabledStyle }}
                                         >
-                                            <span style={{ fontSize: 'clamp(15px, 2vh, 20px)' }}>🔲</span>
+                                            <span style={{ fontSize: keyboardNavIconSize }}>🔲</span>
                                             Zone Board
                                         </button>
                                     )}
@@ -495,7 +502,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         data-gaze-context="navigation"
                                         style={{ ...getButtonStyle('quick-words'), ...focusDisabledStyle }}
                                     >
-                                        <span style={{ fontSize: 'clamp(15px, 2vh, 20px)' }}>💬</span>
+                                        <span style={{ fontSize: keyboardNavIconSize }}>💬</span>
                                         Quick Words
                                     </button>
                                 </>
@@ -513,7 +520,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         style={{ ...getButtonStyle('keyboard'), ...focusDisabledStyle }}
                                     >
                                         <KeyboardNavIcon />
-                                        <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)' }}>⌨️</span>
+                                        <span style={{ fontSize: standardNavIconSize }}>⌨️</span>
                                         Keyboard
                                     </button>
 
@@ -526,7 +533,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('spatial'), ...focusDisabledStyle }}
                                         >
-                                            <span style={{ fontSize: 'clamp(15px, 2vh, 20px)' }}>🔲</span>
+                                            <span style={{ fontSize: standardNavIconSize }}>🔲</span>
                                             Zone Board
                                         </button>
                                     )}
@@ -550,7 +557,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         ...focusDisabledStyle,
                                     }}
                                 >
-                                    <span style={{ fontSize: 'clamp(15px, 2vh, 20px)' }}>🔄</span>
+                                    <span style={{ fontSize: isCompassMap ? compassNavTextSize : standardNavIconSize }}>🔄</span>
                                     Restart Maps
                                 </button>
                             )}
@@ -564,12 +571,13 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     display: 'flex',
                     justifyContent: showMoreToggle ? 'flex-end' : 'center',
                     alignItems: 'center',
+                    minWidth: 0,
                     gap: showMoreToggle ? 'clamp(8px, 1vw, 14px)' : 'clamp(18px, 2.5vw, 36px)',
                 }}>
                     {/* GAZE TOGGLE — spatial: keyboard-style hub with vertical lines; others: circle */}
                     {currentPage === 'spatial' ? (
                         <div style={{
-                            display: 'flex', alignItems: 'stretch', height: '118px',
+                            display: 'flex', alignItems: 'stretch', height: keyboardNavTargetHeight,
                             minWidth: 'clamp(160px, 18vw, 240px)',
                         }}>
                             {/* Left vertical line */}
@@ -598,8 +606,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             >
                                 {/* Visual circle hub */}
                                 <div style={{
-                                    width: 'clamp(90px, 11vh, 110px)',
-                                    height: 'clamp(90px, 11vh, 110px)',
+                                    width: 'clamp(98px, 12vh, 122px)',
+                                    height: 'clamp(98px, 12vh, 122px)',
                                     borderRadius: '50%', margin: 0, flexShrink: 0,
                                     display: 'flex', flexDirection: 'column',
                                     alignItems: 'center', justifyContent: 'center', gap: '2px',
@@ -629,7 +637,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     }} />
                                     {/* Label */}
                                     <span style={{
-                                        fontSize: 'clamp(12px, 1.35vh, 15px)', fontWeight: 900,
+                                        fontSize: 'clamp(13px, 1.5vh, 17px)', fontWeight: 900,
                                         letterSpacing: '1.6px',
                                         color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
                                         textTransform: 'uppercase', zIndex: 2, marginTop: '1px',
@@ -664,9 +672,9 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 boxShadow: isGazeEnabled ? navigationColors.gazeGlow : 'none',
                                 borderRadius: '50%',
                                 color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
-                                width: isKbOrSpatial ? '128px' : 'clamp(104px, 13vh, 128px)',
-                                height: isKbOrSpatial ? '128px' : 'clamp(104px, 13vh, 128px)',
-                                minWidth: isKbOrSpatial ? '128px' : 'clamp(104px, 13vh, 128px)',
+                                width: isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize,
+                                height: isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize,
+                                minWidth: isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize,
                                 cursor: 'pointer',
                                 display: 'flex',
                                 flexDirection: 'column' as const,
@@ -678,13 +686,16 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             }}
                         >
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"
-                                style={{ width: 'clamp(34px, 4.4vh, 46px)', height: 'clamp(34px, 4.4vh, 46px)' }}
+                                style={{
+                                    width: isKbOrSpatial ? 'clamp(38px, 4.8vh, 54px)' : 'clamp(36px, 4.6vh, 50px)',
+                                    height: isKbOrSpatial ? 'clamp(38px, 4.8vh, 54px)' : 'clamp(36px, 4.6vh, 50px)',
+                                }}
                             >
                                 <circle cx="12" cy="12" r="10" />
                                 <circle cx="12" cy="12" r="3" fill={isGazeEnabled ? navigationColors.gazeBorderOn : "none"} />
                             </svg>
                             <span style={{
-                                fontSize: 'clamp(13px, 1.45vh, 16px)',
+                                fontSize: isKbOrSpatial ? 'clamp(14px, 1.65vh, 18px)' : 'clamp(14px, 1.55vh, 17px)',
                                 fontWeight: 900,
                                 letterSpacing: '1.6px',
                                 color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
@@ -708,13 +719,13 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             onClick={onMoreToggle}
                             style={{
                                 minWidth: 'clamp(180px, 18vw, 280px)',
-                                minHeight: isKbOrSpatial ? '118px' : 'clamp(82px, 12vh, 120px)',
-                                ...(isKbOrSpatial ? { height: '118px' } : {}),
+                                minHeight: isKbOrSpatial ? keyboardNavTargetHeight : standardNavTargetHeight,
+                                ...(isKbOrSpatial ? { height: keyboardNavTargetHeight } : {}),
                                 borderRadius: '14px',
                                 border: `2px solid ${navigationColors.auxiliaryBorder}`,
                                 backgroundColor: navigationColors.auxiliaryBackground,
                                 color: colors.text.primary,
-                                fontSize: 'clamp(17px, 2.3vh, 23px)',
+                                fontSize: isKbOrSpatial ? keyboardNavTextSize : standardNavTextSize,
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -727,7 +738,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             }}
                         >
                             FULL SCREEN
-                            <span style={{ fontSize: 'clamp(15px, 2vh, 20px)' }}>↓</span>
+                            <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>↓</span>
                         </button>
                     )}
 
@@ -743,8 +754,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 background: navigationColors.auxiliaryBackground,
                                 border: `2px solid ${isNavHidden ? colors.accent.main : navigationColors.auxiliaryBorder}`,
                                 borderRadius: '24px',
-                                minHeight: compact ? 'clamp(50px, 7vh, 72px)' : 'clamp(70px, 11vh, 110px)',
-                                minWidth: compact ? 'clamp(110px, 11vw, 150px)' : 'clamp(130px, 13vw, 180px)',
+                                minHeight: standardNavTargetHeight,
+                                minWidth: compact ? 'clamp(118px, 11.5vw, 166px)' : 'clamp(146px, 13.5vw, 204px)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -753,10 +764,10 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 padding: '0 clamp(16px, 2vw, 24px)',
                             }}
                         >
-                            <span style={{ fontSize: 'clamp(16px, 2.2vh, 22px)', fontWeight: 600 }}>
+                            <span style={{ fontSize: standardNavTextSize, fontWeight: 600 }}>
                                 {isNavHidden ? 'SHOW' : 'HIDE'}
                             </span>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'clamp(20px, 2.8vh, 26px)', height: 'clamp(20px, 2.8vh, 26px)' }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: standardNavIconSize, height: standardNavIconSize }}>
                                 {isNavHidden ? <polyline points="6 9 12 15 18 9" /> : <polyline points="18 15 12 9 6 15" />}
                             </svg>
                         </button>

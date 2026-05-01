@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-const HIDDEN_SCREENS = new Set<string>(['quickwords']);
+const HIDDEN_SCREENS = new Set<string>(['quickwords', 'keyboard', 'spatial']);
 const UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 
 interface LiveClockProps {

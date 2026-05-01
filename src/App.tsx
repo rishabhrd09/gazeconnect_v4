@@ -451,8 +451,8 @@ const InnerApp: React.FC = () => {
         </ErrorBoundary>
       </div>
 
-      {/* Persistent Emergency Button — always visible, all screens */}
-      {currentScreen !== 'home' && currentScreen !== 'quickwords' && (
+      {/* Persistent Emergency Button — hidden on screens with their own large emergency/nav affordance */}
+      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && (
         <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} emergencyDwellTime={emergencyDwellTime || 1200} />
       )}
 

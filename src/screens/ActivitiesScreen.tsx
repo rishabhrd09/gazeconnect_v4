@@ -14,28 +14,48 @@ import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { TVIcon as HomeActivityIcon } from '../components/icons/Icons';
 
 // Custom Icons for Sidebar
 const TvIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, color = 'currentColor' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
-    <polyline points="17 2 12 7 7 2" />
-  </svg>
+  <HomeActivityIcon size={size} color={color} strokeWidth={2.1} />
 );
 
 const YoutubeIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, color = 'currentColor' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" />
-    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill={color} stroke="none" />
+  <svg width={size} height={size} viewBox="0 0 96 96" fill="none" stroke={color} strokeWidth="5.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="17" y="30" width="62" height="38" rx="13" />
+    <path d="M43 41l17 9-17 9V41z" />
   </svg>
 );
 
 const AlexaIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, color = 'currentColor' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
-    <line x1="12" y1="8" x2="12" y2="16" />
-    <line x1="8" y1="12" x2="16" y2="12" />
+  <svg width={size} height={size} viewBox="0 0 96 96" fill="none" aria-hidden="true">
+    <path
+      d="M35 22v40.5c-3-1.8-7.2-2.3-11.2-1.1-7 2-11.4 7.5-9.9 12.4 1.5 4.8 8.4 7.1 15.4 5.1 6.1-1.8 10.3-6.3 10.3-10.8V39.4l33-7.2v23.2c-3-1.8-7.2-2.3-11.2-1.1-7 2-11.4 7.5-9.9 12.4 1.5 4.8 8.4 7.1 15.4 5.1 6.1-1.8 10.3-6.3 10.3-10.8V17.5L35 27v-5z"
+      fill={color}
+    />
+  </svg>
+);
+
+const WebIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 96 96" fill="none" stroke={color} strokeWidth="5.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="48" cy="48" r="31" />
+    <path d="M17 48h62" />
+    <path d="M48 17c10 11.5 15 21.8 15 31s-5 19.5-15 31" />
+    <path d="M48 17c-10 11.5-15 21.8-15 31s5 19.5 15 31" />
+    <path d="M26 29c6.4 4.1 13.8 6.2 22 6.2S63.6 33.1 70 29" opacity="0.48" />
+    <path d="M26 67c6.4-4.1 13.8-6.2 22-6.2S63.6 62.9 70 67" opacity="0.48" />
+  </svg>
+);
+
+const ActivityBackIcon: React.FC<{ size?: number; color?: string; strokeWidth?: number }> = ({
+  size = 132,
+  color = 'currentColor',
+  strokeWidth = 4,
+}) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M36.5 18.5 23 32l13.5 13.5" />
+    <path d="M24.5 32H49" />
   </svg>
 );
 
@@ -51,6 +71,16 @@ const CATEGORY_ICONS: Record<string, React.FC<any>> = {
   tv: TvIcon,
   youtube: YoutubeIcon,
   alexa: AlexaIcon,
+  web: WebIcon,
+};
+
+const getActivityLandingColor = (id: string, isMix: boolean, isWarmMode: boolean) => {
+  const palette = isMix
+    ? { tv: '#8B6D3F', youtube: '#77413D', alexa: '#879873', web: '#5E807E' }
+    : isWarmMode
+      ? { tv: '#92723D', youtube: '#7E413C', alexa: '#83936E', web: '#5B7D7B' }
+      : { tv: '#8A6A3A', youtube: '#7A403A', alexa: '#788966', web: '#587A78' };
+  return palette[id as keyof typeof palette] || palette.tv;
 };
 
 // Extracted to module scope to avoid re-creation on every render
@@ -123,20 +153,36 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
   const { isLight, isMix } = useTheme();
   const isWarmMode = isDarkMode && !isLight;
   const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
-  const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const titleText = isMix ? '#FFF0D2' : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const cardBg = isMix ? mixColors.home.tileSurfaces.ac : isWarmMode ? screenThemes.activities.cardBg : colors.background.secondary;
   const cardText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const cardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? screenThemes.activities.cardBorder : `1.5px solid ${colors.border.light}`;
-  const categoryCardBg = isMix ? mixColors.home.tileSurfaces.ac : isWarmMode ? '#20221E' : colors.background.secondary;
-  const categoryBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? '1.5px solid rgba(213,216,188,0.16)' : `1.5px solid ${colors.border.light}`;
+  const categoryCardBg = cardBg;
+  const categoryBorder = cardBorder;
   const categoryAccent = isMix ? '#6A4D34' : isWarmMode ? SELECTED_COLOR : lightColors.warning.main;
-  const categoryText = isMix ? mixColors.home.text : titleText;
+  const categoryText = cardText;
   const cardShadow = isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const backCardBg = isMix ? '#28321F' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#DCE2C8';
+  const backIconColor = isMix ? '#9DB384' : isWarmMode ? '#9CAF7E' : '#61714A';
 
   const activeCategory = selectedCategory
     ? (activityCategories.find(c => c.id === selectedCategory) || null)
     : null;
   const items = activeCategory?.items || [];
+  const landingCards = [
+    ...activityCategories.slice(0, 3).map(cat => ({
+      id: cat.id,
+      label: cat.name,
+      iconId: cat.id,
+      type: 'category' as const,
+    })),
+    {
+      id: 'web',
+      label: 'Web Browsing',
+      iconId: 'web',
+      type: 'web' as const,
+    },
+  ];
 
   const speakItem = useCallback((text: string, idx: number) => {
     onSpeak(text);
@@ -149,6 +195,12 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
     const Icon = CATEGORY_ICONS[categoryId] || TvIcon;
     return <Icon size={size} color={color} />;
   };
+  const getLandingIconSize = (categoryId: string) => (
+    categoryId === 'tv' ? 82 : categoryId === 'alexa' ? 108 : 122
+  );
+  const getLandingIconOpacity = (categoryId: string) => (
+    categoryId === 'youtube' ? 0.72 : categoryId === 'alexa' ? 0.76 : 0.78
+  );
 
   return (
     <div className={`activities-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
@@ -166,23 +218,23 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
-        padding: '0 clamp(56px, 5.5vw, 96px) clamp(72px, 8vh, 104px)',
+        padding: '0 clamp(44px, 5vw, 86px) clamp(86px, 10vh, 124px)',
         marginTop: 'clamp(18px, 2.2vh, 30px)',
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'clamp(12px, 1.1vw, 18px)',
-          marginBottom: 'clamp(18px, 2.4vh, 30px)',
+          gap: '14px',
+          marginBottom: 'clamp(18px, 2.4vh, 28px)',
         }}>
-          {activeCategory ? renderIcon(activeCategory.id, 40, categoryAccent) : <TvIcon size={40} color={categoryAccent} />}
+          {activeCategory && renderIcon(activeCategory.id, 40, categoryAccent)}
           <h2 style={{
             margin: 0,
-            fontSize: 'clamp(34px, 4.1vh, 52px)',
+            fontSize: 'clamp(32px, 4vh, 48px)',
             fontWeight: 820,
             color: titleText,
             fontFamily: ENGLISH_UI_FONT,
-            lineHeight: 1.05,
+            lineHeight: 1,
           }}>
             {activeCategory ? activeCategory.name : 'Activities'}
           </h2>
@@ -193,79 +245,111 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
             flex: 1,
             minHeight: 0,
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gridTemplateRows: 'minmax(clamp(260px, 34vh, 390px), 1fr)',
-            gap: 'clamp(22px, 2.8vw, 38px)',
-            alignItems: 'center',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridAutoRows: 'minmax(clamp(210px, 28vh, 310px), 1fr)',
+            gap: 'clamp(22px, 3vh, 34px)',
           }}>
-            {activityCategories.map((cat) => (
-              <GazeButton
-                key={cat.id}
-                id={`act-cat-${cat.id}`}
-                size="lg"
-                context="phrases"
-                onClick={() => { setSelectedCategory(cat.id); setActivatedIdx(null); }}
-                isDarkMode={isDarkMode}
-                gazeEnabled={isGazeEnabled}
-                gazeEnabledTimestamp={lastEnabledTimestamp}
-                contentFill
-                style={{
-                  width: '100%',
-                  height: 'clamp(260px, 34vh, 390px)',
-                  background: categoryCardBg,
-                  border: categoryBorder,
-                  borderRadius: '20px',
-                  boxShadow: cardShadow,
-                  padding: 0,
-                }}
-              >
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  alignItems: 'center',
-                  padding: 'clamp(28px, 3.4vh, 44px) clamp(36px, 3.4vw, 66px)',
-                  columnGap: 'clamp(24px, 2.6vw, 48px)',
-                }}>
-                  <div style={{
+            {landingCards.map((card) => {
+              const color = getActivityLandingColor(card.iconId, isMix, isWarmMode);
+              const handleClick = () => {
+                setActivatedIdx(null);
+                if (card.type === 'web') {
+                  onNavigate('web');
+                  return;
+                }
+                setSelectedCategory(card.id);
+              };
+
+              return (
+                <GazeButton
+                  key={card.id}
+                  id={card.type === 'web' ? 'act-cat-web' : `act-cat-${card.id}`}
+                  size="lg"
+                  context="phrases"
+                  onClick={handleClick}
+                  isDarkMode={isDarkMode}
+                  gazeEnabled={isGazeEnabled}
+                  gazeEnabledTimestamp={lastEnabledTimestamp}
+                  contentFill
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden',
                     width: '100%',
                     height: '100%',
+                    minHeight: 'clamp(210px, 28vh, 310px)',
+                    background: categoryCardBg,
+                    border: categoryBorder,
+                    borderRadius: '22px',
+                    boxShadow: cardShadow,
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    padding: 'clamp(24px, 3vh, 38px) clamp(36px, 4.5vw, 78px)',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute',
+                    left: 'clamp(34px, 3.2vw, 52px)',
+                    top: 'clamp(34px, 4vh, 54px)',
+                    bottom: 'clamp(34px, 4vh, 54px)',
+                    width: '2px',
+                    borderRadius: '999px',
+                    background: color,
+                    opacity: 0.56,
+                  }} />
+                  <div style={{
+                    flex: '0 0 34%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    paddingLeft: 'clamp(34px, 3.6vw, 60px)',
+                    background: 'transparent',
+                    border: 'none',
+                    boxShadow: 'none',
                   }}>
-                    {renderIcon(cat.id, 112, categoryAccent)}
+                    <div style={{
+                      opacity: getLandingIconOpacity(card.iconId),
+                      filter: isDarkMode ? 'drop-shadow(0 1px 0 rgba(255,255,255,0.025)) drop-shadow(0 8px 12px rgba(0,0,0,0.12))' : 'none',
+                      transform: 'translateZ(0)',
+                    }}>
+                      {renderIcon(card.iconId, getLandingIconSize(card.iconId), color)}
+                    </div>
                   </div>
                   <div style={{
-                    width: '100%',
-                    height: '100%',
+                    flex: '1 1 0',
+                    minWidth: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'flex-start',
+                    paddingLeft: 'clamp(10px, 1.6vw, 28px)',
                   }}>
                     <span style={{
-                      fontSize: 'clamp(34px, 3.7vh, 52px)',
-                      fontWeight: 850,
                       color: categoryText,
-                      textAlign: 'left',
-                      lineHeight: 1.08,
                       fontFamily: ENGLISH_UI_FONT,
+                      fontSize: 'clamp(30px, 3.7vh, 43px)',
+                      fontWeight: 820,
+                      lineHeight: 1.08,
+                      letterSpacing: '0',
+                      textAlign: 'left',
                     }}>
-                      {cat.name}
+                      {card.label}
                     </span>
                   </div>
-                </div>
-              </GazeButton>
-            ))}
+                </GazeButton>
+              );
+            })}
           </div>
         ) : (
           <div style={{
             flex: 1,
             minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'clamp(16px, 2vh, 22px)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
+            gap: 'clamp(16px, 2.1vh, 26px)',
+            overflow: 'hidden',
           }}>
             <GazeButton
               id="act-back"
@@ -275,57 +359,25 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
               isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
+              ariaLabel="Back to Activities categories"
               style={{
-                alignSelf: 'flex-start',
-                width: 'clamp(220px, 22vw, 300px)',
-                height: 'clamp(84px, 10vh, 108px)',
-                background: isMix ? '#2B251B' : isWarmMode ? '#20221E' : lightColors.background.secondary,
-                border: isMix ? '1.5px solid rgba(124,100,69,0.52)' : isWarmMode ? '1.5px solid rgba(143,174,114,0.32)' : `1.5px solid ${lightColors.border.main}`,
-                borderRadius: '20px',
+                width: '100%',
+                height: '100%',
+                minHeight: 0,
+                background: backCardBg,
+                border: 'none',
+                borderRadius: '18px',
                 boxShadow: cardShadow,
-                display: 'grid',
-                gridTemplateColumns: '64px 1fr',
-                alignItems: 'center',
-                padding: '0 22px',
-                columnGap: '14px',
-              }}
-            >
-              <div style={{
-                width: 50,
-                height: 50,
-                borderRadius: '16px',
-                border: `1.5px solid ${isMix ? '#D9C894' : isWarmMode ? '#8FAE72' : lightColors.border.strong}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                justifySelf: 'center',
-              }}>
-                <svg width="56%" height="56%" viewBox="0 0 24 24" fill="none" stroke={isMix ? '#F0E2C4' : isWarmMode ? '#DDE4D0' : lightColors.text.primary} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 12H5" />
-                  <path d="M12 19l-7-7 7-7" />
-                </svg>
-              </div>
-              <span style={{
-                fontSize: 'clamp(24px, 2.7vh, 34px)',
-                fontWeight: 760,
-                color: isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary,
-                textAlign: 'left',
-                fontFamily: ENGLISH_UI_FONT,
-              }}>
-                Back
-              </span>
+                padding: 0,
+              }}
+            >
+              <ActivityBackIcon size={150} color={backIconColor} strokeWidth={4.15} />
             </GazeButton>
 
-            <div style={{
-              flex: 1,
-              minHeight: 0,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
-              gap: 'clamp(16px, 2.1vh, 26px)',
-              overflow: 'hidden',
-            }}>
-              {items.slice(0, 9).map((item, idx) => (
+            {items.slice(0, 8).map((item, idx) => (
               <GazeButton
                 key={idx}
                 id={`act-${selectedCategory}-${idx}`}
@@ -384,7 +436,6 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                 )}
                 </GazeButton>
               ))}
-            </div>
           </div>
         )}
       </div>

@@ -159,6 +159,24 @@ const getKeyboardAccent = (isDarkMode: boolean) => (
   isDarkMode ? darkColors.accent.main : lightColors.warning.main
 );
 
+const TOP_PREDICTION_COUNT = 4;
+const DELETE_WORD_DWELL_MS = Math.min(
+  dwellTiming.max,
+  Math.round(dwellTiming.contexts.keyboard * 1.55)
+);
+
+const getKeyboardHierarchyColors = (isDarkMode: boolean) => ({
+  predictionBestBg: isDarkMode ? '#192230' : '#FBF7F1',
+  predictionText: isDarkMode ? 'rgba(237, 221, 195, 0.92)' : '#5B4C3B',
+  predictionBestText: isDarkMode ? '#F4E2C2' : '#3E342A',
+  secondarySuggestionBg: isDarkMode ? '#151F24' : '#F1E9DE',
+  secondarySuggestionText: isDarkMode ? 'rgba(241, 234, 220, 0.90)' : '#5F5548',
+  sentenceSuggestionBg: isDarkMode ? '#1E2C34' : '#E5ECEB',
+  sentenceSuggestionText: isDarkMode ? '#F1E5CF' : '#3F4D4E',
+  showNavSuggestionBg: isDarkMode ? '#223330' : '#E7E4D8',
+  showNavSuggestionText: isDarkMode ? '#D9D0BA' : '#4E5C4E',
+});
+
 interface KeyboardScreenProps {
   onNavigate: (screen: string) => void;
   onSpeak: (text: string) => void;
@@ -182,7 +200,7 @@ interface KeyConfig {
   flex?: number;
   action?: 'letter' | 'space' | 'backspace' | 'enter' |
   'shift' | 'speak' | 'deleteWord' |
-  'toggleNumbers' | 'toggleHindiPage' | 'gaze';
+  'toggleNumbers' | 'toggleHindiPage' | 'gaze' | 'quickWords';
 }
 
 // "Big Key" layout — number row removed, vertical space redistributed to 3 letter rows + command bar
@@ -198,7 +216,7 @@ const QWERTY_ROWS: KeyConfig[][] = [
     { key: 'h' }, { key: 'j' }, { key: 'k' }, { key: 'l' },
     { key: '?' },
   ],
-  // Row 3: Shift + Z–M + comma + BACK (single char delete)
+  // Row 3: Shift + Z–M + comma + DEL (single char delete)
   [
     { key: 'shift', display: 'Shift', action: 'shift' },
     { key: 'z' }, { key: 'x' }, { key: 'c' }, { key: 'v' },
@@ -302,6 +320,42 @@ const FullCircleDwell: React.FC<{
   );
 };
 
+const QuickWordsButtonIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 28,
+  color = 'currentColor',
+}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5.6 5.4h12.8a3.1 3.1 0 0 1 3.1 3.1v5.1a3.1 3.1 0 0 1-3.1 3.1h-6.9L7.4 20v-3.3H5.6a3.1 3.1 0 0 1-3.1-3.1V8.5a3.1 3.1 0 0 1 3.1-3.1Z" />
+    <circle cx="8.5" cy="11.05" r="0.85" fill={color} stroke="none" />
+    <circle cx="12" cy="11.05" r="0.85" fill={color} stroke="none" />
+    <circle cx="15.5" cy="11.05" r="0.85" fill={color} stroke="none" />
+  </svg>
+);
+
+const FilledSpeakerIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 48,
+  color = 'currentColor',
+}) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true">
+    <path
+      d="M8 19.5c0-1.7 1.35-3.1 3.05-3.1h7.05L29.4 8.6c1.65-1.15 3.9.05 3.9 2.05v26.7c0 2-2.25 3.2-3.9 2.05l-11.3-7.8h-7.05A3.08 3.08 0 0 1 8 28.5v-9Z"
+      fill={color}
+    />
+    <path
+      d="M37.6 17.2c2 2 3.15 4.82 3.15 7.8s-1.15 5.8-3.15 7.8"
+      stroke={color}
+      strokeWidth="3.2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M35.35 21.05c.94.98 1.45 2.4 1.45 3.95s-.51 2.97-1.45 3.95"
+      stroke={color}
+      strokeWidth="3.2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 
 // Key Button with animation-driven dwell
 const KeyBtn: React.FC<{
@@ -373,28 +427,42 @@ const KeyBtn: React.FC<{
   const isDeleteWord = config.action === 'deleteWord';
   const isBackspace = config.action === 'backspace';
   const isShiftKey = config.action === 'shift';
+  const isQuickWords = config.action === 'quickWords';
+  const isSpecialAction = isSpeak || isDeleteWord || isBackspace || isShiftKey || isQuickWords;
 
   let bg = keyboardTheme.keyBg;
   let border = keyboardTheme.keyBorder;
   let textColor = keyboardTheme.keyText;
   let dwellColor = keyboardAccent;
+  const actionTextColor = isDarkMode ? '#F5EFE6' : '#FFFDF8';
+  const mutedMaroonActionBg = isDarkMode ? 'rgba(57, 35, 36, 0.96)' : 'rgba(116, 62, 61, 0.86)';
+  const mutedMaroonDwell = isDarkMode ? '#D2A09A' : '#F4D5CA';
 
   if (isSpeak) {
-    bg = keyboardTheme.speakBg; border = keyboardTheme.speakBorder; textColor = keyboardTheme.speakText;
+    bg = keyboardTheme.speakBg; border = 'transparent'; textColor = actionTextColor;
     dwellColor = keyboardTheme.speakBorder;
+  } else if (isQuickWords) {
+    bg = isDarkMode ? 'rgba(30, 48, 60, 0.96)' : 'rgba(83, 119, 126, 0.20)';
+    border = 'transparent';
+    textColor = actionTextColor;
+    dwellColor = isDarkMode ? '#88B7BE' : '#53777E';
   } else if (isDeleteWord) {
-    bg = keyboardTheme.deleteWordSoftBg; border = keyboardTheme.deleteWordSoftBorder; textColor = keyboardTheme.deleteWordSoftText;
-    dwellColor = keyboardTheme.deleteWordSoftBorder;
+    bg = mutedMaroonActionBg; border = 'transparent'; textColor = actionTextColor;
+    dwellColor = mutedMaroonDwell;
   } else if (isBackspace) {
-    bg = keyboardTheme.deleteWordBg; border = keyboardTheme.deleteWordColor; textColor = keyboardTheme.deleteWordColor;
-    dwellColor = keyboardTheme.deleteWordColor;
+    bg = mutedMaroonActionBg; border = 'transparent'; textColor = actionTextColor;
+    dwellColor = mutedMaroonDwell;
   } else if (isShiftKey) {
-    bg = isDarkMode ? 'rgba(56, 189, 248, 0.10)' : 'rgba(183, 142, 73, 0.10)'; border = keyboardAccent; textColor = keyboardAccent;
+    bg = isDarkMode ? 'rgba(28, 48, 54, 0.96)' : 'rgba(72, 103, 110, 0.18)';
+    border = 'transparent';
+    textColor = actionTextColor;
+    dwellColor = isDarkMode ? '#8FB7B2' : '#48676E';
   }
   if (hovered && !isAction) {
     bg = keyboardTheme.keyHoverBg;
     border = keyboardAccent;
   }
+  const visibleBorder = isSpecialAction ? 'transparent' : border;
 
   let display = config.display || config.key;
   // Uppercase by default for faster brain processing; shift toggles to lowercase
@@ -433,7 +501,8 @@ const KeyBtn: React.FC<{
         position: 'relative', flex: config.flex || 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: flash ? `${dwellColor}30` : bg,
-        border: `2px solid ${border}`, borderRadius: '10px',
+        border: `2px solid ${visibleBorder}`, borderRadius: '10px',
+        outline: 'none',
         color: textColor,
         fontSize: isAction ? 'clamp(19px, 1.9vw, 26px)' : 'clamp(32px, 3.25vw, 48px)',
         fontWeight: isAction ? 760 : 720,
@@ -454,7 +523,18 @@ const KeyBtn: React.FC<{
           completed={completed}
         />
       )}
-      <span style={{ position: 'relative', zIndex: 3 }}>{display}</span>
+      <span style={{
+        position: 'relative',
+        zIndex: 3,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: isQuickWords ? 'clamp(8px, 0.7vw, 12px)' : 0,
+        whiteSpace: 'nowrap',
+      }}>
+        {isQuickWords && <QuickWordsButtonIcon size={28} />}
+        <span>{display}</span>
+      </span>
     </button>
   );
 };
@@ -470,19 +550,24 @@ const Predictions: React.FC<{
 }> = ({ predictions, onSelect, isDarkMode: _isDarkMode, gazeEnabled, lastEnabledTs, hasRealGaze, compact = false, isHindiMode = false }) => {
   const keyboardTheme = getKeyboardTheme(_isDarkMode);
   const keyboardAccent = getKeyboardAccent(_isDarkMode);
+  const {
+    predictionBestBg,
+    predictionText,
+    predictionBestText,
+  } = getKeyboardHierarchyColors(_isDarkMode);
+  const predictionCount = TOP_PREDICTION_COUNT;
   const predHintText = isHindiMode
     ? 'टाइप करें — शब्द सुझाव यहाँ दिखेंगे...'
     : 'Start typing for predictions...';
 
   const predWordSize = isHindiMode
-    ? (compact ? 'clamp(30px, 3.2vw, 40px)' : 'clamp(32px, 3.45vw, 44px)')
-    : (compact ? 'clamp(34px, 3.55vw, 44px)' : 'clamp(38px, 4.1vw, 54px)');
+    ? (compact ? 'clamp(34px, 3.5vw, 46px)' : 'clamp(36px, 3.75vw, 50px)')
+    : (compact ? 'clamp(38px, 3.9vw, 50px)' : 'clamp(42px, 4.4vw, 58px)');
 
   const predWordFont = isHindiMode ? "'Noto Sans Devanagari', sans-serif" : UI_FONT;
   const predWordColor = isHindiMode
     ? (_isDarkMode ? '#EAC688' : lightColors.text.primary)
-    : keyboardTheme.keyText;
-  const predBarBorder = keyboardTheme.railBorder;
+    : predictionText;
   const predDwellBar = isHindiMode ? (_isDarkMode ? '#D7A152' : lightColors.warning.main) : keyboardAccent;
 
   const [hIdx, setHIdx] = useState<number | null>(null);
@@ -526,16 +611,16 @@ const Predictions: React.FC<{
       onMouseLeave={leaveContainer}
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gap: '1px',
-        backgroundColor: keyboardTheme.railBg,
+        gridTemplateColumns: `repeat(${predictionCount}, 1fr)`,
+        gap: '4px',
+        backgroundColor: 'transparent',
         // compact=true → nav VISIBLE (smaller, saves space for nav bar)
         // compact=false → nav HIDDEN (larger, uses full available height)
-        height: compact ? 'clamp(82px, 9.5vh, 100px)' : 'clamp(94px, 10.8vh, 114px)',
-        minHeight: compact ? 'clamp(82px, 9.5vh, 100px)' : 'clamp(94px, 10.8vh, 114px)',
+        height: compact ? 'clamp(104px, 11.5vh, 126px)' : 'clamp(112px, 12.5vh, 138px)',
+        minHeight: compact ? 'clamp(104px, 11.5vh, 126px)' : 'clamp(112px, 12.5vh, 138px)',
         padding: 0,
         borderRadius: '14px',
-        border: `2px solid ${predBarBorder}`,
+        border: 'none',
         overflow: 'hidden',
         boxShadow: _isDarkMode ? '0 6px 16px rgba(0,0,0,0.16)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
         flexShrink: 0,
@@ -556,12 +641,21 @@ const Predictions: React.FC<{
           {predHintText}
         </div>
       ) : (
-        [...predictions.slice(0, 5), ...Array(Math.max(0, 5 - predictions.length)).fill(null)].slice(0, 5).map((p, i) => {
+        [...predictions.slice(0, predictionCount), ...Array(Math.max(0, predictionCount - predictions.length)).fill(null)].slice(0, predictionCount).map((p, i) => {
           if (!p) {
             return (
-              <div key={`empty-${i}`} style={{ backgroundColor: keyboardTheme.predictionBg, width: '100%', height: '100%' }} />
+              <div
+                key={`empty-${i}`}
+                style={{
+                  backgroundColor: keyboardTheme.predictionBg,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                  height: '100%',
+                }}
+              />
             );
           }
+          const isBestPrediction = i === 0;
           return (
             <button key={`${p.word}-${i}`}
               className="gaze-button"
@@ -574,13 +668,19 @@ const Predictions: React.FC<{
                 position: 'relative',
                 width: '100%',
                 height: '100%',
-                backgroundColor: hIdx === i ? keyboardTheme.predictionHoverBg : keyboardTheme.predictionBg,
-                border: 'none', // No individual borders
+                backgroundColor: hIdx === i
+                  ? keyboardTheme.predictionHoverBg
+                  : isBestPrediction
+                    ? predictionBestBg
+                    : keyboardTheme.predictionBg,
+                border: 'none',
+                boxShadow: 'none',
+                boxSizing: 'border-box',
                 margin: 0,
-                color: predWordColor,
+                color: isBestPrediction ? predictionBestText : predWordColor,
                 fontSize: predWordSize,
                 fontFamily: predWordFont,
-                fontWeight: 700,
+                fontWeight: isBestPrediction ? 780 : 700,
                 lineHeight: isHindiMode ? 1.6 : 1.2,
                 cursor: isLocked ? 'default' : 'pointer',
                 whiteSpace: 'nowrap', textAlign: 'center',
@@ -632,6 +732,14 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   const [, setPredictionTelemetry] = useState<PredictionTelemetrySnapshot>(() => loadPredictionTelemetry());
   const keyboardTheme = getKeyboardTheme(isDarkMode);
   const keyboardAccent = getKeyboardAccent(isDarkMode);
+  const {
+    secondarySuggestionBg,
+    secondarySuggestionText,
+    sentenceSuggestionBg,
+    sentenceSuggestionText,
+    showNavSuggestionBg,
+    showNavSuggestionText,
+  } = getKeyboardHierarchyColors(isDarkMode);
   const displayRef = useRef<HTMLDivElement>(null);
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
   const { hasRealGaze } = useRealGaze();
@@ -662,8 +770,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
 
   // Strict Vertical Grid — hard-capped heights prevent flexbox collision
   // Nav-hidden mode should be keyboard-first: slimmer support rails, taller alphabet rows.
-  const PREDICTION_ROW_HEIGHT = navHidden ? '96px' : '82px';
-  const ACTION_BAR_HEIGHT = navHidden ? '116px' : '120px';
+  const DISPLAY_BOX_HEIGHT = 'clamp(112px, 12.8vh, 138px)';
+  const PREDICTION_ROW_HEIGHT = navHidden ? '108px' : '82px';
+  const ACTION_BAR_HEIGHT = navHidden ? '124px' : '132px';
   const GAZE_HUB_DIAMETER = navHidden ? '107px' : '97px';
   const SHOW_NAV_COLUMN = 'minmax(170px, 0.78fr)';
 
@@ -782,6 +891,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           onSpeak(text); learnSentence?.(text);
         }
         break;
+      case 'quickWords':
+        onNavigate('quickwords');
+        break;
       case 'deleteWord':
         setText(p => {
           const trimmed = p.trimEnd();
@@ -844,7 +956,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         }
         if (isShift) setIsShift(false); break;
     }
-  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, inlineCompletion, recordPredictionTelemetry, showHindi]);
+  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, inlineCompletion, recordPredictionTelemetry, showHindi, onNavigate]);
 
   const handlePrediction = useCallback((word: string) => {
     const normalizedWord = word.trim();
@@ -951,13 +1063,13 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     setQuickWordChoices(null);
   }, [handlePrediction]);
 
-  // Extra smart predictions (shown in bottom row when nav hidden) — next 4 after the top 5
+  // Extra smart predictions (shown in bottom row when nav hidden) — next 4 after the top row
   const extraPredictions = useMemo(() => {
     if (!navHidden) return [];
-    const mainWords = new Set((predictions || []).slice(0, 5).map(p => p.word));
+    const mainWords = new Set((predictions || []).slice(0, TOP_PREDICTION_COUNT).map(p => p.word));
     const extra: Array<{ word: string; score: number }> = [];
-    // Take predictions 6-9 (indices 5-8)
-    (predictions || []).slice(5).forEach(p => {
+    // Take the next ranked predictions after the visible top row.
+    (predictions || []).slice(TOP_PREDICTION_COUNT).forEach(p => {
       if (!mainWords.has(p.word) && extra.length < 4) {
         extra.push(p);
       }
@@ -1033,12 +1145,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         width: '100%',
         // Use flex-grow to fill space when expanded, ensuring NavBar stays visible
         flex: isExpanded ? 1 : 0,
-        // Nav-visible: minimum 140px ensures 2 full lines always visible (48px font × 1.3lh × 2 + 12px padding)
-        // Nav-hidden: unchanged — 100-130px range (more of the screen available anyway)
-        // Nav-hidden: fits 2 lines comfortably
-        // Nav-visible: slightly shorter — exactly 2 lines, no 3rd row peeking
-        height: isExpanded ? 'auto' : (navHidden ? 'clamp(108px, 12vh, 130px)' : 'clamp(124px, 12.8vh, 138px)'),
-        minHeight: isExpanded ? 0 : (navHidden ? 'clamp(108px, 12vh, 130px)' : 'clamp(124px, 12.8vh, 138px)'),
+        // Tightly fits two readable text lines without showing a clipped third line.
+        height: isExpanded ? 'auto' : DISPLAY_BOX_HEIGHT,
+        minHeight: isExpanded ? 0 : DISPLAY_BOX_HEIGHT,
         backgroundColor: keyboardTheme.textAreaBg,
         borderRadius: '14px',
         border: `2px solid ${keyboardTheme.keyBorder}`,
@@ -1051,7 +1160,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           ref={displayRef}
           style={{
             flex: 1,
-            padding: '4px 26px 3px',
+            padding: '0 26px',
             overflowY: 'auto', // Scrollable so all lines accessible, container clips to 2 visible
             display: 'flex',
             alignItems: 'flex-start',
@@ -1062,7 +1171,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
             color: keyboardTheme.keyText,
             fontSize: 'clamp(45px, 5.25vh, 62px)',
             fontWeight: 700,
-            lineHeight: '1.14',
+            lineHeight: '1.18',
             textAlign: 'left',
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
@@ -1086,6 +1195,30 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           </span>
         </div>
 
+        <GazeButton
+          id="display-speak-button"
+          ariaLabel="Speak"
+          gazeEnabled={isGazeEnabled}
+          gazeEnabledTimestamp={lastEnabledTimestamp}
+          onClick={() => handleKey('speak', 'speak')}
+          dwellCategory="keyboardKey"
+          style={{
+            width: 'clamp(166px, 9.4vw, 214px)',
+            height: '100%',
+            borderLeft: `2px solid ${keyboardTheme.keyBorder}`,
+            backgroundColor: keyboardTheme.speakBg,
+            borderRadius: '0',
+            color: isDarkMode ? '#F5EFE6' : '#FFFDF8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <FilledSpeakerIcon size={52} />
+        </GazeButton>
+
         {/* Right Column: Integrated Expand Trigger */}
         <GazeButton
           id="display-expand-toggle"
@@ -1094,10 +1227,10 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           onClick={() => setIsExpanded(p => !p)}
           dwellCategory="standardButton"
           style={{
-            width: '102px',
+            width: 'clamp(138px, 7.9vw, 166px)',
             height: '100%', // Match container height always
             borderLeft: `2px solid ${keyboardTheme.keyBorder}`, // 1px separator (using 2px for visibility on dark)
-            backgroundColor: 'transparent', // Shared background
+            backgroundColor: isDarkMode ? 'rgba(17, 26, 36, 0.72)' : 'rgba(244, 239, 231, 0.84)',
             borderRadius: '0', // No internal radius
             color: keyboardTheme.keyTextMuted,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1109,12 +1242,14 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
             transition: 'transform 300ms ease',
             transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '64px', height: '64px',
-            backgroundColor: keyboardTheme.keyBg,
-            border: `1px solid ${keyboardTheme.keyBorder}`,
+            width: 'clamp(74px, 4.8vw, 86px)',
+            height: 'clamp(74px, 4.8vw, 86px)',
+            backgroundColor: isDarkMode ? 'rgba(23, 35, 48, 0.92)' : keyboardTheme.keyBg,
+            border: `1px solid ${isDarkMode ? 'rgba(111, 128, 149, 0.32)' : keyboardTheme.keyBorder}`,
             borderRadius: '50%',
+            boxShadow: isDarkMode ? '0 8px 20px rgba(0,0,0,0.22)' : '0 4px 14px rgba(139, 121, 104, 0.12)',
           }}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </div>
@@ -1131,30 +1266,35 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           gazeEnabledTimestamp={lastEnabledTimestamp}
           style={{
             width: '100%',
-            height: 'clamp(100px, 12vh, 140px)',
-            background: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(179, 90, 75, 0.12)',
-            border: isDarkMode ? '2px solid rgba(239, 68, 68, 0.4)' : `2px solid ${lightColors.emergency.hover}`,
-            borderRadius: '12px',
+            height: 'clamp(132px, 15vh, 176px)',
+            background: isDarkMode
+              ? 'linear-gradient(180deg, rgba(54, 31, 37, 0.96), rgba(43, 27, 34, 0.96))'
+              : 'linear-gradient(180deg, rgba(238, 220, 212, 0.94), rgba(230, 206, 197, 0.94))',
+            border: isDarkMode ? '1px solid rgba(198, 121, 112, 0.28)' : '1px solid rgba(151, 86, 78, 0.26)',
+            borderRadius: '14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '12px',
+            gap: '16px',
             cursor: 'pointer',
             flexShrink: 0,
+            boxShadow: isDarkMode
+              ? '0 12px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035)'
+              : '0 8px 20px rgba(139, 91, 82, 0.12)',
           }}
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? 'rgba(239, 68, 68, 0.9)' : lightColors.emergency.deep} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#E7B5AE' : '#8F5149'} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="4 14 10 14 10 20" />
             <polyline points="20 10 14 10 14 4" />
             <line x1="14" y1="10" x2="21" y2="3" />
             <line x1="3" y1="21" x2="10" y2="14" />
           </svg>
           <span style={{
-            fontSize: 'clamp(20px, 2.5vw, 32px)',
-            fontWeight: 700,
-            color: isDarkMode ? 'rgba(239, 68, 68, 0.9)' : lightColors.emergency.deep,
-            letterSpacing: isDarkMode ? '0.05em' : '0.02em',
-            textTransform: isDarkMode ? 'uppercase' : 'none',
+            fontSize: 'clamp(26px, 3vw, 42px)',
+            fontWeight: 820,
+            color: isDarkMode ? '#EAD8CA' : '#5D3D39',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
           }}>
             Close Display
           </span>
@@ -1206,14 +1346,15 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               // When nav is hidden, dock the Master Gaze Hub into the action row (between SPACE and 123)
               if (navHidden && isActionRow) {
                 displayRow = displayRow.map(k =>
-                  k.key === 'space' ? { ...k, flex: 6 } :
-                    k.key === 'speak' ? { ...k, flex: 1.3 } : k
+                  k.key === 'deleteWord' ? { ...k, flex: 1.78 } :
+                    k.key === 'speak' ? { ...k, key: 'quickWords', display: 'QUICK WORDS', action: 'quickWords', flex: 2.05 } :
+                      k.key === 'space' ? { ...k, flex: 5.3 } : k
                 );
-                // Add gutter between SPEAK and SPACE to shift space rightward
+                // Add gutter between QUICK WORDS and SPACE to keep command targets visually separated.
                 const spaceIdx = displayRow.findIndex(k => k.key === 'space');
                 displayRow = [
                   ...displayRow.slice(0, spaceIdx),
-                  { key: '__gutter_speak_space__', display: '', flex: 0.3 } as KeyConfig,
+                  { key: '__gutter_speak_space__', display: '', flex: 0.18 } as KeyConfig,
                   ...displayRow.slice(spaceIdx),
                 ];
                 const idx123 = displayRow.findIndex(k => k.key === '123');
@@ -1225,12 +1366,20 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                   { key: 'gaze', display: '', action: 'gaze', flex: 3.2 },
                   ...after,
                 ] as KeyConfig[];
+              } else if (isActionRow) {
+                displayRow = displayRow
+                  .filter(k => k.action !== 'speak')
+                  .map(k =>
+                    k.key === 'deleteWord' ? { ...k, flex: 1.75 } :
+                      k.key === 'space' ? { ...k, flex: 6.7 } :
+                        k.key === '123' ? { ...k, flex: 1.95 } : k
+                  );
               }
               return (
                 <React.Fragment key={ri}>
                   {/* Safety dead zone between letter rows and action bar when nav hidden */}
                   {navHidden && isActionRow && (
-                    <div style={{ height: 'clamp(8px, 0.9vh, 10px)', width: '100%', pointerEvents: 'none', flexShrink: 0 }} />
+                    <div style={{ height: 'clamp(3px, 0.45vh, 5px)', width: '100%', pointerEvents: 'none', flexShrink: 0 }} />
                   )}
                   <div style={{
                     display: 'flex',
@@ -1417,7 +1566,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                       return (
                         <KeyBtn key={kc.key} config={kc} onPress={handleKey}
                           isShift={isShift} isDarkMode={isDarkMode}
-                          dwellMs={dwellTiming.contexts.keyboard}
+                          dwellMs={kc.action === 'deleteWord'
+                            ? DELETE_WORD_DWELL_MS
+                            : dwellTiming.contexts.keyboard}
                           gazeEnabled={isGazeEnabled}
                           lastEnabledTs={lastEnabledTimestamp}
                           hasRealGaze={hasRealGaze} />
@@ -1438,17 +1589,15 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               gridTemplateColumns: sentencePredictions.length > 0
                 ? `repeat(${Math.min(sentencePredictions.length, 2)}, 1fr) ${SHOW_NAV_COLUMN}`
                 : `repeat(4, 1fr) ${SHOW_NAV_COLUMN}`,
-              gap: '1px',
-              backgroundColor: keyboardTheme.railBg,
+              gap: '4px',
+              backgroundColor: 'transparent',
               height: keyboardMode === 'hindi' ? '84px' : PREDICTION_ROW_HEIGHT,
               minHeight: keyboardMode === 'hindi' ? '84px' : PREDICTION_ROW_HEIGHT,
               flexShrink: 0,
               padding: 0,
               borderRadius: '0 0 14px 14px',
-              border: sentencePredictions.length > 0
-                ? `2px solid ${isDarkMode ? 'rgba(215, 161, 82, 0.42)' : lightColors.warning.main}`
-                : `2px solid ${keyboardTheme.railBorder}`,
-              borderTop: `1px solid ${keyboardTheme.keyBorder}`,
+              border: 'none',
+              borderTop: 'none',
               overflow: 'hidden',
               boxShadow: isDarkMode ? '0 5px 14px rgba(0,0,0,0.14)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
               margin: '0 -2px',
@@ -1456,34 +1605,49 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               {sentencePredictions.length > 0 ? (
                 <>
                   {/* Sentence predictions — max 2 shown */}
-                  {sentencePredictions.slice(0, 2).map((sp, i) => (
-                    <GazeButton
-                      key={`sent-${i}-${sp.text.slice(0,10)}`}
-                      id={`sentence-pred-${i}`}
-                      gazeEnabled={isGazeEnabled}
-                      gazeEnabledTimestamp={lastEnabledTimestamp}
-                      onClick={() => handleSentenceSelect(sp.text)}
-                      dwellCategory="keyboardKey"
-                      style={{
-                        width: '100%', height: '100%',
-                        backgroundColor: keyboardTheme.predictionBg,
-                        border: 'none', borderRadius: 0,
-                        color: isDarkMode ? '#EAC688' : lightColors.text.primary,
-                        fontSize: 'clamp(30px, 3.1vw, 44px)',
-                        fontWeight: 700,
-                        display: 'flex', alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        padding: '0 12px',
-                        textAlign: 'center',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {sp.source === 'history' ? '\u23CE ' : sp.source === 'neural' ? '\u2728 ' : '\uD83D\uDCAC '}{sp.text}
-                    </GazeButton>
-                  ))}
+                  {sentencePredictions.slice(0, 2).map((sp, i) => {
+                    return (
+                      <GazeButton
+                        key={`sent-${i}-${sp.text.slice(0,10)}`}
+                        id={`sentence-pred-${i}`}
+                        gazeEnabled={isGazeEnabled}
+                        gazeEnabledTimestamp={lastEnabledTimestamp}
+                        onClick={() => handleSentenceSelect(sp.text)}
+                        dwellCategory="keyboardKey"
+                        style={{
+                          width: '100%', height: '100%',
+                          minWidth: 0,
+                          backgroundColor: sentenceSuggestionBg,
+                          border: 'none',
+                          borderRadius: '10px',
+                          boxSizing: 'border-box',
+                          color: sentenceSuggestionText,
+                          fontSize: 'clamp(24px, 2.35vw, 34px)',
+                          fontWeight: 720,
+                          lineHeight: 1.08,
+                          display: 'flex', alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: '0 clamp(14px, 1.4vw, 24px)',
+                          textAlign: 'center',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <span style={{
+                          minWidth: 0,
+                          maxWidth: '100%',
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitBoxOrient: 'vertical',
+                          WebkitLineClamp: 2,
+                          whiteSpace: 'normal',
+                          overflowWrap: 'normal',
+                        }}>
+                          {sp.text}
+                        </span>
+                      </GazeButton>
+                    );
+                  })}
                   {/* SHOW NAV button */}
                   {!isFocusLocked && (
                     <GazeButton
@@ -1494,19 +1658,21 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                       dwellTime={800}
                       style={{
                         width: '100%', height: '100%',
-                        backgroundColor: isDarkMode ? 'rgba(45, 212, 191, 0.08)' : 'rgba(250, 247, 242, 0.96)',
-                        border: 'none', borderRadius: 0,
-                        color: keyboardAccent,
-                        fontSize: 'clamp(13px, 1.5vw, 17px)',
-                        fontWeight: 700,
+                        backgroundColor: showNavSuggestionBg,
+                        border: 'none', borderRadius: '10px',
+                        color: showNavSuggestionText,
+                        fontSize: 'clamp(15px, 1.6vw, 20px)',
+                        fontWeight: 820,
                         display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: '6px',
-                        padding: '0 clamp(10px, 1vw, 16px)',
+                        justifyContent: 'center', gap: '8px',
+                        padding: '0 clamp(12px, 1.2vw, 18px)',
                         cursor: 'pointer',
+                        letterSpacing: '1.1px',
+                        textTransform: 'uppercase',
                       }}
                     >
-                      <span style={{ fontSize: 'clamp(11px, 1.15vw, 14px)' }}>SHOW NAV</span>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <span style={{ fontSize: 'inherit' }}>SHOW NAV</span>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 19V5" /><polyline points="5 12 12 5 19 12" />
                       </svg>
                     </GazeButton>
@@ -1516,15 +1682,28 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                 /* Fallback: show extra word predictions (existing behavior) */
                 <>
                   {[...extraPredictions.slice(0, 4), ...Array(Math.max(0, 4 - extraPredictions.length)).fill(null)].slice(0, 4).map((p, i) => {
-                    if (!p) return <div key={`extra-empty-${i}`} style={{ backgroundColor: keyboardTheme.predictionBg, width: '100%', height: '100%' }} />;
+                    if (!p) return (
+                      <div
+                        key={`extra-empty-${i}`}
+                        style={{
+                          backgroundColor: secondarySuggestionBg,
+                          boxSizing: 'border-box',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                      />
+                    );
                     return (
                       <GazeButton key={`extra-${p.word}-${i}`} id={`extra-pred-${i}`}
                         gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
                         onClick={() => handlePrediction(p.word)} dwellCategory="keyboardKey"
                         style={{
-                          width: '100%', height: '100%', backgroundColor: keyboardTheme.predictionBg,
-                          border: 'none', borderRadius: 0, color: keyboardTheme.keyText,
-                          fontSize: 'clamp(32px, 3.25vw, 46px)', fontWeight: 760,
+                          width: '100%', height: '100%', backgroundColor: secondarySuggestionBg,
+                          border: 'none',
+                          borderRadius: '10px',
+                          boxSizing: 'border-box',
+                          color: secondarySuggestionText,
+                          fontSize: 'clamp(32px, 3.25vw, 46px)', fontWeight: 720,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center',
                           transition: 'background-color 150ms',
@@ -1534,7 +1713,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                     );
                   })}
                   {isFocusLocked ? (
-                    <div style={{ backgroundColor: keyboardTheme.predictionBg, width: '100%', height: '100%' }} />
+                    <div style={{ backgroundColor: secondarySuggestionBg, borderRadius: '10px', width: '100%', height: '100%' }} />
                   ) : (
                     <GazeButton id="nav-restore-btn" gazeEnabled={isGazeEnabled}
                       gazeEnabledTimestamp={lastEnabledTimestamp}
@@ -1542,16 +1721,18 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                       dwellTime={800}
                       style={{
                         width: '100%', height: '100%',
-                        backgroundColor: isDarkMode ? 'rgba(45, 212, 191, 0.08)' : 'rgba(244, 247, 242, 0.96)',
-                        border: 'none', borderRadius: 0,
-                        color: keyboardAccent, fontSize: 'clamp(13px, 1.5vw, 17px)',
-                        fontWeight: 700, display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: '6px', cursor: 'pointer',
-                        padding: '0 clamp(10px, 1vw, 16px)',
-                        transition: 'all 150ms ease', letterSpacing: '0.5px',
+                        backgroundColor: showNavSuggestionBg,
+                        border: 'none', borderRadius: '10px',
+                        color: showNavSuggestionText, fontSize: 'clamp(15px, 1.6vw, 20px)',
+                        fontWeight: 820, display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', gap: '8px', cursor: 'pointer',
+                        padding: '0 clamp(12px, 1.2vw, 18px)',
+                        transition: 'all 150ms ease',
+                        letterSpacing: '1.1px',
+                        textTransform: 'uppercase',
                       }}>
-                      <span style={{ fontSize: 'clamp(11px, 1.15vw, 14px)' }}>SHOW NAV</span>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <span style={{ fontSize: 'inherit' }}>SHOW NAV</span>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 19V5" /><polyline points="5 12 12 5 19 12" />
                       </svg>
                     </GazeButton>
