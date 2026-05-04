@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">YouTube icon</title><desc id="desc">Rounded video play button icon for web browsing menu.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#C28E2C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<rect x="4.5" y="7" width="15" height="10" rx="3.2"/>
+</g>
+<g id="glyph"><path d="M10.5 9.5v5l4.5-2.5-4.5-2.5z" fill="#C28E2C"/></g>
+<g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

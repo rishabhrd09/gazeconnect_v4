@@ -121,15 +121,15 @@ const getTone = (wordId?: string | null, isLight = false, isMix = false) => {
 
   return isLight
     ? {
-      accent: '#9B5E54',
-      panelBg: 'rgba(250, 246, 242, 0.98)',
-      panelBorder: 'rgba(155, 94, 84, 0.28)',
-      title: '#42221F',
-      helper: '#7E5A54',
-      cardBg: '#F3E8E4',
-      cardBorder: 'rgba(155, 94, 84, 0.24)',
-      cardText: '#33201D',
-      chipBg: '#EFDCD5',
+      accent: '#8C3F3F',
+      panelBg: 'rgba(252, 247, 240, 0.98)',
+      panelBorder: 'rgba(140, 63, 63, 0.22)',
+      title: '#3D1F1F',
+      helper: '#7A4848',
+      cardBg: '#F2E7D5',
+      cardBorder: 'rgba(140, 63, 63, 0.18)',
+      cardText: '#2B1817',
+      chipBg: '#E8D8C5',
     }
     : isMix
       ? {

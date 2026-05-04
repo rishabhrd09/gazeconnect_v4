@@ -308,8 +308,12 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   const cardBorder = isMix ? '1.5px solid rgba(70,52,32,0.56)' : isWarmMode ? screenThemes.medical.cardBorder : `1.5px solid ${colors.border.light}`;
   const cardText = isMix ? '#180F08' : isWarmMode ? '#ECEDE3' : colors.text.primary;
   const cardShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
-  const sectionCardBg = isMix ? '#B6A17A' : isWarmMode ? 'rgba(27, 31, 27, 0.92)' : '#EFE7DA';
-  const sectionBackCardBg = isMix ? '#28321F' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#DCE2C8';
+  // v4 light-mode fix: #EFE7DA had near-equal RGB (239,231,218) → reads as
+  // dusty-rose on most monitors. Replaced with #E8D4B0 — confident warm sand
+  // with strong yellow lead, never reads pink. The back-card pastel sage
+  // (#DCE2C8) replaced with deeper #D2DCBC — Sarvam/Tobii-tier muted sage.
+  const sectionCardBg = isMix ? '#B6A17A' : isWarmMode ? 'rgba(27, 31, 27, 0.92)' : '#E8D4B0';
+  const sectionBackCardBg = isMix ? '#28321F' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#D2DCBC';
   const sectionCardBorder = '1.5px solid transparent';
   const sectionCardShadow = isWarmMode
     ? 'inset 0 1px 0 rgba(255,255,255,0.025), 0 9px 22px rgba(0,0,0,0.20)'

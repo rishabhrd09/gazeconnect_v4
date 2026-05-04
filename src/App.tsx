@@ -451,8 +451,10 @@ const InnerApp: React.FC = () => {
         </ErrorBoundary>
       </div>
 
-      {/* Persistent Emergency Button — hidden on screens with their own large emergency/nav affordance */}
-      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && (
+      {/* Persistent Emergency Button — hidden on screens with their own large emergency/nav affordance.
+          Web Browsing has its own EMERGENCY in GlobalNavBar + connected toolbar; the floating
+          fallback would be a duplicate at bottom-left. */}
+      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && currentScreen !== 'web' && (
         <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} emergencyDwellTime={emergencyDwellTime || 1200} />
       )}
 

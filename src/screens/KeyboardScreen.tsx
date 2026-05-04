@@ -723,7 +723,10 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   const [text, setText] = useState(initialText);
   const [isShift, setIsShift] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false); // New state for expand/collapse
-  const [navHidden, setNavHidden] = useState(false);
+  // Keyboard always opens with global nav hidden — gives the keyboard maximum
+  // vertical real estate immediately, without an extra dwell to "Hide Nav"
+  // every time the user lands on the keyboard from any other screen.
+  const [navHidden, setNavHidden] = useState(true);
   const [wordLengthHint, setWordLengthHint] = useState<number | null>(null);
   const [keyboardMode, setKeyboardMode] = useState<'english' | 'hindi' | 'numbers'>('english');
   const [hindiPage, setHindiPage] = useState<1 | 2>(1);
@@ -1347,8 +1350,12 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               if (navHidden && isActionRow) {
                 displayRow = displayRow.map(k =>
                   k.key === 'deleteWord' ? { ...k, flex: 1.78 } :
-                    k.key === 'speak' ? { ...k, key: 'quickWords', display: 'QUICK WORDS', action: 'quickWords', flex: 2.05 } :
-                      k.key === 'space' ? { ...k, flex: 5.3 } : k
+                    // QUICK WORDS widened (2.05 → 2.45) and SPACE shifted right
+                    // (5.3 → 4.9) to give the high-frequency Quick Words target
+                    // a more comfortable gaze footprint without shrinking SPACE
+                    // below its critical-mass width.
+                    k.key === 'speak' ? { ...k, key: 'quickWords', display: 'QUICK WORDS', action: 'quickWords', flex: 2.45 } :
+                      k.key === 'space' ? { ...k, flex: 4.9 } : k
                 );
                 // Add gutter between QUICK WORDS and SPACE to keep command targets visually separated.
                 const spaceIdx = displayRow.findIndex(k => k.key === 'space');

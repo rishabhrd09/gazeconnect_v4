@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">Emergency alert icon</title><desc id="desc">Circular emergency alert symbol for gaze communication UI.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#C26969" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5"/>
+</g>
+<g id="glyph"><circle cx="12" cy="16.5" r="1" fill="#C26969"/></g>
+<g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

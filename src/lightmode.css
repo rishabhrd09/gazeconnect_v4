@@ -30,36 +30,44 @@
    ═══════════════════════════════════════════════════════ */
 
 [data-theme="light"] {
-  --lm-root:          #AFA087;
-  --lm-surface:       #BFAE8C;
-  --lm-surface-alt:   #B6A481;
-  --lm-elevated:      #C8B793;
-  --lm-sunken:        #B6A481;
+  /* v4 Sarvam/Apple-tuned warm-earth palette.
+     Cards now lift ~14% off the page bg (Apple HIG elevation pattern).
+     All "pink-leaning" tones (near-equal RGB in upper 90s like #EFE7DA)
+     replaced with yellow-leading warm sand. Borders deepened. Shadows
+     more pronounced (12-16% alpha vs 8-10%) for clear card lift. */
+  --lm-root:          #E0D0B5;   /* warm sand — page bg (~82%) */
+  --lm-surface:       #F0E2C4;   /* cream cards (~92% — clear elevation gap) */
+  --lm-surface-alt:   #D8C7AA;   /* hover / alt section */
+  --lm-elevated:      #F0E2C4;   /* same as surface — Apple-tier elevation */
+  --lm-sunken:        #D0BFA0;   /* recessed / nav rails */
 
+  /* Emergency stays warm-maroon — kept consistent across all themes.
+     Soft variant: was #C29D92 (dusty pink) → #D6BC9A warm cream-tan. */
   --lm-terracotta:    #8A463D;
   --lm-terracotta-hover: #7A3A34;
   --lm-terracotta-deep:  #6A302C;
-  --lm-terracotta-soft:  #CFA094;
+  --lm-terracotta-soft:  #D6BC9A;
 
-  --lm-text:          #1B140E;
-  --lm-text-2:        #251D16;
-  --lm-text-3:        #342A20;
-  --lm-text-muted:    #342A20;
-  --lm-text-hindi:    #251D16;
-  --lm-icon:          #1B140E;
+  --lm-text:          #4A3A2A;   /* warm dark brown (~22% lightness, ~6.5:1 contrast) */
+  --lm-text-2:        #6B5A45;
+  --lm-text-3:        #8E7A60;
+  --lm-text-muted:    #76624A;
+  --lm-text-hindi:    #6B5A45;
+  --lm-icon:          #4A3A2A;
 
-  --lm-border:        #8D7959;
-  --lm-border-2:      #7D6A4E;
-  --lm-border-strong: #6F5D43;
+  --lm-border:        #A89478;   /* visible edge (Apple HIG-tier) */
+  --lm-border-2:      #8A7560;
+  --lm-border-strong: #876730;   /* deeper antique gold — focus / selection */
 
-  --lm-sage:          #1A3B1C;
-  --lm-amber:         #B78E49;
-  --lm-info:          #7F97A8;
+  --lm-sage:          #52704A;   /* deep confident sage (no pastel) */
+  --lm-amber:         #876730;   /* deeper antique gold */
+  --lm-info:          #748A9C;   /* calm blue-gray */
 
-  --lm-shadow-sm:     0 2px 8px rgba(82, 66, 45, 0.12);
-  --lm-shadow-card:   0 8px 18px rgba(82, 66, 45, 0.16), 0 1px 2px rgba(82, 66, 45, 0.10);
-  --lm-shadow-hover:  0 12px 26px rgba(82, 66, 45, 0.18), 0 2px 8px rgba(82, 66, 45, 0.12);
-  --lm-shadow-float:  0 12px 26px rgba(82, 66, 45, 0.18), 0 2px 8px rgba(82, 66, 45, 0.12);
+  /* v4: Stronger elevation shadows — Apple-tier card lift perception */
+  --lm-shadow-sm:     0 2px 6px rgba(82, 66, 45, 0.10);
+  --lm-shadow-card:   0 6px 16px rgba(82, 66, 45, 0.14), 0 1px 3px rgba(82, 66, 45, 0.08);
+  --lm-shadow-hover:  0 12px 26px rgba(82, 66, 45, 0.16), 0 2px 8px rgba(82, 66, 45, 0.10);
+  --lm-shadow-float:  0 16px 34px rgba(82, 66, 45, 0.18), 0 4px 12px rgba(82, 66, 45, 0.12);
 
   /* Fonts */
   --lm-font-en:   'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif;
@@ -198,15 +206,15 @@ html.theme-light .quick-access-btn:hover {
 html[data-theme="light"] .yes-btn,
 html.theme-light .yes-btn {
   background: var(--lm-sage) !important;
-  border-color: rgba(107, 142, 90, 0.72) !important;
+  border-color: rgba(82, 112, 74, 0.72) !important;
   box-shadow: var(--lm-shadow-card) !important;
   color: var(--lm-elevated) !important;
 }
 
 html[data-theme="light"] .enablegaze-btn,
 html.theme-light .enablegaze-btn {
-  background: rgba(122, 156, 181, 0.18) !important;
-  border-color: rgba(122, 156, 181, 0.72) !important;
+  background: rgba(116, 138, 156, 0.18) !important;
+  border-color: rgba(116, 138, 156, 0.72) !important;
   box-shadow: var(--lm-shadow-card) !important;
   color: var(--lm-text) !important;
 }
@@ -222,8 +230,8 @@ html.theme-light .no-btn {
 /* Magnified text overlay (spoken word confirmation) */
 html[data-theme="light"] .magnify-overlay,
 html.theme-light .magnify-overlay {
-  background: rgba(255, 252, 248, 0.95) !important;
-  border-color: rgba(179, 90, 75, 0.28) !important;
+  background: rgba(240, 226, 196, 0.96) !important;
+  border-color: rgba(138, 70, 61, 0.28) !important;
   box-shadow: var(--lm-shadow-float) !important;
   backdrop-filter: blur(12px) !important;
 }
@@ -313,7 +321,7 @@ html.theme-light .hub-card-news {
 html[data-theme="light"] .hub-card-youtube,
 html.theme-light .hub-card-youtube {
   background: var(--lm-surface-alt) !important;
-  border-color: rgba(183, 142, 73, 0.28) !important;
+  border-color: rgba(135, 103, 48, 0.28) !important;
 }
 html[data-theme="light"] .hub-card-knowledge,
 html.theme-light .hub-card-knowledge {
@@ -323,7 +331,7 @@ html.theme-light .hub-card-knowledge {
 html[data-theme="light"] .hub-card-search,
 html.theme-light .hub-card-search {
   background: var(--lm-surface-alt) !important;
-  border-color: rgba(107, 142, 90, 0.24) !important;
+  border-color: rgba(82, 112, 74, 0.24) !important;
 }
 html[data-theme="light"] .hub-card-whatsapp,
 html.theme-light .hub-card-whatsapp {
@@ -333,7 +341,7 @@ html.theme-light .hub-card-whatsapp {
 html[data-theme="light"] .hub-card-social,
 html.theme-light .hub-card-social {
   background: var(--lm-surface-alt) !important;
-  border-color: rgba(122, 156, 181, 0.26) !important;
+  border-color: rgba(116, 138, 156, 0.26) !important;
 }
 
 html[data-theme="light"] .hub-card-label,
@@ -511,7 +519,7 @@ html.theme-light .settings-section-heading {
 html[data-theme="light"] .mouse-only-banner,
 html.theme-light .mouse-only-banner {
   background: var(--lm-surface-alt) !important;
-  border-color: rgba(183, 142, 73, 0.35) !important;
+  border-color: rgba(135, 103, 48, 0.35) !important;
   color: var(--lm-text) !important;
 }
 
@@ -604,24 +612,24 @@ html.theme-light .live-clock-ampm {
 
 html[data-theme="light"] .gaze-cursor-ring,
 html.theme-light .gaze-cursor-ring {
-  border-color: rgba(107, 95, 82, 0.72) !important;
-  background-color: rgba(245, 241, 234, 0.6) !important;
-  box-shadow: 0 2px 8px rgba(139, 121, 104, 0.12) !important;
+  border-color: rgba(74, 58, 42, 0.62) !important;
+  background-color: rgba(234, 219, 192, 0.7) !important;
+  box-shadow: 0 2px 8px rgba(82, 66, 45, 0.10) !important;
 }
 
-/* Dwell progress ring in light mode: saffron */
+/* Dwell progress ring in light mode: deeper antique-gold */
 html[data-theme="light"] .gaze-cursor-ring.dwelling,
 html.theme-light .gaze-cursor-ring.dwelling {
   border-color: var(--lm-amber) !important;
-  background-color: rgba(183, 142, 73, 0.10) !important;
-  box-shadow: 0 2px 8px rgba(183, 142, 73, 0.14) !important;
+  background-color: rgba(135, 103, 48, 0.10) !important;
+  box-shadow: 0 2px 8px rgba(135, 103, 48, 0.14) !important;
 }
 
 html[data-theme="light"] .gaze-cursor-ring.locked,
 html.theme-light .gaze-cursor-ring.locked {
   border-color: var(--lm-info) !important;
-  background-color: rgba(122, 156, 181, 0.08) !important;
-  box-shadow: 0 2px 8px rgba(122, 156, 181, 0.14) !important;
+  background-color: rgba(116, 138, 156, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(116, 138, 156, 0.14) !important;
 }
 
 /* Dwell SVG ring stroke */
@@ -633,7 +641,7 @@ html.theme-light .dwell-ring-svg circle {
 /* Center dot */
 html[data-theme="light"] .gaze-cursor-dot,
 html.theme-light .gaze-cursor-dot {
-  background-color: rgba(107, 95, 82, 0.9) !important;
+  background-color: rgba(74, 58, 42, 0.85) !important;
 }
 
 html[data-theme="light"] .gaze-cursor-dot.dwelling,
@@ -660,8 +668,8 @@ html.theme-light .gaze-status-indicator {
 
 html[data-theme="light"] .connection-indicator,
 html.theme-light .connection-indicator {
-  background-color: rgba(26, 59, 28, 0.12) !important;
-  border-color: rgba(26, 59, 28, 0.72) !important;
+  background-color: rgba(82, 112, 74, 0.12) !important;
+  border-color: rgba(82, 112, 74, 0.55) !important;
   color: var(--lm-sage) !important;
 }
 

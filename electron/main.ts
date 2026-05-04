@@ -1285,6 +1285,21 @@ function setupIpcHandlers(): void {
     }
   });
 
+  // Execute JavaScript in the active BrowserView with user-gesture context.
+  // The user-gesture flag is critical for browser APIs that require it (e.g.
+  // Element.requestFullscreen, autoplay-with-sound, popups). Used by the AAC
+  // toolbar to reliably click YouTube's fullscreen / skip-ad buttons.
+  ipcMain.handle('webview:executeJs', async (_event: any, code: string) => {
+    if (!activeBrowserView || !code || typeof code !== 'string') return { success: false };
+    try {
+      const result = await activeBrowserView.webContents.executeJavaScript(code, true);
+      return { success: true, result };
+    } catch (err: any) {
+      console.error('webview:executeJs error:', err?.message || err);
+      return { success: false, error: err?.message || String(err) };
+    }
+  });
+
   ipcMain.handle('webview:setBounds', (_event: any, bounds: { x: number; y: number; width: number; height: number }) => {
     if (activeBrowserView) {
       activeBrowserView.setBounds(bounds);

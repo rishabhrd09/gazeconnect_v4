@@ -784,7 +784,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     <span style={{
                       fontSize: 'clamp(13px, 1.75vh, 18px)',
                       fontWeight: 600,
-                      color: isLight ? '#6E5A42' : isMix ? THEME.subtleText : screenThemes.home.tealIcon,
+                      color: isLight ? lightColors.icon.muted : isMix ? THEME.subtleText : screenThemes.home.tealIcon,
                       opacity: isLight ? 1 : 0.7,
                       letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,

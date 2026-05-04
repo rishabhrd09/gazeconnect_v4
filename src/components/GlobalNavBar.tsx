@@ -224,10 +224,10 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 padding: compact
                     ? 'clamp(8px, 1.1vh, 12px) clamp(16px, 2vw, 26px)'
                     : 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 34px)',
-                backgroundColor: useHomeNavPalette ? homeEmergencyStyle.background : isDarkMode ? 'rgba(140, 50, 50, 0.35)' : lightColors.emergency.main,
-                border: useHomeNavPalette ? `1.5px solid ${homeEmergencyStyle.border}` : isDarkMode ? '2px solid rgba(180, 70, 70, 0.50)' : `1.5px solid ${lightColors.emergency.hover}`,
+                backgroundColor: homeEmergencyStyle.background,
+                border: `1.5px solid ${homeEmergencyStyle.border}`,
                 borderRadius: 'clamp(14px, 2vh, 20px)',
-                color: useHomeNavPalette ? homeEmergencyStyle.text : isDarkMode ? '#D08080' : lightColors.text.inverse,
+                color: homeEmergencyStyle.text,
                 fontSize: isKbOrSpatial ? 'clamp(18px, 2.35vh, 24px)' : standardNavTextSize,
                 fontWeight: 900 as const,
                 cursor: 'pointer',
@@ -239,15 +239,15 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     : (compact
                         ? 'clamp(160px, 17vw, 220px)'
                         : 'clamp(210px, 22vw, 320px)'),
-                boxShadow: isDarkMode ? '0 4px 16px rgba(0,0,0,0.30)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
+                boxShadow: theme === 'light' ? '0 2px 8px rgba(122, 54, 58, 0.16), 0 1px 2px rgba(122, 54, 58, 0.10)' : '0 4px 16px rgba(0,0,0,0.30)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'clamp(8px, 1vw, 12px)',
                 justifyContent: 'center',
                 flexDirection: 'row' as const,
-                letterSpacing: isDarkMode ? '1.8px' : '0.05em',
+                letterSpacing: '0.05em',
                 fontFamily: emergencyFontFamily,
-                textTransform: isDarkMode ? 'uppercase' as const : 'none' as const,
+                textTransform: 'none' as const,
                 transition: 'all 0.2s ease',
             };
         }
@@ -351,11 +351,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             fontFamily: emergencyFontFamily,
                             fontSize: 'clamp(20px, 2.6vh, 28px)',
                             fontWeight: 900,
-                            letterSpacing: isDarkMode ? '0.14em' : '0.08em',
+                            letterSpacing: '0.08em',
                             lineHeight: 1,
                             whiteSpace: 'nowrap',
                         }}>
-                            {isDarkMode ? 'EMERGENCY' : 'Emergency'}
+                            Emergency
                         </span>
                     </button>
                 </div>
@@ -755,17 +755,20 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 border: `2px solid ${isNavHidden ? colors.accent.main : navigationColors.auxiliaryBorder}`,
                                 borderRadius: '24px',
                                 minHeight: standardNavTargetHeight,
-                                minWidth: compact ? 'clamp(118px, 11.5vw, 166px)' : 'clamp(146px, 13.5vw, 204px)',
+                                minWidth: compact ? 'clamp(144px, 13vw, 192px)' : 'clamp(178px, 15vw, 248px)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
                                 color: isNavHidden ? colors.accent.main : colors.text.primary,
                                 padding: '0 clamp(16px, 2vw, 24px)',
+                                /* Breathing room between gaze toggle (circle) and HIDE NAV —
+                                   prevents accidental dwell when patient targets either button. */
+                                marginLeft: 'clamp(20px, 2.4vw, 36px)',
                             }}
                         >
-                            <span style={{ fontSize: standardNavTextSize, fontWeight: 600 }}>
-                                {isNavHidden ? 'SHOW' : 'HIDE'}
+                            <span style={{ fontSize: standardNavTextSize, fontWeight: 720, whiteSpace: 'nowrap' }}>
+                                {isNavHidden ? 'SHOW NAV' : 'HIDE NAV'}
                             </span>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: standardNavIconSize, height: standardNavIconSize }}>
                                 {isNavHidden ? <polyline points="6 9 12 15 18 9" /> : <polyline points="18 15 12 9 6 15" />}

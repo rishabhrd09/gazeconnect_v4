@@ -18,7 +18,7 @@ import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { SURVEY_QUESTIONS, SURVEY_PHASES_V2 } from '../data/surveyQuestions';
 import { SurveyQuestion, PhaseStatus } from '../types/SurveyTypes';
-import { screenThemes, typography } from '../utils/design';
+import { screenThemes, typography, lightColors } from '../utils/design';
 import { computeCompleteness, formatNotepadSummary } from '../utils/surveyDefaults';
 import { FloorPlanViewerModal } from '../components/FloorPlanViewerModal';
 import { enrichWithSurveyData, CompassMapPayload } from '../utils/floorplanApi';
@@ -68,7 +68,7 @@ function getQuestionOptions(q: SurveyQuestion, answers: Record<string, any>): st
 // ─── Adaptive grid basis helper ─────────────────────────────
 
 function getGridBasis(count: number): string {
-    if (count <= 4) return '48%';
+    if (count <= 4) return '44%';
     if (count <= 6) return '31%';
     if (count <= 9) return '31%';
     return '23%';
@@ -77,13 +77,24 @@ function getGridBasis(count: number): string {
 // ─── SummaryPanel (for Summary Modal) — Beautiful, well-formatted ────
 
 const SummaryPanel = ({
-    answers, questions, currentPhase,
+    answers, questions, currentPhase, isLight = false,
 }: {
-    answers: Record<string, any>; questions: SurveyQuestion[]; currentPhase: string;
+    answers: Record<string, any>; questions: SurveyQuestion[]; currentPhase: string; isLight?: boolean;
 }) => {
     const completeness = useMemo(() => computeCompleteness(answers, questions), [answers, questions]);
     const answeredCount = Object.keys(answers).filter(k => answers[k] !== undefined && answers[k] !== 'SKIPPED').length;
     const skippedCount = Object.values(answers).filter(v => v === 'SKIPPED').length;
+
+    // Theme tokens — fall back to dark THEME when light mode is off
+    const tMain = isLight ? lightColors.text.primary : THEME.textMain;
+    const tSub = isLight ? lightColors.text.secondary : THEME.textSub;
+    const tDim = isLight ? lightColors.text.tertiary : THEME.textDim;
+    const tAccent = isLight ? '#1F6B7E' : THEME.accent;
+    const tWarn = isLight ? lightColors.warning.main : THEME.warning;
+    const tBarTrack = isLight ? 'rgba(82, 66, 45, 0.12)' : 'rgba(255,255,255,0.08)';
+    const tDivider = isLight ? lightColors.border.light : 'rgba(100,116,139,0.12)';
+    const tCardBg = isLight ? 'rgba(82, 66, 45, 0.05)' : 'rgba(255,255,255,0.03)';
+    const tSkippedBg = isLight ? 'rgba(168, 120, 56, 0.10)' : 'rgba(245, 158, 11, 0.06)';
 
     // Group answers by phase
     const phaseGroups = useMemo(() => {
@@ -106,54 +117,54 @@ const SummaryPanel = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Header stats */}
-            <div style={{ padding: 'clamp(16px, 2vh, 24px) clamp(20px, 2.5vw, 32px)', borderBottom: '1px solid rgba(100,116,139,0.12)', flexShrink: 0 }}>
+            <div style={{ padding: 'clamp(16px, 2vh, 24px) clamp(20px, 2.5vw, 32px)', borderBottom: `1px solid ${tDivider}`, flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span style={{ fontSize: 'clamp(14px, 1.8vh, 18px)', color: THEME.textMain, fontWeight: 700 }}>
+                    <span style={{ fontSize: 'clamp(14px, 1.8vh, 18px)', color: tMain, fontWeight: 700 }}>
                         Overall Progress
                     </span>
-                    <span style={{ fontSize: 'clamp(18px, 2.2vh, 24px)', color: THEME.accent, fontWeight: 700 }}>
+                    <span style={{ fontSize: 'clamp(18px, 2.2vh, 24px)', color: tAccent, fontWeight: 700 }}>
                         {completeness.percentage}%
                     </span>
                 </div>
-                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
-                    <div style={{ width: `${completeness.percentage}%`, height: '100%', background: THEME.accent, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                <div style={{ width: '100%', height: '6px', background: tBarTrack, borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
+                    <div style={{ width: `${completeness.percentage}%`, height: '100%', background: tAccent, borderRadius: '3px', transition: 'width 0.3s ease' }} />
                 </div>
                 <div style={{ display: 'flex', gap: 'clamp(16px, 2vw, 32px)' }}>
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 'clamp(20px, 2.5vh, 28px)', fontWeight: 700, color: THEME.accent }}>{answeredCount}</div>
-                        <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: THEME.textSub, fontWeight: 600 }}>Answered</div>
+                        <div style={{ fontSize: 'clamp(20px, 2.5vh, 28px)', fontWeight: 700, color: tAccent }}>{answeredCount}</div>
+                        <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: tSub, fontWeight: 600 }}>Answered</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 'clamp(20px, 2.5vh, 28px)', fontWeight: 700, color: THEME.warning }}>{skippedCount}</div>
-                        <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: THEME.textSub, fontWeight: 600 }}>Skipped</div>
+                        <div style={{ fontSize: 'clamp(20px, 2.5vh, 28px)', fontWeight: 700, color: tWarn }}>{skippedCount}</div>
+                        <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: tSub, fontWeight: 600 }}>Skipped</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 'clamp(20px, 2.5vh, 28px)', fontWeight: 700, color: THEME.textSub }}>{completeness.total - answeredCount - skippedCount}</div>
-                        <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: THEME.textSub, fontWeight: 600 }}>Remaining</div>
+                        <div style={{ fontSize: 'clamp(20px, 2.5vh, 28px)', fontWeight: 700, color: tSub }}>{completeness.total - answeredCount - skippedCount}</div>
+                        <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: tSub, fontWeight: 600 }}>Remaining</div>
                     </div>
                 </div>
             </div>
             {/* Per-phase answers */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(12px, 1.5vh, 20px) clamp(20px, 2.5vw, 32px)' }}>
                 {phaseGroups.length === 0 ? (
-                    <div style={{ color: THEME.textDim, fontStyle: 'italic', padding: '40px 0', textAlign: 'center', fontSize: 'clamp(15px, 1.8vh, 19px)' }}>
+                    <div style={{ color: tDim, fontStyle: 'italic', padding: '40px 0', textAlign: 'center', fontSize: 'clamp(15px, 1.8vh, 19px)' }}>
                         No answers recorded yet. Start answering questions to see your summary here.
                     </div>
                 ) : (
                     phaseGroups.map(group => (
                         <div key={group.phase} style={{ marginBottom: 'clamp(16px, 2vh, 28px)' }}>
                             <div style={{
-                                color: group.phase === currentPhase ? THEME.accent : THEME.textMain,
+                                color: group.phase === currentPhase ? tAccent : tMain,
                                 fontSize: 'clamp(16px, 2vh, 22px)',
                                 fontWeight: 700,
                                 textTransform: 'uppercase',
                                 letterSpacing: '1.5px',
                                 marginBottom: 'clamp(8px, 1vh, 14px)',
                                 paddingBottom: '8px',
-                                borderBottom: `2px solid ${group.phase === currentPhase ? THEME.accent + '40' : 'rgba(100,116,139,0.12)'}`,
+                                borderBottom: `2px solid ${group.phase === currentPhase ? (isLight ? 'rgba(31, 107, 126, 0.42)' : THEME.accent + '40') : tDivider}`,
                             }}>
                                 {group.phase}
-                                <span style={{ fontSize: 'clamp(12px, 1.3vh, 14px)', color: THEME.textSub, fontWeight: 500, marginLeft: '10px', textTransform: 'none', letterSpacing: '0' }}>
+                                <span style={{ fontSize: 'clamp(12px, 1.3vh, 14px)', color: tSub, fontWeight: 500, marginLeft: '10px', textTransform: 'none', letterSpacing: '0' }}>
                                     ({group.items.length} {group.items.length === 1 ? 'answer' : 'answers'})
                                 </span>
                             </div>
@@ -161,15 +172,15 @@ const SummaryPanel = ({
                                 <div key={i} style={{
                                     marginBottom: 'clamp(8px, 1vh, 14px)',
                                     padding: 'clamp(8px, 1vh, 14px) clamp(10px, 1.2vw, 16px)',
-                                    background: item.skipped ? 'rgba(245, 158, 11, 0.06)' : 'rgba(255,255,255,0.03)',
+                                    background: item.skipped ? tSkippedBg : tCardBg,
                                     borderRadius: '10px',
-                                    borderLeft: `3px solid ${item.skipped ? THEME.warning : THEME.accent}`,
+                                    borderLeft: `3px solid ${item.skipped ? tWarn : tAccent}`,
                                 }}>
-                                    <div style={{ color: THEME.textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', marginBottom: '4px', lineHeight: 1.3 }}>
+                                    <div style={{ color: tSub, fontSize: 'clamp(12px, 1.4vh, 15px)', marginBottom: '4px', lineHeight: 1.3 }}>
                                         {item.question}
                                     </div>
                                     <div style={{
-                                        color: item.skipped ? THEME.warning : THEME.textMain,
+                                        color: item.skipped ? tWarn : tMain,
                                         fontSize: 'clamp(15px, 1.8vh, 20px)',
                                         fontWeight: 600,
                                         fontStyle: item.skipped ? 'italic' : 'normal',
@@ -188,36 +199,43 @@ const SummaryPanel = ({
 
 // ─── SaveConfirmModal ───────────────────────────────────────
 
-const SaveConfirmModal = ({ mode, onClose }: { mode: 'generate' | 'save'; onClose: () => void }) => (
-    <div style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.78)',
-    }}>
+const SaveConfirmModal = ({ mode, onClose, isLight = false }: { mode: 'generate' | 'save'; onClose: () => void; isLight?: boolean }) => {
+    const tBg = isLight ? lightColors.background.elevated : THEME.panelBg;
+    const tBorder = isLight ? lightColors.border.main : THEME.border;
+    const tMain = isLight ? lightColors.text.primary : THEME.textMain;
+    const tSub = isLight ? lightColors.text.secondary : THEME.textSub;
+    const tAccent = isLight ? '#1F6B7E' : THEME.accent;
+    return (
         <div style={{
-            background: THEME.panelBg, border: `1px solid ${THEME.border}`,
-            borderRadius: '20px', padding: 'clamp(24px, 4vh, 48px)', maxWidth: '480px', width: '90%',
-            textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
-            fontFamily: UI_FONT,
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isLight ? 'rgba(74, 58, 42, 0.55)' : 'rgba(0,0,0,0.78)',
         }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>
-                {mode === 'generate' ? '\u2705' : '\u{1F4BE}'}
+            <div style={{
+                background: tBg, border: `1px solid ${tBorder}`,
+                borderRadius: '20px', padding: 'clamp(24px, 4vh, 48px)', maxWidth: '480px', width: '90%',
+                textAlign: 'center', boxShadow: isLight ? '0 12px 28px rgba(82, 66, 45, 0.20)' : '0 8px 24px rgba(0,0,0,0.24)',
+                fontFamily: UI_FONT,
+            }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+                    {mode === 'generate' ? '\u2705' : '\u{1F4BE}'}
+                </div>
+                <h2 style={{ color: tMain, fontSize: 'clamp(18px, 2.5vh, 28px)', marginBottom: '12px', fontWeight: 700 }}>
+                    {mode === 'generate' ? 'Plan Generated!' : 'Progress Saved'}
+                </h2>
+                <p style={{ color: tSub, fontSize: 'clamp(13px, 1.6vh, 17px)', lineHeight: 1.5, marginBottom: '24px' }}>
+                    {mode === 'generate'
+                        ? 'Files saved to survey_data folder. You can review and refine these with your architect or caregiver.'
+                        : 'Your progress has been saved. You can resume anytime from Design Home.'}
+                </p>
+                <GazeButton id="modal-ok" onClick={onClose} gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
+                    style={{ padding: 'clamp(12px, 1.8vh, 20px) clamp(32px, 5vw, 64px)', background: tAccent, color: '#FFF', borderRadius: '12px', fontSize: 'clamp(14px, 1.8vh, 20px)', fontWeight: 700, border: 'none' }}>
+                    OK {mode === 'generate' ? '\u2014 Return to Home' : ''}
+                </GazeButton>
             </div>
-            <h2 style={{ color: THEME.textMain, fontSize: 'clamp(18px, 2.5vh, 28px)', marginBottom: '12px', fontWeight: 700 }}>
-                {mode === 'generate' ? 'Plan Generated!' : 'Progress Saved'}
-            </h2>
-            <p style={{ color: THEME.textSub, fontSize: 'clamp(13px, 1.6vh, 17px)', lineHeight: 1.5, marginBottom: '24px' }}>
-                {mode === 'generate'
-                    ? 'Files saved to survey_data folder. You can review and refine these with your architect or caregiver.'
-                    : 'Your progress has been saved. You can resume anytime from Design Home.'}
-            </p>
-            <GazeButton id="modal-ok" onClick={onClose} gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={true}
-                style={{ padding: 'clamp(12px, 1.8vh, 20px) clamp(32px, 5vw, 64px)', background: THEME.accent, color: '#FFF', borderRadius: '12px', fontSize: 'clamp(14px, 1.8vh, 20px)', fontWeight: 700, border: 'none' }}>
-                OK {mode === 'generate' ? '\u2014 Return to Home' : ''}
-            </GazeButton>
         </div>
-    </div>
-);
+    );
+};
 
 // ─── Main Screen Component ─────────────────────────────────
 
@@ -230,8 +248,24 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     const [showSummary, setShowSummary] = useState(false);
     const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
 
-    const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
+    const { isGazeEnabled, toggleGaze } = useGazeControl();
     const { isLight } = useTheme();
+
+    // Theme-aware text + accent tokens. THEME.* is dark-only (light text, dark
+    // bg). When isLight=true, override text colors to dark warm-brown so they
+    // read clearly on the cream surface. Accent stays cyan but switches to a
+    // deeper variant for adequate contrast on light bg.
+    const T_textMain = isLight ? lightColors.text.primary : THEME.textMain;
+    const T_textSub = isLight ? lightColors.text.secondary : THEME.textSub;
+    const T_textDim = isLight ? lightColors.text.tertiary : THEME.textDim;
+    const T_accent = isLight ? '#1F6B7E' : THEME.accent;            // deeper teal for light bg
+    const T_accentSoft = isLight ? 'rgba(31, 107, 126, 0.12)' : 'rgba(100, 181, 246, 0.08)';
+    const T_accentBorder = isLight ? 'rgba(31, 107, 126, 0.42)' : `${THEME.accent}40`;
+    const T_warning = isLight ? lightColors.warning.main : THEME.warning;     // antique amber on light
+    const T_warningSoft = isLight ? 'rgba(168, 120, 56, 0.10)' : 'rgba(245, 158, 11, 0.06)';
+    const T_warningBorder = isLight ? 'rgba(168, 120, 56, 0.36)' : 'rgba(245, 158, 11, 0.25)';
+    const T_optionBg = isLight ? lightColors.background.elevated : THEME.panelBg;
+    const T_optionBorder = isLight ? `1.5px solid ${lightColors.border.main}` : '1px solid rgba(100, 116, 139, 0.2)';
     const { saveSurvey, compileSurvey, snapshotSurvey, surveyData } = useWS();
     const scrollViewRef = useRef<HTMLDivElement>(null);
     const snapshotSurveyRef = useRef(snapshotSurvey);
@@ -273,19 +307,6 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             setSurveyGazeTimestamp(0);
         }
     }, [isGazeEnabled]);
-
-    // Center ENABLE GAZE button: toggle local + sync global
-    const handleSurveyGazeToggle = () => {
-        const next = !surveyGazeActive;
-        setSurveyGazeActive(next);
-        if (next) {
-            setSurveyGazeTimestamp(Date.now());
-        } else {
-            setSurveyGazeTimestamp(0);
-        }
-        // Keep global NavBar toggle in sync
-        if (next !== isGazeEnabled) toggleGaze();
-    };
 
     // Effective state for option buttons (both toggles in sync, so surveyGazeActive suffices)
     const effectiveGazeActive = surveyGazeActive;
@@ -415,7 +436,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
         if (activeQuestions.length > 0 && qIndex >= activeQuestions.length) {
             setQIndex(activeQuestions.length - 1);
         }
-        return <div style={{ color: THEME.textMain, padding: 40, background: THEME.bg }}>Loading Question...</div>;
+        return <div style={{ color: T_textMain, padding: 40, background: isLight ? lightColors.background.primary : THEME.bg }}>Loading Question...</div>;
     }
 
     // ── Derived: current phase index, options, grid basis ──
@@ -522,8 +543,8 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
-            backgroundColor: THEME.bg,
-            color: THEME.textMain,
+            backgroundColor: isLight ? lightColors.background.primary : THEME.bg,
+            color: T_textMain,
             overflow: 'hidden',
             fontFamily: UI_FONT,
         }}>
@@ -539,22 +560,27 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             {/* ═══ ROW 2: Phase Tabs + Progress (HORIZONTAL, CLICKABLE) ═══ */}
             <div style={{
                 flexShrink: 0,
-                borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
-                background: 'rgba(0, 0, 0, 0.15)',
+                borderBottom: `1px solid ${isLight ? lightColors.border.light : 'rgba(148, 163, 184, 0.12)'}`,
+                background: isLight ? lightColors.background.elevated : 'rgba(0, 0, 0, 0.15)',
                 padding: 'clamp(6px, 0.8vh, 10px) clamp(8px, 1vw, 16px)',
             }}>
                 {/* Phase Tabs — comfortable margins, stacked multi-word labels */}
                 <div style={{
                     display: 'flex',
                     alignItems: 'stretch',
-                    justifyContent: 'space-evenly',
-                    gap: 'clamp(6px, 0.8vw, 14px)',
-                    width: '80%',
-                    margin: '0 auto',
+                    justifyContent: 'stretch',
+                    gap: 0,
+                    width: '100%',
+                    margin: 0,
+                    padding: '0 clamp(8px, 1.2vw, 18px)',
                 }}>
                     {UNIQUE_PHASES.map((phase, i) => {
                         const isCurrent = phase === currentQ.phase;
                         const isPast = i < currentPhaseIndex;
+                        const isLastTab = i === UNIQUE_PHASES.length - 1;
+                        const tabDividerColor = isLight
+                            ? 'rgba(82, 66, 45, 0.18)'
+                            : 'rgba(148, 163, 184, 0.18)';
                         // Split multi-word labels into stacked lines
                         const words = phase.split(' ');
                         const isMultiWord = words.length > 1;
@@ -567,17 +593,20 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                 gazeEnabledTimestamp={effectiveGazeTimestamp}
                                 isDarkMode={isDarkMode}
                                 style={{
+                                    flex: '1 1 0',
+                                    minWidth: 0,
                                     padding: isMultiWord
-                                        ? 'clamp(4px, 0.6vh, 8px) clamp(10px, 1.2vw, 18px)'
-                                        : 'clamp(10px, 1.4vh, 16px) clamp(10px, 1.2vw, 18px)',
-                                    fontSize: '1.1rem',
+                                        ? 'clamp(8px, 1vh, 14px) clamp(8px, 1vw, 16px)'
+                                        : 'clamp(14px, 1.8vh, 22px) clamp(8px, 1vw, 16px)',
+                                    fontSize: 'clamp(15px, 1.7vh, 19px)',
                                     fontWeight: 700,
                                     fontFamily: UI_FONT,
-                                    color: isCurrent ? THEME.accent : '#FFFFFF',
-                                    background: isCurrent ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+                                    color: isCurrent ? T_accent : T_textMain,
+                                    background: isCurrent ? T_accentSoft : 'transparent',
                                     border: 'none',
+                                    borderRight: isLastTab ? 'none' : `1px solid ${tabDividerColor}`,
                                     borderRadius: '6px 6px 0 0',
-                                    borderBottom: isCurrent ? `3px solid ${THEME.accent}` : '3px solid transparent',
+                                    borderBottom: isCurrent ? `3px solid ${T_accent}` : '3px solid transparent',
                                     whiteSpace: isMultiWord ? 'normal' : 'nowrap',
                                     textAlign: 'center' as const,
                                     lineHeight: isMultiWord ? 1.15 : 1,
@@ -609,7 +638,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                 }}>
                     <span style={{
                         fontSize: 'clamp(13px, 1.6vh, 17px)',
-                        color: THEME.textSub,
+                        color: T_textSub,
                         fontWeight: 700,
                         whiteSpace: 'nowrap',
                     }}>
@@ -618,14 +647,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     <div style={{
                         flex: 1,
                         height: '5px',
-                        background: 'rgba(255,255,255,0.08)',
+                        background: isLight ? 'rgba(82, 66, 45, 0.12)' : 'rgba(255,255,255,0.08)',
                         borderRadius: '3px',
                         overflow: 'hidden',
                     }}>
                         <div style={{
                             width: `${((qIndex + 1) / activeQuestions.length) * 100}%`,
                             height: '100%',
-                            background: THEME.accent,
+                            background: T_accent,
                             borderRadius: '3px',
                             transition: 'width 0.3s ease',
                         }} />
@@ -647,15 +676,15 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'flex-start',
-                    padding: 'clamp(18px, 3vh, 36px) clamp(16px, 1.8vw, 28px)',
-                    borderRight: '1px solid rgba(148, 163, 184, 0.12)',
+                    padding: 'clamp(18px, 3vh, 36px) clamp(16px, 1.8vw, 28px) clamp(140px, 18vh, 200px)',
+                    borderRight: `1px solid ${isLight ? lightColors.border.light : 'rgba(148, 163, 184, 0.12)'}`,
                     overflowY: 'auto',
                 }}>
                     {/* Phase Label */}
                     <div style={{
                         fontSize: 'clamp(18px, 2.3vh, 25px)',
                         fontWeight: 800,
-                        color: THEME.accent,
+                        color: T_accent,
                         textTransform: 'uppercase',
                         letterSpacing: '1.5px',
                         marginBottom: 'clamp(10px, 1.5vh, 18px)',
@@ -669,7 +698,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         fontWeight: 700,
                         lineHeight: 1.35,
                         marginBottom: 'clamp(12px, 1.8vh, 22px)',
-                        color: THEME.textMain,
+                        color: T_textMain,
                     }}>
                         {currentQ.text}
                     </div>
@@ -678,7 +707,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     {currentQ.subtext && (
                         <div style={{
                             fontSize: 'clamp(17px, 2.1vh, 23px)',
-                            color: THEME.textSub,
+                            color: T_textSub,
                             lineHeight: 1.5,
                         }}>
                             {currentQ.subtext}
@@ -689,7 +718,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     {currentQ.helpText && (
                         <div style={{
                             fontSize: 'clamp(16px, 1.9vh, 21px)',
-                            color: THEME.warning,
+                            color: T_warning,
                             lineHeight: 1.45,
                             fontStyle: 'italic',
                             marginTop: 'clamp(8px, 1.2vh, 16px)',
@@ -703,7 +732,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         <div style={{
                             marginTop: 'clamp(10px, 1.5vh, 20px)',
                             fontSize: 'clamp(16px, 1.9vh, 21px)',
-                            color: THEME.warning,
+                            color: T_warning,
                             fontStyle: 'italic',
                             lineHeight: 1.45,
                         }}>
@@ -727,7 +756,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             flex: 1,
                             overflowY: 'auto',
                             padding: 'clamp(16px, 2.2vh, 28px) clamp(18px, 2.2vw, 30px)',
-                            paddingBottom: 'clamp(190px, 26vh, 310px)',
+                            paddingBottom: 'clamp(220px, 28vh, 320px)',
                             display: 'flex',
                             flexDirection: 'column',
                         }}
@@ -736,14 +765,16 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         <div style={{
                             display: 'flex',
                             flexWrap: 'wrap',
-                            gap: 'clamp(10px, 1.3vh, 18px)',
-                            justifyContent: 'flex-start',
+                            gap: 'clamp(14px, 1.8vh, 24px)',
+                            justifyContent: currentOptions.length <= 4 ? 'center' : 'flex-start',
                             alignContent: 'flex-start',
                         }}>
 
                             {/* ── GRID / COORDINATE-INPUT ── */}
                             {(currentQ.type === 'grid' || currentQ.type === 'coordinate-input') &&
-                                currentOptions.map((opt: string) => (
+                                currentOptions.map((opt: string) => {
+                                    const isFewCards = currentOptions.length <= 4;
+                                    return (
                                     <GazeButton
                                         key={opt}
                                         id={`opt-${opt}`}
@@ -752,25 +783,29 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
                                         isDarkMode={isDarkMode}
                                         style={{
-                                            padding: 'clamp(16px, 2.2vh, 26px) clamp(14px, 1.6vw, 24px)',
-                                            fontSize: 'clamp(20px, 2.6vh, 28px)',
-                                            fontWeight: 600,
-                                            background: THEME.panelBg,
-                                            border: '1px solid rgba(100, 116, 139, 0.2)',
-                                            borderRadius: '14px',
-                                            color: THEME.textMain,
-                                            flex: `1 0 ${gridBasis}`,
+                                            padding: 'clamp(28px, 4vh, 48px) clamp(20px, 2.2vw, 32px)',
+                                            fontSize: 'clamp(24px, 3.1vh, 34px)',
+                                            fontWeight: 700,
+                                            background: T_optionBg,
+                                            border: T_optionBorder,
+                                            borderRadius: '18px',
+                                            color: T_textMain,
+                                            flex: `0 1 ${gridBasis}`,
                                             maxWidth: gridBasis,
-                                            minHeight: 'clamp(68px, 9vh, 100px)',
+                                            minHeight: isFewCards
+                                                ? 'clamp(140px, 19vh, 200px)'
+                                                : 'clamp(86px, 12vh, 132px)',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             textAlign: 'center' as const,
+                                            boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.08)' : 'none',
                                         }}
                                     >
                                         {opt}
                                     </GazeButton>
-                                ))
+                                    );
+                                })
                             }
 
                             {/* ── MULTI-SELECT ── */}
@@ -787,22 +822,23 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             gazeEnabledTimestamp={effectiveGazeTimestamp}
                                             isDarkMode={isDarkMode}
                                             style={{
-                                                padding: 'clamp(16px, 2.2vh, 26px) clamp(14px, 1.6vw, 24px)',
-                                                fontSize: 'clamp(20px, 2.6vh, 28px)',
-                                                fontWeight: 600,
-                                                background: selected ? 'rgba(100, 181, 246, 0.18)' : THEME.panelBg,
+                                                padding: 'clamp(22px, 3vh, 36px) clamp(20px, 2.2vw, 32px)',
+                                                fontSize: 'clamp(24px, 3.1vh, 34px)',
+                                                fontWeight: 700,
+                                                background: selected ? T_accentSoft : T_optionBg,
                                                 border: selected
-                                                    ? `2px solid ${THEME.accent}`
-                                                    : '1px solid rgba(100, 116, 139, 0.2)',
-                                                borderRadius: '14px',
-                                                color: THEME.textMain,
+                                                    ? `2px solid ${T_accent}`
+                                                    : T_optionBorder,
+                                                borderRadius: '16px',
+                                                color: T_textMain,
                                                 flex: `1 0 ${gridBasis}`,
                                                 maxWidth: gridBasis,
-                                                minHeight: 'clamp(68px, 9vh, 100px)',
+                                                minHeight: 'clamp(86px, 12vh, 132px)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 textAlign: 'center' as const,
+                                                boxShadow: isLight ? '0 2px 6px rgba(82, 66, 45, 0.06)' : 'none',
                                             }}
                                         >
                                             {selected ? '\u2611 ' : '\u2610 '}{opt}
@@ -822,18 +858,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
                                         isDarkMode={isDarkMode}
                                         style={{
-                                            padding: 'clamp(18px, 2.5vh, 28px)',
-                                            fontSize: 'clamp(21px, 2.8vh, 30px)',
-                                            background: THEME.accent,
+                                            padding: 'clamp(24px, 3.2vh, 38px)',
+                                            fontSize: 'clamp(24px, 3.2vh, 34px)',
+                                            background: T_accent,
                                             color: '#FFF',
                                             fontWeight: 700,
-                                            borderRadius: '14px',
+                                            borderRadius: '16px',
                                             width: '100%',
-                                            minHeight: 'clamp(68px, 9vh, 100px)',
+                                            minHeight: 'clamp(86px, 12vh, 132px)',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             border: 'none',
+                                            boxShadow: isLight ? '0 4px 10px rgba(31, 107, 126, 0.18)' : 'none',
                                         }}
                                     >
                                         {opt}
@@ -850,18 +887,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     gazeEnabledTimestamp={effectiveGazeTimestamp}
                                     isDarkMode={isDarkMode}
                                     style={{
-                                        padding: 'clamp(16px, 2.2vh, 26px)',
-                                        background: THEME.accent,
+                                        padding: 'clamp(22px, 3vh, 36px)',
+                                        background: T_accent,
                                         color: '#FFF',
-                                        borderRadius: '14px',
+                                        borderRadius: '16px',
                                         width: '100%',
-                                        fontSize: 'clamp(20px, 2.6vh, 28px)',
+                                        fontSize: 'clamp(24px, 3.1vh, 34px)',
                                         fontWeight: 700,
                                         border: 'none',
-                                        minHeight: 'clamp(68px, 9vh, 100px)',
+                                        minHeight: 'clamp(86px, 12vh, 132px)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
+                                        boxShadow: isLight ? '0 4px 10px rgba(31, 107, 126, 0.18)' : 'none',
                                     }}
                                 >
                                     Continue
@@ -874,7 +912,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     width: '100%',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: 'clamp(8px, 1vh, 14px)',
+                                    gap: 'clamp(10px, 1.2vh, 16px)',
                                 }}>
                                     <textarea
                                         value={answers[currentQ.dataKey!] || ''}
@@ -884,17 +922,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         })}
                                         style={{
                                             width: '100%',
-                                            minHeight: 'clamp(80px, 12vh, 120px)',
-                                            padding: '14px',
-                                            fontSize: 'clamp(16px, 2vh, 20px)',
-                                            background: THEME.panelBg,
-                                            border: '1px solid rgba(100, 116, 139, 0.2)',
-                                            borderRadius: '14px',
-                                            color: THEME.textMain,
+                                            minHeight: 'clamp(100px, 14vh, 150px)',
+                                            padding: '18px',
+                                            fontSize: 'clamp(18px, 2.3vh, 24px)',
+                                            background: T_optionBg,
+                                            border: T_optionBorder,
+                                            borderRadius: '16px',
+                                            color: T_textMain,
                                             resize: 'none',
+                                            fontFamily: UI_FONT,
+                                            boxShadow: isLight ? '0 2px 6px rgba(82, 66, 45, 0.06)' : 'none',
                                         }}
                                     />
-                                    <div style={{ display: 'flex', gap: '14px' }}>
+                                    <div style={{ display: 'flex', gap: '16px' }}>
                                         <GazeButton
                                             id="skip-text"
                                             onClick={() => handleAnswer('Skipped')}
@@ -903,14 +943,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             isDarkMode={isDarkMode}
                                             style={{
                                                 flex: 1,
-                                                padding: 'clamp(12px, 1.5vh, 18px)',
-                                                background: 'transparent',
-                                                border: '1px solid rgba(255,255,255,0.15)',
-                                                color: THEME.textSub,
-                                                borderRadius: '12px',
-                                                fontSize: 'clamp(15px, 1.8vh, 20px)',
-                                                fontWeight: 600,
-                                                minHeight: 'clamp(48px, 6vh, 60px)',
+                                                padding: 'clamp(18px, 2.4vh, 26px)',
+                                                background: T_optionBg,
+                                                border: T_optionBorder,
+                                                color: T_textSub,
+                                                borderRadius: '14px',
+                                                fontSize: 'clamp(18px, 2.2vh, 24px)',
+                                                fontWeight: 700,
+                                                minHeight: 'clamp(64px, 8.5vh, 88px)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -926,17 +966,18 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             isDarkMode={isDarkMode}
                                             style={{
                                                 flex: 2,
-                                                padding: 'clamp(12px, 1.5vh, 18px)',
-                                                background: THEME.accent,
+                                                padding: 'clamp(18px, 2.4vh, 26px)',
+                                                background: T_accent,
                                                 color: '#FFF',
-                                                borderRadius: '12px',
-                                                fontSize: 'clamp(15px, 1.8vh, 20px)',
+                                                borderRadius: '14px',
+                                                fontSize: 'clamp(18px, 2.2vh, 24px)',
                                                 fontWeight: 700,
                                                 border: 'none',
-                                                minHeight: 'clamp(48px, 6vh, 60px)',
+                                                minHeight: 'clamp(64px, 8.5vh, 88px)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
+                                                boxShadow: isLight ? '0 4px 10px rgba(31, 107, 126, 0.18)' : 'none',
                                             }}
                                         >
                                             SUBMIT
@@ -951,16 +992,17 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     <div style={{
                                         maxHeight: 'clamp(200px, 30vh, 350px)',
                                         overflowY: 'auto',
-                                        background: 'rgba(0,0,0,0.2)',
-                                        borderRadius: '12px',
-                                        padding: '14px',
-                                        marginBottom: '12px',
+                                        background: isLight ? 'rgba(82, 66, 45, 0.06)' : 'rgba(0,0,0,0.2)',
+                                        border: isLight ? `1px solid ${lightColors.border.light}` : 'none',
+                                        borderRadius: '14px',
+                                        padding: '16px',
+                                        marginBottom: '14px',
                                     }}>
                                         <pre style={{
                                             whiteSpace: 'pre-wrap',
                                             fontFamily: 'monospace',
-                                            color: THEME.textMain,
-                                            fontSize: 'clamp(12px, 1.3vh, 14px)',
+                                            color: T_textMain,
+                                            fontSize: 'clamp(13px, 1.5vh, 16px)',
                                         }}>
                                             {JSON.stringify(answers, null, 2)}
                                         </pre>
@@ -972,18 +1014,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
                                         isDarkMode={isDarkMode}
                                         style={{
-                                            padding: 'clamp(16px, 2.2vh, 26px)',
-                                            background: THEME.accent,
+                                            padding: 'clamp(22px, 3vh, 36px)',
+                                            background: T_accent,
                                             color: '#FFF',
-                                            borderRadius: '14px',
+                                            borderRadius: '16px',
                                             width: '100%',
                                             fontWeight: 700,
                                             border: 'none',
-                                            minHeight: 'clamp(68px, 9vh, 100px)',
+                                            minHeight: 'clamp(86px, 12vh, 132px)',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            fontSize: 'clamp(20px, 2.6vh, 28px)',
+                                            fontSize: 'clamp(24px, 3.1vh, 34px)',
+                                            boxShadow: isLight ? '0 4px 10px rgba(31, 107, 126, 0.18)' : 'none',
                                         }}
                                     >
                                         Proceed to Final Step
@@ -1001,26 +1044,49 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                 Layout: [ BACK ] ←40px→ [ ◉ GAZE ] ←40px→ [ SUMMARY ] [ CONFIRM? ] [ SKIP ]
                 Vertical Stack (top→bottom): Content → Command Bar → Dead Zone
             */}
+            {/* Fade overlay above shelf — only over the options (right) area; never over the question (left) column */}
             <div style={{
                 position: 'fixed',
-                bottom: 'clamp(45px, 6.5vh, 70px)',
-                left: '53%',
-                transform: 'translateX(-50%)',
-                width: 'clamp(700px, 78%, 1300px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1999,
-                background: 'transparent',
-                padding: 'clamp(10px, 1.4vh, 18px) clamp(16px, 2vw, 32px)',
-            }}>
+                left: 'clamp(220px, 24%, 380px)',
+                right: 0,
+                bottom: 0,
+                height: 'clamp(180px, 22vh, 260px)',
+                pointerEvents: 'none',
+                zIndex: 1998,
+                background: isLight
+                    ? `linear-gradient(180deg, ${lightColors.background.primary}00 0%, ${lightColors.background.primary}d8 28%, ${lightColors.background.primary} 60%, ${lightColors.background.primary} 100%)`
+                    : `linear-gradient(180deg, ${THEME.bg}00 0%, ${THEME.bg}cc 28%, ${THEME.bg} 60%, ${THEME.bg} 100%)`,
+            }} />
 
-                {/* ── LEFT WING: BACK ── */}
+            <div style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 'clamp(220px, 24%, 380px)',
+                right: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                zIndex: 1999,
+                background: isLight ? lightColors.background.primary : THEME.bg,
+                paddingBottom: 'clamp(28px, 4vh, 52px)',
+            }}>
+                {/* Subtle horizontal divider that visually connects the row */}
                 <div style={{
-                    flex: 1,
+                    height: '1px',
+                    width: 'min(94%, 1300px)',
+                    margin: '0 auto',
+                    background: isLight
+                        ? 'linear-gradient(90deg, rgba(82, 66, 45, 0) 0%, rgba(82, 66, 45, 0.28) 25%, rgba(82, 66, 45, 0.28) 75%, rgba(82, 66, 45, 0) 100%)'
+                        : 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.16) 75%, rgba(255,255,255,0) 100%)',
+                    marginBottom: 'clamp(14px, 2vh, 22px)',
+                }} />
+
+                <div style={{
                     display: 'flex',
-                    justifyContent: 'flex-end',
-                    paddingRight: 'clamp(30px, 4vw, 60px)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 'clamp(40px, 4.5vw, 76px)',
+                    padding: '0 clamp(20px, 2.5vw, 40px)',
                 }}>
                     <GazeButton
                         id="nav-back"
@@ -1029,79 +1095,23 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         gazeEnabledTimestamp={effectiveGazeTimestamp}
                         isDarkMode={isDarkMode}
                         style={{
-                            padding: 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 36px)',
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '2px solid rgba(255,255,255,0.15)',
-                            borderRadius: '14px',
-                            color: THEME.textMain,
-                            fontSize: 'clamp(15px, 1.9vh, 21px)',
+                            padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
+                            background: isLight ? lightColors.background.elevated : 'rgba(255,255,255,0.04)',
+                            border: isLight ? `1.5px solid ${lightColors.border.main}` : '2px solid rgba(255,255,255,0.15)',
+                            borderRadius: '18px',
+                            color: T_textMain,
+                            fontSize: 'clamp(21px, 2.6vh, 29px)',
                             fontWeight: 700,
-                            minHeight: 'clamp(50px, 6.5vh, 68px)',
-                            minWidth: 'clamp(110px, 11vw, 155px)',
+                            minHeight: 'clamp(96px, 12.5vh, 134px)',
+                            minWidth: 'clamp(210px, 18vw, 280px)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : '0 4px 14px rgba(0,0,0,0.20)',
                         }}
                     >
                         {'← BACK'}
                     </GazeButton>
-                </div>
-
-                {/* ── CENTER ANCHOR: ENABLE GAZE (circular, prominent) ── */}
-                {/* v15: Toggles LOCAL survey gaze, not global. Resets per question. */}
-                <GazeButton
-                    id="gaze-toggle-survey"
-                    onClick={handleSurveyGazeToggle}
-                    gazeEnabled={true}
-                    alwaysActive={true}
-                    gazeEnabledTimestamp={lastEnabledTimestamp}
-                    isDarkMode={isDarkMode}
-                    style={{
-                        flexShrink: 0,
-                        padding: '0',
-                        width: 'clamp(100px, 13vh, 165px)',
-                        height: 'clamp(100px, 13vh, 165px)',
-                        minWidth: 'clamp(100px, 13vh, 165px)',
-                        borderRadius: '50%',
-                        background: effectiveGazeActive ? THEME.successSubtle : THEME.cardBg,
-                        border: `3px solid ${effectiveGazeActive ? THEME.success : THEME.border}`,
-                        color: effectiveGazeActive ? THEME.success : THEME.textSub,
-                        boxShadow: effectiveGazeActive
-                            ? '0 6px 18px rgba(0,0,0,0.18)'
-                            : '0 6px 18px rgba(0,0,0,0.16)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                        transition: 'all 200ms ease',
-                        fontFamily: UI_FONT,
-                    }}
-                >
-                    <div style={{
-                        width: 'clamp(9px, 1.3vh, 14px)',
-                        height: 'clamp(9px, 1.3vh, 14px)',
-                        borderRadius: '50%',
-                        backgroundColor: effectiveGazeActive ? THEME.success : THEME.textDim,
-                        marginBottom: '2px',
-                    }} />
-                    <span style={{ fontSize: 'clamp(11px, 1.4vh, 15px)', fontWeight: 700, lineHeight: 1 }}>
-                        {effectiveGazeActive ? 'GAZE' : 'ENABLE'}
-                    </span>
-                    <span style={{ fontSize: 'clamp(11px, 1.4vh, 15px)', fontWeight: 700, lineHeight: 1 }}>
-                        {effectiveGazeActive ? 'ON' : 'GAZE'}
-                    </span>
-                </GazeButton>
-
-                {/* ── RIGHT WING: VIEW SUMMARY + CONFIRM? + SKIP ── */}
-                <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    justifyContent: 'flex-start',
-                    alignItems: 'center',
-                    paddingLeft: 'clamp(30px, 4vw, 60px)',
-                    gap: 'clamp(12px, 1.5vw, 24px)',
-                }}>
                     <GazeButton
                         id="view-summary"
                         onClick={() => setShowSummary(true)}
@@ -1109,18 +1119,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         gazeEnabledTimestamp={effectiveGazeTimestamp}
                         isDarkMode={isDarkMode}
                         style={{
-                            padding: 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 36px)',
-                            background: 'rgba(100, 181, 246, 0.08)',
-                            border: `2px solid ${THEME.accent}40`,
-                            borderRadius: '14px',
-                            color: THEME.accent,
-                            fontSize: 'clamp(15px, 1.9vh, 21px)',
+                            padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
+                            background: T_accentSoft,
+                            border: `2px solid ${T_accentBorder}`,
+                            borderRadius: '18px',
+                            color: T_accent,
+                            fontSize: 'clamp(21px, 2.6vh, 29px)',
                             fontWeight: 700,
-                            minHeight: 'clamp(50px, 6.5vh, 68px)',
-                            minWidth: 'clamp(130px, 13vw, 185px)',
+                            minHeight: 'clamp(96px, 12.5vh, 134px)',
+                            minWidth: 'clamp(240px, 20vw, 320px)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            boxShadow: isLight ? '0 4px 12px rgba(31, 107, 126, 0.14)' : '0 4px 14px rgba(0,0,0,0.20)',
                         }}
                     >
                         VIEW SUMMARY
@@ -1134,18 +1145,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             gazeEnabledTimestamp={effectiveGazeTimestamp}
                             isDarkMode={isDarkMode}
                             style={{
-                                padding: 'clamp(10px, 1.4vh, 16px) clamp(16px, 2vw, 28px)',
-                                background: 'rgba(100, 181, 246, 0.12)',
-                                border: '2px solid rgba(100, 181, 246, 0.5)',
-                                borderRadius: '14px',
-                                color: '#64B5F6',
-                                fontSize: 'clamp(13px, 1.6vh, 18px)',
+                                padding: 'clamp(26px, 3.2vh, 40px) clamp(32px, 3.6vw, 52px)',
+                                background: isLight ? 'rgba(31, 107, 126, 0.16)' : 'rgba(100, 181, 246, 0.12)',
+                                border: `2px solid ${isLight ? 'rgba(31, 107, 126, 0.55)' : 'rgba(100, 181, 246, 0.5)'}`,
+                                borderRadius: '18px',
+                                color: T_accent,
+                                fontSize: 'clamp(19px, 2.3vh, 25px)',
                                 fontWeight: 700,
-                                minHeight: 'clamp(50px, 6.5vh, 68px)',
-                                minWidth: 'clamp(140px, 14vw, 200px)',
+                                minHeight: 'clamp(96px, 12.5vh, 134px)',
+                                minWidth: 'clamp(240px, 20vw, 320px)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                boxShadow: isLight ? '0 4px 12px rgba(31, 107, 126, 0.14)' : '0 4px 14px rgba(0,0,0,0.20)',
                             }}
                         >
                             ◇ FLOOR PLAN
@@ -1161,18 +1173,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             gazeEnabledTimestamp={effectiveGazeTimestamp}
                             isDarkMode={isDarkMode}
                             style={{
-                                padding: 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 36px)',
-                                background: THEME.accent,
+                                padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
+                                background: T_accent,
                                 border: 'none',
-                                borderRadius: '14px',
+                                borderRadius: '18px',
                                 color: '#FFFFFF',
-                                fontSize: 'clamp(15px, 1.9vh, 21px)',
+                                fontSize: 'clamp(21px, 2.6vh, 29px)',
                                 fontWeight: 700,
-                                minHeight: 'clamp(50px, 6.5vh, 68px)',
-                                minWidth: 'clamp(120px, 12vw, 170px)',
+                                minHeight: 'clamp(96px, 12.5vh, 134px)',
+                                minWidth: 'clamp(220px, 19vw, 300px)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                boxShadow: isLight ? '0 6px 16px rgba(31, 107, 126, 0.22)' : '0 4px 14px rgba(0,0,0,0.20)',
                             }}
                         >
                             {'\u2713 CONFIRM'}
@@ -1186,18 +1199,19 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         gazeEnabledTimestamp={effectiveGazeTimestamp}
                         isDarkMode={isDarkMode}
                         style={{
-                            padding: 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 36px)',
-                            background: 'rgba(245, 158, 11, 0.06)',
-                            border: '2px solid rgba(245, 158, 11, 0.25)',
-                            borderRadius: '14px',
-                            color: THEME.warning,
-                            fontSize: 'clamp(15px, 1.9vh, 21px)',
+                            padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
+                            background: T_warningSoft,
+                            border: `2px solid ${T_warningBorder}`,
+                            borderRadius: '18px',
+                            color: T_warning,
+                            fontSize: 'clamp(21px, 2.6vh, 29px)',
                             fontWeight: 700,
-                            minHeight: 'clamp(50px, 6.5vh, 68px)',
-                            minWidth: 'clamp(110px, 11vw, 155px)',
+                            minHeight: 'clamp(96px, 12.5vh, 134px)',
+                            minWidth: 'clamp(210px, 18vw, 280px)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            boxShadow: isLight ? '0 4px 12px rgba(168, 120, 56, 0.14)' : '0 4px 14px rgba(0,0,0,0.20)',
                         }}
                     >
                         {'SKIP →'}
@@ -1210,42 +1224,42 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                 <div style={{
                     position: 'fixed', inset: 0, zIndex: 9999,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(0,0,0,0.84)',
+                    background: isLight ? 'rgba(74, 58, 42, 0.55)' : 'rgba(0,0,0,0.84)',
                 }}>
                     <div style={{
-                        background: THEME.panelBg,
-                        border: `1px solid ${THEME.border}`, borderRadius: '20px',
+                        background: isLight ? lightColors.background.elevated : THEME.panelBg,
+                        border: `1px solid ${isLight ? lightColors.border.main : THEME.border}`, borderRadius: '20px',
                         width: '92%', maxWidth: '850px', maxHeight: '88vh',
                         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
+                        boxShadow: isLight ? '0 12px 28px rgba(82, 66, 45, 0.20)' : '0 8px 24px rgba(0,0,0,0.24)',
                     }}>
                         {/* Modal Header */}
                         <div style={{
                             padding: 'clamp(16px, 2.2vh, 24px) clamp(20px, 2.5vw, 32px)',
-                            borderBottom: '1px solid rgba(100,116,139,0.15)', flexShrink: 0,
+                            borderBottom: `1px solid ${isLight ? lightColors.border.light : 'rgba(100,116,139,0.15)'}`, flexShrink: 0,
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         }}>
-                            <h2 style={{ color: THEME.textMain, fontSize: 'clamp(20px, 2.8vh, 30px)', fontWeight: 700, margin: 0 }}>
+                            <h2 style={{ color: T_textMain, fontSize: 'clamp(20px, 2.8vh, 30px)', fontWeight: 700, margin: 0 }}>
                                 Design Survey Summary
                             </h2>
                             <div style={{ display: 'flex', gap: 'clamp(8px, 1vw, 16px)' }}>
                                 <GazeButton id="save-summary" onClick={handleSaveProgress}
-                                    gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={true}
+                                    gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
                                     style={{
                                         padding: 'clamp(10px, 1.4vh, 16px) clamp(18px, 2.2vw, 30px)',
-                                        background: 'rgba(100, 181, 246, 0.12)',
-                                        border: `2px solid ${THEME.accent}50`,
+                                        background: T_accentSoft,
+                                        border: `2px solid ${T_accentBorder}`,
                                         borderRadius: '12px',
-                                        color: THEME.accent,
+                                        color: T_accent,
                                         fontSize: 'clamp(14px, 1.8vh, 19px)', fontWeight: 700,
                                     }}>
                                     SAVE PROGRESS
                                 </GazeButton>
                                 <GazeButton id="close-summary" onClick={() => setShowSummary(false)}
-                                    gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={true}
+                                    gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
                                     style={{
                                         padding: 'clamp(10px, 1.4vh, 16px) clamp(18px, 2.2vw, 30px)',
-                                        background: THEME.accent, color: '#FFF', borderRadius: '12px',
+                                        background: T_accent, color: '#FFF', borderRadius: '12px',
                                         fontSize: 'clamp(14px, 1.8vh, 19px)', fontWeight: 700, border: 'none',
                                     }}>
                                     CLOSE
@@ -1254,14 +1268,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         </div>
                         {/* Modal Body */}
                         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                            <SummaryPanel answers={answers} questions={SURVEY_QUESTIONS} currentPhase={currentPhaseId} />
+                            <SummaryPanel answers={answers} questions={SURVEY_QUESTIONS} currentPhase={currentPhaseId} isLight={isLight} />
                         </div>
                     </div>
                 </div>
             )}
 
             {/* ════ SAVE/GENERATE MODAL ════ */}
-            {showModal && <SaveConfirmModal mode={showModal} onClose={handleModalClose} />}
+            {showModal && <SaveConfirmModal mode={showModal} onClose={handleModalClose} isLight={isLight} />}
 
             {showFloorPlanViewer && surveyData?.compass_map && (
                 <FloorPlanViewerModal

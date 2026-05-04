@@ -102,61 +102,112 @@ export const darkColors = {
   },
 };
 
+// LIGHT MODE — Sarvam/Apple-tuned warm-earth palette (v4).
+// Fixes from v3:
+//   - Card lightness raised (~87% → ~92%) for Apple-tier elevation gap (~14%)
+//   - All "pink-leaning" tones (e.g. #EFE7DA) replaced with yellow-leading
+//     warm sand variants — eliminates the dusty-rose hospital perception
+//   - Borders deepened for visible edge definition (Apple HIG pattern)
+//   - Sage-green pastels replaced with confident muted sage (Tobii/Sarvam-tier)
+//   - Emergency maroon kept consistent across all themes
 export const lightColors = {
   background: {
-    primary: '#AFA087', secondary: '#BFAE8C', tertiary: '#B6A481',
-    elevated: '#C8B793', overlay: 'rgba(200, 183, 147, 0.94)',
+    primary: '#E0D0B5',     // warm sand (page bg, ~82% — eye comfort baseline)
+    secondary: '#D8C7AA',   // section / hover layer
+    tertiary: '#D0BFA0',    // sunken / nav rail
+    elevated: '#F0E2C4',    // cream cards (~92% — clearly lifted from bg, ~14% gap)
+    overlay: 'rgba(224, 208, 181, 0.94)',
   },
   text: {
-    primary: '#1B140E', secondary: '#251D16', tertiary: '#342A20', inverse: '#FFF7ED',
+    primary: '#4A3A2A',     // warm dark brown (~22% lightness, ~6.5:1 contrast)
+    secondary: '#6B5A45',   // medium brown
+    tertiary: '#8E7A60',    // light brown / hints
+    inverse: '#EADBC0',
   },
   icon: {
-    primary: '#1B140E', onEmergency: '#FFF7ED', muted: '#342A20',
+    primary: '#4A3A2A',
+    onEmergency: '#EADBC0',
+    muted: '#76624A',
   },
-  border: { main: '#8D7959', light: '#9A8564', focus: '#6F5D43', strong: '#6F5D43' },
-  accent: { main: '#B78E49', hover: '#A57E3F', subtle: 'rgba(183, 142, 73, 0.12)' },
-  success: { main: '#1A3B1C', hover: '#143016', subtle: 'rgba(26, 59, 28, 0.12)' },
-  warning: { main: '#B78E49', hover: '#A57E3F', subtle: 'rgba(183, 142, 73, 0.12)' },
-  emergency: { main: '#8A463D', hover: '#7A3A34', deep: '#6A302C', soft: '#CFA094', subtle: '#CFA094' },
+  border: {
+    main: '#A89478',        // warm tan — visible edge (Apple HIG-tier border)
+    light: '#B8A488',       // subtle separator
+    focus: '#876730',       // deeper antique gold (selection / focus)
+    strong: '#8A7560',
+  },
+  accent: {
+    main: '#876730',        // deeper antique gold (calm, premium)
+    hover: '#76571F',
+    subtle: 'rgba(135, 103, 48, 0.10)',
+  },
+  success: {
+    main: '#52704A',        // sage green (slightly deeper for warm bg)
+    hover: '#445F3D',
+    subtle: 'rgba(82, 112, 74, 0.12)',
+  },
+  warning: {
+    main: '#A87838',        // warm amber (less saturated)
+    hover: '#94661F',
+    subtle: 'rgba(168, 120, 56, 0.12)',
+  },
+  emergency: {
+    main: '#8A463D',        // warm maroon (kept consistent across all themes)
+    hover: '#7A3A34',
+    deep: '#6A302C',
+    soft: '#D6BC9A',        // v4: was #C29D92 (dusty pink) → warm cream-tan, no rose
+    subtle: '#E2C9A4',      // v4: was #DDB5A8 (peachy pink) → warm sand, no peach
+  },
   navigation: {
-    pillBackground: '#BFAE8C',
-    pillBorder: '#8D7959',
-    pillShadow: '0 2px 8px rgba(82, 66, 45, 0.16)',
-    containerDivider: '#9A8564',
+    pillBackground: '#D8C7AA',
+    pillBorder: '#9C8868',
+    pillShadow: '0 2px 8px rgba(82, 66, 45, 0.10)',
+    containerDivider: '#B8A488',
     idleBackground: 'transparent',
-    idleText: '#251D16',
-    hoverBackground: '#B6A481',
-    activeBackground: '#B6A481',
-    activeBorder: '#6F5D43',
-    activeShadow: 'inset 0 0 0 1px rgba(111, 93, 67, 0.34)',
-    activeText: '#1B140E',
-    backBackground: '#B6A481',
-    backHoverBackground: '#AFA087',
-    backBorder: '#8D7959',
+    idleText: '#6B5A45',
+    hoverBackground: '#D0BFA0',
+    activeBackground: '#C0AD8E',
+    activeBorder: '#876730',
+    activeShadow: 'inset 0 0 0 1px rgba(135, 103, 48, 0.30)',
+    activeText: '#4A3A2A',
+    backBackground: '#D0BFA0',
+    backHoverBackground: '#C8B697',
+    backBorder: '#9C8868',
     backShadow: 'none',
-    gazeBackgroundOn: '#B6A481',
-    gazeBackgroundOff: '#BFAE8C',
-    gazeBorderOn: '#6F5D43',
-    gazeBorderOff: '#7D6A4E',
-    gazeGlow: '0 3px 12px rgba(82, 66, 45, 0.18)',
-    gazeTextOn: '#1B140E',
-    gazeTextOff: '#251D16',
-    auxiliaryBackground: '#B6A481',
-    auxiliaryBorder: '#8D7959',
+    gazeBackgroundOn: '#C8B697',
+    gazeBackgroundOff: '#D8C7AA',
+    gazeBorderOn: '#876730',
+    gazeBorderOff: '#9C8868',
+    gazeGlow: '0 3px 12px rgba(82, 66, 45, 0.14)',
+    gazeTextOn: '#4A3A2A',
+    gazeTextOff: '#6B5A45',
+    auxiliaryBackground: '#D0BFA0',
+    auxiliaryBorder: '#9C8868',
   },
   category: {
-    people: '#6B7F98', medical: '#E05550', needs: '#34C759', feelings: '#7B6BAE',
-    actions: '#4E8CA8', activities: '#B98A4A', responses: '#6B8E6B', courtesy: '#8B7B90',
+    people: '#6E7E92',      // muted blue-grey
+    medical: '#8E5238',     // v4: was #9C5448 coral-pink → deeper terracotta (Sarvam-tier, no pink)
+    needs: '#52704A',       // sage
+    feelings: '#7A6E92',    // v4: deeper lavender (was #80709C, less mauve-pink)
+    actions: '#547F9C',     // denim
+    activities: '#A87838',  // warm gold
+    responses: '#6E8060',   // olive
+    courtesy: '#857580',    // v4: deeper mauve (was #8C7C8E, less pink-purple)
   },
   quickfire: {
-    yes: '#6E8C5C', no: '#B35A4B', wait: '#B78E49', help: '#B35A4B',
-    more: '#7F97A8', done: '#6E8C5C', thanks: '#B78E49', sorry: '#847565',
+    yes: '#52704A',         // sage
+    no: '#8E5238',          // v4: was #9C5448 → deeper terracotta
+    wait: '#A87838',
+    help: '#8E5238',        // v4: same fix
+    more: '#547F9C',
+    done: '#52704A',
+    thanks: '#A87838',
+    sorry: '#76695A',
   },
   gaze: {
-    active: '#7F97A8',
-    activeSubtle: 'rgba(127, 151, 168, 0.14)',
-    inactive: '#A48F6A',
-    text: '#251D16',
+    active: '#748A9C',                                  // calm blue-gray
+    activeSubtle: 'rgba(116, 138, 156, 0.12)',
+    inactive: '#948268',                                // warm muted tan
+    text: '#4A3A2A',
   },
 };
 
@@ -385,23 +436,23 @@ export const screenThemes = {
     predictionHoverBg: 'rgba(56, 189, 248, 0.10)',
   },
   web: {
-    bg: '#0E1620',
-    cardBg: '#223247',
-    cardBorder: '2px solid rgba(42, 61, 82, 0.78)',
-    textMain: '#F0EDE8',
-    textSub: '#A8B5C4',
-    accent: '#38BDF8',
-    glass: 'rgba(19, 30, 46, 0.94)',
-    chrome: '#8CB8D9',
-    youtube: '#D4544C',
-    ai: '#5FCDBD',
-    whatsapp: '#84B69C',
-    warning: '#D7A152',
-    danger: '#E28C83',
-    info: '#96C4E8',
-    softInfo: '#B4D7EE',
-    success: '#9CC5B1',
-    status: '#7EC3DD',
+    bg: '#11140F',
+    cardBg: '#20221E',
+    cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
+    textMain: '#ECEDE3',
+    textSub: '#B4B8A9',
+    accent: '#B28A45',
+    glass: 'rgba(25, 31, 24, 0.94)',
+    chrome: '#648D8B',
+    youtube: '#9A5D54',
+    ai: '#6F9B96',
+    whatsapp: '#7F9A70',
+    warning: '#C19A5B',
+    danger: '#D69A8C',
+    info: '#8EA9B7',
+    softInfo: '#A9CAC7',
+    success: '#A7BE99',
+    status: '#8EA9B7',
   },
   floorPlan: {
     bg: '#0E1620',
@@ -442,6 +493,24 @@ export const screenThemes = {
     debugInactive: '#888',
   },
 };
+
+/**
+ * Shared card surface tokens — single source of truth for the warm-dark card
+ * surface used across MedicalScreen (Daily Assistance), Phrases, Activities,
+ * and the Web Browsing hub. Consuming screens should reference these tokens
+ * rather than re-declaring their own card surface values.
+ */
+export const sharedCardTokens = {
+  cardBg: '#20221E',
+  cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
+  cardShadow: '0 8px 18px rgba(0,0,0,0.22)',
+  cardRadius: '22px',
+  // Sidebar grammar (Phrases / Activities pattern)
+  sidebarBg: '#1B1C18',
+  sidebarBorder: '1.5px solid rgba(213, 216, 188, 0.12)',
+  sidebarSelectedAccent: '#C69A45',
+  sidebarSelectedBg: 'rgba(198, 154, 69, 0.16)',
+} as const;
 
 export type Theme = 'dark' | 'light' | 'mix';
 export const getColors = (theme: Theme) => theme === 'light' ? lightColors : darkColors;

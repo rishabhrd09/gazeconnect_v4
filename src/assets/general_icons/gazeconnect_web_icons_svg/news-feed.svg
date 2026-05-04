@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">News feed icon</title><desc id="desc">Outlined news document icon for web browsing menu.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#9C6D67" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<rect x="6" y="4.5" width="10.5" height="15" rx="2"/><path d="M16.5 7.5h1c.9 0 1.5.6 1.5 1.5v8c0 1.4-1.1 2.5-2.5 2.5"/>
+</g>
+<g id="glyph" stroke="#9C6D67" stroke-width="1.5" stroke-linecap="round" fill="none">
+<path d="M9 8h4.5M9 11h4.5M9 14h3"/>
+</g>
+<g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

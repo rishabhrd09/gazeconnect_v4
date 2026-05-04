@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-const HIDDEN_SCREENS = new Set<string>(['quickwords', 'keyboard', 'spatial']);
+// 'web' is hidden because the Web Browsing landing + sub-panels use the
+// bottom-left zone for sidebar content; the floating clock would overlap.
+const HIDDEN_SCREENS = new Set<string>(['quickwords', 'keyboard', 'spatial', 'web']);
 const UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 
 interface LiveClockProps {

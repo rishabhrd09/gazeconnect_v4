@@ -141,7 +141,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
             minWidth: 'clamp(360px, 34vw, 520px)',
             maxWidth: '74vw',
             padding: 'clamp(26px, 3.8vh, 40px) clamp(34px, 4.4vw, 56px)',
-            background: isLight ? 'rgba(250, 246, 239, 0.98)' : isMix ? 'rgba(36, 31, 24, 0.98)' : 'rgba(22, 23, 21, 0.98)',
+            background: isLight ? 'rgba(240, 226, 196, 0.98)' : isMix ? 'rgba(36, 31, 24, 0.98)' : 'rgba(22, 23, 21, 0.98)',
             border: `1.5px solid ${shellAccent}`,
             borderRadius: '22px',
             color: isLight ? lightColors.text.primary : isMix ? '#F0E2C4' : '#ECEDE3',

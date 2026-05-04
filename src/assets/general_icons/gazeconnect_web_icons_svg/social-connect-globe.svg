@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">Social connect icon</title><desc id="desc">Calm globe network icon for social and connect section.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#7890A2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<circle cx="12" cy="12" r="7"/><path d="M5 12h14"/><path d="M12 5c2 2 3 4.2 3 7s-1 5-3 7"/><path d="M12 5c-2 2-3 4.2-3 7s1 5 3 7"/>
+</g>
+<g id="glyph"></g><g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>
