@@ -206,9 +206,50 @@ interface AdvancedMapScreenProps {
 
 function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
   const ws = useWS();
   const { settings: dwellSettings } = useDwellTime();
+
+  // ── Theme-aware tokens (drafting paper / workshop dusk) ──
+  const T_pageBg = isLight ? '#EBE0CC' : isMix ? '#1A1611' : THEME.bg;
+  const T_panelBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : THEME.panel;
+  const T_panelBorder = isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
+  const T_panelBorderSoft = isLight ? '#A89478' : isMix ? 'rgba(180, 147, 98, 0.28)' : THEME.border;
+  const T_textMain = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : THEME.text;
+  const T_textSub = isLight ? '#76624A' : isMix ? '#C4B697' : THEME.sub;
+  const T_textDim = isLight ? '#9A8568' : isMix ? '#8E7E62' : THEME.dim;
+  const T_textInverse = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : '#FFFFFF';
+  const T_cellEmpty = isLight ? '#F5EDDB' : isMix ? '#241E16' : THEME.bg;
+  const T_cellBorder = isLight ? '#A89478' : isMix ? 'rgba(180, 147, 98, 0.32)' : THEME.border2;
+  const T_subSurface = isLight
+    ? 'rgba(168, 148, 120, 0.18)'
+    : isMix
+      ? 'rgba(180, 147, 98, 0.10)'
+      : 'rgba(255,255,255,0.04)';
+  const T_subSurfaceFaint = isLight
+    ? 'rgba(168, 148, 120, 0.10)'
+    : isMix
+      ? 'rgba(180, 147, 98, 0.06)'
+      : 'rgba(255,255,255,0.03)';
+  const T_subSurfaceFainter = isLight
+    ? 'rgba(168, 148, 120, 0.06)'
+    : isMix
+      ? 'rgba(180, 147, 98, 0.04)'
+      : 'rgba(255,255,255,0.02)';
+  // SPLIT/WALLS/ROTATE/EXPAND fills
+  const T_splitFill = isLight ? '#5B4B98' : isMix ? '#3A2F58' : THEME.violet;
+  const T_wallsFill = isLight ? '#1F6B7E' : isMix ? '#1F4855' : THEME.teal;
+  const T_rotateFill = isLight ? '#8C5A1E' : isMix ? '#6E4520' : THEME.amber;
+  const T_expandFill = isLight ? '#3D7853' : isMix ? '#324F3D' : THEME.success;
+  // Generate plan / refine accents
+  const T_generatePlanBg = isLight ? '#1F6B7E' : isMix ? '#3A6770' : `${THEME.teal}15`;
+  const T_generatePlanBorder = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.teal;
+  const T_generatePlanText = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : THEME.teal;
+  const T_refineMapBg = isLight ? '#5B4B98' : isMix ? '#5A4878' : 'rgba(139,92,246,0.08)';
+  const T_refineMapBorder = isLight ? '#5B4B98' : isMix ? '#8B7AB8' : 'rgba(139,92,246,0.4)';
+  const T_refineMapText = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : THEME.violet;
+  // Right plot canvas bg (slightly cooler than panel)
+  const T_canvasBg = isLight ? '#E5DAC2' : isMix ? '#15110C' : '#08131F';
 
   const compassDwellScale = useMemo(() => {
     const base = DEFAULT_DWELL_TIMES.compassMapAction || 1;
@@ -604,8 +645,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  SIDEBAR HEADER — thin label only (nav moved to floating panel)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderSidebarHeader = () => (
-    <div style={{ padding: '10px 14px 8px', borderBottom: `1px solid ${THEME.border}`, flexShrink: 0 }}>
-      <span style={{ fontSize: 9, fontWeight: 800, color: THEME.dim, letterSpacing: 2 }}>
+    <div style={{ padding: '10px 14px 8px', borderBottom: `1px solid ${T_panelBorderSoft}`, flexShrink: 0 }}>
+      <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>
         GAZECONNECT · ADVANCED MAP
       </span>
     </div>
@@ -615,6 +656,24 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  FLOATING NAV — top-right corner of screen
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderFloatingNav = () => {
+    // Theme-aware nav panel surfaces
+    const navRestoreBg = isLight ? 'rgba(240, 226, 196, 0.92)' : isMix ? 'rgba(36, 31, 24, 0.92)' : 'rgba(15,23,42,0.85)';
+    const navRestoreBorder = isLight ? '#1F6B7E' : isMix ? 'rgba(180, 147, 98, 0.5)' : 'rgba(45,212,191,0.4)';
+    const navRestoreColor = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.teal;
+    const navPanelBg = isLight ? 'rgba(240, 226, 196, 0.95)' : isMix ? 'rgba(36, 31, 24, 0.94)' : 'rgba(13,27,46,0.92)';
+    const navPanelBorder = isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
+    const navBtnBg = isLight ? 'rgba(168, 148, 120, 0.18)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(255,255,255,0.05)';
+    const navBtnBorder = isLight ? 'rgba(168, 148, 120, 0.50)' : isMix ? 'rgba(180, 147, 98, 0.32)' : THEME.border2;
+    const navBackText = isLight ? '#76624A' : isMix ? '#C4B697' : THEME.sub;
+    const navHomeBg = isLight ? 'rgba(31, 107, 126, 0.12)' : isMix ? 'rgba(94, 156, 168, 0.14)' : 'rgba(45,212,191,0.08)';
+    const navHomeBorder = isLight ? 'rgba(31, 107, 126, 0.5)' : isMix ? 'rgba(94, 156, 168, 0.4)' : 'rgba(45,212,191,0.3)';
+    const navHomeText = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.teal;
+    const navGazeBorderInactive = isLight ? 'rgba(168, 148, 120, 0.6)' : isMix ? 'rgba(180, 147, 98, 0.4)' : 'rgba(255,255,255,0.2)';
+    const navGazeColorInactive = isLight ? '#9A8568' : isMix ? '#8E7E62' : '#4A6080';
+    const hideNavBg = isLight ? 'rgba(168, 148, 120, 0.18)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(15,23,42,0.7)';
+    const hideNavBorder = isLight ? 'rgba(168, 148, 120, 0.4)' : isMix ? 'rgba(180, 147, 98, 0.28)' : 'rgba(100,116,139,0.2)';
+    const hideNavText = isLight ? '#76624A' : isMix ? '#8E7E62' : '#64748B';
+
     // NAV restore button — shown when nav is hidden
     if (navHidden) {
       return (
@@ -624,9 +683,9 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           style={{
             position: 'fixed', top: 24, right: 118, zIndex: 100,
             width: 100, height: 100, borderRadius: '50%',
-            background: 'rgba(15,23,42,0.85)',
-            border: '2px solid rgba(45,212,191,0.4)',
-            color: THEME.teal, fontSize: 14, fontWeight: 800,
+            background: navRestoreBg,
+            border: `2px solid ${navRestoreBorder}`,
+            color: navRestoreColor, fontSize: 14, fontWeight: 800,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
           }}>
@@ -640,8 +699,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       <div style={{
         position: 'fixed', top: 24, right: 58, zIndex: 100,
         display: 'flex', flexDirection: 'column', gap: 6,
-        background: 'rgba(13,27,46,0.92)',
-        border: `1px solid ${THEME.border2}`,
+        background: navPanelBg,
+        border: `1px solid ${navPanelBorder}`,
         borderRadius: 14, padding: 10,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(12px)',
@@ -651,21 +710,21 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         <div style={{ display: 'flex', gap: 5 }}>
           <GazeButton id="adv-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => { handleSave(); onNavigate('compass-map'); }}
-            style={{ height: 52, flex: 1, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: `1px solid ${THEME.border2}`, color: THEME.sub, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ height: 52, flex: 1, borderRadius: 8, background: navBtnBg, border: `1px solid ${navBtnBorder}`, color: navBackText, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             ← Back
           </GazeButton>
           <GazeButton id="adv-home" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => onNavigate('home')}
-            style={{ height: 52, flex: 1, borderRadius: 8, background: 'rgba(45,212,191,0.08)', border: '1px solid rgba(45,212,191,0.3)', color: THEME.teal, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ height: 52, flex: 1, borderRadius: 8, background: navHomeBg, border: `1px solid ${navHomeBorder}`, color: navHomeText, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Home
           </GazeButton>
           <GazeButton id="adv-gaze" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             alwaysActive onClick={toggleGaze}
             style={{
               width: 52, height: 52, borderRadius: '50%', flexShrink: 0, padding: 0,
-              border: `2px solid ${isGazeEnabled ? THEME.teal : 'rgba(255,255,255,0.2)'}`,
-              background: isGazeEnabled ? 'rgba(45,212,191,0.1)' : 'transparent',
-              color: isGazeEnabled ? THEME.teal : '#4A6080', fontSize: 11, fontWeight: 700,
+              border: `2px solid ${isGazeEnabled ? navHomeText : navGazeBorderInactive}`,
+              background: isGazeEnabled ? navHomeBg : 'transparent',
+              color: isGazeEnabled ? navHomeText : navGazeColorInactive, fontSize: 11, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 200ms ease'
             }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -675,7 +734,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           </GazeButton>
         </div>
 
-        {/* Emergency */}
+        {/* Emergency — preserved as-is for safety/visibility */}
         <GazeButton id="adv-emergency" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
           alwaysActive onClick={() => onSpeak('I need help immediately!')}
           style={{ height: 58, width: '100%', borderRadius: 8, background: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.5)', color: '#F87171', fontSize: 16, fontWeight: 900, letterSpacing: '0.12em', fontFamily: EMERGENCY_FONT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -688,9 +747,9 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           onClick={() => { setNavHidden(true); onSpeak('Navigation hidden. Look at NAV button to restore.'); }}
           style={{
             height: 36, width: '100%', borderRadius: 8,
-            background: 'rgba(15,23,42,0.7)',
-            border: '1px solid rgba(100,116,139,0.2)',
-            color: '#64748B', fontSize: 11, fontWeight: 600,
+            background: hideNavBg,
+            border: `1px solid ${hideNavBorder}`,
+            color: hideNavText, fontSize: 11, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
           HIDE NAV
@@ -717,7 +776,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         {roomPickerOpen ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <div style={{ padding: '10px 14px 4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 9, fontWeight: 800, color: THEME.dim, letterSpacing: 2 }}>SELECT A ROOM:</span>
+              <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>SELECT A ROOM:</span>
             </div>
             <div style={{
               flex: 1, overflowY: 'auto', minHeight: 0,
@@ -738,9 +797,9 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                     onClick={() => selectRoom(key)}
                     style={{
                       height: 88, minWidth: 130, borderRadius: 10,
-                      background: isSelected ? `${lib.color}25` : 'rgba(255,255,255,0.03)',
-                      border: isSelected ? `2px solid ${lib.color}` : `1px solid ${THEME.border}`,
-                      color: isSelected ? lib.color : THEME.sub,
+                      background: isSelected ? `${lib.color}25` : T_subSurfaceFaint,
+                      border: isSelected ? `2px solid ${lib.color}` : `1px solid ${T_panelBorderSoft}`,
+                      color: isSelected ? lib.color : T_textSub,
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
                       justifyContent: 'center', gap: 4, padding: '8px 6px',
                       position: 'relative',
@@ -749,11 +808,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                     <span style={{ fontSize: 14, fontWeight: 800, textAlign: 'center', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                       {lib.shortLabel}
                     </span>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 1.1 }}>
+                    <span style={{ fontSize: 10, color: T_textDim, textAlign: 'center', lineHeight: 1.1 }}>
                       {lib.desc}
                     </span>
                     {cellCount > 0 && (
-                      <span style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, fontWeight: 800, color: THEME.success, background: 'rgba(16,185,129,0.15)', padding: '1px 6px', borderRadius: 4 }}>
+                      <span style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, fontWeight: 800, color: T_expandFill, background: isLight ? 'rgba(61, 120, 83, 0.18)' : isMix ? 'rgba(50, 79, 61, 0.30)' : 'rgba(16,185,129,0.15)', padding: '1px 6px', borderRadius: 4 }}>
                         {cellCount}
                       </span>
                     )}
@@ -777,13 +836,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           /* ── Default State (Picker Collapsed) ── */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 14px' }}>
             {/* Current Room Label */}
-            <span style={{ fontSize: 9, fontWeight: 800, color: THEME.dim, letterSpacing: 2 }}>CURRENT ROOM</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>CURRENT ROOM</span>
 
             {/* Active room display */}
             <div style={{
               height: 80, borderRadius: 10,
-              background: activeLib ? `${activeLib.color}15` : 'rgba(255,255,255,0.03)',
-              border: `1.5px solid ${activeLib ? activeLib.color + '60' : THEME.border}`,
+              background: activeLib ? `${activeLib.color}15` : T_subSurfaceFaint,
+              border: `1.5px solid ${activeLib ? activeLib.color + '60' : T_panelBorderSoft}`,
               display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px',
             }}>
               {activeLib ? (
@@ -793,13 +852,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                     <span style={{ fontSize: 14, fontWeight: 800, color: activeLib.color }}>
                       {activeLib.shortLabel}
                     </span>
-                    <span style={{ fontSize: 10, color: THEME.sub }}>
+                    <span style={{ fontSize: 10, color: T_textSub }}>
                       {activeCellCount > 0 ? `${activeCellCount} cell${activeCellCount > 1 ? 's' : ''} placed` : 'Not placed yet'}
                     </span>
                   </div>
                 </>
               ) : (
-                <span style={{ fontSize: 12, color: THEME.sub, fontStyle: 'italic' }}>No room selected</span>
+                <span style={{ fontSize: 12, color: T_textSub, fontStyle: 'italic' }}>No room selected</span>
               )}
             </div>
 
@@ -808,8 +867,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               onClick={() => { setRoomPickerOpen(true); setIsGridArmed(false); }}
               style={{
                 height: 80, width: '100%', borderRadius: 10,
-                background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border2}`,
-                color: THEME.text, fontSize: 14, fontWeight: 700,
+                background: T_subSurface, border: `1px solid ${T_panelBorder}`,
+                color: T_textMain, fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
               CHANGE ROOM
@@ -819,8 +878,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               onClick={nextRoom}
               style={{
                 height: 80, width: '100%', borderRadius: 10,
-                background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border2}`,
-                color: THEME.sub, fontSize: 14, fontWeight: 700,
+                background: T_subSurface, border: `1px solid ${T_panelBorder}`,
+                color: T_textSub, fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
               NEXT ROOM
@@ -835,10 +894,10 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             style={{
               height: 90, width: '100%', borderRadius: 12,
               background: isGridArmed
-                ? 'rgba(45,212,191,0.12)'
-                : 'rgba(255,255,255,0.03)',
-              border: `2px solid ${isGridArmed ? THEME.teal : 'rgba(45,212,191,0.2)'}`,
-              color: isGridArmed ? THEME.teal : THEME.sub,
+                ? (isLight ? 'rgba(31, 107, 126, 0.16)' : isMix ? 'rgba(94, 156, 168, 0.18)' : 'rgba(45,212,191,0.12)')
+                : T_subSurfaceFaint,
+              border: `2px solid ${isGridArmed ? T_wallsFill : (isLight ? 'rgba(31, 107, 126, 0.4)' : isMix ? 'rgba(94, 156, 168, 0.32)' : 'rgba(45,212,191,0.2)')}`,
+              color: isGridArmed ? T_wallsFill : T_textSub,
               fontSize: 18, fontWeight: 900, letterSpacing: 1,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
               transition: 'all 300ms ease',
@@ -857,9 +916,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             onClick={() => setActiveFloor('gnd')}
             style={{
               height: 60, flex: 1, borderRadius: 8,
-              background: activeFloor === 'gnd' ? 'rgba(45,212,191,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1.5px solid ${activeFloor === 'gnd' ? THEME.teal : THEME.border}`,
-              color: activeFloor === 'gnd' ? THEME.teal : THEME.sub,
+              background: activeFloor === 'gnd'
+                ? (isLight ? 'rgba(31, 107, 126, 0.14)' : isMix ? 'rgba(94, 156, 168, 0.16)' : 'rgba(45,212,191,0.1)')
+                : T_subSurfaceFaint,
+              border: `1.5px solid ${activeFloor === 'gnd' ? T_wallsFill : T_panelBorderSoft}`,
+              color: activeFloor === 'gnd' ? T_wallsFill : T_textSub,
               fontSize: 13, fontWeight: 800,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
             }}>
@@ -869,9 +930,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             onClick={() => setActiveFloor('1f')}
             style={{
               height: 60, flex: 1, borderRadius: 8,
-              background: activeFloor === '1f' ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1.5px solid ${activeFloor === '1f' ? THEME.violet : THEME.border}`,
-              color: activeFloor === '1f' ? THEME.violet : THEME.sub,
+              background: activeFloor === '1f'
+                ? (isLight ? 'rgba(91, 75, 152, 0.14)' : isMix ? 'rgba(90, 72, 120, 0.18)' : 'rgba(139,92,246,0.1)')
+                : T_subSurfaceFaint,
+              border: `1.5px solid ${activeFloor === '1f' ? T_splitFill : T_panelBorderSoft}`,
+              color: activeFloor === '1f' ? T_splitFill : T_textSub,
               fontSize: 13, fontWeight: 800,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
             }}>
@@ -883,13 +946,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         <div style={{ flex: 1, minHeight: 4 }} />
 
         {/* ── Bottom action buttons ── */}
-        <div style={{ padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, borderTop: `1px solid ${THEME.border}` }}>
+        <div style={{ padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, borderTop: `1px solid ${T_panelBorderSoft}` }}>
           <GazeButton id="adv-save" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={handleSave}
             style={{
               height: 60, width: '100%', borderRadius: 8,
-              background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border2}`,
-              color: THEME.text, fontSize: 13, fontWeight: 700,
+              background: T_subSurface, border: `1px solid ${T_panelBorder}`,
+              color: T_textMain, fontSize: 13, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
             SAVE
@@ -898,8 +961,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             onClick={switchToRefinement}
             style={{
               height: 60, width: '100%', borderRadius: 8,
-              background: 'rgba(139,92,246,0.08)', border: `1.5px solid rgba(139,92,246,0.4)`,
-              color: THEME.violet, fontSize: 13, fontWeight: 700,
+              background: T_refineMapBg, border: `1.5px solid ${T_refineMapBorder}`,
+              color: T_refineMapText, fontSize: 13, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
             REFINE
@@ -908,8 +971,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             onClick={handleGenerate}
             style={{
               height: 80, width: '100%', borderRadius: 10,
-              background: `${THEME.teal}15`, border: `2px solid ${THEME.teal}`,
-              color: THEME.teal, fontSize: 16, fontWeight: 800,
+              background: T_generatePlanBg, border: `2px solid ${T_generatePlanBorder}`,
+              color: T_generatePlanText, fontSize: 16, fontWeight: 800,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
             GENERATE PLAN
@@ -927,7 +990,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       flex: 1, display: 'flex', flexDirection: 'column', gap: 8,
       padding: '12px 14px', minHeight: 0,
     }}>
-      <span style={{ fontSize: 8, fontWeight: 800, color: THEME.dim, letterSpacing: 2, textTransform: 'uppercase', flexShrink: 0 }}>
+      <span style={{ fontSize: 8, fontWeight: 800, color: T_textDim, letterSpacing: 2, textTransform: 'uppercase', flexShrink: 0 }}>
         Refinement Phase
       </span>
       {([
@@ -938,15 +1001,25 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         { key: 'rotate' as AdvancedPhase, icon: '↻', label: 'Rotate / Stairs' },
       ]).map(p => {
         const isActive = phase === p.key;
-        const pc = PHASE_COLORS[p.key] || THEME.sub;
+        const darkPc = PHASE_COLORS[p.key] || THEME.sub;
+        // Theme-aware action color (saturated for light, muted warm for mix)
+        const pc = isLight || isMix
+          ? (p.key === 'split' ? T_splitFill
+            : p.key === 'walls' ? T_wallsFill
+            : p.key === 'void' ? T_wallsFill
+            : p.key === 'rotate' ? T_rotateFill
+            : T_textSub)
+          : darkPc;
         return (
           <GazeButton key={p.key} id={`phase-${p.key}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => { setPhase(p.key); setSelectedCell(null); }}
             style={{
               flex: 1, minHeight: 52, borderRadius: 10,
-              background: isActive ? `${pc}26` : 'rgba(255,255,255,0.03)',
-              border: isActive ? `2px solid ${pc}` : `1px solid ${THEME.border}`,
-              color: isActive ? pc : THEME.sub,
+              background: isActive
+                ? (isLight ? `${pc}22` : isMix ? `${pc}33` : `${darkPc}26`)
+                : T_subSurfaceFaint,
+              border: isActive ? `2px solid ${pc}` : `1px solid ${T_panelBorderSoft}`,
+              color: isActive ? pc : T_textSub,
               fontSize: 'clamp(13px, 1.8vh, 17px)', fontWeight: isActive ? 800 : 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
@@ -957,25 +1030,25 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
       {/* SPLIT TOOLS */}
       {phase === 'split' && selectedCell && (
-        <div style={{ flexShrink: 0, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: THEME.violet }}>
+        <div style={{ flexShrink: 0, background: isLight ? `${T_splitFill}14` : isMix ? `${T_splitFill}22` : 'rgba(139,92,246,0.07)', border: `1px solid ${T_splitFill}33`, borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: T_splitFill }}>
             {gridState[selectedCell]?.roomLabel?.toUpperCase() || selectedCell}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <GazeButton id="tool-vsplit" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => handleSplit('vertical')}
-              style={{ flex: 1, height: 36, borderRadius: 8, background: 'rgba(139,92,246,0.15)', border: `1.5px solid ${THEME.violet}`, color: '#C4B5FD', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ flex: 1, height: 36, borderRadius: 8, background: isLight ? T_splitFill : isMix ? `${T_splitFill}55` : 'rgba(139,92,246,0.15)', border: `1.5px solid ${T_splitFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#C4B5FD', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               V-Split
             </GazeButton>
             <GazeButton id="tool-hsplit" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => handleSplit('horizontal')}
-              style={{ flex: 1, height: 36, borderRadius: 8, background: 'rgba(139,92,246,0.15)', border: `1.5px solid ${THEME.violet}`, color: '#C4B5FD', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ flex: 1, height: 36, borderRadius: 8, background: isLight ? T_splitFill : isMix ? `${T_splitFill}55` : 'rgba(139,92,246,0.15)', border: `1.5px solid ${T_splitFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#C4B5FD', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               H-Split
             </GazeButton>
           </div>
           <GazeButton id="tool-desel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => setSelectedCell(null)}
-            style={{ height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ height: 30, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Cancel
           </GazeButton>
         </div>
@@ -984,13 +1057,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       {/* WALL TOOLS */}
       {phase === 'walls' && selectedCell && (
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: THEME.teal }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: T_wallsFill }}>
             {gridState[selectedCell]?.roomLabel?.toUpperCase() || selectedCell}
           </div>
           {([
-            { label: 'Full Wall', type: 'full_wall', color: THEME.text },
-            { label: 'Glass Panel', type: 'half_wall_glass', color: THEME.teal },
-            { label: 'Open Archway', type: 'open_archway', color: THEME.success },
+            { label: 'Full Wall', type: 'full_wall', color: T_textMain },
+            { label: 'Glass Panel', type: 'half_wall_glass', color: T_wallsFill },
+            { label: 'Open Archway', type: 'open_archway', color: T_expandFill },
             { label: 'Remove Wall', type: 'no_wall', color: THEME.red },
           ]).map(w => (
             <GazeButton key={w.type} id={`wall-${w.type}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
@@ -1006,13 +1079,20 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                 onSpeak(`${w.label} applied.`);
                 setSelectedCell(null);
               }}
-              style={{ height: 36, borderRadius: 8, background: `${w.color}15`, border: `1px solid ${w.color}40`, color: w.color, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{
+                height: 36, borderRadius: 8,
+                background: isLight ? w.color : isMix ? `${w.color}33` : `${w.color}15`,
+                border: `1px solid ${w.color}${isLight ? '' : '40'}`,
+                color: isLight ? T_textInverse : w.color,
+                fontSize: 11, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
               {w.label}
             </GazeButton>
           ))}
           <GazeButton id="wall-desel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => setSelectedCell(null)}
-            style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Cancel
           </GazeButton>
         </div>
@@ -1021,7 +1101,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       {/* VOID TOOL */}
       {phase === 'void' && selectedCell && (
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: THEME.blue }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: T_wallsFill }}>
             {gridState[selectedCell]?.roomLabel?.toUpperCase() || selectedCell}
           </div>
           <GazeButton id="tool-void" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
@@ -1037,12 +1117,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               onSpeak('Marked as open to below.');
               setSelectedCell(null);
             }}
-            style={{ height: 40, borderRadius: 8, background: 'rgba(59,130,246,0.15)', border: `1.5px solid ${THEME.blue}`, color: '#93C5FD', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ height: 40, borderRadius: 8, background: isLight ? T_wallsFill : isMix ? `${T_wallsFill}55` : 'rgba(59,130,246,0.15)', border: `1.5px solid ${T_wallsFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#93C5FD', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Mark as Open to Below
           </GazeButton>
           <GazeButton id="void-desel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => setSelectedCell(null)}
-            style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Cancel
           </GazeButton>
         </div>
@@ -1129,7 +1209,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               </div>
               <GazeButton id="stair-combo-cancel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => setSelectedCell(null)}
-                style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 Cancel
               </GazeButton>
             </div>
@@ -1176,7 +1256,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               </div>
               <GazeButton id="stair-cancel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => setSelectedCell(null)}
-                style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 Cancel
               </GazeButton>
             </div>
@@ -1186,7 +1266,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         // Non-stair cell in rotate phase: generic rotation
         return (
           <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: THEME.sub }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: T_textSub }}>
               {cellInfo?.roomLabel?.toUpperCase() || selectedCell} — ROTATE
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1203,7 +1283,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                   }));
                   onSpeak(`Rotated to ${next}°.`);
                 }}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${THEME.border2}`, color: THEME.text, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ flex: 1, height: 48, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorder}`, color: T_textMain, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 ↺
               </GazeButton>
               <GazeButton id="rotate-cw" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
@@ -1219,13 +1299,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                   }));
                   onSpeak(`Rotated to ${next}°.`);
                 }}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${THEME.border2}`, color: THEME.text, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ flex: 1, height: 48, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorder}`, color: T_textMain, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 ↻
               </GazeButton>
             </div>
             <GazeButton id="rotate-cancel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => setSelectedCell(null)}
-              style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Cancel
             </GazeButton>
           </div>
@@ -1236,14 +1316,14 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       {phase === 'overview' && (
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {([
-            { label: 'Splits', count: refinements.subCellSplits.length, color: THEME.violet },
-            { label: 'Walls', count: refinements.customEdges.length, color: THEME.teal },
-            { label: 'Voids', count: refinements.voidMarkers.length, color: THEME.blue },
-            { label: 'Notes', count: refinements.caregiverAnnotations.length, color: THEME.amber },
+            { label: 'Splits', count: refinements.subCellSplits.length, color: T_splitFill },
+            { label: 'Walls', count: refinements.customEdges.length, color: T_wallsFill },
+            { label: 'Voids', count: refinements.voidMarkers.length, color: T_wallsFill },
+            { label: 'Notes', count: refinements.caregiverAnnotations.length, color: T_rotateFill },
           ]).map(item => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-              <span style={{ fontSize: 11, color: THEME.sub, fontWeight: 600 }}>{item.label}</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: item.color, background: `${item.color}20`, padding: '2px 8px', borderRadius: 4 }}>{item.count}</span>
+            <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 6, background: T_subSurfaceFainter }}>
+              <span style={{ fontSize: 11, color: T_textSub, fontWeight: 600 }}>{item.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: isLight ? T_textInverse : item.color, background: isLight ? item.color : `${item.color}20`, padding: '2px 8px', borderRadius: 4 }}>{item.count}</span>
             </div>
           ))}
         </div>
@@ -1251,24 +1331,24 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
       {/* HINT */}
       {phase !== 'overview' && !selectedCell && (
-        <div style={{ fontSize: 10, color: THEME.sub, textAlign: 'center', padding: 16, flexShrink: 0 }}>
+        <div style={{ fontSize: 10, color: T_textSub, textAlign: 'center', padding: 16, flexShrink: 0 }}>
           Tap a cell in the grid
         </div>
       )}
 
       {/* AUTO FLAGS */}
       {(refinements.vastuFlags.length > 0 || refinements.accessibilityMarkers.length > 0) && (
-        <div style={{ flexShrink: 0, borderTop: `1px solid ${THEME.border}`, paddingTop: 8, marginTop: 'auto' }}>
-          <span style={{ fontSize: 8, fontWeight: 800, color: THEME.dim, letterSpacing: 2, textTransform: 'uppercase' }}>
+        <div style={{ flexShrink: 0, borderTop: `1px solid ${T_panelBorderSoft}`, paddingTop: 8, marginTop: 'auto' }}>
+          <span style={{ fontSize: 8, fontWeight: 800, color: T_textDim, letterSpacing: 2, textTransform: 'uppercase' }}>
             Auto Flags
           </span>
           {refinements.vastuFlags.map((flag, i) => (
-            <div key={`v-${i}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', borderRadius: 6, marginTop: 4, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: THEME.amber, fontSize: 10, fontWeight: 600 }}>
+            <div key={`v-${i}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', borderRadius: 6, marginTop: 4, background: isLight ? `${T_rotateFill}18` : isMix ? `${T_rotateFill}26` : 'rgba(245,158,11,0.1)', border: `1px solid ${T_rotateFill}40`, color: T_rotateFill, fontSize: 10, fontWeight: 600 }}>
               {flag.issue}
             </div>
           ))}
           {refinements.accessibilityMarkers.map((marker, i) => (
-            <div key={`a-${i}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', borderRadius: 6, marginTop: 4, background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.25)', color: THEME.teal, fontSize: 10, fontWeight: 600 }}>
+            <div key={`a-${i}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', borderRadius: 6, marginTop: 4, background: isLight ? `${T_wallsFill}18` : isMix ? `${T_wallsFill}26` : 'rgba(45,212,191,0.1)', border: `1px solid ${T_wallsFill}40`, color: T_wallsFill, fontSize: 10, fontWeight: 600 }}>
               {marker.cell} — {marker.type.replace(/_/g, ' ')}
             </div>
           ))}
@@ -1283,8 +1363,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const renderLeftColumn = () => (
     <div style={{
       width: '40%', height: '100%', flexShrink: 0,
-      background: THEME.panel,
-      borderRight: `1px solid ${THEME.border2}`,
+      background: T_panelBg,
+      borderRight: `1px solid ${T_panelBorder}`,
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
@@ -1295,15 +1375,15 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         <>
           {renderRefinementPanel()}
           {/* Refinement bottom actions */}
-          <div style={{ padding: '12px 14px', borderTop: `1px solid ${THEME.border}`, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+          <div style={{ padding: '12px 14px', borderTop: `1px solid ${T_panelBorderSoft}`, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
             <GazeButton id="adv-back-rooms" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={switchToRooms}
-              style={{ height: 52, width: '100%', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${THEME.border}`, color: THEME.sub, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              style={{ height: 52, width: '100%', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               ← Back to Rooms
             </GazeButton>
             <GazeButton id="adv-generate-ref" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={handleGenerate}
-              style={{ height: 64, width: '100%', borderRadius: 8, background: `${THEME.teal}15`, border: `2px solid ${THEME.teal}`, color: THEME.teal, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              style={{ height: 64, width: '100%', borderRadius: 8, background: T_generatePlanBg, border: `2px solid ${T_generatePlanBorder}`, color: T_generatePlanText, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               Generate Plan
             </GazeButton>
           </div>
@@ -1319,14 +1399,14 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
     <div style={{
       flex: 1, height: '100%',
       display: 'flex', flexDirection: 'column',
-      background: '#08131F',
+      background: T_canvasBg,
       position: 'relative',
     }}>
       {/* Directional label TOP */}
       <div style={{
         position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10, pointerEvents: 'none',
-        background: 'rgba(0,0,0,0.5)', borderRadius: 6, padding: '3px 10px',
-        fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: 1,
+        background: isLight ? 'rgba(74, 58, 42, 0.18)' : isMix ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.5)', borderRadius: 6, padding: '3px 10px',
+        fontSize: 10, fontWeight: 800, color: T_textDim, letterSpacing: 1,
       }}>
         BACK ({directions.back})
       </div>
@@ -1334,7 +1414,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       {/* Directional label LEFT */}
       <div style={{
         position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%) rotate(-90deg)', zIndex: 10, pointerEvents: 'none',
-        fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, whiteSpace: 'nowrap',
+        fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 1, whiteSpace: 'nowrap',
       }}>
         LEFT ({directions.left})
       </div>
@@ -1342,7 +1422,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       {/* Directional label RIGHT */}
       <div style={{
         position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%) rotate(90deg)', zIndex: 10, pointerEvents: 'none',
-        fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, whiteSpace: 'nowrap',
+        fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 1, whiteSpace: 'nowrap',
       }}>
         RIGHT ({directions.right})
       </div>
@@ -1354,12 +1434,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       {isRoomPhase && selectedRoomId && (
         <div style={{
           position: 'absolute', top: 8, left: 8, zIndex: 10, pointerEvents: 'none',
-          background: 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '6px 12px',
+          background: isLight ? 'rgba(240, 226, 196, 0.92)' : isMix ? 'rgba(36, 31, 24, 0.85)' : 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '6px 12px',
           display: 'flex', alignItems: 'center', gap: 8,
-          border: isGridArmed ? '1px solid rgba(45,212,191,0.5)' : '1px solid transparent',
+          border: isGridArmed ? `1px solid ${T_wallsFill}80` : '1px solid transparent',
         }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: ROOM_LIBRARY[selectedRoomId]?.color || '#888' }} />
-          <span style={{ fontSize: 11, fontWeight: 800, color: isGridArmed ? THEME.teal : '#F0F4F8' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: isGridArmed ? T_wallsFill : T_textMain }}>
             {ROOM_LIBRARY[selectedRoomId]?.shortLabel || selectedRoomId}
             {isGridArmed ? ' — ARMED' : ' — Press READY'}
           </span>
@@ -1389,7 +1469,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
           // Merged room border logic
           const merged = mergedRooms[cellKey];
-          const normalBorder = `1px solid ${THEME.border2}`;
+          const normalBorder = `1px solid ${T_cellBorder}`;
           const borderRight = merged?.hideBorder === 'right' || merged?.hideBorder === 'both' ? 'none' : normalBorder;
           const borderBottom = merged?.hideBorder === 'bottom' || merged?.hideBorder === 'both' ? 'none' : normalBorder;
           const borderLeft = merged?.leftSame ? 'none' : normalBorder;
@@ -1507,12 +1587,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
               {/* Vastu flag */}
               {hasVastu && (
-                <span style={{ position: 'absolute', top: 2, right: 3, fontSize: 9, color: THEME.amber, pointerEvents: 'none', zIndex: 16 }}>!</span>
+                <span style={{ position: 'absolute', top: 2, right: 3, fontSize: 9, color: T_rotateFill, pointerEvents: 'none', zIndex: 16 }}>!</span>
               )}
 
               {/* Accessibility marker */}
               {hasAccess && (
-                <span style={{ position: 'absolute', bottom: 2, left: 3, fontSize: 8, color: THEME.teal, pointerEvents: 'none', zIndex: 16 }}>A</span>
+                <span style={{ position: 'absolute', bottom: 2, left: 3, fontSize: 8, color: T_wallsFill, pointerEvents: 'none', zIndex: 16 }}>A</span>
               )}
 
               {/* Void marker */}
@@ -1525,7 +1605,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               {/* Wall edge indicator */}
               {hasWallEdge && (() => {
                 const edge = refinements.customEdges.find(e => e.cells[0] === cellKey);
-                const edgeColor = edge?.type === 'half_wall_glass' ? THEME.teal : edge?.type === 'open_archway' ? THEME.success : edge?.type === 'no_wall' ? THEME.red : THEME.sub;
+                const edgeColor = edge?.type === 'half_wall_glass' ? T_wallsFill : edge?.type === 'open_archway' ? T_expandFill : edge?.type === 'no_wall' ? THEME.red : T_textSub;
                 return <div style={{ position: 'absolute', top: 4, bottom: 4, right: 0, width: 3, background: edgeColor, pointerEvents: 'none', zIndex: 16, borderRadius: 2 }} />;
               })()}
             </GazeButton>
@@ -1533,15 +1613,17 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         })}
       </div>
 
-      {/* Road label at bottom */}
+      {/* Road label at bottom — taller, stronger typography for plot-canvas feel */}
       <div style={{
-        height: 48, flexShrink: 0,
-        background: 'rgba(22,32,56,0.8)',
-        borderTop: '1px solid rgba(56,189,248,0.2)',
+        minHeight: 'clamp(72px, 8.5vh, 96px)', flexShrink: 0,
+        background: isLight ? T_panelBg : isMix ? '#241F18' : 'rgba(22,32,56,0.8)',
+        borderTop: `2px solid ${isLight ? T_panelBorderSoft : isMix ? T_panelBorderSoft : 'rgba(56,189,248,0.2)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: THEME.road, fontWeight: 900, fontSize: 14, letterSpacing: 1,
+        color: isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.road,
+        fontWeight: 800, fontSize: 'clamp(18px, 2.2vh, 24px)', letterSpacing: '0.6px',
+        boxShadow: isLight ? '0 -3px 10px rgba(82, 66, 45, 0.06)' : isMix ? '0 -3px 12px rgba(0,0,0,0.18)' : 'none',
       }}>
-        FRONT / ROAD ({facing}) — {pw} ft
+        FRONT / ROAD ({facing}) &mdash; {pw} ft
       </div>
     </div>
   );
@@ -1550,11 +1632,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  ROOT
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   return (
-    <div className={`advanced-map-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`advanced-map-screen${isLight ? ' theme-light' : ''}${isMix ? ' theme-mix' : ''}`} style={{
       width: '100vw', height: '100vh',
       display: 'flex', flexDirection: 'row',
       overflow: 'hidden',
-      background: THEME.bg,
+      background: T_pageBg,
     }}>
       {renderLeftColumn()}
       {renderRightColumn()}

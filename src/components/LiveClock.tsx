@@ -3,7 +3,10 @@ import { useTheme } from '../contexts/ThemeContext';
 
 // 'web' is hidden because the Web Browsing landing + sub-panels use the
 // bottom-left zone for sidebar content; the floating clock would overlap.
-const HIDDEN_SCREENS = new Set<string>(['quickwords', 'keyboard', 'spatial', 'web']);
+// 'compass-map' / 'advanced-map' / 'floor-plan-survey' are hidden so the
+// road bar + canvas can flow uninterrupted — clock at bottom-left would
+// break the "plot drafting" feel of the design tools.
+const HIDDEN_SCREENS = new Set<string>(['quickwords', 'keyboard', 'spatial', 'web', 'compass-map', 'advanced-map', 'floor-plan-survey']);
 const UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 
 interface LiveClockProps {

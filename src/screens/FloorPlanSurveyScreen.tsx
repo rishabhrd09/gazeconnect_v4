@@ -248,7 +248,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     const [showSummary, setShowSummary] = useState(false);
     const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
 
-    const { isGazeEnabled, toggleGaze } = useGazeControl();
+    const { isGazeEnabled } = useGazeControl();
     const { isLight } = useTheme();
 
     // Theme-aware text + accent tokens. THEME.* is dark-only (light text, dark
@@ -279,38 +279,28 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
         snapshotSurveyRef.current = snapshotSurvey;
     }, [snapshotSurvey]);
 
-    // v16: Per-question gaze control — disabled by default on each new question.
-    // User reads the question first, then enables gaze via EITHER button to select.
-    // Both the center ENABLE GAZE button and the global NavBar footer toggle are kept in sync.
-    const [surveyGazeActive, setSurveyGazeActive] = useState(false);
+    // v17: Survey-only gaze model — gaze stays bound to the global NavBar toggle.
+    //   On each new question, we bump `surveyGazeTimestamp = Date.now()` which
+    //   trips the GazeButton's built-in 1.5s cooldown (GAZE_ENABLE_COOLDOWN_MS) —
+    //   options become inert for ~1.5s while the user reads the question, then
+    //   activate automatically with no extra click required.
+    //   Combined with `dwellCategory="surveyOption"` (1300ms dwell) on option
+    //   buttons, this gives a strong margin against accidental selections without
+    //   the friction of a per-question "ready" gate.
+    //   BACK / VIEW SUMMARY / SKIP / Emergency keep their standard fast dwell.
     const [surveyGazeTimestamp, setSurveyGazeTimestamp] = useState(0);
-    const lockSurveyGaze = () => {
-        setSurveyGazeActive(false);
-        setSurveyGazeTimestamp(0);
-        if (isGazeEnabled) toggleGaze();
-    };
 
-    // Reset BOTH toggles when question changes — user must re-enable after reading
+    // Bump timestamp on every question change → triggers settling cooldown for options
     useEffect(() => {
-        setSurveyGazeActive(false);
-        setSurveyGazeTimestamp(0);
-        if (isGazeEnabled) toggleGaze();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        setSurveyGazeTimestamp(Date.now());
     }, [qIndex]);
 
-    // Sync: when global NavBar toggle changes, mirror to local survey state
-    useEffect(() => {
-        setSurveyGazeActive(isGazeEnabled);
-        if (isGazeEnabled) {
-            setSurveyGazeTimestamp(Date.now());
-        } else {
-            setSurveyGazeTimestamp(0);
-        }
-    }, [isGazeEnabled]);
-
-    // Effective state for option buttons (both toggles in sync, so surveyGazeActive suffices)
-    const effectiveGazeActive = surveyGazeActive;
+    // Effective gaze state mirrors the global NavBar toggle directly
+    const effectiveGazeActive = isGazeEnabled;
     const effectiveGazeTimestamp = surveyGazeTimestamp;
+    // Nav-bar buttons (BACK / SKIP / VIEW SUMMARY) bypass the per-question
+    // settling cooldown — escape paths must always be reachable instantly.
+    const navGazeTimestamp = 0;
 
     // ── Session Resume: localStorage first (instant), then WebSocket ──
     useEffect(() => {
@@ -445,9 +435,10 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     const gridBasis = getGridBasis(currentOptions.length);
 
     // ── Handlers ──
+    // qIndex change triggers the settling-cooldown effect automatically — no
+    // manual gaze lock needed.
     const advanceQuestion = () => {
         if (isLast) return;
-        lockSurveyGaze();
         setQIndex(prev => prev + 1);
     };
 
@@ -501,7 +492,6 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     };
 
     const handleBack = () => {
-        lockSurveyGaze();
         setQIndex(prev => Math.max(0, prev - 1));
     };
 
@@ -509,7 +499,6 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     const handlePhaseClick = (phase: string) => {
         const firstIdx = activeQuestions.findIndex(q => q.phase === phase);
         if (firstIdx >= 0) {
-            lockSurveyGaze();
             setQIndex(firstIdx);
             if (scrollViewRef.current) scrollViewRef.current.scrollTop = 0;
         }
@@ -590,7 +579,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                 id={`phase-tab-${phase}`}
                                 onClick={() => handlePhaseClick(phase)}
                                 gazeEnabled={effectiveGazeActive}
-                                gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                gazeEnabledTimestamp={navGazeTimestamp}
                                 isDarkMode={isDarkMode}
                                 style={{
                                     flex: '1 1 0',
@@ -781,6 +770,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         onClick={() => handleAnswer(opt)}
                                         gazeEnabled={effectiveGazeActive}
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                        dwellCategory="surveyOption"
                                         isDarkMode={isDarkMode}
                                         style={{
                                             padding: 'clamp(28px, 4vh, 48px) clamp(20px, 2.2vw, 32px)',
@@ -820,6 +810,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             onClick={() => handleMultiToggle(opt)}
                                             gazeEnabled={effectiveGazeActive}
                                             gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                            dwellCategory="surveyOption"
                                             isDarkMode={isDarkMode}
                                             style={{
                                                 padding: 'clamp(22px, 3vh, 36px) clamp(20px, 2.2vw, 32px)',
@@ -856,6 +847,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         onClick={() => handleAnswer(opt)}
                                         gazeEnabled={effectiveGazeActive}
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                        dwellCategory="surveyOption"
                                         isDarkMode={isDarkMode}
                                         style={{
                                             padding: 'clamp(24px, 3.2vh, 38px)',
@@ -885,6 +877,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     onClick={advanceQuestion}
                                     gazeEnabled={effectiveGazeActive}
                                     gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                    dwellCategory="surveyOption"
                                     isDarkMode={isDarkMode}
                                     style={{
                                         padding: 'clamp(22px, 3vh, 36px)',
@@ -939,7 +932,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             id="skip-text"
                                             onClick={() => handleAnswer('Skipped')}
                                             gazeEnabled={effectiveGazeActive}
-                                            gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                            gazeEnabledTimestamp={navGazeTimestamp}
                                             isDarkMode={isDarkMode}
                                             style={{
                                                 flex: 1,
@@ -963,6 +956,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             onClick={() => handleAnswer(answers[currentQ.dataKey!] || 'No input')}
                                             gazeEnabled={effectiveGazeActive}
                                             gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                            dwellCategory="surveyOption"
                                             isDarkMode={isDarkMode}
                                             style={{
                                                 flex: 2,
@@ -1012,6 +1006,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         onClick={advanceQuestion}
                                         gazeEnabled={effectiveGazeActive}
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
+                                        dwellCategory="surveyOption"
                                         isDarkMode={isDarkMode}
                                         style={{
                                             padding: 'clamp(22px, 3vh, 36px)',
@@ -1092,7 +1087,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         id="nav-back"
                         onClick={handleBack}
                         gazeEnabled={effectiveGazeActive}
-                        gazeEnabledTimestamp={effectiveGazeTimestamp}
+                        gazeEnabledTimestamp={navGazeTimestamp}
                         isDarkMode={isDarkMode}
                         style={{
                             padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
@@ -1116,7 +1111,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         id="view-summary"
                         onClick={() => setShowSummary(true)}
                         gazeEnabled={effectiveGazeActive}
-                        gazeEnabledTimestamp={effectiveGazeTimestamp}
+                        gazeEnabledTimestamp={navGazeTimestamp}
                         isDarkMode={isDarkMode}
                         style={{
                             padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
@@ -1142,7 +1137,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             id="gen-fp-survey"
                             onClick={handleGenerateFromSurvey}
                             gazeEnabled={effectiveGazeActive}
-                            gazeEnabledTimestamp={effectiveGazeTimestamp}
+                            gazeEnabledTimestamp={navGazeTimestamp}
                             isDarkMode={isDarkMode}
                             style={{
                                 padding: 'clamp(26px, 3.2vh, 40px) clamp(32px, 3.6vw, 52px)',
@@ -1170,7 +1165,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             id="multi-done"
                             onClick={advanceQuestion}
                             gazeEnabled={effectiveGazeActive}
-                            gazeEnabledTimestamp={effectiveGazeTimestamp}
+                            gazeEnabledTimestamp={navGazeTimestamp}
                             isDarkMode={isDarkMode}
                             style={{
                                 padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
@@ -1196,7 +1191,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         id="nav-skip"
                         onClick={handleSkip}
                         gazeEnabled={effectiveGazeActive}
-                        gazeEnabledTimestamp={effectiveGazeTimestamp}
+                        gazeEnabledTimestamp={navGazeTimestamp}
                         isDarkMode={isDarkMode}
                         style={{
                             padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',

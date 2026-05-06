@@ -21,6 +21,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import GazeButton from './core/GazeButton';
 import { useGazeControl } from './core/GazeControlToggle';
 import { screenThemes, typography } from '../utils/design';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   generateFloorPlan,
   checkBackendHealth,
@@ -81,7 +82,12 @@ interface FloorPlanViewerProps {
 const CellGridMiniMap: React.FC<{
   compassData: CompassMapPayload;
   floor: 'ground' | 'first';
-}> = ({ compassData, floor }) => {
+  miniBg?: string;
+  miniBorder?: string;
+  miniEmptyCellBg?: string;
+  miniEmptyText?: string;
+  miniDataText?: string;
+}> = ({ compassData, floor, miniBg, miniBorder, miniEmptyCellBg, miniEmptyText, miniDataText }) => {
   const rows = compassData.grid_size?.rows || 4;
   const cols = compassData.grid_size?.cols || 4;
   const floorData = floor === 'first' ? compassData.first_floor : compassData.ground_floor;
@@ -104,10 +110,10 @@ const CellGridMiniMap: React.FC<{
       gap: '0px',
       width: '100%',
       aspectRatio: `${cols}/${rows}`,
-      border: `2px solid ${T.border}`,
+      border: `2px solid ${miniBorder || T.border}`,
       borderRadius: '6px',
       overflow: 'hidden',
-      background: T.bg,
+      background: miniBg || T.bg,
     }}>
       {Array.from({ length: rows }, (_, ri) => rows - ri).map(row =>
         Array.from({ length: cols }, (_, ci) => ci + 1).map(col => {
@@ -117,7 +123,7 @@ const CellGridMiniMap: React.FC<{
           const isBottomEdge = row > 1;
           return (
             <div key={cellKey} style={{
-              background: data ? `${data.color}30` : 'rgba(30,41,59,0.4)',
+              background: data ? `${data.color}30` : (miniEmptyCellBg || 'rgba(30,41,59,0.4)'),
               borderRight: isRightEdge ? '1px solid rgba(100,116,139,0.15)' : 'none',
               borderBottom: isBottomEdge ? '1px solid rgba(100,116,139,0.15)' : 'none',
               borderLeft: data ? `3px solid ${data.color}` : 'none',
@@ -127,7 +133,7 @@ const CellGridMiniMap: React.FC<{
             }}>
               <span style={{
                 fontSize: '7px', fontWeight: 700,
-                color: data ? '#FFFFFF' : '#475569',
+                color: data ? (miniDataText || '#FFFFFF') : (miniEmptyText || '#475569'),
                 textAlign: 'center', lineHeight: 1,
                 overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
@@ -151,6 +157,34 @@ export function FloorPlanViewerModal({
   initialCustomNotes = '',
 }: FloorPlanViewerProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
+  const { isLight, isMix } = useTheme();
+
+  // ── Theme-aware tokens (drafting paper / workshop dusk) ──
+  const T_overlayBg = isLight
+    ? 'rgba(74, 58, 42, 0.55)'
+    : isMix
+      ? 'rgba(0,0,0,0.78)'
+      : 'rgba(0,0,0,0.94)';
+  const T_modalBg = isLight ? '#EBE0CC' : isMix ? '#1A1611' : T.bg;
+  const T_panel = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.panel;
+  const T_card = isLight ? '#F5EDDB' : isMix ? '#2A2419' : T.card;
+  const T_border = isLight
+    ? '#A89478'
+    : isMix
+      ? 'rgba(180, 147, 98, 0.42)'
+      : T.border;
+  const T_text = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.text;
+  const T_sub = isLight ? '#76624A' : isMix ? '#C4B697' : T.sub;
+  const T_dim = isLight ? '#9A8568' : isMix ? '#8E7E62' : T.dim;
+  const T_accent = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : T.accent;
+  const T_accentSubtle = isLight
+    ? 'rgba(31, 107, 126, 0.14)'
+    : isMix
+      ? 'rgba(94, 156, 168, 0.16)'
+      : T.accentSubtle;
+  const T_danger = isLight ? '#7A363A' : isMix ? '#9C5A53' : T.danger;
+  const T_blue = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : T.blue;
+  const T_elevated = isLight ? '#F5EDDB' : isMix ? '#2A2419' : T.elevatedBg;
 
   const [style, setStyle] = useState<FloorPlanStyle>('modern');
   const [floor, setFloor] = useState<'ground' | 'first'>('ground');
@@ -242,24 +276,24 @@ export function FloorPlanViewerModal({
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.94)', display: 'flex', flexDirection: 'column',
+      background: T_overlayBg, display: 'flex', flexDirection: 'column',
       fontFamily: UI_FONT,
     }}>
       {/* ═══ HEADER BAR ═══ */}
       <div style={{
         flexShrink: 0, display: 'flex', alignItems: 'center',
         padding: 'clamp(8px, 1.2vh, 14px) clamp(12px, 1.5vw, 24px)',
-        borderBottom: `2px solid ${T.border}`, background: T.panel,
+        borderBottom: `2px solid ${T_border}`, background: T_panel,
         gap: 'clamp(8px, 1vw, 16px)',
         justifyContent: 'center',
         position: 'relative',
       }}>
         {/* Title */}
         <div style={{ position: 'absolute', left: 'clamp(12px, 1.5vw, 24px)', top: '50%', transform: 'translateY(-50%)' }}>
-          <div style={{ fontSize: 'clamp(15px, 2vh, 22px)', fontWeight: 900, color: T.text, letterSpacing: '1.5px' }}>
+          <div style={{ fontSize: 'clamp(15px, 2vh, 22px)', fontWeight: 900, color: T_text, letterSpacing: '1.5px' }}>
             ARCHITECTURAL FLOOR PLAN
           </div>
-          <div style={{ fontSize: 'clamp(10px, 1.1vh, 13px)', color: T.sub, fontWeight: 600, marginTop: '2px' }}>
+          <div style={{ fontSize: 'clamp(10px, 1.1vh, 13px)', color: T_sub, fontWeight: 600, marginTop: '2px' }}>
             {compassData.plot.width_ft}' × {compassData.plot.depth_ft}' — {compassData.plot.facing} Facing — {compassData.plot.type}
           </div>
         </div>
@@ -273,9 +307,9 @@ export function FloorPlanViewerModal({
                 padding: '8px 18px', minHeight: 'clamp(44px, 5.8vh, 60px)',
                 borderRadius: '10px', fontWeight: 800,
                 fontSize: 'clamp(11px, 1.35vh, 14px)', letterSpacing: '0.6px',
-                background: style === s ? T.accentSubtle : T.card,
-                border: `2px solid ${style === s ? STYLE_INFO[s].color : T.border}`,
-                color: style === s ? STYLE_INFO[s].color : T.dim,
+                background: style === s ? T_accentSubtle : T_card,
+                border: `2px solid ${style === s ? STYLE_INFO[s].color : T_border}`,
+                color: style === s ? STYLE_INFO[s].color : T_dim,
                 fontFamily: UI_FONT,
               }}>
               {STYLE_INFO[s].icon} {STYLE_INFO[s].label}
@@ -293,9 +327,9 @@ export function FloorPlanViewerModal({
                   padding: '8px 18px', minHeight: 'clamp(44px, 5.8vh, 60px)',
                   borderRadius: '10px', fontWeight: 800,
                   fontSize: 'clamp(11px, 1.35vh, 14px)',
-                  background: floor === f ? T.accentSubtle : T.card,
-                  border: `2px solid ${floor === f ? T.accent : T.border}`,
-                  color: floor === f ? T.accent : T.dim,
+                  background: floor === f ? T_accentSubtle : T_card,
+                  border: `2px solid ${floor === f ? T_accent : T_border}`,
+                  color: floor === f ? T_accent : T_dim,
                   fontFamily: UI_FONT,
                 }}>
                 {f === 'ground' ? 'GND' : '1F'}
@@ -310,7 +344,7 @@ export function FloorPlanViewerModal({
           style={{
             padding: '10px 26px', minHeight: 'clamp(48px, 6vh, 64px)',
             borderRadius: '10px', fontWeight: 900, fontSize: 'clamp(15px, 1.7vh, 19px)',
-            background: T.card, border: `2px solid ${T.danger}`, color: T.text, marginLeft: '0px',
+            background: T_card, border: `2px solid ${T_danger}`, color: T_text, marginLeft: '0px',
             fontFamily: UI_FONT,
           }}>
           ✕ CLOSE
@@ -323,21 +357,29 @@ export function FloorPlanViewerModal({
         {/* ── Left Panel: Mini-Map + Data + Downloads ── */}
         <div style={{
           width: 'clamp(320px, 28vw, 420px)', flexShrink: 0,
-          background: T.panel, borderRight: `2px solid ${T.border}`,
+          background: T_panel, borderRight: `2px solid ${T_border}`,
           display: 'flex', flexDirection: 'column', gap: '20px',
           padding: 'clamp(24px, 3vh, 32px)', overflowY: 'auto',
         }}>
           {/* Mini-Map */}
           <div>
-            <div style={{ fontSize: '11px', color: T.dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               CELL MAPPING — {floor === 'first' ? '1ST FLOOR' : 'GROUND'}
             </div>
-            <CellGridMiniMap compassData={compassData} floor={floor} />
+            <CellGridMiniMap
+              compassData={compassData}
+              floor={floor}
+              miniBg={T_modalBg}
+              miniBorder={T_border}
+              miniEmptyCellBg={isLight ? '#F5EDDB' : isMix ? '#241E16' : undefined}
+              miniEmptyText={isLight ? '#9A8568' : isMix ? '#8E7E62' : undefined}
+              miniDataText={isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : undefined}
+            />
           </div>
 
           {/* Room Legend */}
-          <div style={{ background: T.card, borderRadius: '8px', padding: '12px', border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: '11px', color: T.dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
+          <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
+            <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               ROOMS ({floor === 'first' ? ffCount : gfCount})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -347,20 +389,20 @@ export function FloorPlanViewerModal({
                     width: '12px', height: '12px', borderRadius: '3px', flexShrink: 0,
                     background: ROOM_COLORS[p.roomId] || '#78909C',
                   }} />
-                  <span style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: T.sub, fontWeight: 700, flex: 1 }}>
+                  <span style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', color: T_sub, fontWeight: 700, flex: 1 }}>
                     {p.room}
                   </span>
-                  <span style={{ fontSize: '11px', color: T.dim, fontWeight: 800 }}>
+                  <span style={{ fontSize: '11px', color: T_dim, fontWeight: 800 }}>
                     {p.area_sqft}ft²
                   </span>
                 </div>
-              )) || <span style={{ fontSize: '12px', color: T.dim }}>No rooms placed</span>}
+              )) || <span style={{ fontSize: '12px', color: T_dim }}>No rooms placed</span>}
             </div>
           </div>
 
           {/* Plan Data */}
-          <div style={{ background: T.card, borderRadius: '8px', padding: '12px', border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: '11px', color: T.dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
+          <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
+            <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               PLOT INFO
             </div>
             {[
@@ -371,15 +413,15 @@ export function FloorPlanViewerModal({
               ['Style', STYLE_INFO[style].label],
             ].map(([k, v]) => (
               <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                <span style={{ fontSize: '13px', color: T.sub, fontWeight: 600 }}>{k}</span>
-                <span style={{ fontSize: '13px', color: T.text, fontWeight: 800 }}>{v}</span>
+                <span style={{ fontSize: '13px', color: T_sub, fontWeight: 600 }}>{k}</span>
+                <span style={{ fontSize: '13px', color: T_text, fontWeight: 800 }}>{v}</span>
               </div>
             ))}
           </div>
 
           {/* Custom notes for advanced fusion */}
-          <div style={{ background: T.card, borderRadius: '8px', padding: '12px', border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: '11px', color: T.dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
+          <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
+            <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               CUSTOM PLAN NOTES (OPTIONAL)
             </div>
             <textarea
@@ -390,9 +432,9 @@ export function FloorPlanViewerModal({
                 width: '100%',
                 minHeight: '84px',
                 resize: 'vertical',
-                background: T.elevatedBg,
-                color: T.text,
-                border: `1px solid ${T.border}`,
+                background: T_elevated,
+                color: T_text,
+                border: `1px solid ${T_border}`,
                 borderRadius: '8px',
                 padding: '10px 12px',
                 fontSize: '13px',
@@ -413,9 +455,9 @@ export function FloorPlanViewerModal({
                 fontWeight: 800,
                 fontSize: '13px',
                 textTransform: 'uppercase',
-                background: T.accentSubtle,
-                border: `2px solid ${T.accent}`,
-                color: T.accent,
+                background: T_accentSubtle,
+                border: `2px solid ${T_accent}`,
+                color: T_accent,
                 fontFamily: UI_FONT,
               }}>
               APPLY NOTES
@@ -430,9 +472,9 @@ export function FloorPlanViewerModal({
           }}>
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
-              background: backendOk === true ? T.success : backendOk === false ? T.danger : T.warn,
+              background: backendOk === true ? T.success : backendOk === false ? T_danger : T.warn,
             }} />
-            <span style={{ fontSize: '9px', color: T.dim }}>
+            <span style={{ fontSize: '9px', color: T_dim }}>
               {backendOk === true ? 'Backend connected' : backendOk === false ? 'Backend offline' : 'Checking...'}
             </span>
           </div>
@@ -441,21 +483,21 @@ export function FloorPlanViewerModal({
         {/* ── Main Image Area ── */}
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: T.bg, overflow: 'auto', position: 'relative',
+          background: T_modalBg, overflow: 'auto', position: 'relative',
           padding: 'clamp(4px, 0.8vh, 12px)',
         }}>
           {loading && (
             <div style={{ textAlign: 'center' }}>
               <div style={{
                 width: '52px', height: '52px',
-                border: '4px solid rgba(45,212,191,0.2)', borderTopColor: T.accent,
+                border: '4px solid rgba(45,212,191,0.2)', borderTopColor: T_accent,
                 borderRadius: '50%', animation: 'fpv-spin 1s linear infinite',
                 margin: '0 auto 16px',
               }} />
-              <div style={{ color: T.sub, fontSize: 'clamp(14px, 1.8vh, 18px)', fontWeight: 700 }}>
+              <div style={{ color: T_sub, fontSize: 'clamp(14px, 1.8vh, 18px)', fontWeight: 700 }}>
                 Generating {STYLE_INFO[style].label} Floor Plan...
               </div>
-              <div style={{ color: T.dim, fontSize: 'clamp(10px, 1.2vh, 13px)', marginTop: '8px' }}>
+              <div style={{ color: T_dim, fontSize: 'clamp(10px, 1.2vh, 13px)', marginTop: '8px' }}>
                 PyCairo render engine • IS 962:1989 standards
               </div>
             </div>
@@ -464,23 +506,23 @@ export function FloorPlanViewerModal({
           {error && !loading && (
             <div style={{ textAlign: 'center', maxWidth: '480px', padding: '32px' }}>
               <div style={{ fontSize: '40px', marginBottom: '14px' }}>⚠️</div>
-              <div style={{ color: T.danger, fontSize: 'clamp(16px, 2vh, 22px)', fontWeight: 800, marginBottom: '10px' }}>
+              <div style={{ color: T_danger, fontSize: 'clamp(16px, 2vh, 22px)', fontWeight: 800, marginBottom: '10px' }}>
                 Generation Failed
               </div>
-              <div style={{ color: T.sub, fontSize: 'clamp(11px, 1.4vh, 15px)', lineHeight: 1.5, marginBottom: '16px' }}>
+              <div style={{ color: T_sub, fontSize: 'clamp(11px, 1.4vh, 15px)', lineHeight: 1.5, marginBottom: '16px' }}>
                 {error}
               </div>
-              <div style={{ color: T.dim, fontSize: 'clamp(10px, 1.2vh, 13px)', lineHeight: 1.5, marginBottom: '20px', background: T.card, padding: '12px', borderRadius: '8px', textAlign: 'left' }}>
+              <div style={{ color: T_dim, fontSize: 'clamp(10px, 1.2vh, 13px)', lineHeight: 1.5, marginBottom: '20px', background: T_card, padding: '12px', borderRadius: '8px', textAlign: 'left' }}>
                 <strong>To start the backend:</strong><br />
-                <code style={{ color: T.accent }}>cd tools && python floorplan_server.py</code><br /><br />
+                <code style={{ color: T_accent }}>cd tools && python floorplan_server.py</code><br /><br />
                 This runs on port 5050 and serves the PyCairo floor plan generator as an HTTP API.
               </div>
               <GazeButton id="retry-gen" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
                 onClick={doGenerate}
                 style={{
                   padding: '10px 24px', minHeight: '40px', borderRadius: '10px',
-                  background: 'rgba(45,212,191,0.12)', border: `2px solid ${T.accent}`,
-                  color: T.accent, fontWeight: 800, fontSize: 'clamp(12px, 1.4vh, 16px)',
+                  background: T_accentSubtle, border: `2px solid ${T_accent}`,
+                  color: T_accent, fontWeight: 800, fontSize: 'clamp(12px, 1.4vh, 16px)',
                 }}>
                 RETRY
               </GazeButton>
@@ -504,7 +546,7 @@ export function FloorPlanViewerModal({
                 style={{
                   position: 'absolute', bottom: '60px', right: '320px', // Further inward, above the downloads
                   width: '120px', height: '120px', borderRadius: '60px',
-                  background: T.panel, border: `4px solid ${T.accent}`, color: T.accent,
+                  background: T_panel, border: `4px solid ${T_accent}`, color: T_accent,
                   fontSize: '72px', fontWeight: 900,
                   boxShadow: '0 8px 20px rgba(0,0,0,0.24)',
                   cursor: 'pointer', zIndex: 50,
@@ -516,13 +558,13 @@ export function FloorPlanViewerModal({
               {/* Downloads — Now floating on the right side */}
               <div style={{
                 position: 'absolute', right: '24px', bottom: '24px',
-                background: T.panel,
-                border: `2px solid ${T.border}`, borderRadius: '16px',
+                background: T_panel,
+                border: `2px solid ${T_border}`, borderRadius: '16px',
                 padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px',
                 boxShadow: '0 8px 20px rgba(0,0,0,0.22)',
                 zIndex: 40, width: '220px',
               }}>
-                <div style={{ fontSize: '13px', color: T.dim, fontWeight: 900, letterSpacing: '2px', textAlign: 'center' }}>
+                <div style={{ fontSize: '13px', color: T_dim, fontWeight: 900, letterSpacing: '2px', textAlign: 'center' }}>
                   DOWNLOAD PLAN
                 </div>
                 {(['png', 'pdf', 'svg'] as const).map(fmt => (
@@ -531,8 +573,8 @@ export function FloorPlanViewerModal({
                     style={{
                       padding: '16px 12px', minHeight: '64px', borderRadius: '12px',
                       fontWeight: 900, fontSize: 'clamp(18px, 2vh, 22px)',
-                      background: T.card, border: `3px solid ${T.border}`,
-                      color: T.blue, textTransform: 'uppercase' as const,
+                      background: T_card, border: `3px solid ${T_border}`,
+                      color: T_blue, textTransform: 'uppercase' as const,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                       fontFamily: UI_FONT,
                     }}>
@@ -549,7 +591,7 @@ export function FloorPlanViewerModal({
       {isFullscreen && imageUrl && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 10000,
-          background: T.bg, display: 'flex', flexDirection: 'column',
+          background: T_modalBg, display: 'flex', flexDirection: 'column',
           overflow: 'hidden', // No padding, allow full bleed
         }}>
           <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
@@ -569,7 +611,7 @@ export function FloorPlanViewerModal({
             style={{
               position: 'absolute', bottom: '60px', right: '80px', // Further inward from corner
               width: '140px', height: '140px', borderRadius: '70px',
-              background: T.panel, border: `4px solid ${T.danger}`, color: T.danger,
+              background: T_panel, border: `4px solid ${T_danger}`, color: T_danger,
               fontSize: '84px', fontWeight: 900,
               boxShadow: '0 8px 22px rgba(0,0,0,0.24)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,

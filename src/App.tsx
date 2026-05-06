@@ -453,8 +453,10 @@ const InnerApp: React.FC = () => {
 
       {/* Persistent Emergency Button — hidden on screens with their own large emergency/nav affordance.
           Web Browsing has its own EMERGENCY in GlobalNavBar + connected toolbar; the floating
-          fallback would be a duplicate at bottom-left. */}
-      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && currentScreen !== 'web' && (
+          fallback would be a duplicate at bottom-left.
+          Compass-map / advanced-map / floor-plan-survey: floating widget would overlap the road
+          bar / canvas area and break the "plot drawing" feel — Emergency is in the top NavBar. */}
+      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && currentScreen !== 'web' && currentScreen !== 'compass-map' && currentScreen !== 'advanced-map' && currentScreen !== 'floor-plan-survey' && (
         <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} emergencyDwellTime={emergencyDwellTime || 1200} />
       )}
 

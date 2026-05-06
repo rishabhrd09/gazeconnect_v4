@@ -973,6 +973,18 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
     isNavHidden?: boolean;
 }) => {
     const ws = useWS();
+    const { isLight, isMix } = useTheme();
+    // Theme-aware chrome tokens. Content cards stay dark in all modes.
+    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_chromePillSelected = isLight ? 'rgba(31, 107, 126, 0.16)' : isMix ? 'rgba(180, 147, 98, 0.22)' : 'rgba(198, 154, 69, 0.16)';
+    const T_chromePillSelectedBorder = isLight ? 'rgba(31, 107, 126, 0.34)' : isMix ? 'rgba(180, 147, 98, 0.40)' : 'rgba(198, 154, 69, 0.34)';
+    const T_chromePillSelectedText = isLight ? '#1F6B7E' : isMix ? '#E3C28E' : '#F1E2C2';
+    const T_chromeAccentLine = isLight ? '#1F6B7E' : isMix ? '#B49362' : '#C69A45';
     const [cat, setCat] = useState('positive_india');
     const [sel, setSel] = useState<NewsItem | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -1161,7 +1173,8 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
             <div style={{
                 flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
                 marginTop: 'clamp(95px, 12.5vh, 125px)', padding: 'clamp(16px, 2vh, 24px) clamp(20px, 3vw, 40px)',
-                paddingBottom: 'clamp(20px, 2.5vh, 40px)'
+                paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+                background: T_pageBg,
             }}>
                 <div style={{ display: 'flex', gap: 'clamp(16px,2.5vw,28px)', flexShrink: 0, flexWrap: 'wrap', marginBottom: 'clamp(12px,2vh,20px)' }}>
                     <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); setReaderLiveMode(false); browser.closePage(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -1404,6 +1417,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
             padding: 'clamp(14px, 1.6vh, 22px) clamp(20px, 2.2vw, 32px)',
             paddingBottom: 'clamp(14px, 1.8vh, 24px)',
             overflow: 'hidden',
+            background: T_pageBg,
         }}>
             {/* SIDEBAR — 7 news categories */}
             <div style={{
@@ -1411,11 +1425,12 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                 display: 'grid',
                 gridAutoRows: 'minmax(clamp(94px, 10.5vh, 126px), 1fr)',
                 gap: 'clamp(8px, 1vh, 12px)',
-                background: '#1B1C18',
-                border: '1.5px solid rgba(213, 216, 188, 0.12)',
+                background: T_chromeBg,
+                border: `1.5px solid ${T_chromeBorder}`,
                 borderRadius: '20px',
                 padding: 'clamp(12px, 1.4vh, 18px)',
                 overflow: 'hidden',
+                boxShadow: T_chromeShadow,
             }}>
                 {cats.map((c: any) => {
                     const isSelected = cat === c.id;
@@ -1427,8 +1442,8 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                 width: '100%', height: '100%', minHeight: 0,
                                 position: 'relative', overflow: 'hidden',
                                 borderRadius: '14px',
-                                background: isSelected ? 'rgba(198, 154, 69, 0.16)' : 'transparent',
-                                border: isSelected ? '1.5px solid rgba(198, 154, 69, 0.34)' : '1.5px solid transparent',
+                                background: isSelected ? T_chromePillSelected : 'transparent',
+                                border: isSelected ? `1.5px solid ${T_chromePillSelectedBorder}` : '1.5px solid transparent',
                                 display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
                                 gap: 'clamp(10px, 1vw, 14px)',
                                 padding: 'clamp(10px, 1.2vh, 16px) clamp(14px, 1.4vw, 20px)',
@@ -1438,12 +1453,12 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             {isSelected && <div style={{
                                 position: 'absolute', left: 'clamp(8px, 0.8vw, 12px)',
                                 top: 'clamp(12px, 1.3vh, 18px)', bottom: 'clamp(12px, 1.3vh, 18px)',
-                                width: '3px', borderRadius: '999px', background: '#C69A45',
+                                width: '3px', borderRadius: '999px', background: T_chromeAccentLine,
                             }} />}
-                            <NewsIcon size={28} color={isSelected ? '#C69A45' : '#789D91'} strokeWidth={2.2} />
+                            <NewsIcon size={28} color={isSelected ? T_chromeAccentLine : (isLight ? '#76624A' : '#789D91')} strokeWidth={2.2} />
                             <span style={{
                                 fontSize: 'clamp(17px, 2vh, 24px)', fontWeight: isSelected ? 800 : 700,
-                                color: isSelected ? '#F1E2C2' : T.textMain, lineHeight: 1.15,
+                                color: isSelected ? T_chromePillSelectedText : T_chromeText, lineHeight: 1.15,
                                 fontStyle: isSelected ? 'italic' : 'normal',
                             }}>
                                 {stripLeadingEmoji(c.label)}
@@ -1470,9 +1485,9 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             minHeight: 'clamp(72px, 8.5vh, 96px)',
                             padding: '0 clamp(18px, 1.8vw, 26px)',
                             display: 'flex', alignItems: 'center',
-                            color: '#A9CAC7',
-                            border: '1px solid rgba(169, 202, 199, 0.28)',
-                            background: 'rgba(28, 47, 45, 0.42)',
+                            color: isLight ? '#1F6B7E' : isMix ? '#B6D7D1' : '#A9CAC7',
+                            border: `1px solid ${isLight ? 'rgba(31, 107, 126, 0.28)' : 'rgba(169, 202, 199, 0.28)'}`,
+                            background: isLight ? 'rgba(31, 107, 126, 0.10)' : isMix ? 'rgba(28, 47, 45, 0.55)' : 'rgba(28, 47, 45, 0.42)',
                             borderRadius: '20px',
                             fontSize: 'clamp(15px, 1.8vh, 19px)',
                             fontFamily: FONT_PRIMARY,
@@ -1571,6 +1586,21 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     onNavHiddenToggle?: (hidden: boolean) => void;
     onEmergency: () => void;
 }) => {
+    const { isLight, isMix } = useTheme();
+    // Theme-aware chrome tokens. The YouTube video card stays dark in all modes.
+    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.22)';
+    // Watch / Control mode toggle: dark teal/maroon work fine on dark, but on
+    // cream/walnut chrome they're too heavy — use tinted-but-transparent variants.
+    const T_watchModeBg = isLight ? 'rgba(122, 54, 58, 0.14)' : isMix ? 'rgba(122, 54, 58, 0.30)' : WATCH_MODE_BG;
+    const T_watchModeText = isLight ? '#7A363A' : isMix ? '#E9B9AE' : WATCH_MODE_TEXT;
+    const T_controlModeBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isMix ? 'rgba(31, 107, 126, 0.30)' : CONTROL_MODE_BG;
+    const T_controlModeText = isLight ? '#1F6B7E' : isMix ? '#A9CAC7' : CONTROL_MODE_TEXT;
+    void T_chromeText; void T_chromeTextMuted; void T_watchModeBg; void T_watchModeText; void T_controlModeBg; void T_controlModeText;
     const [catId, setCatId] = useState('old_songs');
     const [playing, setPlaying] = useState<any>(null);
     const viewRef = useRef<HTMLDivElement>(null);
@@ -1646,7 +1676,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(12px,1.5vh,20px)', gap: 'clamp(10px,1.2vh,16px)', overflow: 'hidden',
             marginTop: '0', transition: 'margin-top 0.3s ease',
             marginLeft: 'clamp(10px,1.5vw,20px)', marginRight: 'clamp(10px,1.5vw,20px)',
-            paddingBottom: 'clamp(10px, 1.5vh, 20px)'
+            paddingBottom: 'clamp(10px, 1.5vh, 20px)',
+            background: T_pageBg,
         }}>
             {/* ── CONNECTED TOOLBAR — bi-modal + nav-aware (no duplicates with global nav) ── */}
             <div style={{ ...connectedToolbarStyle, flexShrink: 0 }}>
@@ -1708,9 +1739,9 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             </div>
 
             {/* Now-playing label */}
-            {!isNavHidden && <div style={{ color: T.textSub, fontSize: 'clamp(15px,1.85vh,19px)', padding: '0 8px', flexShrink: 0, fontWeight: 600, fontFamily: FONT_PRIMARY, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <YoutubeIcon size={18} color="#789D91" strokeWidth={2.2} />
-                <b style={{ color: T.textMain }}>{playing.title}</b>
+            {!isNavHidden && <div style={{ color: T_chromeTextMuted, fontSize: 'clamp(15px,1.85vh,19px)', padding: '0 8px', flexShrink: 0, fontWeight: 600, fontFamily: FONT_PRIMARY, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <YoutubeIcon size={18} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.2} />
+                <b style={{ color: T_chromeText }}>{playing.title}</b>
                 <span style={{ opacity: 0.7 }}>— {playing.ch}</span>
             </div>}
 
@@ -1760,6 +1791,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             flex: 1, display: 'flex', flexDirection: 'row', gap: 'clamp(18px, 2vw, 28px)',
             padding: 'clamp(14px, 1.6vh, 22px) clamp(18px, 2vw, 28px)', overflow: 'hidden',
             paddingBottom: 'clamp(20px, 2.4vh, 32px)',
+            background: T_pageBg,
         }}>
             {/* SIDEBAR — 4 large category buttons. Each card uses a distinct
                 category icon (no more identical YouTube glyph everywhere) and
@@ -1772,22 +1804,30 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                    each card gets ~190px. Min 130 prevents collapse on small screens. */
                 display: 'grid', gridTemplateRows: 'repeat(4, minmax(clamp(130px, 16vh, 200px), 1fr))',
                 gap: 'clamp(10px, 1.2vh, 16px)',
-                background: '#1B1C18',
-                border: '1.5px solid rgba(213, 216, 188, 0.14)',
+                background: T_chromeBg,
+                border: `1.5px solid ${T_chromeBorder}`,
                 borderRadius: '22px',
                 padding: 'clamp(14px, 1.5vh, 20px)',
-                boxShadow: '0 8px 18px rgba(0,0,0,0.22)',
+                boxShadow: T_chromeShadow,
                 overflow: 'hidden',
             }}>
                 {YT_CATS.map((c) => {
                     const isSelected = catId === c.id;
                     // Muted, darker antique-gold palette — less neon than #C69A45.
-                    const SELECTED_ACCENT = '#9B7A38';            // Accent line + icon tint (deep antique gold)
-                    const SELECTED_BG = 'rgba(155, 122, 56, 0.13)'; // Card background tint, very subtle
-                    const SELECTED_TITLE = '#E0CDA6';             // Cream title (less saturated than F1E2C2)
-                    const iconColor = isSelected ? SELECTED_ACCENT : WEB_ACCENTS.tealText;
-                    const titleColor = isSelected ? SELECTED_TITLE : T.textMain;
-                    const subtitleColor = isSelected ? 'rgba(224, 205, 166, 0.58)' : T.textSub;
+                    const SELECTED_ACCENT_DARK = '#9B7A38';           // Accent line + icon tint (deep antique gold) — dark mode
+                    const SELECTED_ACCENT = isLight ? '#1F6B7E' : isMix ? '#B49362' : SELECTED_ACCENT_DARK;
+                    const SELECTED_BG = isLight ? 'rgba(31, 107, 126, 0.14)'
+                        : isMix ? 'rgba(180, 147, 98, 0.20)'
+                        : 'rgba(155, 122, 56, 0.13)';
+                    const SELECTED_TITLE = isLight ? '#1F6B7E' : isMix ? '#E3C28E' : '#E0CDA6';
+                    const UNSELECTED_BG = isLight ? 'rgba(255, 248, 228, 0.55)' : isMix ? 'rgba(60, 48, 32, 0.40)' : 'rgba(213, 216, 188, 0.025)';
+                    const UNSELECTED_BORDER = isLight ? '1.5px solid rgba(168, 120, 56, 0.20)' : isMix ? '1.5px solid rgba(180, 147, 98, 0.18)' : '1.5px solid rgba(213, 216, 188, 0.08)';
+                    const UNSELECTED_ICON = isLight ? '#76624A' : isMix ? '#C4B697' : WEB_ACCENTS.tealText;
+                    const UNSELECTED_TITLE = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+                    const UNSELECTED_SUBTITLE = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+                    const iconColor = isSelected ? SELECTED_ACCENT : UNSELECTED_ICON;
+                    const titleColor = isSelected ? SELECTED_TITLE : UNSELECTED_TITLE;
+                    const subtitleColor = isSelected ? (isLight ? 'rgba(31, 107, 126, 0.72)' : isMix ? 'rgba(227, 194, 142, 0.65)' : 'rgba(224, 205, 166, 0.58)') : UNSELECTED_SUBTITLE;
                     const meta = YT_CATEGORY_META[c.id] || { subtitle: '', renderIcon: () => <YoutubeIcon size={48} color={iconColor} strokeWidth={2.2} /> };
                     return (
                         <GazeButton key={c.id} id={`yc-${c.id}`} onClick={() => { setCatId(c.id); disableGaze(); }}
@@ -1797,10 +1837,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                 width: '100%', height: '100%', minHeight: 0,
                                 position: 'relative', overflow: 'hidden',
                                 borderRadius: '18px',
-                                background: isSelected ? SELECTED_BG : 'rgba(213, 216, 188, 0.025)',
+                                background: isSelected ? SELECTED_BG : UNSELECTED_BG,
                                 // Same neutral border in both states — no colored selection border.
                                 // Selection is conveyed by the accent line + bg tint + icon color only.
-                                border: '1.5px solid rgba(213, 216, 188, 0.08)',
+                                border: UNSELECTED_BORDER,
                                 display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
                                 padding: 'clamp(18px, 2vh, 28px) clamp(20px, 2vw, 32px) clamp(18px, 2vh, 28px) clamp(20px, 2vw, 32px)',
                                 fontFamily: FONT_PRIMARY,
@@ -1957,6 +1997,15 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
 // ── KNOWLEDGE PANEL ──
 const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: number; onSpeak: (t: string) => void; isNavHidden?: boolean; }) => {
     const ws = useWS();
+    const { isLight, isMix } = useTheme();
+    // Theme-aware chrome tokens. The knowledge article card stays dark in all modes.
+    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    void T_chromeTextMuted;
     const [selCat, setSelCat] = useState<string | null>(null);
     const [selArt, setSelArt] = useState<any>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -1968,7 +2017,8 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
         <div style={{
             flex: 1, display: 'flex', flexDirection: 'column', padding: GAP, gap: GAP, overflow: 'hidden',
             marginTop: 'clamp(50px,6vh,65px)', marginLeft: 'clamp(10px,1.5vw,20px)',
-            paddingBottom: 'clamp(20px, 2.5vh, 40px)'
+            paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+            background: T_pageBg,
         }}>
             <div style={{ display: 'flex', gap: '12px', flexShrink: 0, flexWrap: 'wrap' }}>
                 <GazeButton id="kb-back" onClick={() => setSelArt(null)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -2002,29 +2052,38 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
 
     return (
         <div style={{
-            flex: 1, display: 'flex', gap: GAP, padding: GAP, overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)'
+            flex: 1, display: 'flex', gap: GAP, padding: GAP, overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+            background: T_pageBg,
         }}>
             <div style={{
                 width: 'clamp(220px,26vw,320px)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px',
-                background: GL, borderRadius: '20px', padding: 'clamp(14px,1.8vh,20px)', border: WEB_SURFACE.borderSoft, overflow: 'auto'
+                background: T_chromeBg, borderRadius: '20px', padding: 'clamp(14px,1.8vh,20px)',
+                border: `1.5px solid ${T_chromeBorder}`, overflow: 'auto', boxShadow: T_chromeShadow,
             }}>
-                {ws.knowledgeCategories.map((c: any) => (
-                    <GazeButton key={c.id} id={`kc-${c.id}`} onClick={() => { setSelCat(c.id); setSelArt(null); }}
-                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{
-                            width: '100%', padding: 'clamp(14px,1.8vh,20px) 14px', textAlign: 'left' as const,
-                            background: selCat === c.id ? `${c.color || AC}20` : 'transparent',
-                            borderLeft: selCat === c.id ? `4px solid ${c.color || AC}` : '4px solid transparent',
-                            borderRadius: '0 14px 14px 0', border: 'none', minHeight: 'clamp(60px,7.5vh,78px)',
-                            display: 'flex', alignItems: 'center', gap: '10px'
-                        }}>
-                        <BookIcon size={28} color={selCat === c.id ? (c.color || AC) : WEB_ACCENTS.oliveText} strokeWidth={2} />
-                        <div>
-                            <div style={{ fontSize: 'clamp(15px,1.8vh,19px)', fontWeight: 600, color: selCat === c.id ? (c.color || AC) : T.textMain }}>{c.title}</div>
-                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>{c.article_count} articles</div>
-                        </div>
-                    </GazeButton>
-                ))}
+                {ws.knowledgeCategories.map((c: any) => {
+                    const isSel = selCat === c.id;
+                    const accent = c.color || AC;
+                    const selectedTextColor = isLight ? '#1F6B7E' : accent;
+                    const selectedBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isMix ? `${accent}30` : `${accent}20`;
+                    const selectedAccentLine = isLight ? '#1F6B7E' : accent;
+                    return (
+                        <GazeButton key={c.id} id={`kc-${c.id}`} onClick={() => { setSelCat(c.id); setSelArt(null); }}
+                            gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                            style={{
+                                width: '100%', padding: 'clamp(14px,1.8vh,20px) 14px', textAlign: 'left' as const,
+                                background: isSel ? selectedBg : 'transparent',
+                                borderLeft: isSel ? `4px solid ${selectedAccentLine}` : '4px solid transparent',
+                                borderRadius: '0 14px 14px 0', border: 'none', minHeight: 'clamp(60px,7.5vh,78px)',
+                                display: 'flex', alignItems: 'center', gap: '10px'
+                            }}>
+                            <BookIcon size={28} color={isSel ? selectedAccentLine : (isLight ? '#76624A' : WEB_ACCENTS.oliveText)} strokeWidth={2} />
+                            <div>
+                                <div style={{ fontSize: 'clamp(15px,1.8vh,19px)', fontWeight: 600, color: isSel ? selectedTextColor : T_chromeText }}>{c.title}</div>
+                                <div style={{ fontSize: '12px', color: isLight ? 'rgba(74, 58, 42, 0.55)' : isMix ? 'rgba(196, 182, 151, 0.55)' : 'rgba(255,255,255,0.3)' }}>{c.article_count} articles</div>
+                            </div>
+                        </GazeButton>
+                    );
+                })}
             </div>
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gridTemplateRows: 'repeat(3,1fr)', gap: GAP, overflow: 'hidden', minHeight: 0 }}>
                 {selCat && ws.knowledgeArticles.length ? ws.knowledgeArticles.slice(0, 6).map((a: any, i: number) => (
@@ -2040,7 +2099,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                 )) : (
                     <div style={{
                         gridColumn: '1/-1', gridRow: '1/-1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'rgba(255,255,255,0.25)', fontSize: '18px'
+                        color: isLight ? 'rgba(74, 58, 42, 0.55)' : isMix ? 'rgba(196, 182, 151, 0.55)' : 'rgba(255,255,255,0.25)', fontSize: '18px'
                     }}>
                         {selCat ? 'Loading...' : 'Select a category'}
                     </div>
@@ -2064,6 +2123,15 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     onEmergency: () => void;
 }) => {
     const ws = useWS();
+    const { isLight, isMix } = useTheme();
+    // Theme-aware chrome tokens. Search-result / card-mode card stay dark.
+    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    void T_chromeShadow;
     const [topic, setTopic] = useState<QuickTopic | null>(null);
     const [showLinksSidebar, setShowLinksSidebar] = useState(false);
     const viewRef = useRef<HTMLDivElement>(null);
@@ -2166,7 +2234,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
     if (isWebTopic && topic) {
         return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T.bg, paddingBottom: 'clamp(10px, 1.5vh, 20px)' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg, paddingBottom: 'clamp(10px, 1.5vh, 20px)' }}>
                 {/* TOP REGION: Connected toolbar + status line */}
                 <div style={{
                     flex: '0 0 auto', width: '100%',
@@ -2233,7 +2301,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     </div>
                     {/* Status line — small, low-noise */}
                     {!isNavHidden && <div style={{
-                        fontSize: 'clamp(13px,1.5vh,16px)', color: T.textSub,
+                        fontSize: 'clamp(13px,1.5vh,16px)', color: T_chromeTextMuted,
                         padding: 'clamp(4px,0.5vh,6px) clamp(8px,1vw,12px)',
                         fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         width: '100%', boxSizing: 'border-box', fontFamily: FONT_PRIMARY,
@@ -2248,8 +2316,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         <div style={{
                             flex: '0 0 clamp(280px, 25vw, 380px)',
                             height: '100%',
-                            background: WEB_SURFACE.panelBg,
-                            border: WEB_SURFACE.borderSoft,
+                            background: T_chromeBg,
+                            border: `1px solid ${T_chromeBorder}`,
                             borderRadius: '16px',
                             padding: 'clamp(12px,1.5vh,18px)',
                             display: 'flex',
@@ -2257,8 +2325,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                             gap: 'clamp(8px,1vh,12px)',
                             overflow: 'hidden',
                         }}>
-                            <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 700, color: T.textMain, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <WebLayoutIcon size={22} color="#789D91" strokeWidth={2.1} />
+                            <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 700, color: T_chromeText, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <WebLayoutIcon size={22} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.1} />
                                 <span>Page Links</span>
                             </div>
                             <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
@@ -2275,7 +2343,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                         {link.text}
                                     </GazeButton>
                                 )) : (
-                                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 'clamp(14px,1.8vh,18px)' }}>No links detected on this page.</div>
+                                    <div style={{ color: isLight ? 'rgba(74, 58, 42, 0.65)' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(255,255,255,0.5)', fontSize: 'clamp(14px,1.8vh,18px)' }}>No links detected on this page.</div>
                                 )}
                             </div>
                             <GazeButton id="bv-links-refresh" onClick={() => browser.refreshLinks()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -2345,7 +2413,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
         return (
             <div style={{
-                flex: 1, display: 'flex', flexDirection: 'column', padding: GAP, gap: GAP, overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)'
+                flex: 1, display: 'flex', flexDirection: 'column', padding: GAP, gap: GAP, overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+                background: T_pageBg,
             }}>
                 <div style={{ display: 'flex', gap: 'clamp(14px,2vw,24px)', flexWrap: 'wrap' }}>
                     <GazeButton id="qs-card-back" onClick={() => { setTopic(null); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -2409,13 +2478,14 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
             padding: 'clamp(14px, 1.6vh, 22px) clamp(28px, 3vw, 56px)',
             paddingBottom: 'clamp(14px, 1.8vh, 24px)',
             gap: 'clamp(14px, 1.8vh, 24px)',
+            background: T_pageBg,
         }}>
             <div style={{
-                color: T.textMain, fontSize: 'clamp(24px,3vh,32px)', fontWeight: 820,
+                color: T_chromeText, fontSize: 'clamp(24px,3vh,32px)', fontWeight: 820,
                 flexShrink: 0, fontFamily: FONT_PRIMARY, letterSpacing: '0.04em',
                 display: 'flex', alignItems: 'center', gap: '14px',
             }}>
-                <SearchIcon size={34} color="#789D91" strokeWidth={2.4} />
+                <SearchIcon size={34} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.4} />
                 <span>Quick Search</span>
             </div>
             <div style={{
@@ -2426,40 +2496,51 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                 gap: 'clamp(16px, 2vh, 24px) clamp(20px, 2.4vw, 36px)',
                 overflow: 'hidden', minHeight: 0,
             }}>
-                {QUICK_TOPICS.map((t) => (
-                    <GazeButton key={t.id} id={`qs-${t.id}`} onClick={() => openTopic(t)}
-                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                        contentFill
-                        style={{
-                            width: '100%', height: '100%', minHeight: 0,
-                            background: '#20221E',
-                            border: '1.5px solid rgba(213, 216, 188, 0.14)',
-                            borderRadius: '26px',
-                            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)',
-                            display: 'flex', flexDirection: 'row', alignItems: 'center',
-                            position: 'relative',
-                            padding: 0, overflow: 'hidden',
-                        }}>
-                        <div style={{
-                            flex: '0 0 22%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            paddingLeft: 'clamp(28px, 2.6vw, 44px)',
-                            color: '#789D91',
-                        }}>
-                            {renderQuickTopicIcon(t.id, 64, '#789D91')}
-                        </div>
-                        <div style={{
-                            flex: '1 1 0', minWidth: 0,
-                            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start',
-                            padding: 'clamp(14px,1.8vh,22px) clamp(20px,2.4vw,32px) clamp(14px,1.8vh,22px) clamp(14px,1.4vw,22px)',
-                        }}>
-                            <span style={{
-                                fontSize: 'clamp(22px, 2.7vh, 32px)', fontWeight: 820, color: '#ECEDE3',
-                                fontFamily: FONT_PRIMARY, lineHeight: 1.1, letterSpacing: 0,
-                            }}>{stripLeadingEmoji(t.label)}</span>
-                        </div>
-                    </GazeButton>
-                ))}
+                {QUICK_TOPICS.map((t) => {
+                    const tileBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : '#20221E';
+                    const tileBorder = isLight ? '1.5px solid rgba(168, 120, 56, 0.30)' : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)' : '1.5px solid rgba(213, 216, 188, 0.14)';
+                    const tileShadow = isLight
+                        ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+                        : isMix
+                            ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
+                            : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
+                    const iconColor = isLight ? '#76624A' : '#789D91';
+                    const labelColor = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : '#ECEDE3';
+                    return (
+                        <GazeButton key={t.id} id={`qs-${t.id}`} onClick={() => openTopic(t)}
+                            gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
+                            contentFill
+                            style={{
+                                width: '100%', height: '100%', minHeight: 0,
+                                background: tileBg,
+                                border: tileBorder,
+                                borderRadius: '26px',
+                                boxShadow: tileShadow,
+                                display: 'flex', flexDirection: 'row', alignItems: 'center',
+                                position: 'relative',
+                                padding: 0, overflow: 'hidden',
+                            }}>
+                            <div style={{
+                                flex: '0 0 22%',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                paddingLeft: 'clamp(28px, 2.6vw, 44px)',
+                                color: iconColor,
+                            }}>
+                                {renderQuickTopicIcon(t.id, 64, iconColor)}
+                            </div>
+                            <div style={{
+                                flex: '1 1 0', minWidth: 0,
+                                display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start',
+                                padding: 'clamp(14px,1.8vh,22px) clamp(20px,2.4vw,32px) clamp(14px,1.8vh,22px) clamp(14px,1.4vw,22px)',
+                            }}>
+                                <span style={{
+                                    fontSize: 'clamp(22px, 2.7vh, 32px)', fontWeight: 820, color: labelColor,
+                                    fontFamily: FONT_PRIMARY, lineHeight: 1.1, letterSpacing: 0,
+                                }}>{stripLeadingEmoji(t.label)}</span>
+                            </div>
+                        </GazeButton>
+                    );
+                })}
             </div>
         </div>
     );
@@ -2471,6 +2552,12 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
     goBack: () => void;
     isNavHidden?: boolean;
 }) => {
+    const { isLight, isMix } = useTheme();
+    // Theme-aware chrome tokens. The chat / message-list card stays dark.
+    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
+    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+    void T_chromeText; void T_chromeTextMuted;
     const [connected, setConnected] = useState(false);
     const viewRef = useRef<HTMLDivElement>(null);
 
@@ -2495,6 +2582,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
     if (connected) return (
         <div style={{
             flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+            background: T_pageBg,
         }}>
             {/* ── HORIZONTAL TOOLBAR ── */}
             <div style={{ ...toolbarStyle, flexShrink: 0 }}>
@@ -2553,7 +2641,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
                 </GazeButton>
             </div>
             <div style={{
-                fontSize: 'clamp(15px,1.8vh,18px)', color: WEB_ACCENTS.oliveText, padding: 'clamp(6px,1vh,10px) clamp(14px,2vw,24px)',
+                fontSize: 'clamp(15px,1.8vh,18px)', color: isLight ? '#4F6B3F' : isMix ? '#A8BC8E' : WEB_ACCENTS.oliveText, padding: 'clamp(6px,1vh,10px) clamp(14px,2vw,24px)',
                 flexShrink: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px'
             }}>
                 <WhatsAppIcon size={20} color="currentColor" strokeWidth={2} />
@@ -2576,7 +2664,8 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
     return (
         <div style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: GAP,
-            marginTop: isNavHidden ? '0' : 'clamp(95px,12.5vh,125px)', paddingBottom: 'clamp(20px, 2.5vh, 40px)', transition: 'margin-top 0.3s ease'
+            marginTop: isNavHidden ? '0' : 'clamp(95px,12.5vh,125px)', paddingBottom: 'clamp(20px, 2.5vh, 40px)', transition: 'margin-top 0.3s ease',
+            background: T_pageBg,
         }}>
             <div style={{ ...cs, width: 'clamp(420px,42vw,620px)', height: 'auto', padding: 'clamp(40px,5.5vh,65px)', gap: 'clamp(20px,3.2vh,36px)', border: WEB_SURFACE.borderSoft }}>
                 <div style={{ color: WEB_ACCENTS.oliveText, display: 'flex', filter: 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' }}><WhatsAppIcon size={88} /></div>
@@ -2600,6 +2689,12 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
 const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden, setView }: {
     ige: boolean, ts: number, browser: any, gpRef: React.MutableRefObject<{ x: number; y: number }>, goBack: () => void, disableGaze: () => void, isNavHidden: boolean, setView?: (view: any) => void
 }) => {
+    const { isLight, isMix } = useTheme();
+    // Theme-aware chrome tokens. The browser-view content card stays dark.
+    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
     const [topic, setTopic] = useState<{ id: string, url: string, label: string } | null>(null);
     const viewRef = useRef<HTMLDivElement>(null);
 
@@ -2626,7 +2721,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
     // Reuse the QuickSearchPanel browser layout when a topic is selected
     if (topic && browser.isOpen) {
         return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T.bg, paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg, paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
                 <div style={{
                     flex: '0 0 clamp(170px, 20vh, 220px)', width: '100%',
                     display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
@@ -2716,9 +2811,28 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
         },
     ];
 
+    // Theme-aware tile bg per social platform (cream-elevated in light, walnut in mix, dark in dark)
+    const tileBgFor = (id: string, darkBg: string) => {
+        if (isLight) {
+            // Cream tiles with subtle platform-tint hue
+            if (id === 'linkedin') return 'rgba(31, 107, 126, 0.10)';
+            if (id === 'gmail') return 'rgba(165, 106, 96, 0.12)';
+            if (id === 'whatsapp') return 'rgba(143, 161, 123, 0.14)';
+            return '#F0E2C4';
+        }
+        if (isMix) {
+            if (id === 'linkedin') return 'rgba(31, 50, 60, 0.85)';
+            if (id === 'gmail') return 'rgba(72, 38, 32, 0.85)';
+            if (id === 'whatsapp') return 'rgba(48, 56, 36, 0.85)';
+            return '#241F18';
+        }
+        return darkBg;
+    };
+    const tileBorder = isLight ? `1.5px solid ${T_chromeBorder}` : isMix ? '1.5px solid rgba(180, 147, 98, 0.20)' : WEB_SURFACE.borderSoft;
+    const tileLabelColor = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T.bg, padding: 'clamp(20px, 4vh, 60px)' }}>
-            <h2 style={{ fontSize: 'clamp(32px, 4.5vh, 48px)', color: T.textMain, marginBottom: 'clamp(40px, 6vh, 80px)', fontFamily: FONT_PRIMARY, fontWeight: 800 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T_pageBg, padding: 'clamp(20px, 4vh, 60px)' }}>
+            <h2 style={{ fontSize: 'clamp(32px, 4.5vh, 48px)', color: T_chromeText, marginBottom: 'clamp(40px, 6vh, 80px)', fontFamily: FONT_PRIMARY, fontWeight: 800 }}>
                 Social Media
             </h2>
             <div style={{ display: 'flex', gap: 'clamp(22px, 3vw, 36px)', width: 'clamp(800px, 85vw, 1200px)' }}>
@@ -2738,10 +2852,10 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                             fontFamily: FONT_PRIMARY,
                             fontSize: 'clamp(25px, 3vh, 36px)',
                             fontWeight: 800,
-                            background: card.bg,
-                            border: WEB_SURFACE.borderSoft,
-                            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)',
-                            color: T.textMain,
+                            background: tileBgFor(card.id, card.bg),
+                            border: tileBorder,
+                            boxShadow: T_chromeShadow,
+                            color: tileLabelColor,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
