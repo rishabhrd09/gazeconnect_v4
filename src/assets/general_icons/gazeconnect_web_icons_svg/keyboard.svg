@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">Keyboard icon</title><desc id="desc">Rounded keyboard symbol for gaze communication UI.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#AEB7C6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M7 10h.5M10 10h.5M13 10h.5M16 10h.5M7 13h.5M10 13h.5M13 13h.5M16 13h.5M9 16h6"/>
+</g>
+<g id="glyph"></g><g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

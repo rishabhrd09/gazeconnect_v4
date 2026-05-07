@@ -4,7 +4,6 @@ import GazeButton from '../../core/GazeButton';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { generateDefaultPhrases } from '../../../services/defaultCustomization';
-import { ROLES } from '../../../types/customization';
 import type { Person } from '../../../types/customization';
 
 interface PeoplePanelProps {
@@ -18,7 +17,7 @@ const AddPersonForm: React.FC<{
   const colors = isDarkMode ? darkColors : lightColors;
   const [name, setName] = useState('');
   const [nameHi, setNameHi] = useState('');
-  const [role, setRole] = useState<string>(ROLES[0]);
+  const role = 'Other';
 
   const handleAdd = useCallback(() => {
     const trimmedName = name.trim();
@@ -32,7 +31,6 @@ const AddPersonForm: React.FC<{
     });
     setName('');
     setNameHi('');
-    setRole(ROLES[0]);
   }, [name, nameHi, role, onAdd]);
 
   const inputStyle: React.CSSProperties = {
@@ -79,18 +77,6 @@ const AddPersonForm: React.FC<{
             placeholder="e.g. पापा"
             style={inputStyle}
           />
-        </div>
-        <div style={{ flex: 1, minWidth: 140 }}>
-          <label style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, display: 'block', marginBottom: 4 }}>
-            Role
-          </label>
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            style={{ ...inputStyle, cursor: 'pointer' }}
-          >
-            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
         </div>
       </div>
       <GazeButton
@@ -142,7 +128,10 @@ const PersonRow: React.FC<{
             ({person.nameHi})
           </span>
         </div>
-        <div style={{ fontSize: typography.fontSize.sm, color: colors.text.tertiary }}>
+        <div style={{ display: 'none', fontSize: typography.fontSize.sm, color: colors.text.tertiary }}>
+          {person.role}
+        </div>
+        <div style={{ display: 'none', fontSize: typography.fontSize.sm, color: colors.text.tertiary }}>
           {person.role} · {person.phrases.length} phrases
         </div>
       </div>
@@ -180,7 +169,7 @@ const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
         fontSize: typography.fontSize.sm,
         color: colors.text.secondary,
       }}>
-        Manage the people in your care network. Each person gets personalized phrases.
+        Manage the names in your care network. You can add or remove people whenever needed.
       </div>
 
       {people.map(person => (

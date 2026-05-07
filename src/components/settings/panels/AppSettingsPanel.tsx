@@ -422,7 +422,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
         <h3 style={sectionHeading}>Appearance</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
 
-          {/* Theme Toggle — Dark / Light pill */}
+          {/* Theme toggle */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -438,13 +438,16 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
               </div>
               <div style={{ fontSize: '12px', color: colors.text.secondary, marginTop: '2px' }}>
                 {theme === 'light'
-                  ? `☀️ Light mode${settings.showHindi ? ' \u00B7 \u0932\u093E\u0907\u091F \u092E\u094B\u0921' : ''}`
-                  : `🌙 Dark mode${settings.showHindi ? ' \u00B7 \u0921\u093E\u0930\u094D\u0915 \u092E\u094B\u0921' : ''}`}
+                  ? `Light mode${settings.showHindi ? ' \u00B7 \u0932\u093E\u0907\u091F \u092E\u094B\u0921' : ''}`
+                  : theme === 'mix'
+                    ? `Mix mode${settings.showHindi ? ' \u00B7 \u092E\u093F\u0915\u094D\u0938 \u092E\u094B\u0921' : ''}`
+                    : `Dark mode${settings.showHindi ? ' \u00B7 \u0921\u093E\u0930\u094D\u0915 \u092E\u094B\u0921' : ''}`}
               </div>
             </div>
 
             <div className="theme-toggle-pill" style={{
               display: 'flex',
+              flexWrap: 'wrap',
               gap: 8,
               background: 'rgba(255,255,255,0.06)',
               borderRadius: 100,
@@ -455,8 +458,8 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                 onClick={() => { setTheme('dark'); updateSetting('isDarkMode', true); }}
                 style={{
                   borderRadius: 100,
-                  padding: '10px 24px',
-                  minWidth: 110,
+                  padding: '10px 20px',
+                  minWidth: 96,
                   minHeight: 44,
                   background: theme === 'dark'
                     ? 'rgba(255,255,255,0.18)'
@@ -471,15 +474,38 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                   transition: 'background 200ms, color 200ms',
                 }}
               >
-                🌙 Dark
+                Dark
+              </button>
+
+              <button
+                onClick={() => { setTheme('mix'); updateSetting('isDarkMode', true); }}
+                style={{
+                  borderRadius: 100,
+                  padding: '10px 20px',
+                  minWidth: 96,
+                  minHeight: 44,
+                  background: theme === 'mix'
+                    ? 'rgba(138, 74, 61, 0.38)'
+                    : 'transparent',
+                  border: 'none',
+                  color: theme === 'mix' ? '#F5EAD3' : 'rgba(255,255,255,0.40)',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 8,
+                  transition: 'background 200ms, color 200ms',
+                }}
+              >
+                Mix
               </button>
 
               <button
                 onClick={() => { setTheme('light'); updateSetting('isDarkMode', false); }}
                 style={{
                   borderRadius: 100,
-                  padding: '10px 24px',
-                  minWidth: 110,
+                  padding: '10px 20px',
+                  minWidth: 96,
                   minHeight: 44,
                   background: theme === 'light'
                     ? 'linear-gradient(135deg, #F97316, #F59E0B)'
@@ -494,7 +520,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                   transition: 'background 200ms, color 200ms',
                 }}
               >
-                ☀️ Light
+                Light
               </button>
             </div>
           </div>

@@ -201,6 +201,21 @@ export function useGazeBrowser() {
         await api.webview.type(text);
     }, []);
 
+    // Execute JS in the BrowserView with user-gesture context. Used by the
+    // AAC toolbar to reliably click YouTube's fullscreen / skip-ad buttons —
+    // keyboard shortcuts ('f', 'l') don't work without focus + user gesture,
+    // but executeJavaScript with userGesture=true does.
+    const executeJs = useCallback(async (code: string) => {
+        const api = getElectronAPI();
+        if (!api?.webview?.executeJs) return { success: false };
+        try {
+            return await api.webview.executeJs(code);
+        } catch (err: any) {
+            console.error('executeJs error:', err?.message || err);
+            return { success: false, error: err?.message || String(err) };
+        }
+    }, []);
+
     const updateBounds = useCallback(async (bounds: BrowserViewBounds) => {
         const api = getElectronAPI();
         if (!api?.webview) return;
@@ -240,6 +255,7 @@ export function useGazeBrowser() {
         adjustZoom,
         toggleHighContrast,
         typeText,
+        executeJs,
         updateBounds,
         updateGazeCursor,
         canGoBack,

@@ -29,7 +29,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(245, 241, 234, 0.72)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -39,6 +39,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         backgroundColor: colors.background.elevated,
         borderRadius: layout.borderRadius.xl,
         border: `1px solid ${colors.border.main}`,
+        boxShadow: isDarkMode ? '0 8px 20px rgba(0,0,0,0.24)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)',
         padding: spacing[6],
         maxWidth: 420,
         width: '90%',

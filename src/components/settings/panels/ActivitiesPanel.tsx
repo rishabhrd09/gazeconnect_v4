@@ -14,13 +14,13 @@ interface ActivitiesPanelProps {
   isDarkMode: boolean;
 }
 
-const MAX_ITEMS = 12;
+const MAX_ITEMS = 11;
 
 // Section display config
 const SECTION_META: Record<string, { icon: string; color: string; description: string }> = {
-  tv: { icon: '📺', color: '#4299E1', description: 'TV channels and controls' },
-  youtube: { icon: '▶', color: '#FF0000', description: 'YouTube content to play' },
-  alexa: { icon: '◉', color: '#00CAFF', description: 'Alexa voice commands' },
+  tv: { icon: 'TV', color: '#C69A45', description: 'TV channels and controls' },
+  youtube: { icon: 'YT', color: '#B49362', description: 'YouTube content to play' },
+  alexa: { icon: 'A', color: '#8FAE72', description: 'Alexa voice commands' },
 };
 
 // ============================================
@@ -395,6 +395,18 @@ const ActivitiesPanel: React.FC<ActivitiesPanelProps> = ({ isDarkMode }) => {
         >
           Save All Changes
         </button>
+      </div>
+
+      <div style={{
+        padding: '10px 14px',
+        borderRadius: 8,
+        background: `${colors.accent.main}10`,
+        border: `1px solid ${colors.accent.main}30`,
+        fontSize: 13,
+        color: colors.text.secondary,
+        lineHeight: 1.5,
+      }}>
+        Patient activity detail screens show one Back card plus the first {MAX_ITEMS} items. Keep the most-used TV, YouTube, and Alexa actions at the top.
       </div>
 
       {/* Section accordions */}

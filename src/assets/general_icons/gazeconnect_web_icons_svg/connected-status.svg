@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">Connected status icon</title><desc id="desc">Small linked status icon for connected device state.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#2CCB8E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<path d="M9.5 8.5l-1.8 1.8a3 3 0 0 0 4.2 4.2l1.2-1.2"/><path d="M14.5 15.5l1.8-1.8a3 3 0 0 0-4.2-4.2l-1.2 1.2"/>
+</g>
+<g id="glyph"><circle cx="12" cy="12" r="1" fill="#2CCB8E"/></g>
+<g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

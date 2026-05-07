@@ -129,9 +129,39 @@ export const SpeakIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColo
   </svg>
 );
 
-export const MessageIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2 }) => (
+export const MessageIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => {
+  const bubbleStrokeWidth = Math.max(1.6, strokeWidth * 0.82);
+  const waveformStrokeWidth = Math.max(1.15, strokeWidth * 0.4);
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <path strokeWidth={bubbleStrokeWidth} d="M5.7 5.15h12.6a3.25 3.25 0 0 1 3.25 3.25v4.9a3.25 3.25 0 0 1-3.25 3.25h-7.1L7.35 19.6v-3.05H5.7a3.25 3.25 0 0 1-3.25-3.25V8.4A3.25 3.25 0 0 1 5.7 5.15Z" />
+      <g strokeWidth={waveformStrokeWidth}>
+        <line x1="8.15" y1="10.65" x2="8.15" y2="13.05" />
+        <line x1="10.7" y1="9.85" x2="10.7" y2="13.85" />
+        <line x1="13.3" y1="10.15" x2="13.3" y2="13.55" />
+        <line x1="15.85" y1="10.75" x2="15.85" y2="12.95" />
+      </g>
+    </svg>
+  );
+};
+
+export const ConversationIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <path d="M8.5 16.5c-3.04 0-5.5-2.13-5.5-4.75S5.46 7 8.5 7 14 9.13 14 11.75c0 .8-.24 1.55-.66 2.2L14 17l-3.08-1.08c-.74.37-1.57.58-2.42.58Z" />
+    <path d="M15.75 15.5c2.9-.18 5.25-2.24 5.25-4.75C21 8.01 18.54 6 15.5 6c-.78 0-1.52.13-2.2.37" />
+    <path d="M15.8 17.85 13.75 17.1" />
+    <circle cx="7.25" cy="11.75" r=".65" fill={color} stroke="none" />
+    <circle cx="9.5" cy="11.75" r=".65" fill={color} stroke="none" />
+    <circle cx="11.75" cy="11.75" r=".65" fill={color} stroke="none" />
+  </svg>
+);
+
+export const DialogueTileIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3.25" y="4.25" width="17.5" height="15.5" rx="3.4" />
+    <path d="M7.1 8.7h9.8" />
+    <path d="M7.1 14.9h7.2" />
   </svg>
 );
 

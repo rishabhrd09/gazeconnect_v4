@@ -82,6 +82,10 @@ const api = {
     get: () => ipcRenderer.invoke('mouse-only-mode:get'),
   },
 
+  alertMode: {
+    set: (enabled: boolean) => ipcRenderer.invoke('alert-mode:set', enabled),
+  },
+
   // Gaze-controlled BrowserView for web browsing
   webview: {
     open: (url: string, bounds: { x: number; y: number; width: number; height: number }) =>
@@ -92,6 +96,7 @@ const api = {
     back: () => ipcRenderer.invoke('webview:back'),
     forward: () => ipcRenderer.invoke('webview:forward'),
     type: (text: string) => ipcRenderer.invoke('webview:type', text),
+    executeJs: (code: string) => ipcRenderer.invoke('webview:executeJs', code),
     setBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
       ipcRenderer.invoke('webview:setBounds', bounds),
     updateGaze: (x: number, y: number) =>

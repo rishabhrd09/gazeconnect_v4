@@ -10,7 +10,7 @@ import React, { useCallback } from 'react';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useGazeControl } from '../components/core/GazeControlToggle';
-import { darkColors } from '../utils/design';
+import { mixColors } from '../utils/design';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface DesignHomeLandingScreenProps {
@@ -20,19 +20,49 @@ interface DesignHomeLandingScreenProps {
   showHindi?: boolean;
 }
 
-const THEME = {
+const DARK_PAGE = {
   bg: '#0B1120',
-  textMain: '#E8EDF5',
-  textSub: '#8896AB',
-  textDim: '#5A6577',
-  accent: '#64B5F6',
-  cardBg: 'rgba(30, 41, 59, 0.6)',
-  border: 'rgba(100, 116, 139, 0.15)',
+  title: '#E8EDF5',
+  subtitle: '#9BA8BA',
+  cardBg: 'rgba(30, 41, 59, 0.68)',
+  cardBorder: 'rgba(100, 116, 139, 0.22)',
+  cardShadow: '0 10px 24px rgba(0,0,0,0.22)',
+  icon: '#64B5F6',
+  iconBg: 'rgba(100, 181, 246, 0.08)',
+  iconBorder: 'rgba(100, 181, 246, 0.16)',
+  titleText: '#E8EDF5',
+  bodyText: '#9BA8BA',
 };
 
 function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: DesignHomeLandingScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
+
+  const pageTheme = isMix ? {
+    bg: mixColors.home.root,
+    title: '#F0E2C4',
+    subtitle: '#CDB98E',
+    cardBg: mixColors.home.tileSurfaces.fp,
+    cardBorder: mixColors.home.cardBorder,
+    cardShadow: mixColors.home.cardShadow,
+    icon: '#4E6E69',
+    iconBg: 'rgba(78, 110, 105, 0.10)',
+    iconBorder: 'rgba(78, 110, 105, 0.24)',
+    titleText: mixColors.home.text,
+    bodyText: mixColors.home.subtleText,
+  } : isLight ? {
+    bg: '#E6D7BA',
+    title: '#5A4530',
+    subtitle: '#6E5A42',
+    cardBg: '#BFB694',
+    cardBorder: 'rgba(122, 99, 71, 0.32)',
+    cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), 0 8px 18px rgba(82, 62, 38, 0.14)',
+    icon: '#3F5E5A',
+    iconBg: 'rgba(63, 94, 90, 0.08)',
+    iconBorder: 'rgba(63, 94, 90, 0.22)',
+    titleText: '#3B2D20',
+    bodyText: '#6E5A42',
+  } : DARK_PAGE;
 
   const handleTileNavigate = useCallback((screen: string, title: string) => {
     onSpeak(`Opening ${title}.`);
@@ -46,7 +76,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
       title: 'Survey Design',
       subtitle: 'Step-by-step guided survey to plan your home layout through questions.',
       icon: (
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64B5F6" strokeWidth="1.5">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <line x1="3" y1="9" x2="21" y2="9" />
           <line x1="9" y1="21" x2="9" y2="9" />
@@ -60,7 +90,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
       title: 'Compass Map',
       subtitle: 'Visual 4x4 grid tool to place rooms directly on your plot map.',
       icon: (
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <line x1="3" y1="9" x2="21" y2="9" />
           <line x1="3" y1="15" x2="21" y2="15" />
@@ -68,62 +98,67 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
           <line x1="15" y1="3" x2="15" y2="21" />
         </svg>
       ),
-    }
+    },
   ];
 
   return (
-    <div className={`design-home-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`design-home-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
       width: '100vw',
       height: '100vh',
       overflow: 'hidden',
-      background: THEME.bg,
+      background: pageTheme.bg,
       display: 'flex',
       flexDirection: 'column',
     }}>
       <GlobalNavBar currentPage="design-home" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
 
-      {/* Content */}
-      <div style={{
+      <main style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        padding: '24px',
-        paddingTop: 'clamp(20px, 4vh, 60px)',
-        paddingBottom: 'clamp(36px, 6vh, 80px)',
-        gap: '16px',
+        padding: 'clamp(28px, 4vh, 48px) clamp(40px, 6vw, 96px) clamp(80px, 10vh, 128px)',
+        gap: 'clamp(30px, 4vh, 46px)',
         minHeight: 0,
       }}>
-        <h1 style={{
-          fontSize: 'clamp(24px, 3.5vh, 36px)',
-          fontWeight: 700,
-          color: THEME.textMain,
-          marginBottom: '8px',
-          textAlign: 'center',
-        }}>
-          Design Your Home
-        </h1>
-        <p style={{
-          fontSize: 'clamp(14px, 1.8vh, 18px)',
-          color: THEME.textSub,
-          marginBottom: '24px',
-          textAlign: 'center',
-          maxWidth: '500px',
-        }}>
-          Choose how you want to plan your floor layout.
-        </p>
-
-        {/* Two Tiles */}
-        <div style={{
+        <header style={{
           display: 'flex',
-          gap: 'clamp(20px, 3vw, 40px)',
-          justifyContent: 'center',
-          flexWrap: 'wrap',
-          maxWidth: '900px',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: 'clamp(10px, 1.4vh, 16px)',
+          maxWidth: '720px',
+        }}>
+          <h1 style={{
+            fontSize: 'clamp(30px, 4.3vh, 46px)',
+            fontWeight: 780,
+            color: pageTheme.title,
+            margin: 0,
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+          }}>
+            Design Your Home
+          </h1>
+          <p style={{
+            fontSize: 'clamp(16px, 2vh, 21px)',
+            color: pageTheme.subtitle,
+            margin: 0,
+            lineHeight: 1.35,
+          }}>
+            Choose how you want to plan your floor layout.
+          </p>
+        </header>
+
+        <section style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))',
+          gap: 'clamp(28px, 3.5vw, 48px)',
+          justifyContent: 'stretch',
+          maxWidth: '1080px',
           width: '100%',
         }}>
-          {tiles.map(tile => (
+          {tiles.map((tile) => (
             <GazeButton
               key={tile.id}
               id={`landing-${tile.id}`}
@@ -131,60 +166,72 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
               onClick={() => handleTileNavigate(tile.screen, tile.title)}
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
-              isDarkMode={true}
+              isDarkMode={isDarkMode}
               dwellCategory="navigationButton"
               style={{
-                flex: '1 1 320px',
-                maxWidth: '420px',
-                minHeight: 'clamp(180px, 28vh, 260px)',
-                padding: 'clamp(24px, 3vh, 40px)',
+                width: '100%',
+                minHeight: 'clamp(250px, 32vh, 340px)',
+                padding: 'clamp(28px, 4vh, 48px) clamp(28px, 3.4vw, 48px)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '16px',
-                background: THEME.cardBg,
-                border: `2px solid ${THEME.border}`,
-                borderRadius: '20px',
+                gap: 0,
+                background: pageTheme.cardBg,
+                border: `1.5px solid ${pageTheme.cardBorder}`,
+                borderRadius: '24px',
+                boxShadow: pageTheme.cardShadow,
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.2s ease',
               }}
             >
               <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '16px',
-                background: 'rgba(100, 181, 246, 0.08)',
-                border: '1px solid rgba(100, 181, 246, 0.15)',
+                width: 'clamp(74px, 8.2vh, 92px)',
+                height: 'clamp(74px, 8.2vh, 92px)',
+                background: 'transparent',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                color: pageTheme.icon,
+                flexShrink: 0,
+                marginBottom: 'clamp(30px, 3.8vh, 46px)',
               }}>
                 {tile.icon}
               </div>
+
               <div style={{
-                fontSize: 'clamp(20px, 2.8vh, 28px)',
-                fontWeight: 700,
-                color: THEME.textMain,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 'clamp(10px, 1.3vh, 14px)',
+                maxWidth: '390px',
               }}>
-                {tile.title}
-              </div>
-              <div style={{
-                fontSize: 'clamp(13px, 1.6vh, 16px)',
-                color: THEME.textSub,
-                lineHeight: 1.4,
-                maxWidth: '280px',
-              }}>
-                {tile.subtitle}
+                <div style={{
+                  fontSize: 'clamp(28px, 3.45vh, 36px)',
+                  fontWeight: 780,
+                  color: pageTheme.titleText,
+                  lineHeight: 1.08,
+                  letterSpacing: '-0.015em',
+                  fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif",
+                }}>
+                  {tile.title}
+                </div>
+                <div style={{
+                  fontSize: 'clamp(16px, 1.95vh, 20px)',
+                  fontWeight: 650,
+                  color: pageTheme.bodyText,
+                  lineHeight: 1.35,
+                  maxWidth: '360px',
+                }}>
+                  {tile.subtitle}
+                </div>
               </div>
             </GazeButton>
           ))}
-        </div>
-      </div>
-
-      {/* Floating Gaze Toggle */}
-      {/* Gaze toggle provided by GlobalNavBar at fixed bottom-center */}
+        </section>
+      </main>
     </div>
   );
 }

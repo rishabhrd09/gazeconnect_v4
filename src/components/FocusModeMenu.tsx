@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusMode } from '../contexts/FocusModeContext';
+import { darkColors, lightColors, typography } from '../utils/design';
 
 interface MenuPosition {
     x: number;
@@ -51,17 +52,13 @@ const FocusModeMenu: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode = true }
 
     if (!visible) return null;
 
-    const bgColor = isDarkMode
-        ? 'rgba(20, 27, 38, 0.92)'
-        : 'rgba(255, 255, 255, 0.95)';
-    const borderColor = isDarkMode
-        ? 'rgba(100, 116, 139, 0.35)'
-        : 'rgba(0, 0, 0, 0.12)';
-    const textColor = isDarkMode ? '#E2E8F0' : '#1E293B';
-    const hoverBg = isDarkMode
-        ? 'rgba(45, 212, 191, 0.15)'
-        : 'rgba(45, 212, 191, 0.1)';
-    const accentColor = isFocusMode ? '#F59E0B' : '#2DD4BF';
+    const bgColor = isDarkMode ? darkColors.background.secondary : lightColors.background.elevated;
+    const borderColor = isDarkMode ? darkColors.border.main : lightColors.border.main;
+    const textColor = isDarkMode ? darkColors.text.primary : lightColors.text.primary;
+    const hoverBg = isDarkMode ? darkColors.success.subtle : lightColors.background.tertiary;
+    const accentColor = isFocusMode
+        ? (isDarkMode ? '#F59E0B' : lightColors.warning.main)
+        : (isDarkMode ? '#2DD4BF' : lightColors.text.secondary);
 
     return (
         <div
@@ -75,10 +72,10 @@ const FocusModeMenu: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode = true }
                 backgroundColor: bgColor,
                 border: `1px solid ${borderColor}`,
                 borderRadius: 12,
-                boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0,0,0,0.3)',
-                backdropFilter: 'blur(16px)',
+                boxShadow: isDarkMode ? '0 8px 20px rgba(0, 0, 0, 0.18)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)',
                 padding: '6px',
                 animation: 'focusMenuFadeIn 120ms ease-out',
+                fontFamily: typography.fontFamily.primary,
             }}
         >
             <style>{`
@@ -118,8 +115,8 @@ const FocusModeMenu: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode = true }
                     height: 32,
                     borderRadius: 8,
                     backgroundColor: isFocusMode
-                        ? 'rgba(245, 158, 11, 0.15)'
-                        : 'rgba(45, 212, 191, 0.12)',
+                        ? (isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(196, 151, 74, 0.12)')
+                        : (isDarkMode ? 'rgba(45, 212, 191, 0.12)' : 'rgba(237, 230, 218, 0.92)'),
                     flexShrink: 0,
                 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -149,8 +146,8 @@ const FocusModeMenu: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode = true }
                     <span style={{
                         padding: '3px 8px',
                         borderRadius: 6,
-                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                        color: '#F59E0B',
+                        backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(196, 151, 74, 0.12)',
+                        color: isDarkMode ? '#F59E0B' : lightColors.warning.main,
                         fontSize: 11,
                         fontWeight: 700,
                         letterSpacing: '0.5px',

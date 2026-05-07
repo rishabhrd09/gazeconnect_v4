@@ -8,7 +8,7 @@
  * for ALS/MND patients. Users can customise via Settings.
  *
  * Sections:
- *   - People (9 default contacts)
+ *   - People (6 default contacts)
  *   - Phrase Categories (7 categories, ~80 phrases)
  *   - Medical Sections (3 sections, 27 items)
  *   - Quick Words (3 categories, 7-8 words each)
@@ -32,6 +32,33 @@ export function generateDefaultPhrases(name: string, nameHi: string): Phrase[] {
     { en: `${name} thank you`, hi: `${nameHi} धन्यवाद` },
   ];
 }
+
+const DEFAULT_PEOPLE: CustomizationData['people'] = [
+  {
+    name: 'Rishabh', nameHi: 'Rishabh', role: 'Other',
+    phrases: generateDefaultPhrases('Rishabh', 'Rishabh'),
+  },
+  {
+    name: 'Bhawana', nameHi: 'Bhawana', role: 'Other',
+    phrases: generateDefaultPhrases('Bhawana', 'Bhawana'),
+  },
+  {
+    name: 'Parakh', nameHi: 'Parakh', role: 'Other',
+    phrases: generateDefaultPhrases('Parakh', 'Parakh'),
+  },
+  {
+    name: 'Caretaker', nameHi: 'Caretaker', role: 'Other',
+    phrases: generateDefaultPhrases('Caretaker', 'Caretaker'),
+  },
+  {
+    name: 'Nurse', nameHi: 'Nurse', role: 'Other',
+    phrases: generateDefaultPhrases('Nurse', 'Nurse'),
+  },
+  {
+    name: 'Doctor', nameHi: 'Doctor', role: 'Other',
+    phrases: generateDefaultPhrases('Doctor', 'Doctor'),
+  },
+];
 
 export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   // ============================================
@@ -206,7 +233,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
         { en: 'Wait a moment', hi: 'एक पल रुको' },
         { en: 'Let me think', hi: 'मुझे सोचने दो' },
         { en: "I don't understand", hi: 'समझ नहीं आया' },
-        { en: 'Please repeat that', hi: 'कृपया दोहराएं' },
+        { en: 'Repeat that', hi: 'दोहराएं' },
         { en: 'Thank you', hi: 'धन्यवाद' },
         { en: 'Sorry', hi: 'माफ़ी' },
       ],
@@ -288,8 +315,8 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
         { en: 'Eye Drops', hi: 'आई ड्रॉप्स' },
         { en: 'Lip Balm', hi: 'लिप बाम' },
         { en: 'Toilet / Urine Pot', hi: 'टॉयलेट / पॉट' },
-        { en: 'Remove Urine Pot', hi: 'पॉट हटाओ' },
-        { en: 'Adjust Fan / AC', hi: 'पंखा / AC' },
+        { en: 'Fan', hi: 'पंखा' },
+        { en: 'AC', hi: 'AC' },
         { en: 'Lights On/Off', hi: 'लाइट्स' },
         { en: 'Open/Close Curtains', hi: 'पर्दे' },
       ],
@@ -301,8 +328,8 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   // ============================================
   quickWords: {
     enabled: true,
-    highColor: 'muted_red',
-    mediumColor: 'muted_blue',
+    highColor: 'muted_maroon',
+    mediumColor: 'alert_maroon',
     coreWords: [
       { en: 'Yes', hi: 'हाँ', enabled: true },
       { en: 'No', hi: 'नहीं', enabled: true },
@@ -318,7 +345,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
         id: 'emergency', heading: 'Emergency', headingHi: 'आपातकालीन', color: '#EF4444',
         words: [
           { en: 'TT Suction', hi: 'TT सक्शन', enabled: true, priority: 'high' },
-          { en: 'Ambu bag', hi: 'अंबू बैग', enabled: true, priority: 'high' },
+          { en: 'Ambu Bag', hi: 'अंबू बैग', enabled: true, priority: 'high' },
           { en: 'Oral Suction', hi: 'ओरल सक्शन', enabled: true, priority: 'high' },
           { en: 'Breathing Discomfort', hi: 'सांस की तकलीफ', enabled: true, priority: 'high' },
           { en: 'Check O₂', hi: 'ऑक्सीजन', enabled: true, priority: 'medium' },
@@ -361,7 +388,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   homeQuickActions: {
     leftSidebar: [
       { label: 'TT Suction' },
-      { label: 'Ambu bag' },
+      { label: 'Ambu Bag' },
       { label: 'Oral Suction' },
       { label: 'Breathing Discomfort' },
       { label: 'Check O2' },
@@ -378,7 +405,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   // ============================================
   homeEmergencyCards: [
     { en: 'TT Suction', hi: 'TT सक्शन', enabled: true, priority: 'high' },
-    { en: 'Ambu bag', hi: 'अंबू बैग', enabled: true, priority: 'high' },
+    { en: 'Ambu Bag', hi: 'अंबू बैग', enabled: true, priority: 'high' },
     { en: 'Oral Suction', hi: 'ओरल सक्शन', enabled: true, priority: 'high' },
     { en: 'Breathing Discomfort', hi: 'सांस की तकलीफ', enabled: true, priority: 'high' },
   ],
@@ -568,6 +595,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     gazeOffsetX: 0,
     gazeOffsetY: 0,
     gazeDebugOverlay: false,
+    homeEmergencyLaunchMode: 'cards',
   },
 
   // ============================================
@@ -583,3 +611,5 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
 
   version: 1,
 };
+
+DEFAULT_CUSTOMIZATION.people = DEFAULT_PEOPLE;

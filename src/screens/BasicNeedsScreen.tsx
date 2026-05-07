@@ -9,7 +9,7 @@
  *  - minHeight: clamp(96px, 11vh, 120px) on every button — hard floor
  */
 import React from 'react';
-import { darkColors, lightColors } from '../utils/design';
+import { darkColors, lightColors, mixColors } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -30,15 +30,15 @@ const BasicNeedsScreen: React.FC<Props> = ({
 }) => {
   const colors = isDarkMode ? darkColors : lightColors;
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
   const { basicNeeds: NEEDS } = useCustomization();
 
   return (
     <div
-      className={`needs-screen${isLight ? ' theme-light' : ''}`}
+      className={`needs-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`}
       style={{
         display: 'flex', flexDirection: 'column', height: '100%',
-        backgroundColor: colors.background.primary,
+        backgroundColor: isMix ? mixColors.home.root : colors.background.primary,
         padding: '8px 16px 12px 16px', gap: '8px',
       }}
     >
@@ -76,10 +76,10 @@ const BasicNeedsScreen: React.FC<Props> = ({
               justifyContent: 'center',
               minHeight: 'clamp(96px, 11vh, 120px)',
               padding: 'clamp(14px, 1.8vh, 20px) clamp(12px, 1.5vw, 20px)',
-              background: 'linear-gradient(145deg, rgba(50,62,75,0.65) 0%, rgba(40,52,65,0.55) 100%)',
-              border: `2px solid rgba(90,110,130,0.45)`,
+              background: isMix ? mixColors.home.tileSurfaces.med : 'linear-gradient(145deg, rgba(50,62,75,0.65) 0%, rgba(40,52,65,0.55) 100%)',
+              border: isMix ? `1.5px solid ${mixColors.home.cardBorder}` : `2px solid rgba(90,110,130,0.45)`,
               borderRadius: '16px',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+              boxShadow: isMix ? mixColors.home.cardShadow : '0 4px 14px rgba(0,0,0,0.2)',
               cursor: 'pointer',
               gap: '6px',
               transition: 'all 0.15s ease',
@@ -88,7 +88,7 @@ const BasicNeedsScreen: React.FC<Props> = ({
             <span style={{
               fontSize: 'clamp(20px, 2.4vh, 28px)',
               fontWeight: 600,
-              color: '#FFFFFF',
+              color: isMix ? mixColors.home.text : '#FFFFFF',
               textAlign: 'center',
               lineHeight: 1.2,
               fontFamily: "'Atkinson Hyperlegible Next', 'Inter', 'Segoe UI', system-ui, sans-serif",
@@ -99,7 +99,7 @@ const BasicNeedsScreen: React.FC<Props> = ({
               <span style={{
                 fontSize: 'clamp(22px, 2.6vh, 30px)',
                 fontWeight: 600,
-                color: 'rgba(200,215,230,0.85)',
+                color: isMix ? mixColors.home.subtleText : 'rgba(200,215,230,0.85)',
                 textAlign: 'center',
                 lineHeight: 1.3,
                 marginTop: '8px',

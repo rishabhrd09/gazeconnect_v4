@@ -8,7 +8,7 @@
  * - Enhanced aesthetic styling
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { darkColors, lightColors, screenThemes } from '../utils/design';
+import { darkColors, lightColors, mixColors, screenThemes } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -20,10 +20,12 @@ import {
 import { useCustomization } from '../contexts/CustomizationContext';
 
 // Colors from design.ts screenThemes
-const SELECTED_COLOR = screenThemes.phrases.selectedColor;
+const SELECTED_COLOR = '#B88A37';
 const SIDEBAR_BG = screenThemes.phrases.sidebarBg;
 const ACCENT_TEAL = screenThemes.phrases.accentTeal;
-const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Inter', 'Segoe UI', system-ui, sans-serif";
+const CATEGORY_NAME_COLOR = '#6F7650';
+const PAGE_ICON_COLOR = '#A99673';
+const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 const HINDI_UI_FONT = "'Noto Sans Devanagari', 'Mukta', 'Mangal', 'Segoe UI', sans-serif";
 
 // Custom Basic Needs icon - Hand with heart (caring needs)
@@ -42,8 +44,10 @@ const CATEGORY_ICONS: Record<string, React.FC<{ size?: number; color?: string }>
   medical: MedicalIcon,
   position: BedIcon,
   basic_needs: BasicNeedsIcon,
+  daily_care: BasicNeedsIcon,
   communication: MessageIcon,
   people: FamilyIcon,
+  feelings: HappyIcon,
 };
 
 interface PhrasesScreenProps {
@@ -54,6 +58,15 @@ interface PhrasesScreenProps {
 }
 
 type CategoryKey = string;
+
+const isPrimaryPhraseCategory = (cat: { id: string; name: string }) => {
+  const id = cat.id.toLowerCase();
+  const name = cat.name.toLowerCase();
+  const isCommunication = id === 'communication' || name.includes('communication');
+  const isFeelings = id === 'feelings' || name.includes('feeling') || name.includes('emotion');
+
+  return isCommunication || isFeelings;
+};
 
 // Extracted to module scope to avoid re-creation on every render
 const PhrasesCategoryButton: React.FC<{
@@ -66,7 +79,16 @@ const PhrasesCategoryButton: React.FC<{
   gazeEnabled: boolean;
   gazeEnabledTimestamp: number;
   textColor: string;
-}> = ({ category, icon: Icon, isSelected, onSelect, isDarkMode, showHindi, gazeEnabled, gazeEnabledTimestamp, textColor }) => {
+  inactiveIconColor?: string;
+  selectedBg?: string;
+}> = ({
+  category, icon: Icon, isSelected, onSelect, isDarkMode, showHindi, gazeEnabled,
+  gazeEnabledTimestamp, textColor, inactiveIconColor: inactiveIconColorOverride, selectedBg: selectedBgOverride,
+}) => {
+  const selectedColor = isDarkMode ? SELECTED_COLOR : lightColors.warning.main;
+  const categoryNameColor = isDarkMode ? CATEGORY_NAME_COLOR : textColor;
+  const inactiveIconColor = inactiveIconColorOverride || (isDarkMode ? PAGE_ICON_COLOR : lightColors.text.tertiary);
+  const selectedBg = selectedBgOverride || (isDarkMode ? screenThemes.phrases.selectedBg : lightColors.background.tertiary);
   return (
     <GazeButton
       id={`cat-${category.id}`}
@@ -78,35 +100,37 @@ const PhrasesCategoryButton: React.FC<{
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       style={{
         width: '100%',
-        backgroundColor: isSelected ? screenThemes.phrases.selectedBg : 'transparent',
-        minHeight: 'clamp(96px, 10.8vh, 124px)',
-        padding: 'clamp(20px, 2.4vh, 28px) clamp(16px, 1.5vw, 24px)',
+        backgroundColor: isSelected ? selectedBg : 'transparent',
+        minHeight: 'clamp(190px, 23vh, 260px)',
+        padding: 'clamp(28px, 3.8vh, 44px) clamp(24px, 2.2vw, 36px)',
         border: 'none',
-        borderLeft: isSelected ? `5px solid ${SELECTED_COLOR}` : '5px solid transparent',
-        borderRadius: '0 16px 16px 0',
+        borderLeft: 'none',
+        borderRadius: '18px',
         transition: 'all 180ms ease',
-        justifyContent: 'flex-start',
+        justifyContent: 'center',
       }}
     >
       <div style={{
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 'clamp(10px, 1vw, 14px)',
+        justifyContent: 'center',
+        gap: 'clamp(22px, 2vw, 34px)',
         width: '100%',
       }}>
         <Icon
-          size={30}
-          color={isSelected ? SELECTED_COLOR : ACCENT_TEAL}
+          size={48}
+          color={isDarkMode ? PAGE_ICON_COLOR : (isSelected ? selectedColor : inactiveIconColor)}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
           <span style={{
-            fontSize: 'clamp(18px, 1.7vw, 24px)',
-            fontWeight: isSelected ? 700 : 600,
-            color: isSelected ? SELECTED_COLOR : textColor,
+            fontSize: 'clamp(28px, 2.25vw, 38px)',
+            fontWeight: isSelected ? 800 : 720,
+            color: categoryNameColor,
             fontFamily: ENGLISH_UI_FONT,
             lineHeight: 1.15,
             letterSpacing: '0.2px',
+            textAlign: 'center',
           }}>
             {category.name}
           </span>
@@ -114,13 +138,13 @@ const PhrasesCategoryButton: React.FC<{
             <>
               <div style={{
                 width: '24px', height: '1px',
-                background: isSelected ? `${SELECTED_COLOR}55` : 'rgba(255,255,255,0.18)',
+                background: isSelected ? `${selectedColor}55` : (isDarkMode ? 'rgba(255,255,255,0.18)' : lightColors.border.light),
                 borderRadius: '1px', margin: '4px 0 2px',
               }} />
               <span style={{
-                fontSize: 'clamp(18px, 1.7vw, 24px)',
+                fontSize: 'clamp(20px, 1.8vw, 28px)',
                 fontWeight: 700,
-                color: isSelected ? 'rgba(255, 210, 140, 0.95)' : 'rgba(255, 210, 140, 0.70)',
+                color: isSelected ? (isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary) : (isDarkMode ? 'rgba(255, 210, 140, 0.70)' : lightColors.text.tertiary),
                 fontFamily: "'Noto Sans Devanagari', sans-serif",
                 lineHeight: 1.5,
                 letterSpacing: '0.02em',
@@ -141,11 +165,25 @@ const MAX_RECENT = 10;
 const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   onNavigate, onSpeak, isDarkMode = true, showHindi = false,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState('basic_needs');
+  const [selectedCategory, setSelectedCategory] = useState('communication');
   const colors = isDarkMode ? darkColors : lightColors;
   const { phraseCategories } = useCustomization();
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight } = useTheme();
+  const { isLight, isMix } = useTheme();
+  const isWarmMode = isDarkMode && !isLight;
+  const primaryPhraseCategories = phraseCategories.filter(isPrimaryPhraseCategory);
+  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
+  const sidebarBg = isMix ? '#2A241C' : isWarmMode ? SIDEBAR_BG : lightColors.background.secondary;
+  const sidebarBorder = isMix ? 'rgba(139, 111, 73, 0.42)' : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
+  const sidebarShadow = isWarmMode ? '0 8px 22px rgba(0,0,0,0.24)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const selectedBg = isMix ? 'rgba(196, 178, 142, 0.22)' : isWarmMode ? screenThemes.phrases.selectedBg : lightColors.background.tertiary;
+  const inactiveIcon = isMix || isWarmMode ? PAGE_ICON_COLOR : lightColors.text.tertiary;
+  const sidebarText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseCardBg = isMix ? mixColors.home.tileSurfaces.ph : isWarmMode ? screenThemes.phrases.cardBg : colors.background.secondary;
+  const phraseCardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? screenThemes.phrases.cardBorder : `1.5px solid ${colors.border.light}`;
+  const phraseText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseShadow = isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
   const [activatedIdx, setActivatedIdx] = useState<number | null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -162,10 +200,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   const isRecentSelected = selectedCategory === 'recent';
   const selectedCategoryData = isRecentSelected
     ? null
-    : (phraseCategories.find(c => c.id === selectedCategory) || phraseCategories[0]);
+    : (primaryPhraseCategories.find(c => c.id === selectedCategory) || primaryPhraseCategories[0] || phraseCategories[0]);
   const displayedPhrases: { en: string; hi: string }[] = isRecentSelected
     ? recentPhrases
     : (selectedCategoryData?.phrases ?? []);
+  const visiblePhrases = displayedPhrases.slice(0, 9);
 
   const handlePhraseClick = useCallback((phrase: { en: string; hi?: string }, idx: number) => {
     onSpeak(phrase.en);
@@ -184,11 +223,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   }, [onSpeak]);
 
   return (
-    <div className={`phrases-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`phrases-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      backgroundColor: colors.background.primary,
+      backgroundColor: pageBg,
       padding: '4px 20px 6px 20px',
       overflow: 'hidden',
     }}>
@@ -213,31 +252,32 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
 
         {/* ===== LEFT SIDEBAR ===== */}
         <div className="category-sidebar" style={{
-          width: 'clamp(228px, 21vw, 292px)',
+          width: 'clamp(348px, 22vw, 420px)',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          backgroundColor: SIDEBAR_BG,
+          gap: 'clamp(12px, 1.5vh, 18px)',
+          backgroundColor: sidebarBg,
           borderRadius: '18px',
-          padding: 'clamp(14px, 1.8vh, 22px) 10px',
-          marginLeft: 'clamp(28px, 3.2vw, 56px)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-          border: '1px solid rgba(100, 140, 180, 0.15)',
+          padding: 'clamp(16px, 2vh, 24px) 10px',
+          marginLeft: 'clamp(22px, 2.4vw, 44px)',
+          boxShadow: sidebarShadow,
+          border: `1px solid ${sidebarBorder}`,
           alignSelf: 'flex-start',
         }}>
           {/* Sidebar Header */}
           <div style={{
+            display: 'none',
             padding: '8px 16px 14px 16px',
-            borderBottom: '1px solid rgba(100, 140, 180, 0.2)',
+            borderBottom: `1px solid ${sidebarBorder}`,
             marginBottom: '6px',
           }}>
             <span style={{
               fontSize: 'clamp(13px, 1.1vw, 15px)',
               fontWeight: 600,
-              color: ACCENT_TEAL,
-              textTransform: 'uppercase',
-              letterSpacing: '1.7px',
+              color: isWarmMode ? inactiveIcon : lightColors.text.secondary,
+              textTransform: 'none',
+              letterSpacing: '0.02em',
               fontFamily: ENGLISH_UI_FONT,
             }}>
               Categories
@@ -256,29 +296,29 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
               gazeEnabledTimestamp={lastEnabledTimestamp}
               style={{
                 width: '100%',
-                backgroundColor: isRecentSelected ? screenThemes.phrases.selectedBg : 'rgba(45,212,191,0.06)',
-                minHeight: 'clamp(96px, 10.8vh, 124px)',
-                padding: 'clamp(20px, 2.4vh, 28px) clamp(16px, 1.5vw, 24px)',
+                backgroundColor: isRecentSelected ? selectedBg : 'transparent',
+                minHeight: 'clamp(140px, 16vh, 180px)',
+                padding: 'clamp(24px, 3vh, 34px) clamp(20px, 1.8vw, 30px)',
                 border: 'none',
-                borderLeft: isRecentSelected ? `5px solid ${SELECTED_COLOR}` : '5px solid rgba(45,212,191,0.35)',
-                borderRadius: '0 16px 16px 0',
+                borderLeft: 'none',
+                borderRadius: '18px',
                 transition: 'all 180ms ease',
                 justifyContent: 'flex-start',
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'clamp(10px, 1vw, 14px)', width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'clamp(14px, 1.25vw, 22px)', width: '100%' }}>
                 {/* Clock icon */}
-                <svg width={30} height={30} viewBox="0 0 24 24" fill="none"
-                  stroke={isRecentSelected ? SELECTED_COLOR : 'rgba(45,212,191,0.7)'} strokeWidth="1.8"
+                <svg width={34} height={34} viewBox="0 0 24 24" fill="none"
+                  stroke={isRecentSelected ? (isDarkMode ? PAGE_ICON_COLOR : lightColors.warning.main) : inactiveIcon} strokeWidth="1.8"
                   strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
                   <span style={{
-                    fontSize: 'clamp(18px, 1.7vw, 24px)',
-                    fontWeight: isRecentSelected ? 700 : 600,
-                    color: isRecentSelected ? SELECTED_COLOR : 'rgba(45,212,191,0.8)',
+                    fontSize: 'clamp(22px, 1.9vw, 30px)',
+                    fontWeight: isRecentSelected ? 800 : 720,
+                    color: isRecentSelected ? (isWarmMode ? SELECTED_COLOR : lightColors.warning.main) : sidebarText,
                     fontFamily: ENGLISH_UI_FONT,
                     lineHeight: 1.15,
                   }}>
@@ -288,7 +328,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                     <span style={{
                       fontSize: 'clamp(15px, 1.5vw, 20px)',
                       fontWeight: 700,
-                      color: isRecentSelected ? SELECTED_COLOR : 'rgba(45,212,191,0.6)',
+                      color: isRecentSelected ? (isWarmMode ? SELECTED_COLOR : lightColors.warning.main) : inactiveIcon,
                       fontFamily: HINDI_UI_FONT,
                       lineHeight: 1.15,
                     }}>
@@ -301,20 +341,13 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
           )}
 
           {/* Regular Category Buttons */}
-          {phraseCategories.filter(cat => {
-            const id = cat.id.toLowerCase();
-            const name = cat.name.toLowerCase();
-            const isEmergency = id === 'emergency' || name.includes('emergency');
-            const isPeople = id === 'people' || name.includes('people');
-
-            // Strictly retain only medical, basic needs, position, and communication
-            const isMedical = id === 'medical' || name === 'medical';
-            const isPosition = id === 'position' || name.includes('position');
-            const isBasicNeeds = id === 'basic_needs' || id === 'daily_care' || name.includes('basic needs') || name.includes('daily care');
-            const isCommunication = id === 'communication' || name.includes('communication');
-
-            return (isMedical || isPosition || isBasicNeeds || isCommunication) && !isEmergency && !isPeople;
-          }).map(cat => {
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'clamp(34px, 5.4vh, 68px)',
+            width: '100%',
+          }}>
+          {primaryPhraseCategories.map(cat => {
             const categoryHindiNames: Record<string, string> = {
               emergency: 'इमरजेंसी',
               medical: 'दवा-दारू',
@@ -330,16 +363,19 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 key={cat.id}
                 category={{ ...cat, nameHi: categoryHindiNames[cat.id] }}
                 icon={CATEGORY_ICONS[cat.id] || MessageIcon}
-                isSelected={selectedCategory === cat.id}
+                isSelected={selectedCategoryData?.id === cat.id}
                 onSelect={() => setSelectedCategory(cat.id)}
                 isDarkMode={isDarkMode}
                 showHindi={showHindi}
                 gazeEnabled={isGazeEnabled}
                 gazeEnabledTimestamp={lastEnabledTimestamp}
-                textColor={colors.text.primary}
+                textColor={sidebarText}
+                inactiveIconColor={inactiveIcon}
+                selectedBg={selectedBg}
               />
             );
           })}
+          </div>
         </div>
 
         {/* ===== RIGHT SIDE — Phrase Cards ===== */}
@@ -361,17 +397,17 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
             {isRecentSelected ? (
               // Recent tab header
               <svg width={34} height={34} viewBox="0 0 24 24" fill="none"
-                stroke={SELECTED_COLOR} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  stroke={isDarkMode ? PAGE_ICON_COLOR : lightColors.warning.main} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
             ) : (
-              React.createElement(CATEGORY_ICONS[selectedCategoryData!.id] || MessageIcon, { size: 34, color: SELECTED_COLOR })
+              React.createElement(CATEGORY_ICONS[selectedCategoryData!.id] || MessageIcon, { size: 34, color: isDarkMode ? PAGE_ICON_COLOR : lightColors.warning.main })
             )}
             <h2 style={{
               fontSize: 'clamp(28px, 3.2vh, 40px)',
               fontWeight: 700,
-              color: colors.text.primary,
+              color: titleText,
               margin: 0,
               fontFamily: ENGLISH_UI_FONT,
             }}>
@@ -384,11 +420,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
             flex: 1,
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gridAutoRows: 'minmax(clamp(120px, 14.5vh, 180px), auto)',
+            gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
             gap: 'clamp(14px, 2.2vh, 28px)',
-            overflowY: 'auto',
+            overflow: 'hidden',
             alignContent: 'start',
-            padding: '4px 8px clamp(90px, 12vh, 140px) 8px',
+            padding: '4px 8px clamp(78px, 9vh, 108px) 8px',
           }}>
             {displayedPhrases.length === 0 && isRecentSelected ? (
               // Empty state for Recent tab
@@ -397,7 +433,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 height: '100%', gap: '16px', opacity: 0.5,
               }}>
                 <svg width={48} height={48} viewBox="0 0 24 24" fill="none"
-                  stroke={ACCENT_TEAL} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  stroke={isDarkMode ? PAGE_ICON_COLOR : lightColors.text.tertiary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
@@ -405,7 +441,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   Phrases you speak will appear here
                 </span>
               </div>
-            ) : displayedPhrases.map((phrase, index) => (
+            ) : visiblePhrases.map((phrase, index) => (
               <GazeButton
                 key={index}
                 id={`phrase-${index}`}
@@ -419,12 +455,12 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 style={{
                   width: '100%',
                   height: 'auto',
-                  minHeight: 'clamp(120px, 14.5vh, 180px)',
+                  minHeight: 0,
                   padding: 'clamp(18px, 2.2vh, 26px) clamp(18px, 2vw, 28px)',
-                  background: 'linear-gradient(145deg, rgba(50, 62, 75, 0.65) 0%, rgba(40, 52, 65, 0.55) 100%)',
-                  border: activatedIdx === index ? '2px solid rgba(45, 212, 191, 0.9)' : `2px solid rgba(90, 110, 130, 0.45)`,
-                  borderRadius: '20px',
-                  boxShadow: activatedIdx === index ? '0 0 18px rgba(45,212,191,0.35)' : '0 5px 16px rgba(0,0,0,0.2)',
+                  background: phraseCardBg,
+                  border: activatedIdx === index ? `2px solid ${isMix ? '#8B6F49' : isWarmMode ? '#D6C98E' : colors.accent.main}` : phraseCardBorder,
+                  borderRadius: '22px',
+                  boxShadow: activatedIdx === index ? (isMix ? mixColors.home.cardShadow : isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)') : phraseShadow,
                   transition: 'border 0.15s ease, box-shadow 0.15s ease',
                   transform: activatedIdx === index ? 'scale(1.02)' : 'scale(1)',
                 }}
@@ -442,22 +478,21 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   <span style={{
                     fontSize: 'clamp(22px, 2.6vh, 34px)',
                     fontWeight: 600,
-                    color: '#FFFFFF',
+                    color: phraseText,
                     lineHeight: 1.15,
                     fontFamily: ENGLISH_UI_FONT,
                     letterSpacing: '0.1px',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.15)',
                   }}>
                     {phrase.en}
                   </span>
                   {/* Hindi text - Beautiful, clear Devanagari font */}
                   {showHindi && phrase.hi && (
                     <>
-                      <div style={{ width: '36px', height: '1.5px', background: 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
+                      <div style={{ width: '36px', height: '1.5px', background: isMix ? 'rgba(122,99,71,0.30)' : 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
                       <span style={{
                         fontSize: 'clamp(22px, 2.6vh, 34px)',
                         fontWeight: 700,
-                        color: 'rgba(255, 210, 140, 0.95)',
+                        color: isMix ? mixColors.home.subtleText : 'rgba(255, 210, 140, 0.95)',
                         lineHeight: 1.5,
                         fontFamily: "'Noto Sans Devanagari', sans-serif",
                         letterSpacing: '0.02em',

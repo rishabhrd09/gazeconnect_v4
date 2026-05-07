@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">Eye tracker off icon</title><desc id="desc">Target eye tracker status symbol in off state.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#AEB7C6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<circle cx="12" cy="10.5" r="7"/><circle cx="12" cy="10.5" r="3.3"/><circle cx="12" cy="10.5" r="1.1" fill="#AEB7C6"/>
+</g>
+<g id="glyph" stroke="#AEB7C6" stroke-width="1.5" stroke-linecap="round" fill="none"><path d="M9 18h6"/></g>
+<g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

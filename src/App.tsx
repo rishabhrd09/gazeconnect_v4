@@ -23,6 +23,7 @@ import { DwellTimeProvider, useDwellTime } from './contexts/DwellTimeContext';
 import { FocusModeProvider, useFocusMode } from './contexts/FocusModeContext';
 import { AlertModeProvider, useAlertMode } from './contexts/AlertModeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { useTheme } from './contexts/ThemeContext';
 import SarvamBloom from './components/SarvamBloom';
 import './lightmode.css';
 
@@ -59,7 +60,7 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.88)',
+      backgroundColor: isDarkMode ? 'rgba(0,0,0,0.88)' : 'rgba(245, 241, 234, 0.92)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       zIndex: 9999,
     }}>
@@ -80,7 +81,7 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
       </p>
       <button onClick={onDismiss} style={{
         padding: '18px 48px', backgroundColor: colors.accent.main, border: 'none',
-        borderRadius: '12px', color: '#fff', fontSize: '18px', fontWeight: 700,
+        borderRadius: '12px', color: isDarkMode ? '#fff' : colors.text.inverse, fontSize: '18px', fontWeight: 700,
         cursor: 'pointer', minWidth: '180px', minHeight: '64px',
       }}>
         Continue
@@ -206,9 +207,11 @@ const InnerApp: React.FC = () => {
   const { isGazeEnabled, disableGaze, signalNavigation, isMouseMode } = useGazeControl();
   const { settings, isLoaded } = useCustomization();
   const { isFocusMode } = useFocusMode();
-  const { isAlertMode } = useAlertMode();
+  const { isAlertMode, disableAlertMode } = useAlertMode();
+  const { theme } = useTheme();
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [isLiveClockSuppressed, setIsLiveClockSuppressed] = useState(false);
   const [globalText, setGlobalText] = useState(() => {
     try {
       return sessionStorage.getItem(KEYBOARD_TEXT_SESSION_KEY) || '';
@@ -283,6 +286,13 @@ const InnerApp: React.FC = () => {
       if (ws.isConnected && ws.speak) ws.speak(text);
     }
   }, [ttsRate, ttsVolume, ttsLanguage, ws]);
+
+  const handleAlertModeHome = useCallback(() => {
+    setQuickWordsReturnScreen(null);
+    setCurrentScreen('home');
+    ws.setScreen('home');
+    disableAlertMode();
+  }, [disableAlertMode, ws]);
   const handleTextChange = useCallback((text: string) => setGlobalText(text), []);
 
   // Quick Words injection: appends a word to the global text (used by QuickWordsScreen in inject mode)
@@ -311,6 +321,7 @@ const InnerApp: React.FC = () => {
     switch (currentScreen) {
       case 'keyboard':
         return <KeyboardScreen {...common} onTextChange={handleTextChange} initialText={globalText}
+          onNavHiddenChange={setIsLiveClockSuppressed}
           getPredictions={ws.getPredictions} predictions={ws.predictions}
           sentencePredictions={ws.sentencePredictions}
           expandAbbreviation={ws.expandAbbreviation} abbreviationExpansion={ws.abbreviationExpansion}
@@ -354,7 +365,7 @@ const InnerApp: React.FC = () => {
 
   // Alert Mode: unconditionally render the lock screen
   if (isAlertMode) {
-    return <AlertModeScreen onSpeak={handleSpeak} isDarkMode={isDarkMode} />;
+    return <AlertModeScreen onSpeak={handleSpeak} onHome={handleAlertModeHome} isDarkMode={isDarkMode} />;
   }
 
   // Show loading screen while settings are being loaded from disk
@@ -362,12 +373,67 @@ const InnerApp: React.FC = () => {
     return (
       <div style={{
         width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#0D1117', color: '#8B949E', fontSize: '18px',
+        backgroundColor: darkColors.background.primary,
+        color: darkColors.text.secondary,
+        fontSize: '18px',
+        fontFamily: "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, sans-serif",
       }}>
         Loading settings...
       </div>
     );
   }
+
+  const isQuickWordsScreen = currentScreen === 'quickwords';
+  const isHomeWarmLight = currentScreen === 'home' && theme === 'light';
+  const connectionIndicatorStyle: React.CSSProperties = isHomeWarmLight ? {
+    position: 'fixed',
+    bottom: 10,
+    right: 12,
+    padding: '4px 10px',
+    backgroundColor: 'rgba(90,140,100,0.14)',
+    border: '1px solid #5A8C64',
+    borderRadius: '999px',
+    color: '#5A8C64',
+    fontSize: '10px',
+    fontWeight: 650,
+    letterSpacing: '0.03em',
+    zIndex: 100,
+    boxShadow: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  } : isQuickWordsScreen ? {
+    position: 'fixed',
+    bottom: 12,
+    right: 14,
+    padding: '4px 12px',
+    backgroundColor: ws.isConnected
+      ? (isDarkMode ? 'rgba(23, 31, 25, 0.94)' : 'rgba(238, 245, 240, 0.96)')
+      : (isDarkMode ? 'rgba(42, 26, 26, 0.94)' : 'rgba(248, 239, 237, 0.97)'),
+    border: `1px solid ${ws.isConnected
+      ? (isDarkMode ? 'rgba(113, 153, 118, 0.58)' : 'rgba(110, 140, 92, 0.48)')
+      : (isDarkMode ? 'rgba(167, 107, 98, 0.54)' : 'rgba(158, 74, 61, 0.42)')}`,
+    borderRadius: '999px',
+    color: ws.isConnected
+      ? (isDarkMode ? '#9FB89E' : '#5D7B52')
+      : (isDarkMode ? '#C99990' : '#9E4A3D'),
+    fontSize: '10px',
+    fontWeight: 650,
+    letterSpacing: '0.03em',
+    zIndex: 100,
+    boxShadow: 'none',
+  } : {
+    position: 'fixed',
+    bottom: 6,
+    right: 10,
+    padding: '3px 10px',
+    backgroundColor: ws.isConnected ? colors.success.subtle : colors.emergency.subtle,
+    border: `1px solid ${ws.isConnected ? colors.success.main : colors.emergency.main}`,
+    borderRadius: '6px',
+    color: ws.isConnected ? colors.success.main : colors.emergency.main,
+    fontSize: '11px',
+    zIndex: 100,
+  };
 
   return (
     <div style={{
@@ -376,7 +442,7 @@ const InnerApp: React.FC = () => {
       display: 'flex', flexDirection: 'column',
     }}>
       {/* Live clock — hidden on screens where top-right is crowded */}
-      <LiveClock currentScreen={currentScreen} />
+      <LiveClock currentScreen={currentScreen} suppressed={isLiveClockSuppressed} />
 
       {/* Screen content */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
@@ -385,33 +451,32 @@ const InnerApp: React.FC = () => {
         </ErrorBoundary>
       </div>
 
-      {/* Persistent Emergency Button — always visible, all screens */}
-      {currentScreen !== 'home' && (
+      {/* Persistent Emergency Button — hidden on screens with their own large emergency/nav affordance.
+          Web Browsing has its own EMERGENCY in GlobalNavBar + connected toolbar; the floating
+          fallback would be a duplicate at bottom-left.
+          Compass-map / advanced-map / floor-plan-survey: floating widget would overlap the road
+          bar / canvas area and break the "plot drawing" feel — Emergency is in the top NavBar. */}
+      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && currentScreen !== 'web' && currentScreen !== 'compass-map' && currentScreen !== 'advanced-map' && currentScreen !== 'floor-plan-survey' && (
         <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} emergencyDwellTime={emergencyDwellTime || 1200} />
       )}
 
       {/* Connection indicator */}
-      <div className="connection-indicator" style={{
-        position: 'fixed', bottom: 6, right: 10,
-        padding: '3px 10px', backgroundColor: ws.isConnected ? colors.success.subtle : colors.emergency.subtle,
-        border: `1px solid ${ws.isConnected ? colors.success.main : colors.emergency.main}`,
-        borderRadius: '6px', color: ws.isConnected ? colors.success.main : colors.emergency.main,
-        fontSize: '11px', zIndex: 100,
-      }}>
+      <div className="connection-indicator" style={connectionIndicatorStyle}>
+        {isHomeWarmLight && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5A8C64', flexShrink: 0 }} />}
         {ws.isConnected ? 'Connected' : 'Connecting...'}
       </div>
 
       {/* Mouse Only Mode indicator */}
       {isMouseMode && (
-        <div style={{
+        <div className="mouse-only-banner" style={{
           position: 'fixed',
           top: 4,
           right: 120,
           padding: '4px 12px',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
+          backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(183, 142, 73, 0.12)',
+          border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(183, 142, 73, 0.45)',
           borderRadius: '6px',
-          color: '#F59E0B',
+          color: isDarkMode ? '#F59E0B' : '#62584D',
           fontSize: '12px',
           fontWeight: 600,
           zIndex: 99999,
@@ -431,10 +496,10 @@ const InnerApp: React.FC = () => {
           top: 4,
           right: isMouseMode ? 230 : 120,
           padding: '4px 12px',
-          backgroundColor: 'rgba(239, 68, 68, 0.15)',
-          border: '1px solid rgba(239, 68, 68, 0.45)',
+          backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(179, 90, 75, 0.12)',
+          border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(179, 90, 75, 0.45)',
           borderRadius: '6px',
-          color: '#EF4444',
+          color: isDarkMode ? '#EF4444' : '#9E4A3D',
           fontSize: '12px',
           fontWeight: 700,
           zIndex: 99999,

@@ -244,6 +244,17 @@ function setMouseOnlyMode(enabled: boolean): void {
   console.log('Mouse Only Mode:', isMouseOnlyMode ? 'ON' : 'OFF');
 }
 
+function setAlertModeActive(enabled: boolean): void {
+  isAlertModeActive = enabled;
+  if (isAlertModeActive && isFocusModeActive) {
+    isFocusModeActive = false;
+    mainWindow?.webContents.send('focus-mode-changed', false);
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('alert-mode-changed', isAlertModeActive);
+  }
+}
+
 function quitAppNow(): void {
   isQuitting = true;
   app.quit();
@@ -617,14 +628,7 @@ function createWindow(): void {
         type: 'checkbox',
         checked: isAlertModeActive,
         click: (menuItem) => {
-          isAlertModeActive = menuItem.checked;
-          if (isAlertModeActive && isFocusModeActive) {
-            isFocusModeActive = false;
-            mainWindow?.webContents.send('focus-mode-changed', false);
-          }
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('alert-mode-changed', isAlertModeActive);
-          }
+          setAlertModeActive(menuItem.checked);
         },
       },
       {
@@ -1281,6 +1285,21 @@ function setupIpcHandlers(): void {
     }
   });
 
+  // Execute JavaScript in the active BrowserView with user-gesture context.
+  // The user-gesture flag is critical for browser APIs that require it (e.g.
+  // Element.requestFullscreen, autoplay-with-sound, popups). Used by the AAC
+  // toolbar to reliably click YouTube's fullscreen / skip-ad buttons.
+  ipcMain.handle('webview:executeJs', async (_event: any, code: string) => {
+    if (!activeBrowserView || !code || typeof code !== 'string') return { success: false };
+    try {
+      const result = await activeBrowserView.webContents.executeJavaScript(code, true);
+      return { success: true, result };
+    } catch (err: any) {
+      console.error('webview:executeJs error:', err?.message || err);
+      return { success: false, error: err?.message || String(err) };
+    }
+  });
+
   ipcMain.handle('webview:setBounds', (_event: any, bounds: { x: number; y: number; width: number; height: number }) => {
     if (activeBrowserView) {
       activeBrowserView.setBounds(bounds);
@@ -1409,6 +1428,10 @@ function setupIpcHandlers(): void {
 
   // Mouse Only Mode: renderer can query current state
   ipcMain.handle('mouse-only-mode:get', () => isMouseOnlyMode);
+  ipcMain.handle('alert-mode:set', (_event: any, enabled: boolean) => {
+    setAlertModeActive(Boolean(enabled));
+    return isAlertModeActive;
+  });
 
   // Chat history — auto-save keyboard display text to chat_history/chat_YYYY-MM-DD.txt
   const chatHistoryDir = !app.isPackaged

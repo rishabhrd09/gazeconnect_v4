@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+<title id="title">Music icon</title><desc id="desc">Simple music note icon for audio and music section.</desc>
+<g id="meta"></g>
+<g id="anatomy" stroke="#C28E2C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<path d="M9 17V6.5l9-2v10.5"/><path d="M9 10l9-2"/>
+</g>
+<g id="glyph" fill="none" stroke="#C28E2C" stroke-width="1.5"><circle cx="7" cy="17.5" r="2"/><circle cx="16" cy="15.5" r="2"/></g>
+<g id="masking"></g><g id="labels" aria-hidden="true"></g><g id="interactions" aria-hidden="true"></g>
+</svg>

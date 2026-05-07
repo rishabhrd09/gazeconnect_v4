@@ -302,9 +302,10 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
                 fontWeight: 700,
                 color: '#25394A',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {cellWidthFt}x{cellDepthFt} ft
+              {cellWidthFt}&times;{cellDepthFt} ft
             </span>
           </>
         )
@@ -314,11 +315,14 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
         </span>
       ) : (
         <>
+          {/* Ghost zone label — italic + lighter weight = "guidance hint", not active label */}
           <span
             style={{
               fontSize: 'clamp(10px, 1.2vh, 14px)',
-              fontWeight: 700,
-              color: '#5A6D66',
+              fontWeight: 600,
+              fontStyle: 'italic',
+              color: '#6F7F79',
+              opacity: 0.78,
               textAlign: 'center',
               lineHeight: 1.1,
               whiteSpace: 'pre-line',
@@ -328,14 +332,19 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
             {zoneLabel}
             {sideLabel ? `\n${sideLabel}` : ''}
           </span>
+          {/* Cell coordinate marker — architectural grid reference, subtle on purpose */}
           <span
             style={{
               position: 'absolute',
-              right: '4px',
-              bottom: '3px',
-              fontSize: '8px',
+              right: '3px',
+              bottom: '2px',
+              fontSize: '7px',
               color: '#7E8F8A',
+              opacity: 0.45,
               fontWeight: 600,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '0.2px',
             }}
           >
             {cellKey}

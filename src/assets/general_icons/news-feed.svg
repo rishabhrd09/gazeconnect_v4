@@ -1,0 +1,11 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="News Feed">
+  <title>News Feed</title>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M31 25H58C63.5 25 68 29.5 68 35V66C68 69.9 64.9 73 61 73H33C26.9 73 22 68.1 22 62V34C22 29 26 25 31 25Z" fill="#F0D8D3" stroke="#8D3C3D" stroke-width="3.2"/>
+    <path d="M62 32H69C72.3 32 75 34.7 75 38V64C75 69 71 73 66 73H60" fill="#F7E8E5" stroke="#8D3C3D" stroke-width="3.2"/>
+    <path d="M33 39H48" stroke="#8D3C3D" stroke-width="3" />
+    <path d="M33 49H57" stroke="#8D3C3D" stroke-width="3" />
+    <path d="M33 59H54" stroke="#8D3C3D" stroke-width="3" />
+    <rect x="33" y="32" width="11" height="10" rx="2" fill="#F7E8E5" stroke="#8D3C3D" stroke-width="2.4"/>
+  </g>
+</svg>

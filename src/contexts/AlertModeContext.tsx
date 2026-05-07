@@ -45,9 +45,18 @@ export const AlertModeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
     }, []);
 
-    const enableAlertMode = useCallback(() => setIsAlertMode(true), []);
-    const disableAlertMode = useCallback(() => setIsAlertMode(false), []);
-    const toggleAlertMode = useCallback(() => setIsAlertMode(prev => !prev), []);
+    const setAlertMode = useCallback((enabled: boolean) => {
+        const api = (window as any).electronAPI;
+        if (api?.alertMode?.set) {
+            api.alertMode.set(enabled).catch(() => setIsAlertMode(enabled));
+        } else {
+            setIsAlertMode(enabled);
+        }
+    }, []);
+
+    const enableAlertMode = useCallback(() => setAlertMode(true), [setAlertMode]);
+    const disableAlertMode = useCallback(() => setAlertMode(false), [setAlertMode]);
+    const toggleAlertMode = useCallback(() => setAlertMode(!isAlertMode), [isAlertMode, setAlertMode]);
 
     return (
         <AlertModeContext.Provider value={{ isAlertMode, enableAlertMode, disableAlertMode, toggleAlertMode }}>

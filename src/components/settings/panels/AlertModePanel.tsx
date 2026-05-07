@@ -1,5 +1,5 @@
 /**
- * AlertModePanel — Settings panel for Alert Mode cards
+ * AlertModePanel - Settings panel for Alert Mode cards
  * =====================================================
  * Allows caregivers to configure the 5 customizable cards
  * shown on the Alert Mode lock screen.
@@ -25,7 +25,7 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
 
     const savedCards = data.alertModeCards ?? DEFAULT_CUSTOMIZATION.alertModeCards;
 
-    // Local draft state — padded to exactly 5 slots
+    // Local draft state padded to exactly 5 slots
     const [cards, setCards] = useState<AlertModeCard[]>(() => {
         const base = [...savedCards];
         while (base.length < MAX_CARDS) base.push({ label: '', enabled: false });
@@ -76,21 +76,21 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                 background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
                 fontSize: 13, color: colors.text.secondary, lineHeight: 1.5,
             }}>
-                <strong style={{ color: '#EF4444' }}>🚨 Alert Mode</strong> is activated via right-click menu on the home screen.
+                <strong style={{ color: '#EF4444' }}>Alert Mode</strong> is activated via right-click menu on the home screen.
                 When active, the app shows a full-screen lock screen with the SOS card and your configured cards below.
             </div>
 
-            {/* SOS Card — fixed, read-only */}
+            {/* SOS card: fixed, read-only */}
             <div style={{
                 padding: '14px 18px', borderRadius: 12,
                 background: 'rgba(127,29,29,0.25)', border: '2px solid rgba(239,68,68,0.45)',
                 display: 'flex', alignItems: 'center', gap: 14,
             }}>
-                <span style={{ fontSize: 24 }}>🆘</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#FCA5A5' }}>SOS</span>
                 <div>
-                    <div style={{ fontWeight: 700, color: '#FCA5A5', fontSize: 15 }}>Card 1 — SOS EMERGENCY</div>
+                    <div style={{ fontWeight: 700, color: '#FCA5A5', fontSize: 15 }}>Card 1 - SOS EMERGENCY</div>
                     <div style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 2 }}>
-                        Always present, cannot be removed or renamed. Speaks: "Emergency — please come immediately"
+                        Always present, cannot be removed or renamed. Speaks: "Emergency - please come immediately"
                     </div>
                 </div>
                 <span style={{
@@ -175,7 +175,7 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                         cursor: 'pointer', transition: 'background 200ms', fontFamily: 'inherit',
                     }}
                 >
-                    {saved ? '✓ Saved' : 'Save Changes'}
+                    {saved ? 'Saved' : 'Save Changes'}
                 </button>
                 <button
                     onClick={handleReset}
