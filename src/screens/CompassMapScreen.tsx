@@ -189,9 +189,16 @@ const FOUNDATION_QUESTIONS: FoundationQuestion[] = [
     options: ['1', '2', '3', '4+'],
     columns: 2 as const,
   },
+  {
+    key: 'gatePosition' as const,
+    text: 'Where is the main gate?',
+    subtext: 'Position of the entry gate along the road-facing side. Drives the gate diagram on the plot.',
+    options: ['Left', 'Center', 'Right'],
+    columns: 3 as const,
+  },
 ];
 
-type FoundationKey = 'facing' | 'plotWidth' | 'plotDepth' | 'plotType' | 'numFloors' | 'numBedrooms';
+type FoundationKey = 'facing' | 'plotWidth' | 'plotDepth' | 'plotType' | 'numFloors' | 'numBedrooms' | 'gatePosition';
 
 interface FoundationQuestion {
   key: FoundationKey;
@@ -220,6 +227,7 @@ interface CompassState {
     plotType: string | null;
     numFloors: string | null;
     numBedrooms: string | null;
+    gatePosition: string | null;
   };
   foundationStep: number;
   grid: Record<string, GridCellState>;
@@ -368,7 +376,7 @@ function appendHistory(
 function createInitialState(queue: RoomComponent[]): CompassState {
   return {
     phase: 'foundation', currentFloor: 'ground',
-    foundation: { facing: null, plotWidth: null, plotDepth: null, plotType: null, numFloors: null, numBedrooms: null },
+    foundation: { facing: null, plotWidth: null, plotDepth: null, plotType: null, numFloors: null, numBedrooms: null, gatePosition: null },
     foundationStep: 0,
     grid: createEmptyGrid(), componentQueue: queue, currentIndex: 0,
     placements: [], armed: false, pendingExpansion: null, history: [],
@@ -729,20 +737,107 @@ function compassReducer(state: CompassState, action: CompassAction): CompassStat
 
 // ─── Compass Rose ─────────────────────────────────────────
 
-const CompassRose: React.FC<{ facing: string; bg?: string; border?: string; textColor?: string }> = ({ facing, bg, border, textColor }) => {
-  const rotMap: Record<string, number> = { North: 0, South: 180, East: 90, West: 270 };
+const CompassRose: React.FC<{ facing: string; bg?: string; border?: string; textColor?: string; northColor?: string; size?: number }> = ({ facing, bg, border, textColor, northColor, size = 72 }) => {
+  // facing = the direction the road faces (the bottom edge of screen).
+  // Convention (see compassDirections.ts): viewer stands on the road looking at the plot.
+  //   East-facing road  → viewer faces West → viewer's right = North → N is at SCREEN RIGHT  (rot 90)
+  //   South-facing road → viewer faces North → N is at SCREEN TOP                              (rot 0)
+  //   West-facing road  → viewer faces East → viewer's right = South → N is at SCREEN LEFT     (rot 270)
+  //   North-facing road → viewer faces South → N is at SCREEN BOTTOM                           (rot 180)
+  const facingToNorthRot: Record<string, number> = { South: 0, East: 90, North: 180, West: 270 };
+  const rot = facingToNorthRot[facing] ?? 0;
+  const ring = border || THEME.border;
+  const ink = textColor || THEME.textSub;
+  const north = northColor || '#8C3F3F';
   return (
     <div style={{
-      position: 'absolute', top: '6px', right: '6px', zIndex: 2,
-      width: '40px', height: '40px', borderRadius: '50%',
-      background: bg || THEME.panelBg, border: `1px solid ${border || THEME.border}`,
+      position: 'absolute', top: '12px', right: '12px', zIndex: 4,
+      width: size, height: size, borderRadius: '50%',
+      background: bg || THEME.panelBg,
+      border: `1.5px solid ${ring}`,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.10), inset 0 0 0 1px rgba(255,255,255,0.30)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '9px', color: textColor || THEME.textSub, lineHeight: 1,
+      pointerEvents: 'none', userSelect: 'none',
     }}>
-      <div style={{ transform: `rotate(${rotMap[facing] || 0}deg)`, textAlign: 'center' }}>
-        <div style={{ color: '#EF5350', fontWeight: 700, fontSize: '10px' }}>N</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '26px', padding: '1px 0' }}><span>W</span><span>E</span></div>
-        <div style={{ fontSize: '10px' }}>S</div>
+      <div style={{
+        position: 'relative', width: '100%', height: '100%',
+        transform: `rotate(${rot}deg)`,
+        transition: 'transform 280ms ease',
+      }}>
+        {/* tick marks at cardinal positions */}
+        {[0, 90, 180, 270].map((deg) => (
+          <div key={deg} style={{
+            position: 'absolute', top: '50%', left: '50%',
+            width: 1, height: size * 0.46,
+            background: ring,
+            transformOrigin: 'top center',
+            transform: `translate(-50%, 0) rotate(${deg}deg) translateY(${size * 0.04}px)`,
+            opacity: 0.42,
+          }} />
+        ))}
+        {/* North arrow — slim triangle */}
+        <svg
+          width={size * 0.30}
+          height={size * 0.42}
+          viewBox="0 0 24 34"
+          style={{
+            position: 'absolute',
+            top: size * 0.12, left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <polygon points="12,2 22,32 12,24 2,32" fill={north} stroke={north} strokeWidth="0.6" strokeLinejoin="round" />
+        </svg>
+        {/* Cardinal letters */}
+        <div style={{
+          position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)',
+          fontSize: Math.round(size * 0.16), fontWeight: 900, color: north, letterSpacing: '0.5px', lineHeight: 1,
+        }}>N</div>
+        <div style={{
+          position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
+          fontSize: Math.round(size * 0.13), fontWeight: 700, color: ink, opacity: 0.62, lineHeight: 1,
+        }}>S</div>
+        <div style={{
+          position: 'absolute', left: 5, top: '50%', transform: 'translateY(-50%)',
+          fontSize: Math.round(size * 0.13), fontWeight: 700, color: ink, opacity: 0.62, lineHeight: 1,
+        }}>W</div>
+        <div style={{
+          position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
+          fontSize: Math.round(size * 0.13), fontWeight: 700, color: ink, opacity: 0.62, lineHeight: 1,
+        }}>E</div>
+      </div>
+    </div>
+  );
+};
+
+// Scale indicator — sits at canvas bottom-left, architectural drawing convention.
+// Shows a labeled ruler representing one cell (typically 10ft).
+const ScaleBar: React.FC<{ feet: number; bg?: string; ink?: string; muted?: string }> = ({ feet, bg, ink, muted }) => {
+  const inkColor = ink || THEME.textSub;
+  const mutedColor = muted || THEME.textDim;
+  return (
+    <div style={{
+      position: 'absolute', left: '12px', bottom: '12px', zIndex: 4,
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
+      background: bg || 'transparent',
+      padding: bg ? '6px 10px' : 0,
+      borderRadius: bg ? 6 : 0,
+      pointerEvents: 'none', userSelect: 'none',
+    }}>
+      {/* Horizontal scale: two segments alternating filled/empty like a real scale bar */}
+      <div style={{ display: 'flex', alignItems: 'center', height: 10 }}>
+        <div style={{ width: 1, height: 10, background: inkColor }} />
+        <div style={{ width: 28, height: 6, background: inkColor }} />
+        <div style={{ width: 1, height: 10, background: inkColor }} />
+        <div style={{ width: 28, height: 6, border: `1px solid ${inkColor}`, borderLeft: 'none' }} />
+        <div style={{ width: 1, height: 10, background: inkColor }} />
+      </div>
+      <div style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.5px',
+        color: mutedColor, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {`0   ${feet}   ${feet * 2} ft`}
       </div>
     </div>
   );
@@ -831,7 +926,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const [menuReady, setMenuReady] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState<{ cell: GridCellKey, oldRoomId: string, newRoomId: string } | null>(null);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
-  const [navHidden, setNavHidden] = useState(false);
+  // Compass map opens with the global NavBar hidden by default — the canvas is
+  // the workspace; users press SHOW NAV when they need to navigate elsewhere.
+  const [navHidden, setNavHidden] = useState(true);
 
   // Track Focus Lock state from Electron
   const [isFocusLocked, setIsFocusLocked] = useState(false);
@@ -854,6 +951,21 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       (window as any).electronAPI.off('ui-lock-toggled', handleLockToggle);
     };
   }, []);
+
+  // Auto-hide global nav when the phase advances to placement/review — gives
+  // the canvas the full workspace immediately after the foundation survey.
+  // If the user revealed the nav during the survey, it should fold back away
+  // automatically as the actual mapping work starts.
+  const lastAutoHidePhaseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if ((state.phase === 'placement' || state.phase === 'review') && lastAutoHidePhaseRef.current !== state.phase) {
+      lastAutoHidePhaseRef.current = state.phase;
+      setNavHidden(true);
+    }
+    if (state.phase === 'foundation') {
+      lastAutoHidePhaseRef.current = null;
+    }
+  }, [state.phase]);
 
   const [roomToast, setRoomToast] = useState<{ name: string; color: string; index: number; total: number } | null>(null);
   const roomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1395,6 +1507,28 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       localStorage.removeItem(COMPASS_PRIMARY_BACKUP_KEY);
     } catch (e) { }
     dispatch({ type: 'RESET', queue: initialQueue });
+    // Clear all cell-level refinements (splits, walls, voids, rotations,
+    // expansions, layouts, vastu flags, etc.) so the user gets a truly clean
+    // canvas — no leftover ✦ stars on cells they previously edited.
+    setRefinements({
+      version: 2,
+      subCellSplits: [],
+      customEdges: [],
+      voidMarkers: [],
+      cellRotations: [],
+      cellExpansions: [],
+      cellLayouts: {},
+      caregiverAnnotations: [],
+      vastuFlags: [],
+      accessibilityMarkers: [],
+    });
+    setSelectedRefinementCell(null);
+    setRefinementMode(false);
+    setMapRefinementArmed(false);
+    setRefinementTool('overview');
+    setCellEditorOpen(false);
+    setCellEditorTool(null);
+    setRefinementArmed(false);
     setFoundationReady(false);
     setShowRestartConfirm(false);
     onSpeak('Map reset. Please answer the foundation questions again.');
@@ -1742,19 +1876,92 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         </div>
         {/* RIGHT: Options + Command Bar */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-          <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(18px, 3vh, 36px) clamp(20px, 2.5vw, 40px)', paddingBottom: 'clamp(235px, 33vh, 370px)' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(12px, 1.5vh, 20px)' }}>
-              {q.options.map((opt) => (
-                <GazeButton key={opt} id={`fq-${state.foundationStep}-${opt}`} gazeEnabled={isGazeEnabled && foundationReady} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
-                  onClick={() => handleFoundationAnswer(opt)}
-                  style={{ flexBasis: q.columns === 2 ? 'calc(50% - 12px)' : 'calc(33.33% - 16px)', minWidth: '140px', minHeight: 'clamp(60px, 8vh, 95px)', padding: 'clamp(14px, 1.8vh, 22px) clamp(14px, 1.6vw, 24px)', borderRadius: '14px', background: foundationReady ? T_cardBg : (isLight ? 'rgba(168, 148, 120, 0.10)' : isMix ? 'rgba(180, 147, 98, 0.06)' : 'rgba(30,41,59,0.45)'), border: `2px solid ${foundationReady ? T_panelBorderSoft : (isLight ? 'rgba(168, 148, 120, 0.25)' : isMix ? 'rgba(180, 147, 98, 0.20)' : 'rgba(100,116,139,0.25)')}`, color: foundationReady ? T_textMain : T_textDim, fontSize: 'clamp(16px, 2vh, 22px)', fontWeight: 700, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {opt}
-                </GazeButton>
-              ))}
+          <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(18px, 3vh, 36px) clamp(20px, 2.5vw, 40px)', paddingBottom: 'clamp(280px, 36vh, 400px)' }}>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'clamp(14px, 1.8vh, 24px)',
+              justifyContent: q.options.length <= 4 ? 'center' : 'flex-start',
+              alignContent: 'flex-start',
+            }}>
+              {q.options.map((opt) => {
+                // Match the large FloorPlanSurveyScreen card sizing — taller,
+                // bolder, more breathing room. 4-or-fewer-options gets portrait
+                // cards (compass-direction question); more options use shorter cards.
+                const isFewOptions = q.options.length <= 4;
+                return (
+                  <GazeButton key={opt} id={`fq-${state.foundationStep}-${opt}`} gazeEnabled={isGazeEnabled && foundationReady} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+                    onClick={() => handleFoundationAnswer(opt)}
+                    style={{
+                      flexBasis: q.columns === 2 ? 'calc(50% - 12px)' : 'calc(33.33% - 16px)',
+                      minWidth: '160px',
+                      minHeight: isFewOptions ? 'clamp(140px, 19vh, 200px)' : 'clamp(86px, 12vh, 132px)',
+                      padding: isFewOptions ? 'clamp(28px, 4vh, 48px) clamp(20px, 2.2vw, 32px)' : 'clamp(22px, 3vh, 36px) clamp(20px, 2.2vw, 32px)',
+                      borderRadius: '18px',
+                      background: foundationReady ? T_cardBg : (isLight ? 'rgba(168, 148, 120, 0.10)' : isMix ? 'rgba(180, 147, 98, 0.06)' : 'rgba(30,41,59,0.45)'),
+                      border: foundationReady
+                        ? (isLight ? `1.5px solid ${lightColors.border.main}` : isMix ? `2px solid ${T_panelBorderSoft}` : `2px solid ${T_panelBorderSoft}`)
+                        : `2px solid ${isLight ? 'rgba(168, 148, 120, 0.25)' : isMix ? 'rgba(180, 147, 98, 0.20)' : 'rgba(100,116,139,0.25)'}`,
+                      color: foundationReady ? T_textMain : T_textDim,
+                      fontSize: 'clamp(24px, 3.1vh, 34px)',
+                      fontWeight: 700,
+                      letterSpacing: '0.3px',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.08)' : 'none',
+                    }}>
+                    {opt}
+                  </GazeButton>
+                );
+              })}
             </div>
           </div>
-          {/* Command bar */}
-          <div style={{ position: 'absolute', bottom: 'clamp(78px, 12vh, 170px)', left: '50%', transform: 'translateX(-50%)', width: 'min(97%, 1180px)', padding: 'clamp(8px, 1.2vh, 14px) clamp(12px, 1.8vw, 24px)', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: 'clamp(30px, 4vw, 56px)', rowGap: 'clamp(22px, 3vh, 34px)', zIndex: 10 }}>
+          {/* Fade overlay above the command bar — masks any cards scrolling
+              behind so they never bleed into the action zone. Mirrors the
+              pattern used in the large FloorPlanSurveyScreen. */}
+          <div style={{
+            position: 'absolute',
+            left: 0, right: 0, bottom: 0,
+            height: 'clamp(220px, 28vh, 320px)',
+            pointerEvents: 'none',
+            zIndex: 9,
+            background: isLight
+              ? `linear-gradient(180deg, ${lightColors.background.primary}00 0%, ${lightColors.background.primary}d8 28%, ${lightColors.background.primary} 60%, ${lightColors.background.primary} 100%)`
+              : isMix
+                ? `linear-gradient(180deg, ${T_pageBg}00 0%, ${T_pageBg}cc 28%, ${T_pageBg} 60%, ${T_pageBg} 100%)`
+                : `linear-gradient(180deg, ${T_pageBg}00 0%, ${T_pageBg}cc 28%, ${T_pageBg} 60%, ${T_pageBg} 100%)`,
+          }} />
+
+          {/* Command bar — fixed at right-column bottom with solid backdrop
+              and a subtle horizontal divider above the buttons (matches the
+              large survey's polished shelf style). */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0, left: 0, right: 0,
+            zIndex: 10,
+            background: isLight ? lightColors.background.primary : T_pageBg,
+            paddingBottom: 'clamp(28px, 4vh, 52px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'stretch',
+          }}>
+            {/* Subtle horizontal divider line */}
+            <div style={{
+              height: '1px',
+              width: 'min(94%, 1300px)',
+              margin: '0 auto',
+              marginBottom: 'clamp(14px, 2vh, 22px)',
+              background: isLight
+                ? 'linear-gradient(90deg, rgba(82, 66, 45, 0) 0%, rgba(82, 66, 45, 0.28) 25%, rgba(82, 66, 45, 0.28) 75%, rgba(82, 66, 45, 0) 100%)'
+                : 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.16) 75%, rgba(255,255,255,0) 100%)',
+            }} />
+            <div style={{
+              display: 'flex', flexWrap: 'wrap',
+              justifyContent: 'center', alignItems: 'center',
+              columnGap: 'clamp(30px, 4vw, 56px)',
+              rowGap: 'clamp(18px, 2.4vh, 28px)',
+              padding: '0 clamp(20px, 2.5vw, 40px)',
+            }}>
             {!foundationReady && (
               <>
                 <GazeButton id="f-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
@@ -1790,6 +1997,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               style={{ padding: 'clamp(14px, 2.1vh, 22px) clamp(34px, 3.8vw, 54px)', minHeight: 'clamp(78px, 10.6vh, 108px)', minWidth: 'clamp(200px, 20vw, 290px)', borderRadius: '20px', fontSize: 'clamp(24px, 3.1vh, 32px)', fontWeight: 800, background: T_cardBg, border: `3px solid ${T_panelBorderSoft}`, color: T_textSub }}>
               SKIP {'\u2192'}
             </GazeButton>
+            </div>
           </div>
         </div>
       </div>
@@ -1827,9 +2035,16 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     return (
       <div style={{
         position: 'absolute',
-        right: '48px', // Shifted inward for better reachability
-        top: '190px', // Pushed down to reserve space for NAV controls above it
-        width: '240px', height: 'calc(100% - 310px)', // Shorter to pull bottom up
+        right: '24px',
+        // Dynamic top: when nav is hidden, SHOW NAV sits at top:12 (ends ~132),
+        // so the strip can start much higher and claim the full vertical column.
+        // When nav is visible, HIDE NAV sits at top:175 (ends ~295), so the strip
+        // drops down to clear it.
+        top: navHidden ? '152px' : '316px',
+        // Bottom gutter of ~32px so the last button (REFINE MAP) is fully visible
+        // and not pushed past the bottom edge.
+        width: '296px',
+        height: navHidden ? 'calc(100% - 184px)' : 'calc(100% - 348px)',
         background: T_panelBg,
         border: `1px solid ${T_panelBorderSoft}`,
         borderRadius: '24px', overflow: 'hidden',
@@ -1838,6 +2053,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
         pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
       }}>
+        <div key={refinementMode ? 'mode-refine' : 'mode-place'} className="cmap-mode-fade" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
         {refinementMode ? (
           <>
             {/* REFINEMENT MODE — 3-button layout (no dedicated EXIT) */}
@@ -1851,11 +2067,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 color: selectedRefinementCell ? T_editAccent : T_textDim,
                 minHeight: '132px',
               }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '2px', color: selectedRefinementCell ? T_refineModeAccent : T_textDim }}>REFINE MODE</div>
-              <div style={{ fontSize: '24px' }}>🛠</div>
-              <div>EDIT</div>
-              {/* #5 — larger SELECT CELL cue */}
-              {!selectedRefinementCell && <div style={{ fontSize: '16px', color: T_editAccent, fontWeight: 800, letterSpacing: '0.5px', marginTop: '4px' }}>👁 SELECT CELL</div>}
+              <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '2.2px', color: selectedRefinementCell ? T_refineModeAccent : T_textDim, fontVariantNumeric: 'tabular-nums' }}>REFINE MODE</div>
+              <div style={{ fontSize: '24px' }}>{'🛠'}</div>
+              <div style={{ fontSize: 'clamp(18px, 2.1vh, 22px)', fontWeight: 900, letterSpacing: '0.8px' }}>{selectedRefinementCell ? 'OPEN EDITOR' : 'EDIT'}</div>
+              {!selectedRefinementCell && <div style={{ fontSize: '14px', color: T_editAccent, fontWeight: 700, letterSpacing: '0.5px', marginTop: '4px', fontStyle: 'italic' }}>{'👁 select a cell'}</div>}
             </GazeButton>
 
             {/* GENERATE REFINED PLAN — always available in refinement mode */}
@@ -1993,6 +2208,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <span style={{ fontSize: 'clamp(18px, 2.1vh, 22px)', fontWeight: 900, letterSpacing: '0.8px' }}>REFINE MAP</span>
           </GazeButton>
         )}
+        </div>
       </div>
     );
   };
@@ -2005,11 +2221,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       flex: 1, // Fill available space
       position: 'relative',
       overflow: 'hidden',
-      // Top: push grid down ~30px from top NavBar.
-      // Bottom: keep road close to viewport bottom (~36px gutter).
-      // Net effect vs prior 10/100 padding: ~44px more vertical canvas room
-      // and the road sits lower on screen.
-      padding: '30px 320px 36px 40px',
+      // Top: push grid down ~24px from top NavBar.
+      // Bottom: minimal gutter so road hugs viewport bottom (~20px).
+      // Right: 360px reserves space for the 296px sidebar + 24px right inset + ~40px gap.
+      padding: '24px 360px 20px 40px',
       pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
     }}>
 
@@ -2065,30 +2280,54 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           position: 'relative',
           transition: 'all 0.4s ease',
         }}>
-          <CompassRose facing={facing} bg={T_panelBg} border={T_panelBorderSoft} textColor={T_textSub} />
+          <CompassRose
+            facing={facing}
+            bg={T_panelBg}
+            border={isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : T_panelBorderSoft}
+            textColor={T_textSub}
+            northColor={isLight ? '#8C3F3F' : isMix ? '#C9695C' : '#EF5350'}
+            size={72}
+          />
+          <ScaleBar
+            feet={cellWFt}
+            ink={isLight ? '#5C4A30' : isMix ? '#A89476' : T_textSub}
+            muted={isLight ? T_textSub : isMix ? '#8E7E62' : T_textDim}
+          />
 
-          {/* Directions Labels */}
+          {/* Direction labels — inset tabs on the wall edges (architectural drawing style)
+              Side walls use writing-mode vertical-rl so the text runs along the wall
+              naturally and stays inside the overflow:hidden boundary. */}
           <div style={{
-            position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)', zIndex: 3,
-            padding: '5px 12px', borderRadius: '8px', background: T_panelBg, color: T_textMain,
-            fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '0.5px',
-            border: `1px solid ${T_panelBorderSoft}`,
-            boxShadow: isLight ? '0 2px 4px rgba(82, 66, 45, 0.08)' : 'none',
-          }}>BACK ({backDir})</div>
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3,
+            padding: '4px 16px', borderRadius: '0 0 10px 10px',
+            background: isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328',
+            color: isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3',
+            fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
+            fontVariantNumeric: 'tabular-nums',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.14)',
+          }}>BACK &middot; {backDir.toUpperCase()}</div>
           <div style={{
-            position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', zIndex: 3,
-            padding: '5px 12px', borderRadius: '8px', background: T_panelBg, color: T_textMain,
-            fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '0.5px',
-            border: `1px solid ${T_panelBorderSoft}`,
-            boxShadow: isLight ? '0 2px 4px rgba(82, 66, 45, 0.08)' : 'none',
-          }}>LEFT ({sideLabels.left})</div>
+            position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', zIndex: 3,
+            padding: '16px 4px', borderRadius: '0 10px 10px 0',
+            background: isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328',
+            color: isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3',
+            fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
+            fontVariantNumeric: 'tabular-nums',
+            writingMode: 'vertical-rl' as const,
+            textOrientation: 'mixed' as const,
+            boxShadow: '2px 0 6px rgba(0,0,0,0.14)',
+          }}>LEFT &middot; {sideLabels.left.toUpperCase()}</div>
           <div style={{
-            position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', zIndex: 3,
-            padding: '5px 12px', borderRadius: '8px', background: T_panelBg, color: T_textMain,
-            fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '0.5px',
-            border: `1px solid ${T_panelBorderSoft}`,
-            boxShadow: isLight ? '0 2px 4px rgba(82, 66, 45, 0.08)' : 'none',
-          }}>RIGHT ({sideLabels.right})</div>
+            position: 'absolute', top: '50%', right: 0, transform: 'translateY(-50%)', zIndex: 3,
+            padding: '16px 4px', borderRadius: '10px 0 0 10px',
+            background: isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328',
+            color: isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3',
+            fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
+            fontVariantNumeric: 'tabular-nums',
+            writingMode: 'vertical-rl' as const,
+            textOrientation: 'mixed' as const,
+            boxShadow: '-2px 0 6px rgba(0,0,0,0.14)',
+          }}>RIGHT &middot; {sideLabels.right.toUpperCase()}</div>
 
           {/* Grid */}
           <div style={{
@@ -2326,11 +2565,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           </div>
         </div>
 
-        {/* Dead zone between grid row 4 and road — gives plot canvas more breathing room
-            and prevents accidental gaze cross-selection */}
-        <div data-gaze="false" style={{ width: '100%', height: 'clamp(20px, 2.6vh, 36px)', flexShrink: 0, pointerEvents: 'none' }} />
+        {/* Minimal gaze-protection gap between grid bottom row and road — visually
+            almost touching so the road reads as the natural plot edge */}
+        <div data-gaze="false" style={{ width: '100%', height: 'clamp(4px, 0.6vh, 8px)', flexShrink: 0, pointerEvents: 'none' }} />
 
-        {/* Road Section — taller with stronger presence */}
+        {/* Road Section — taller with stronger presence + gate indicator */}
         <div style={{
           width: '100%', height: 'clamp(140px, 15.5vh, 184px)', flexShrink: 0,
           marginBottom: '-16px',
@@ -2340,10 +2579,87 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             : `2px solid ${isLight ? T_panelBorderSoft : isMix ? T_panelBorderSoft : '#2E4B3A'}`,
           borderTop: 'none', borderRadius: '0 0 16px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: isLight ? T_textMain : isMix ? '#F0E2C4' : THEME.road, fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 26px)', letterSpacing: '0.6px',
           position: 'relative',
+          color: isLight ? T_textMain : isMix ? '#F0E2C4' : THEME.road, fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 26px)', letterSpacing: '0.6px',
           boxShadow: isLight ? '0 -4px 14px rgba(82, 66, 45, 0.08)' : isMix ? '0 -4px 16px rgba(0,0,0,0.22)' : 'none',
         }}>
+          {/* Gate diagram — spans exactly one cell width (25% of grid frontage).
+              Position respects user's foundation choice:
+                Left   → leftmost cell (center 12.5%)
+                Center → straddles cells 2&3 boundary (center 50%)
+                Right  → rightmost cell (center 87.5%)
+              Visual: pillared gate frame with two doors and an entry arrow,
+              styled like an architectural site-plan gate marker. */}
+          {(() => {
+            const gp = state.foundation.gatePosition || 'Center';
+            const centerPct = gp === 'Left' ? 12.5 : gp === 'Right' ? 87.5 : 50;
+            const stone = isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328';
+            const stoneShade = isLight ? '#5C4A30' : isMix ? '#3D3328' : '#26221C';
+            const cream = isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3';
+            return (
+              <div style={{
+                position: 'absolute',
+                top: '-26px',
+                left: `${centerPct}%`,
+                width: '25%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                pointerEvents: 'none', userSelect: 'none',
+                filter: isLight ? 'drop-shadow(0 3px 5px rgba(82, 66, 45, 0.22))' : 'drop-shadow(0 3px 5px rgba(0,0,0,0.32))',
+              }}>
+                {/* Gate frame stretches the full container width */}
+                <svg
+                  width="100%"
+                  height="26"
+                  preserveAspectRatio="none"
+                  viewBox="0 0 100 26"
+                  aria-hidden="true"
+                  style={{ display: 'block' }}
+                >
+                  {/* Lintel cap — slightly extruded above the wall line */}
+                  <rect x="0" y="0" width="100" height="5" fill={stoneShade} />
+                  <rect x="0" y="3" width="100" height="4" fill={stone} />
+                  {/* Left pillar */}
+                  <rect x="0" y="5" width="4.5" height="19" fill={stone} />
+                  <rect x="0" y="5" width="1.2" height="19" fill={stoneShade} />
+                  {/* Right pillar */}
+                  <rect x="95.5" y="5" width="4.5" height="19" fill={stone} />
+                  <rect x="98.8" y="5" width="1.2" height="19" fill={stoneShade} />
+                  {/* Pillar bases */}
+                  <rect x="-1" y="22" width="7" height="4" fill={stoneShade} />
+                  <rect x="94" y="22" width="7" height="4" fill={stoneShade} />
+                  {/* Two gate panels (split center, decorative) */}
+                  <rect x="6" y="8" width="42" height="14" fill="none" stroke={stone} strokeWidth="0.7" opacity="0.55" />
+                  <rect x="52" y="8" width="42" height="14" fill="none" stroke={stone} strokeWidth="0.7" opacity="0.55" />
+                  {/* Vertical bars on each panel (gate slats) */}
+                  <line x1="20" y1="9" x2="20" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
+                  <line x1="34" y1="9" x2="34" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
+                  <line x1="66" y1="9" x2="66" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
+                  <line x1="80" y1="9" x2="80" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
+                  {/* Hinges */}
+                  <circle cx="2.2" cy="11" r="0.9" fill={cream} opacity="0.78" />
+                  <circle cx="2.2" cy="19" r="0.9" fill={cream} opacity="0.78" />
+                  <circle cx="97.8" cy="11" r="0.9" fill={cream} opacity="0.78" />
+                  <circle cx="97.8" cy="19" r="0.9" fill={cream} opacity="0.78" />
+                  {/* Entry arrow at the center seam */}
+                  <polygon points="50,18 46.5,12 53.5,12" fill={stone} opacity="0.78" />
+                </svg>
+                <div style={{
+                  marginTop: -2,
+                  background: stone,
+                  color: cream,
+                  padding: '3px 14px',
+                  borderRadius: '0 0 8px 8px',
+                  fontSize: 10, fontWeight: 800, letterSpacing: '1.6px',
+                  fontVariantNumeric: 'tabular-nums',
+                  whiteSpace: 'nowrap',
+                }}>
+                  MAIN GATE
+                </div>
+              </div>
+            );
+          })()}
           {/* READY BUTTON - Left (~25% width = 1 cell width) */}
           {state.phase === 'placement' && (
             <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${100 / GRID_COLS}%`, padding: '6px' }}>
@@ -2380,7 +2696,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
           {/* Road label + live coverage counter */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
-            <span style={{ color: isLight ? T_accent : isMix ? '#5E9CA8' : THEME.road, fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 27px)', letterSpacing: '0.6px' }}>
+            <span style={{
+              color: isLight ? T_accent : isMix ? '#5E9CA8' : THEME.road,
+              fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 27px)', letterSpacing: '0.6px',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
               FRONT / ROAD ({facing}) &ndash; {pw} ft
             </span>
             {state.phase === 'placement' && (
@@ -2389,6 +2709,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 fontWeight: 700,
                 color: isLight ? T_textSub : isMix ? '#C4B697' : 'rgba(56,189,248,0.6)',
                 letterSpacing: '0.4px',
+                fontVariantNumeric: 'tabular-nums',
               }}>
                 {occupiedCount} / {16} cells placed &middot; {coveragePercent}%
               </span>
@@ -2429,6 +2750,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                       fontSize: 'clamp(14px, 1.6vh, 18px)', fontWeight: 700,
                       color: isLight ? T_accent : isMix ? '#5E9CA8' : 'rgba(56, 189, 248, 0.85)',
                       lineHeight: 1,
+                      fontVariantNumeric: 'tabular-nums',
                     }}>
                       {state.currentIndex + 1} of {state.componentQueue.length}
                     </span>
@@ -2452,6 +2774,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   <span style={{
                     fontSize: 'clamp(13px, 1.5vh, 16px)', fontWeight: 700,
                     color: isLight ? T_textSub : isMix ? '#C4B697' : '#94A3B8',
+                    fontVariantNumeric: 'tabular-nums',
                   }}>
                     {coveragePercent}%
                   </span>
@@ -2882,10 +3205,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           dwellTime={1200}
           onClick={() => { setNavHidden(false); onSpeak('Navigation restored.'); }}
           style={{
-            position: 'fixed', top: '24px', right: '48px', zIndex: 100,
-            width: '240px',
-            minHeight: 'clamp(72px, 9vh, 100px)',
-            borderRadius: '14px',
+            position: 'fixed', top: '12px', right: '24px', zIndex: 100,
+            width: '296px',
+            minHeight: 'clamp(86px, 11vh, 120px)',
+            borderRadius: '16px',
             background: T_navBtnBg,
             border: `2px solid ${T_navBtnBorder}`,
             color: T_accent,
@@ -2911,10 +3234,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           dwellTime={1400}
           onClick={() => { setNavHidden(true); onSpeak('Navigation hidden. Look at SHOW NAV to restore.'); }}
           style={{
-            position: 'fixed', top: '185px', right: '48px', zIndex: 100,
-            width: '240px',
-            minHeight: 'clamp(72px, 9vh, 100px)',
-            borderRadius: '14px',
+            position: 'fixed', top: '175px', right: '24px', zIndex: 100,
+            width: '296px',
+            minHeight: 'clamp(86px, 11vh, 120px)',
+            borderRadius: '16px',
             background: T_navBtnBg,
             border: `2px solid ${T_navBtnBorder}`,
             color: T_textMain,
@@ -3051,8 +3374,25 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           return (
             <GazeButton id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
               onClick={() => { if (action) { action(); } else { setCellEditorTool(tool); triggerReadingCooldown(); setRoomPage(0); onSpeak(`${label} tool.`); } }}
-              style={{ width: '100%', minHeight: '120px', flex: 1, borderRadius: '16px', border: isActive ? `2px solid ${themeToolColor}` : inactiveBorder, background: isActive ? `${themeToolColor}22` : inactiveBg, color: isActive ? themeToolColor : inactiveText, fontSize: '15px', fontWeight: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '14px 6px', letterSpacing: '0.5px' }}>
-              <span style={{ fontSize: '32px', color: themeToolColor }}>{icon}</span>
+              style={{
+                width: '100%',
+                minHeight: 'clamp(140px, 16vh, 170px)',
+                flex: 1,
+                borderRadius: '18px',
+                border: isActive ? `3px solid ${themeToolColor}` : inactiveBorder,
+                background: isActive ? `${themeToolColor}22` : inactiveBg,
+                color: isActive ? themeToolColor : inactiveText,
+                fontSize: 'clamp(16px, 1.9vh, 20px)',
+                fontWeight: 900,
+                letterSpacing: '0.7px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '14px',
+                padding: '18px 8px',
+                boxShadow: isActive
+                  ? (isLight ? `0 4px 14px ${themeToolColor}33` : '0 4px 14px rgba(0,0,0,0.20)')
+                  : 'none',
+              }}>
+              <span style={{ fontSize: 'clamp(34px, 4vh, 44px)', color: themeToolColor }}>{icon}</span>
               <span>{label}</span>
             </GazeButton>
           );
@@ -3068,8 +3408,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               </div>
             )}
 
-            {/* ── BREADCRUMB BAR / HEADER (120px) ── */}
-            <div style={{ position: 'relative', height: 120, flexShrink: 0, background: T_panelBg, borderBottom: `2px solid ${T_panelBorderSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 40px' }}>
+            {/* ── BREADCRUMB BAR / HEADER (taller for bigger BACK button) ── */}
+            <div style={{ position: 'relative', minHeight: 'clamp(140px, 14vh, 160px)', flexShrink: 0, background: T_panelBg, borderBottom: `2px solid ${T_panelBorderSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 40px' }}>
               {/* Left Breadcrumbs (Non-interactive) */}
               <div style={{ position: 'absolute', left: 40, display: 'flex', alignItems: 'center', gap: 12, fontSize: 16, overflow: 'hidden' }}>
                 <span style={{ color: T_textDim, fontWeight: 600 }}>Refinement</span>
@@ -3082,11 +3422,27 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 <span style={{ color: T_textSub, fontWeight: 600, whiteSpace: 'nowrap' }}>{getStepLabel()}</span>
               </div>
 
-              {/* Center BACK/EXIT Button (Safely away from corners) */}
+              {/* Center BACK/EXIT Button — large gaze-friendly target */}
               <GazeButton id="focus-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode alwaysActive dwellTime={1200}
                 onClick={editorBack}
-                style={{ height: 72, minWidth: 260, borderRadius: 20, background: T_subSurface, border: `3px solid ${T_panelBorder}`, color: T_info, fontSize: 24, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '0 30px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 10 }}>
-                <span style={{ fontSize: 32 }}>←</span> {!cellEditorTool ? 'EXIT TO MAP' : 'BACK'}
+                style={{
+                  minHeight: 'clamp(96px, 11vh, 120px)',
+                  minWidth: 'clamp(280px, 24vw, 360px)',
+                  borderRadius: 22,
+                  background: T_subSurface,
+                  border: `3px solid ${T_panelBorder}`,
+                  color: T_info,
+                  fontSize: 'clamp(24px, 2.8vh, 30px)',
+                  fontWeight: 900,
+                  letterSpacing: '0.5px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 14,
+                  padding: '8px 36px',
+                  boxShadow: isLight ? '0 6px 18px rgba(82, 66, 45, 0.16)' : '0 8px 32px rgba(0,0,0,0.3)',
+                  zIndex: 10,
+                }}>
+                <span style={{ fontSize: 'clamp(28px, 3.2vh, 36px)' }}>{'←'}</span>
+                <span>{!cellEditorTool ? 'EXIT TO MAP' : 'BACK'}</span>
               </GazeButton>
 
               {/* Right Step Label */}
@@ -3172,30 +3528,105 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   </div>
                 )}
 
-                {/* ── ACTIVE TOOL MENU ── */}
+                {/* ── ACTIVE CELL HEADER + 4 LARGE TOOL CARDS (compass-style) ── */}
                 {refinementArmed && cellEditorTool === null && (
-                  <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#8B5CF6', letterSpacing: 3, textAlign: 'center', marginBottom: 20 }}>CHOOSE A TOOL</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, justifyContent: 'center', maxWidth: '900px' }}>
-                      {bigBtn('ce-split', '✂ SPLIT', '#C4B5FD', 'rgba(139,92,246,0.08)', 'rgba(139,92,246,0.3)', () => { openSplitOverlay(); triggerReadingCooldown(); }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
-                      {bigBtn('ce-walls', '▐ WALLS', '#6EE7B7', 'rgba(45,212,191,0.08)', 'rgba(45,212,191,0.3)', () => { setCellEditorTool('walls'); triggerReadingCooldown(); }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
-                      {bigBtn('ce-rotate', '↻ ROTATE', '#F59E0B', 'rgba(245,158,11,0.08)', 'rgba(245,158,11,0.3)', () => { openRotateOverlay(); triggerReadingCooldown(); }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
-                      {bigBtn('ce-expand', '⇔ EXPAND', '#10B981', 'rgba(16,185,129,0.08)', 'rgba(16,185,129,0.3)', () => { openExpandOverlay(); triggerReadingCooldown(); }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
-                      {hasCellRefinement && bigBtn('ce-reset', '✕ RESET', '#EF5350', 'rgba(239,83,80,0.06)', 'rgba(239,83,80,0.3)', () => { resetCellRefinements(); triggerReadingCooldown(); }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
+                  <div style={{ animation: 'fadeIn 0.3s ease-out', textAlign: 'center', width: '100%', maxWidth: 920, padding: '0 24px' }}>
+                    {/* Compact cell-context header */}
+                    <div style={{
+                      fontSize: 12, fontWeight: 800, color: T_refineMapBorder,
+                      letterSpacing: '2.6px', marginBottom: 6,
+                    }}>ACTIVE CELL</div>
+                    <div style={{
+                      fontSize: 'clamp(22px, 2.6vh, 30px)', fontWeight: 900, color: T_textMain,
+                      lineHeight: 1.1, marginBottom: 4, letterSpacing: '0.3px',
+                    }}>
+                      {roomFullLabel}
+                      {zoneLabel && (
+                        <span style={{ fontSize: 'clamp(13px, 1.5vh, 17px)', fontWeight: 500, color: T_textSub, fontStyle: 'italic', marginLeft: 10 }}>
+                          ({zoneLabel})
+                        </span>
+                      )}
                     </div>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, color: T_textDim, letterSpacing: '0.6px',
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                      fontVariantNumeric: 'tabular-nums',
+                      marginBottom: 'clamp(20px, 2.6vh, 32px)',
+                    }}>
+                      GRID {cellKey.toUpperCase()} &middot; {cellWFt}&times;{cellDFt} ft
+                      {hasCellRefinement && (
+                        <span style={{ marginLeft: 12, color: isLight ? '#8C5A1E' : isMix ? '#D9A560' : '#F59E0B', fontWeight: 800 }}>{'✦ refined'}</span>
+                      )}
+                    </div>
+
+                    {/* CHOOSE A TOOL label */}
+                    <div style={{
+                      fontSize: 13, fontWeight: 800, color: T_refineMapBorder,
+                      letterSpacing: '2.8px', marginBottom: 16,
+                    }}>
+                      CHOOSE A TOOL
+                    </div>
+
+                    {/* 2x2 compass-style tool grid — large gaze-friendly cards */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                      gap: 'clamp(16px, 2vh, 28px)',
+                      maxWidth: 760, margin: '0 auto',
+                    }}>
+                      {bigBtn('ce-split', '✂ SPLIT',
+                        isLight ? '#5B4B98' : isMix ? '#9B85D9' : '#C4B5FD',
+                        isLight ? 'rgba(91, 75, 152, 0.10)' : isMix ? 'rgba(155, 133, 217, 0.12)' : 'rgba(139,92,246,0.08)',
+                        isLight ? 'rgba(91, 75, 152, 0.42)' : isMix ? 'rgba(155, 133, 217, 0.42)' : 'rgba(139,92,246,0.3)',
+                        () => { openSplitOverlay(); triggerReadingCooldown(); }, 1500,
+                        { width: '100%', height: 'clamp(160px, 22vh, 220px)', fontSize: 'clamp(26px, 3.2vh, 34px)' })}
+                      {bigBtn('ce-walls', '▐ WALLS',
+                        isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : '#6EE7B7',
+                        isLight ? 'rgba(31, 107, 126, 0.10)' : isMix ? 'rgba(94, 156, 168, 0.12)' : 'rgba(45,212,191,0.08)',
+                        isLight ? 'rgba(31, 107, 126, 0.42)' : isMix ? 'rgba(94, 156, 168, 0.42)' : 'rgba(45,212,191,0.3)',
+                        () => { setCellEditorTool('walls'); triggerReadingCooldown(); }, 1500,
+                        { width: '100%', height: 'clamp(160px, 22vh, 220px)', fontSize: 'clamp(26px, 3.2vh, 34px)' })}
+                      {bigBtn('ce-rotate', '↻ ROTATE',
+                        isLight ? '#8C5A1E' : isMix ? '#D9A560' : '#F59E0B',
+                        isLight ? 'rgba(140, 90, 30, 0.10)' : isMix ? 'rgba(217, 165, 96, 0.12)' : 'rgba(245,158,11,0.08)',
+                        isLight ? 'rgba(140, 90, 30, 0.42)' : isMix ? 'rgba(217, 165, 96, 0.42)' : 'rgba(245,158,11,0.3)',
+                        () => { openRotateOverlay(); triggerReadingCooldown(); }, 1500,
+                        { width: '100%', height: 'clamp(160px, 22vh, 220px)', fontSize: 'clamp(26px, 3.2vh, 34px)' })}
+                      {bigBtn('ce-expand', '⇔ EXPAND',
+                        isLight ? '#3D7853' : isMix ? '#8FB99D' : '#10B981',
+                        isLight ? 'rgba(61, 120, 83, 0.10)' : isMix ? 'rgba(143, 185, 157, 0.12)' : 'rgba(16,185,129,0.08)',
+                        isLight ? 'rgba(61, 120, 83, 0.42)' : isMix ? 'rgba(143, 185, 157, 0.42)' : 'rgba(16,185,129,0.3)',
+                        () => { openExpandOverlay(); triggerReadingCooldown(); }, 1500,
+                        { width: '100%', height: 'clamp(160px, 22vh, 220px)', fontSize: 'clamp(26px, 3.2vh, 34px)' })}
+                    </div>
+
+                    {hasCellRefinement && (
+                      <div style={{ marginTop: 'clamp(16px, 2vh, 24px)', display: 'flex', justifyContent: 'center' }}>
+                        {bigBtn('ce-reset', '✕ RESET',
+                          isLight ? '#8C3F3F' : isMix ? '#D68264' : '#EF5350',
+                          isLight ? 'rgba(140, 63, 63, 0.10)' : isMix ? 'rgba(214, 130, 100, 0.12)' : 'rgba(239,83,80,0.06)',
+                          isLight ? 'rgba(140, 63, 63, 0.42)' : isMix ? 'rgba(214, 130, 100, 0.42)' : 'rgba(239,83,80,0.3)',
+                          () => { resetCellRefinements(); triggerReadingCooldown(); }, 1500,
+                          { width: '300px', height: '92px', fontSize: '22px' })}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* ── SPLIT TOOL ── */}
-                {refinementArmed && cellEditorTool === 'split' && (
+                {refinementArmed && cellEditorTool === 'split' && (() => {
+                  const splitTextColor = isLight ? '#5B4B98' : isMix ? '#9B85D9' : '#C4B5FD';
+                  const splitBgColor = isLight ? 'rgba(91, 75, 152, 0.10)' : isMix ? 'rgba(155, 133, 217, 0.12)' : 'rgba(139,92,246,0.1)';
+                  const splitBorderColor = isLight ? 'rgba(91, 75, 152, 0.55)' : isMix ? 'rgba(155, 133, 217, 0.55)' : 'rgba(139,92,246,0.4)';
+                  return (
                   <>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#C4B5FD' }}>✂ SPLIT — {roomLabel}</div>
+                    <div style={{ fontSize: 'clamp(22px, 2.6vh, 28px)', fontWeight: 900, color: splitTextColor, letterSpacing: '0.5px' }}>{'✂'} SPLIT &mdash; {roomLabel}</div>
                     {splitStep === 'direction' && (
-                      <div style={{ display: 'flex', gap: 40 }}>
-                        {bigBtn('ce-split-v', '┃ VERTICAL\nLeft / Right', '#C4B5FD', 'rgba(139,92,246,0.1)', 'rgba(139,92,246,0.4)',
-                          () => { setSplitDirection('vertical'); setSplitStep('roomA'); triggerReadingCooldown(); onSpeak('Vertical. Pick first room.'); }, 2000, { width: '280px', height: '180px', fontSize: '24px' })}
-                        {bigBtn('ce-split-h', '━ HORIZONTAL\nTop / Bottom', '#C4B5FD', 'rgba(139,92,246,0.1)', 'rgba(139,92,246,0.4)',
-                          () => { setSplitDirection('horizontal'); setSplitStep('roomA'); triggerReadingCooldown(); onSpeak('Horizontal. Pick first room.'); }, 2000, { width: '280px', height: '180px', fontSize: '24px' })}
+                      <div style={{ display: 'flex', gap: 'clamp(28px, 3.6vw, 56px)' }}>
+                        {bigBtn('ce-split-v', '┃ VERTICAL\nLeft / Right', splitTextColor, splitBgColor, splitBorderColor,
+                          () => { setSplitDirection('vertical'); setSplitStep('roomA'); triggerReadingCooldown(); onSpeak('Vertical. Pick first room.'); }, 2000, { width: 'clamp(260px, 26vw, 320px)', height: 'clamp(170px, 22vh, 220px)', fontSize: 'clamp(22px, 2.6vh, 28px)' })}
+                        {bigBtn('ce-split-h', '━ HORIZONTAL\nTop / Bottom', splitTextColor, splitBgColor, splitBorderColor,
+                          () => { setSplitDirection('horizontal'); setSplitStep('roomA'); triggerReadingCooldown(); onSpeak('Horizontal. Pick first room.'); }, 2000, { width: 'clamp(260px, 26vw, 320px)', height: 'clamp(170px, 22vh, 220px)', fontSize: 'clamp(22px, 2.6vh, 28px)' })}
                       </div>
                     )}
                     {splitStep === 'roomA' && (
@@ -3264,19 +3695,28 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                         </div>
 
                         <div style={{ display: 'flex', gap: 40, marginTop: 10 }}>
-                          {bigBtn('ce-cancel-split', '✕ CANCEL', '#EF5350', 'rgba(239,83,80,0.1)', 'rgba(239,83,80,0.4)', () => { setSplitStep('roomB'); setSubRoomB(null); triggerReadingCooldown(); onSpeak('Cancelled. Pick second room again.'); }, 1500, { width: '220px', height: '140px', fontSize: '24px' })}
+                          {bigBtn('ce-cancel-split', '✕ CANCEL',
+                            isLight ? '#8C3F3F' : isMix ? '#D68264' : '#EF5350',
+                            isLight ? 'rgba(140, 63, 63, 0.10)' : isMix ? 'rgba(214, 130, 100, 0.12)' : 'rgba(239,83,80,0.1)',
+                            isLight ? 'rgba(140, 63, 63, 0.55)' : isMix ? 'rgba(214, 130, 100, 0.55)' : 'rgba(239,83,80,0.4)',
+                            () => { setSplitStep('roomB'); setSubRoomB(null); triggerReadingCooldown(); onSpeak('Cancelled. Pick second room again.'); }, 1500, { width: '220px', height: '140px', fontSize: '24px' })}
 
-                          {bigBtn('ce-confirm-split', '✔️ CONFIRM SPLIT', '#2DD4BF', 'rgba(45,212,191,0.15)', 'rgba(45,212,191,0.5)', () => { confirmSplitFull(subRoomB); }, 2500, { width: '320px', height: '140px', fontSize: '28px', boxShadow: '0 0 30px rgba(45,212,191,0.3)' })}
+                          {bigBtn('ce-confirm-split', '✔️ CONFIRM SPLIT',
+                            isLight ? T_textInverse : isMix ? T_textInverse : '#2DD4BF',
+                            isLight ? T_accent : isMix ? T_accent : 'rgba(45,212,191,0.15)',
+                            isLight ? T_accent : isMix ? T_accent : 'rgba(45,212,191,0.5)',
+                            () => { confirmSplitFull(subRoomB); }, 2500, { width: '320px', height: '140px', fontSize: '28px', boxShadow: isLight ? '0 8px 22px rgba(31, 107, 126, 0.30)' : '0 0 30px rgba(45,212,191,0.3)' })}
                         </div>
                       </div>
                     )}
                   </>
-                )}
+                  );
+                })()}
 
                 {/* ── WALLS TOOL ── */}
                 {refinementArmed && cellEditorTool === 'walls' && (
                   <>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#6EE7B7' }}>▐ WALLS — {roomLabel}</div>
+                    <div style={{ fontSize: 'clamp(22px, 2.6vh, 28px)', fontWeight: 900, color: isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : '#6EE7B7', letterSpacing: '0.5px' }}>{'▐'} WALLS &mdash; {roomLabel}</div>
                     {!cellEditorWallEdge ? (
                       <>
                         <div style={{ fontSize: 16, color: '#94A3B8' }}>Select an edge</div>
@@ -3393,6 +3833,24 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
           100% { opacity: 0; transform: translate(-50%, -50%) scale(1.03); }
         }
+
+        /* Tier 3 micro-animations */
+        @keyframes placement-pop {
+          0%   { transform: scale(0.94); filter: brightness(1.18); }
+          55%  { transform: scale(1.025); filter: brightness(1.10); }
+          100% { transform: scale(1);     filter: brightness(1); }
+        }
+        @keyframes mode-fade-in {
+          0%   { opacity: 0; transform: translateY(4px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Smooth state transitions on grid cells — color/border changes
+           glide rather than snap, giving the canvas a polished feel. */
+        .cmap-cell-anim { transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, opacity 220ms ease; }
+
+        /* Refinement / placement mode swap fades the action strip in */
+        .cmap-mode-fade { animation: mode-fade-in 200ms ease-out both; }
       `}</style>
 
       {/* Room change toast — brief 2s notification */}

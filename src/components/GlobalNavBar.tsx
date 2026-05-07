@@ -313,7 +313,13 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     display: 'grid',
                     gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
                     alignItems: 'center',
-                    columnGap: isKbOrSpatial ? 'clamp(30px, 3.6vw, 68px)' : 'clamp(18px, 2.4vw, 44px)',
+                    // Compass map: extra-wide gap between columns so Emergency, the
+                    // center pill, and the gaze toggle each get a clear breathing zone.
+                    columnGap: isCompassMap
+                        ? 'clamp(48px, 5vw, 96px)'
+                        : isKbOrSpatial
+                            ? 'clamp(30px, 3.6vw, 68px)'
+                            : 'clamp(18px, 2.4vw, 44px)',
                     padding: compact
                         ? 'clamp(9px, 1.3vh, 16px) clamp(16px, 2vw, 30px) clamp(12px, 1.6vh, 20px)'
                         : isKbOrSpatial
@@ -397,7 +403,9 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             borderRadius: '24px',
                             overflow: 'hidden',
                             boxShadow: navigationColors.pillShadow,
-                            gap: (isKbOrSpatial || isCompassMap) ? '0px' : '1px',
+                            // Compass map: small internal pill gap so Back/Home/Keyboard/Restart Maps
+                            // read as distinct gaze targets, not a single mashed strip.
+                            gap: isKbOrSpatial ? '0px' : isCompassMap ? '4px' : '1px',
                         }}>
                             {/* BACK — custom callback (e.g. web browsing panels) */}
                             {onBack && (
