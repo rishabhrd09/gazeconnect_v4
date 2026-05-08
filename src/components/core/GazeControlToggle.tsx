@@ -221,7 +221,6 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
   const toggleDwellTime = dwellSettings.gazeToggle;
 
   // Mouse-Only Mode: hide the gaze toggle entirely — no gaze to toggle
-  if (isMouseMode) return null;
   const dwellTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const progressTimerRef = useRef<number | null>(null);
@@ -313,6 +312,10 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
     setDwellProgress(0);
     clearTimers();
   };
+
+  // Mouse-Only Mode: hide the gaze toggle entirely; keep hooks above this
+  // return so switching mouse mode on/off never violates React hook order.
+  if (isMouseMode) return null;
 
   // Position styles
   const getPositionStyle = (): React.CSSProperties => {

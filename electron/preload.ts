@@ -17,6 +17,7 @@ const validEventChannels = [
   'webview:navigation-state',
   'webview:links',
   'webview:edge-scroll',
+  'webview:closed',
   'ui-lock-toggled',
 ] as const;
 
@@ -97,10 +98,18 @@ const api = {
     forward: () => ipcRenderer.invoke('webview:forward'),
     type: (text: string) => ipcRenderer.invoke('webview:type', text),
     executeJs: (code: string) => ipcRenderer.invoke('webview:executeJs', code),
+    youtubeCommand: (command: string) => ipcRenderer.invoke('webview:youtubeCommand', command),
+    setGazeConfig: (config: Record<string, number | boolean>) =>
+      ipcRenderer.invoke('webview:setGazeConfig', config),
+    setScrollMode: (enabled: boolean) =>
+      ipcRenderer.invoke('webview:setScrollMode', enabled),
+    getDiagnostics: () => ipcRenderer.invoke('webview:getDiagnostics'),
+    resetBrowserSession: (reason: string) =>
+      ipcRenderer.invoke('webview:resetBrowserSession', reason),
     setBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
       ipcRenderer.invoke('webview:setBounds', bounds),
-    updateGaze: (x: number, y: number) =>
-      ipcRenderer.invoke('webview:updateGaze', x, y),
+    updateGaze: (x: number, y: number, options?: { cursor?: boolean }) =>
+      ipcRenderer.invoke('webview:updateGaze', x, y, options),
     navigate: (url: string) => ipcRenderer.invoke('webview:navigate', url),
     refreshLinks: () => ipcRenderer.invoke('webview:refreshLinks'),
     adjustZoom: (delta: number) => ipcRenderer.invoke('webview:adjustZoom', delta),

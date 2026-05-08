@@ -14,6 +14,20 @@ import { app, BrowserWindow, BrowserView, ipcMain, Tray, Menu, screen, nativeIma
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { browserDiagnostics } from './browser/browserDiagnostics';
+import {
+  BROWSER_CURSOR_CSS,
+  BROWSER_CURSOR_HIDE_SCRIPT,
+  BROWSER_CURSOR_RESET_SCRIPT,
+  buildBrowserCursorInjectionScript,
+  buildGazeUpdateAndPollScript,
+} from './browser/browserGazeController';
+import { disposeBrowserView } from './browser/browserViewController';
+import {
+  buildYoutubeCommandScript,
+  isYoutubeCommand,
+  type YoutubeCommandResult,
+} from './browser/youtubeController';
 
 // ============================================
 // GLOBALS
@@ -37,14 +51,115 @@ let isAppNavHidden = false;
 let isUiLocked = false;
 
 let activeBrowserView: BrowserView | null = null; // Gaze-controlled BrowserView
+let activeBrowserViewSessionId = 0;
 let lastNavState: { canGoBack: boolean; canGoForward: boolean; url: string } | null = null;
 const domainZoomPrefs = new Map<string, number>();
 const DEFAULT_WEB_ZOOM = 1.35;
 let lastEdgeScrollAt = 0;
 let lastEdgeScrollDirection: 'up' | 'down' | 'none' = 'none';
+let edgeScrollCandidate: 'up' | 'down' | 'none' = 'none';
+let edgeScrollEnteredAt = 0;
+let edgeScrollActiveDirection: 'up' | 'down' | 'none' = 'none';
+let edgeScrollStartedAt = 0;
 let highContrastEnabled = false;
 let rendererBootReady = false;
 let splashTransitionStarted = false;
+let browserDiagnosticsInterval: NodeJS.Timeout | null = null;
+
+type BrowserGazeConfig = {
+  dwellMs: number;
+  onsetMs: number;
+  stabilityRadiusPx: number;
+  postClickCooldownMs: number;
+  edgeScrollEnabled: boolean;
+  edgeHoldMs: number;
+  edgeZonePct: number;
+  edgeDeadZonePct: number;
+  edgeMinDeltaPx: number;
+  edgeMaxDeltaPx: number;
+  edgeThrottleMs: number;
+  edgeMaxBurstMs: number;
+};
+
+let browserGazeConfig: BrowserGazeConfig = {
+  dwellMs: 1200,
+  onsetMs: 300,
+  stabilityRadiusPx: 50,
+  postClickCooldownMs: 900,
+  edgeScrollEnabled: false,
+  edgeHoldMs: 650,
+  edgeZonePct: 0.20,
+  edgeDeadZonePct: 0.02,
+  edgeMinDeltaPx: 18,
+  edgeMaxDeltaPx: 36,
+  edgeThrottleMs: 120,
+  edgeMaxBurstMs: 6000,
+};
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function resetEdgeScrollState(notify: boolean = true) {
+  lastEdgeScrollAt = 0;
+  edgeScrollCandidate = 'none';
+  edgeScrollEnteredAt = 0;
+  edgeScrollActiveDirection = 'none';
+  edgeScrollStartedAt = 0;
+  if (notify) sendEdgeScrollState('none');
+}
+
+function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activeBrowserViewSessionId) {
+  const view = activeBrowserView;
+  if (!view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
+  const cx = Math.round(x);
+  const cy = Math.round(y);
+  view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+  view.webContents.sendInputEvent({ type: 'mouseMove', x: cx, y: cy } as any);
+  setTimeout(() => {
+    if (activeBrowserView !== view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
+    view.webContents.sendInputEvent({ type: 'mouseDown', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
+    setTimeout(() => {
+      if (activeBrowserView !== view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
+      view.webContents.sendInputEvent({ type: 'mouseUp', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
+      setTimeout(() => sendBrowserNavState(true), 350);
+    }, 60);
+  }, 30);
+}
+
+function startBrowserDiagnosticsSampling(): void {
+  if (browserDiagnosticsInterval) clearInterval(browserDiagnosticsInterval);
+  browserDiagnosticsInterval = setInterval(() => {
+    const snapshot = browserDiagnostics.snapshot(activeBrowserView);
+    if (!snapshot.isOpen) return;
+    browserDiagnostics.debug(
+      'browser-memory',
+      `[BrowserView] url=${snapshot.url || 'about:blank'} memory=${snapshot.memoryMb ?? 'n/a'}MB ipc=${snapshot.ipcPerSecond ?? 0}/s state=${snapshot.youtubeState || 'n/a'}`,
+      60000
+    );
+  }, 60000);
+}
+
+async function closeActiveBrowserView(reason: string): Promise<void> {
+  const view = activeBrowserView;
+  activeBrowserView = null;
+  activeBrowserViewSessionId += 1;
+
+  if (browserDiagnosticsInterval) {
+    clearInterval(browserDiagnosticsInterval);
+    browserDiagnosticsInterval = null;
+  }
+
+  await disposeBrowserView(mainWindow, view, reason);
+  lastNavState = null;
+  resetEdgeScrollState();
+  mainWindow?.webContents.send('webview:links', { links: [] });
+  mainWindow?.webContents.send('webview:closed', { reason });
+  highContrastEnabled = false;
+  browserDiagnostics.markClose();
+}
 
 function getDomainFromUrl(url: string): string {
   try {
@@ -169,10 +284,15 @@ function sendBrowserNavState(force = false): void {
     }
 
     lastNavState = nextState;
-    console.log(`[Main] Nav state changed: back=${nextState.canGoBack}, fwd=${nextState.canGoForward}`);
+    browserDiagnostics.debug(
+      'nav-state',
+      `[Main] Nav state changed: back=${nextState.canGoBack}, fwd=${nextState.canGoForward}, url=${nextState.url}`,
+      1500
+    );
     mainWindow.webContents.send('webview:navigation-state', {
       canGoBack: nextState.canGoBack,
       canGoForward: nextState.canGoForward,
+      url: nextState.url,
     });
   } catch (err) {
     console.error('Failed to send navigation state:', err);
@@ -1020,22 +1140,18 @@ function setupIpcHandlers(): void {
   // ============================================
 
   ipcMain.handle('webview:open', async (_event: any, url: string, bounds: { x: number; y: number; width: number; height: number }) => {
-    console.log(`[Main] webview:open called for: ${url}`);
+    browserDiagnostics.debug('webview-open', `[Main] webview:open called for: ${url}`, 500);
     if (!mainWindow) return { success: false };
     try {
-      // Destroy existing view if any
       if (activeBrowserView) {
-        mainWindow.removeBrowserView(activeBrowserView);
-        (activeBrowserView.webContents as any).destroy?.();
-        activeBrowserView = null;
+        await closeActiveBrowserView('replace');
       }
       lastNavState = null;
-      lastEdgeScrollAt = 0;
-      sendEdgeScrollState('none');
+      resetEdgeScrollState();
       mainWindow.webContents.send('webview:links', { links: [] });
       highContrastEnabled = false;
 
-      activeBrowserView = new BrowserView({
+      const view = new BrowserView({
         webPreferences: {
           contextIsolation: true, // Must be true for security
           nodeIntegration: false,
@@ -1043,180 +1159,114 @@ function setupIpcHandlers(): void {
         },
       });
 
-      mainWindow.addBrowserView(activeBrowserView);
-      activeBrowserView.setBounds(bounds);
-      activeBrowserView.setAutoResize({ width: true, height: true });
+      activeBrowserView = view;
+      activeBrowserViewSessionId += 1;
+      const sessionId = activeBrowserViewSessionId;
+      browserDiagnostics.markOpen();
+      startBrowserDiagnosticsSampling();
 
-      // OPTIMIZATION: Inject the gaze cursor script ONCE when the DOM is ready
-      activeBrowserView.webContents.on('dom-ready', () => {
-        console.log(`[Main] dom-ready for: ${activeBrowserView?.webContents.getURL()}`);
+      mainWindow.addBrowserView(view);
+      view.setBounds(bounds);
+      view.setAutoResize({ width: true, height: true });
+
+      const listenerCleanup: Array<() => void> = [];
+      const onBrowserViewEvent = (eventName: string, handler: (...args: any[]) => void) => {
+        view.webContents.on(eventName as any, handler as any);
+        listenerCleanup.push(() => {
+          try {
+            view.webContents.removeListener(eventName as any, handler as any);
+          } catch {
+            // Ignore cleanup races during BrowserView teardown.
+          }
+        });
+      };
+      (view as any)._browserViewCleanup = () => {
+        while (listenerCleanup.length) {
+          const cleanup = listenerCleanup.pop();
+          cleanup?.();
+        }
+      };
+
+      const injectBrowserPageHelpers = async () => {
+        if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
         applyAacBrowsingMode();
-        activeBrowserView?.webContents.insertCSS(`
-          #gazeconnect-cursor {
-            position: fixed; width: 52px; height: 52px; border-radius: 50%;
-            border: 4px solid #2DD4BF; background: rgba(45,212,191,0.18);
-            pointer-events: none; z-index: 2147483647;
-            transform: translate(-50%, -50%);
-            transition: left 80ms linear, top 80ms linear, border-color 200ms, background-color 200ms, transform 150ms;
-            box-shadow: 0 0 20px rgba(45,212,191,0.5);
-            display: none; /* Hidden until valid coordinates received */
-          }
-          #gazeconnect-cursor.dwelling {
-            border-color: #FACC15; background: rgba(250,204,21,0.25);
-            transform: translate(-50%, -50%) scale(1.1);
-          }
-          #gazeconnect-cursor.clicking {
-            border-color: #22C55E; background: rgba(34,197,94,0.4);
-            transform: translate(-50%, -50%) scale(0.9);
-            box-shadow: 0 0 40px rgba(34,197,94,0.8);
-          }
-        `).then(() => console.log('[Main] Cursor CSS injected')).catch((e) => console.error('[Main] CSS injection failed:', e));
-
-        activeBrowserView?.webContents.executeJavaScript(`
-          if (!window.gcUpdate) {
-            window.gcState = { x: 0, y: 0, start: 0, clicked: false };
-            let gc = document.createElement('div');
-            gc.id = 'gazeconnect-cursor';
-            document.body.appendChild(gc);
-            
-            window.gcUpdate = (x, y) => {
-              if (!gc) return;
-              gc.style.display = 'block';
-              gc.style.left = x + 'px';
-              gc.style.top = y + 'px';
-              
-              // DWELL LOGIC (Client-side lightweight)
-              const now = Date.now();
-              const dist = Math.hypot(x - window.gcState.x, y - window.gcState.y);
-              
-              if (dist < 50) { // Stable?
-                const elapsed = now - window.gcState.start;
-                const dwellMs = 1000; // BrowserView dwell is intentionally longer than app buttons
-                if (elapsed > 250 && !window.gcState.clicked) gc.classList.add('dwelling');
-                if (elapsed > dwellMs && !window.gcState.clicked) {
-                   // Click!
-                   const el = document.elementFromPoint(x, y);
-                   let clickable = null;
-                   if (el) {
-                       // 1. Check standard interactive elements
-                       clickable = el.closest('a, button, input, textarea, [role="button"], [onclick], select, [tabindex], label');
-                       
-                       // 2. If not found, check computed style for cursor: pointer
-                       if (!clickable) {
-                           const style = window.getComputedStyle(el);
-                           if (style.cursor === 'pointer') clickable = el;
-                       }
-                   }
-
-                   if (clickable) {
-                      window.gcState.clicked = true;
-                      gc.classList.remove('dwelling');
-                      gc.classList.add('clicking');
-                      // Signal main process to perform a TRUSTED click via sendInputEvent
-                      // (synthetic .click() doesn't update Chromium history properly)
-                      window.gcClickRequest = { x: x, y: y };
-                      clickable.focus();
-                      setTimeout(() => {
-                        gc.classList.remove('clicking');
-                        window.gcState.clicked = false;
-                        window.gcState.start = Date.now();
-                      }, 600);
-                   } else if (elapsed > 2000) {
-                      window.gcState.start = now; // Reset if just reading
-                   }
-                }
-              } else {
-                // Moved
-                window.gcState.x = x;
-                window.gcState.y = y;
-                window.gcState.start = now;
-                window.gcState.clicked = false;
-                gc.classList.remove('dwelling');
-                gc.classList.remove('clicking');
-              }
-            };
-            console.log("GC: Script injected");
-          }
-        `).then(() => console.log('[Main] Cursor JS injected')).catch((e) => console.error('[Main] JS injection failed:', e));
-
-        // Also send state on load finish
+        view.webContents.insertCSS(BROWSER_CURSOR_CSS)
+          .catch((e) => browserDiagnostics.warn('cursor-css', `[Main] Cursor CSS injection failed: ${e?.message || e}`));
+        view.webContents.executeJavaScript(buildBrowserCursorInjectionScript())
+          .catch((e) => browserDiagnostics.warn('cursor-js', `[Main] Cursor JS injection failed: ${e?.message || e}`));
         sendBrowserNavState(true);
         extractAndSendPageLinks();
+      };
+
+      onBrowserViewEvent('dom-ready', () => {
+        browserDiagnostics.debug('dom-ready', `[Main] dom-ready for: ${view.webContents.getURL()}`, 1000);
+        void injectBrowserPageHelpers();
       });
 
-      // FIX: Single Window Enforcer
-      // Intercept 'new-window' requests and load them in the SAME view
-      activeBrowserView.webContents.setWindowOpenHandler(({ url }) => {
-        console.log(`[BrowserView] Intercepted new window: ${url}`);
-        activeBrowserView?.webContents.loadURL(url).finally(() => {
-          applyAacBrowsingMode();
-          sendBrowserNavState(true);
-          extractAndSendPageLinks();
+      view.webContents.setWindowOpenHandler(({ url }) => {
+        browserDiagnostics.debug('window-open', `[BrowserView] Intercepted new window: ${url}`, 1000);
+        view.webContents.loadURL(url).finally(() => {
+          void injectBrowserPageHelpers();
         });
         return { action: 'deny' };
       });
 
-      await activeBrowserView.webContents.loadURL(url);
-
-
-
-      activeBrowserView.webContents.on('did-navigate', (e, url) => {
-        console.log(`[Main] did-navigate: ${url}`);
-        applyAacBrowsingMode();
+      onBrowserViewEvent('did-start-navigation', () => {
+        view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+      });
+      onBrowserViewEvent('did-navigate', (_e, nextUrl) => {
+        browserDiagnostics.debug('did-navigate', `[Main] did-navigate: ${nextUrl}`, 1000);
+        view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+        void injectBrowserPageHelpers();
+      });
+      onBrowserViewEvent('did-navigate-in-page', (_e, nextUrl) => {
+        browserDiagnostics.debug('did-navigate-in-page', `[Main] did-navigate-in-page: ${nextUrl}`, 1000);
+        view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+        void injectBrowserPageHelpers();
+      });
+      onBrowserViewEvent('did-stop-loading', () => {
         sendBrowserNavState(true);
         extractAndSendPageLinks();
       });
-      activeBrowserView.webContents.on('did-navigate-in-page', (e, url) => {
-        console.log(`[Main] did-navigate-in-page: ${url}`);
-        applyAacBrowsingMode();
-        sendBrowserNavState(true);
-        extractAndSendPageLinks();
+      onBrowserViewEvent('unresponsive', () => {
+        browserDiagnostics.warn('browser-unresponsive', '[BrowserView] renderer became unresponsive');
+        void closeActiveBrowserView('unresponsive');
       });
-      // Also check when loading stops (often settles history state)
-      activeBrowserView.webContents.on('did-stop-loading', () => {
-        sendBrowserNavState(true);
-        extractAndSendPageLinks();
+      onBrowserViewEvent('responsive', () => {
+        browserDiagnostics.debug('browser-responsive', '[BrowserView] renderer responsive again', 1000);
+      });
+      onBrowserViewEvent('render-process-gone', (_event, details) => {
+        browserDiagnostics.warn('browser-render-gone', `[BrowserView] render process gone: ${details?.reason || 'unknown'}`);
+        void closeActiveBrowserView(`render-process-gone:${details?.reason || 'unknown'}`);
+      });
+      onBrowserViewEvent('destroyed', () => {
+        browserDiagnostics.markClose();
       });
 
-      // POLLING: Safety net in case navigation events are missed (every 1s)
       const pollInterval = setInterval(() => {
-        if (!activeBrowserView || !mainWindow) {
+        if (activeBrowserView !== view || !mainWindow) {
           clearInterval(pollInterval);
           return;
         }
         sendBrowserNavState(false);
       }, 1000);
 
-      // Attach interval ID to view so we can clear it if needed
-      (activeBrowserView as any)._navPoll = pollInterval;
+      (view as any)._navPoll = pollInterval;
 
-      sendBrowserNavState(true); // Initial state
+      await view.webContents.loadURL(url);
+      sendBrowserNavState(true);
 
       return { success: true, url };
     } catch (err: any) {
       console.error('webview:open failed:', err?.message);
+      await closeActiveBrowserView('open-failed');
       return { success: false, error: err?.message };
     }
   });
 
-  ipcMain.handle('webview:close', () => {
-    if (!mainWindow || !activeBrowserView) return;
-    try {
-      // Clear polling
-      if ((activeBrowserView as any)._navPoll) {
-        clearInterval((activeBrowserView as any)._navPoll);
-      }
-
-      mainWindow.removeBrowserView(activeBrowserView);
-      // Clean up cleanly
-      (activeBrowserView.webContents as any).destroy?.();
-    } catch { /* ignore */ }
-    activeBrowserView = null;
-    lastNavState = null;
-    lastEdgeScrollAt = 0;
-    sendEdgeScrollState('none');
-    mainWindow.webContents.send('webview:links', { links: [] });
-    highContrastEnabled = false;
+  ipcMain.handle('webview:close', async () => {
+    await closeActiveBrowserView('close');
+    return { success: true };
   });
 
   ipcMain.handle('webview:click', (_event: any, x: number, y: number) => {
@@ -1300,6 +1350,276 @@ function setupIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle('webview:youtubeCommand', async (_event: any, command: string) => {
+    const view = activeBrowserView;
+    const sessionId = activeBrowserViewSessionId;
+    if (!view || view.webContents.isDestroyed() || typeof command !== 'string') {
+      return { ok: false, status: 'failed', detail: 'no_active_browser_view' };
+    }
+
+    if (!isYoutubeCommand(command)) {
+      return { ok: false, status: 'failed', detail: 'unknown_command' };
+    }
+
+    try {
+      const result = await view.webContents.executeJavaScript(
+        buildYoutubeCommandScript(command),
+        true
+      ) as YoutubeCommandResult | null;
+      if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId) {
+        return { ok: false, status: 'failed', detail: 'stale_browser_view' };
+      }
+      const safeResult = result || { ok: false, status: 'failed', detail: 'empty_result' };
+      const point = safeResult.trustedClick;
+      if (point && Number.isFinite(point.x) && Number.isFinite(point.y)) {
+        sendTrustedBrowserClick(point.x, point.y, sessionId);
+      }
+      browserDiagnostics.recordCommand(command, safeResult.status || 'failed', safeResult.youtubeState);
+      return safeResult;
+    } catch (err: any) {
+      console.error('webview:youtubeCommand error:', err?.message || err);
+      browserDiagnostics.recordCommand(command, 'failed');
+      return { ok: false, status: 'failed', detail: err?.message || String(err) };
+    }
+  });
+
+    /*
+    const allowed = new Set(['play_pause', 'next', 'skip_ad', 'show_controls', 'hide_controls']);
+    if (!allowed.has(command)) {
+      return { ok: false, status: 'failed', detail: 'unknown_command' };
+    }
+
+    const script = `
+      (function(command) {
+        const player = document.querySelector('#movie_player') || document;
+        const video = player.querySelector('video') || document.querySelector('video');
+        const state = window.gcYouTubeController = window.gcYouTubeController || {};
+
+        const visible = (el) => {
+          if (!el) return false;
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          return rect.width >= 10 && rect.height >= 10 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            Number(style.opacity || 1) > 0.05 &&
+            !el.disabled &&
+            el.getAttribute('aria-disabled') !== 'true';
+        };
+
+        const centerOf = (el) => {
+          const rect = el.getBoundingClientRect();
+          return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+        };
+
+        const pressElement = (el) => {
+          if (!el) return false;
+          try { el.scrollIntoView?.({ block: 'center', inline: 'center' }); } catch (_) {}
+          const events = ['pointerdown', 'mousedown', 'mouseup', 'click'];
+          for (const type of events) {
+            try {
+              el.dispatchEvent(new MouseEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 0,
+                buttons: type.endsWith('down') ? 1 : 0
+              }));
+            } catch (_) {}
+          }
+          try { el.click?.(); } catch (_) {}
+          return true;
+        };
+
+        const normalizeButton = (el) =>
+          el && (el.closest('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .ytp-next-button, .ytp-play-button') || el);
+
+        const findSkipButton = () => {
+          const selectors = [
+            '.ytp-ad-skip-button',
+            '.ytp-ad-skip-button-modern',
+            '.ytp-skip-ad-button',
+            '.ytp-ad-skip-button-container button',
+            '.ytp-ad-preview-container button',
+            '.videoAdUiSkipButton',
+            'button[aria-label*="Skip" i]',
+            '[role="button"][aria-label*="Skip" i]',
+            '[title*="Skip" i]',
+            '[data-title-no-tooltip*="Skip" i]',
+            'button[class*="skip" i]',
+            '[role="button"][class*="skip" i]'
+          ];
+          const roots = [player, document];
+          const candidates = [];
+          for (const root of roots) {
+            for (const selector of selectors) {
+              try { root.querySelectorAll(selector).forEach((el) => candidates.push(normalizeButton(el))); } catch (_) {}
+            }
+          }
+          document.querySelectorAll('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button')
+            .forEach((el) => {
+              const text = [
+                el.textContent || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('title') || '',
+                el.getAttribute('data-title-no-tooltip') || ''
+              ].join(' ');
+              if (/skip|छोड़|छोड|छोड़/i.test(text)) candidates.push(normalizeButton(el));
+            });
+          const seen = new Set();
+          for (const candidate of candidates) {
+            if (!candidate || seen.has(candidate)) continue;
+            seen.add(candidate);
+            if (visible(candidate)) return candidate;
+          }
+          return null;
+        };
+
+        const installAdSkipObserver = () => {
+          if (state.adSkipObserver) return;
+          state.adSkipObserver = new MutationObserver(() => {
+            const button = findSkipButton();
+            if (button) pressElement(button);
+          });
+          state.adSkipObserver.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'style', 'aria-disabled', 'disabled']
+          });
+        };
+
+        const adPresent = () =>
+          !!document.querySelector('.ad-showing, .ytp-ad-player-overlay, .ytp-ad-module, .video-ads, .ytp-ad-text, .ytp-ad-preview-container');
+
+        installAdSkipObserver();
+
+        if (command === 'skip_ad') {
+          const button = findSkipButton();
+          if (button) {
+            return { ok: true, status: 'done', detail: 'skip_clicked', trustedClick: centerOf(button) };
+          }
+          return { ok: false, status: adPresent() ? 'waiting_for_skip' : 'no_ad' };
+        }
+
+        if (command === 'play_pause') {
+          const spinnerVisible = visible(player.querySelector?.('.ytp-spinner, .ytp-spinner-container') || document.querySelector('.ytp-spinner, .ytp-spinner-container'));
+          const videoStalledAtStart = !!video && !video.paused && video.currentTime < 0.35 && (video.readyState < 3 || spinnerVisible);
+          try {
+            if (player && typeof player.getPlayerState === 'function' && typeof player.playVideo === 'function' && typeof player.pauseVideo === 'function') {
+              const s = player.getPlayerState();
+              if (videoStalledAtStart || s === 3 || s === 5 || s === -1) {
+                player.playVideo();
+                try { video?.play?.(); } catch (_) {}
+                return { ok: true, status: 'done', detail: 'player_recover_play' };
+              }
+              if (s === 1) player.pauseVideo(); else player.playVideo();
+              return { ok: true, status: 'done', detail: 'player_api' };
+            }
+          } catch (_) {}
+          if (video) {
+            if (videoStalledAtStart || video.paused) video.play?.(); else video.pause?.();
+            return { ok: true, status: 'done', detail: 'video_element' };
+          }
+          const playButton = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
+          if (visible(playButton)) {
+            return { ok: true, status: 'done', detail: 'play_button', trustedClick: centerOf(playButton) };
+          }
+          return { ok: false, status: 'failed', detail: 'no_play_target' };
+        }
+
+        if (command === 'next') {
+          const nextButton = normalizeButton(player.querySelector?.('.ytp-next-button') || document.querySelector('.ytp-next-button'));
+          if (visible(nextButton)) {
+            return { ok: true, status: 'done', detail: 'next_button', trustedClick: centerOf(nextButton) };
+          }
+          try {
+            if (player && typeof player.nextVideo === 'function') {
+              player.nextVideo();
+              return { ok: true, status: 'done', detail: 'player_api' };
+            }
+          } catch (_) {}
+          const playlistItem = document.querySelector('ytd-playlist-panel-video-renderer:not([selected]), ytd-compact-video-renderer a#thumbnail, ytd-video-renderer a#thumbnail');
+          if (visible(playlistItem)) {
+            const target = playlistItem.closest('a, button, [role="button"]') || playlistItem;
+            return { ok: true, status: 'done', detail: 'playlist_fallback', trustedClick: centerOf(target) };
+          }
+          return { ok: false, status: 'no_next', detail: 'no_next_target' };
+        }
+
+        if (command === 'show_controls' || command === 'hide_controls') {
+          const rect = (player.getBoundingClientRect && player.getBoundingClientRect()) || { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+          const x = Math.round(rect.left + rect.width / 2);
+          const y = Math.round(rect.top + rect.height / 2);
+          document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
+          return { ok: true, status: 'done', detail: 'mousemove_controls' };
+        }
+
+        return { ok: false, status: 'failed', detail: 'unhandled_command' };
+      })(${JSON.stringify(command)});
+    `;
+
+    try {
+      const result = await activeBrowserView!.webContents.executeJavaScript(script, true);
+      const point = result?.trustedClick;
+      if (point && Number.isFinite(point.x) && Number.isFinite(point.y)) {
+        sendTrustedBrowserClick(point.x, point.y);
+      }
+      return result || { ok: false, status: 'failed', detail: 'empty_result' };
+    } catch (err: any) {
+      console.error('webview:youtubeCommand error:', err?.message || err);
+      return { ok: false, status: 'failed', detail: err?.message || String(err) };
+    }
+  });
+
+    */
+  ipcMain.handle('webview:setGazeConfig', async (_event: any, config: Partial<BrowserGazeConfig>) => {
+    browserGazeConfig = {
+      dwellMs: clampNumber(config?.dwellMs, browserGazeConfig.dwellMs, 700, 3200),
+      onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
+      stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
+      postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),
+      edgeScrollEnabled: typeof config?.edgeScrollEnabled === 'boolean' ? config.edgeScrollEnabled : browserGazeConfig.edgeScrollEnabled,
+      edgeHoldMs: clampNumber(config?.edgeHoldMs, browserGazeConfig.edgeHoldMs, 300, 1600),
+      edgeZonePct: clampNumber(config?.edgeZonePct, browserGazeConfig.edgeZonePct, 0.06, 0.22),
+      edgeDeadZonePct: clampNumber(config?.edgeDeadZonePct, browserGazeConfig.edgeDeadZonePct, 0.01, 0.04),
+      edgeMinDeltaPx: clampNumber(config?.edgeMinDeltaPx, browserGazeConfig.edgeMinDeltaPx, 12, 70),
+      edgeMaxDeltaPx: clampNumber(config?.edgeMaxDeltaPx, browserGazeConfig.edgeMaxDeltaPx, 18, 90),
+      edgeThrottleMs: clampNumber(config?.edgeThrottleMs, browserGazeConfig.edgeThrottleMs, 80, 220),
+      edgeMaxBurstMs: clampNumber(config?.edgeMaxBurstMs, browserGazeConfig.edgeMaxBurstMs, 2000, 10000),
+    };
+
+    if (activeBrowserView) {
+      const serialized = JSON.stringify({
+        dwellMs: browserGazeConfig.dwellMs,
+        onsetMs: browserGazeConfig.onsetMs,
+        stabilityRadiusPx: browserGazeConfig.stabilityRadiusPx,
+        postClickCooldownMs: browserGazeConfig.postClickCooldownMs,
+      });
+      try {
+        await activeBrowserView.webContents.executeJavaScript(
+          `window.gcConfig = Object.assign(window.gcConfig || {}, ${serialized});`
+        );
+      } catch { /* page may be navigating */ }
+    }
+    return browserGazeConfig;
+  });
+
+  ipcMain.handle('webview:setScrollMode', async (_event: any, enabled: boolean) => {
+    browserGazeConfig.edgeScrollEnabled = Boolean(enabled);
+    resetEdgeScrollState();
+    return { enabled: browserGazeConfig.edgeScrollEnabled };
+  });
+
+  ipcMain.handle('webview:getDiagnostics', () => {
+    return browserDiagnostics.snapshot(activeBrowserView);
+  });
+
+  ipcMain.handle('webview:resetBrowserSession', async (_event: any, reason: string) => {
+    await closeActiveBrowserView(typeof reason === 'string' && reason ? reason : 'renderer-reset');
+    return { success: true };
+  });
+
   ipcMain.handle('webview:setBounds', (_event: any, bounds: { x: number; y: number; width: number; height: number }) => {
     if (activeBrowserView) {
       activeBrowserView.setBounds(bounds);
@@ -1353,73 +1673,96 @@ function setupIpcHandlers(): void {
   // Inject visible gaze cursor into BrowserView with AUTOMATIC DWELL CLICKING
   // Inject visible gaze cursor into BrowserView with AUTOMATIC DWELL CLICKING
   // v2: OPTIMIZED - cursor update is fire-and-forget, click check runs separately
-  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number) => {
-    if (!activeBrowserView) return;
+  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) => {
+    const view = activeBrowserView;
+    const sessionId = activeBrowserViewSessionId;
+    if (!view || view.webContents.isDestroyed()) return;
     try {
-      // 1. Fire-and-forget: update the gaze cursor position (must not fail)
-      activeBrowserView.webContents.executeJavaScript(
-        `if (window.gcUpdate) window.gcUpdate(${x}, ${y});`
-      ).catch(() => { });
+      const bounds = view.getBounds();
+      const cursorEnabled = options?.cursor !== false;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > bounds.width || y > bounds.height) {
+        view.webContents.executeJavaScript(
+          BROWSER_CURSOR_HIDE_SCRIPT
+        ).catch(() => { });
+        resetEdgeScrollState();
+        return;
+      }
 
       // 1b. Edge-gaze auto-scrolling (throttled ~10Hz)
       // x,y are already BrowserView-local coordinates.
-      const bounds = activeBrowserView.getBounds();
       const viewHeight = bounds.height;
-      const deadZone = viewHeight * 0.02;      // top/bottom 2% ignored
-      const topZone = viewHeight * 0.12;       // top 12% scroll up
-      const bottomZone = viewHeight * 0.88;    // bottom 12% scroll down
+      const deadZone = viewHeight * browserGazeConfig.edgeDeadZonePct;
+      const topZone = viewHeight * browserGazeConfig.edgeZonePct;
+      const bottomZone = viewHeight * (1 - browserGazeConfig.edgeZonePct);
       let direction: 'up' | 'down' | 'none' = 'none';
-      let speed = 0;
+      let depth = 0;
 
       if (y > deadZone && y < topZone) {
         direction = 'up';
-        speed = Math.max(1, Math.round(3 * (1 - (y / topZone))));
+        depth = Math.max(0, Math.min(1, 1 - (y / topZone)));
       } else if (y > bottomZone && y < (viewHeight - deadZone)) {
         direction = 'down';
-        speed = Math.max(1, Math.round(3 * ((y - bottomZone) / (viewHeight - bottomZone))));
+        depth = Math.max(0, Math.min(1, (y - bottomZone) / (viewHeight - bottomZone)));
       }
 
-      sendEdgeScrollState(direction);
+      const now = Date.now();
+      if (!browserGazeConfig.edgeScrollEnabled || direction === 'none') {
+        resetEdgeScrollState();
+      } else if (direction !== edgeScrollCandidate) {
+        edgeScrollCandidate = direction;
+        edgeScrollEnteredAt = now;
+        edgeScrollActiveDirection = 'none';
+        edgeScrollStartedAt = 0;
+        sendEdgeScrollState(direction);
+      } else {
+        sendEdgeScrollState(direction);
+      }
 
-      if (direction !== 'none') {
-        const now = Date.now();
-        if (now - lastEdgeScrollAt >= 100) {
+      if (browserGazeConfig.edgeScrollEnabled && direction !== 'none' && edgeScrollEnteredAt > 0) {
+        const edgeHoldElapsed = now - edgeScrollEnteredAt;
+        if (edgeHoldElapsed >= browserGazeConfig.edgeHoldMs && edgeScrollActiveDirection === 'none') {
+          edgeScrollActiveDirection = direction;
+          edgeScrollStartedAt = now;
+        }
+
+        if (
+          edgeScrollActiveDirection === direction &&
+          now - edgeScrollStartedAt <= browserGazeConfig.edgeMaxBurstMs &&
+          now - lastEdgeScrollAt >= browserGazeConfig.edgeThrottleMs
+        ) {
           lastEdgeScrollAt = now;
-          const delta = Math.max(60, speed * 90);
-          const deltaY = direction === 'up' ? delta : -delta;
-          activeBrowserView.webContents.sendInputEvent({
+          const delta = browserGazeConfig.edgeMinDeltaPx +
+            (browserGazeConfig.edgeMaxDeltaPx - browserGazeConfig.edgeMinDeltaPx) * depth;
+          const deltaY = Math.round(direction === 'up' ? delta : -delta);
+          view.webContents.sendInputEvent({
             type: 'mouseWheel',
             x: Math.round(Math.max(10, Math.min(bounds.width - 10, x))),
             y: Math.round(Math.max(10, Math.min(bounds.height - 10, y))),
             deltaX: 0,
             deltaY,
           } as any);
+        } else if (edgeScrollActiveDirection === direction && now - edgeScrollStartedAt > browserGazeConfig.edgeMaxBurstMs) {
+          edgeScrollActiveDirection = 'none';
+          edgeScrollStartedAt = 0;
+          edgeScrollEnteredAt = now;
         }
       }
 
-      // 2. Separate check: did the injected script request a trusted click?
-      //    Returns a JSON string (always serializable) or "null"
-      activeBrowserView.webContents.executeJavaScript(`
-        (function() {
-          var r = window.gcClickRequest;
-          window.gcClickRequest = null;
-          return r ? JSON.stringify(r) : null;
-        })();
-      `).then((json: string | null) => {
-        if (json && activeBrowserView) {
+      browserDiagnostics.recordIpcTick();
+      view.webContents.executeJavaScript(
+        buildGazeUpdateAndPollScript(x, y, cursorEnabled)
+      ).then((json: string | null) => {
+        if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
           try {
             const clickReq = JSON.parse(json);
             const cx = Math.round(clickReq.x);
             const cy = Math.round(clickReq.y);
-            console.log(`[Main] Gaze dwell click at (${cx}, ${cy}) — using trusted sendInputEvent`);
-            activeBrowserView.webContents.sendInputEvent({ type: 'mouseMove', x: cx, y: cy } as any);
-            setTimeout(() => {
-              activeBrowserView?.webContents.sendInputEvent({ type: 'mouseDown', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
-              setTimeout(() => {
-                activeBrowserView?.webContents.sendInputEvent({ type: 'mouseUp', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
-                setTimeout(() => sendBrowserNavState(true), 350);
-              }, 60);
-            }, 30);
+            browserDiagnostics.debug(
+              'gaze-dwell-click',
+              `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
+              1000
+            );
+            sendTrustedBrowserClick(cx, cy, sessionId);
           } catch { /* ignore parse errors */ }
         }
       }).catch(() => { });

@@ -184,6 +184,7 @@ class GazePoint:
     left_valid: bool = True
     right_valid: bool = True
     confidence: float = 1.0
+    validity_source: str = "reported"
 
     @property
     def is_valid(self) -> bool:
@@ -813,6 +814,28 @@ class AdaptiveKalmanFilter:
         self._wma_m2_x: Optional[float] = None  # Two-back measurement X
         self._wma_m2_y: Optional[float] = None
 
+    def configure(self, *, state_noise: Optional[Dict[str, float]] = None,
+                  smoothing_level: Optional[int] = None,
+                  wma_weights: Optional[Tuple[float, float, float]] = None,
+                  smooth_when_changing_target: Optional[bool] = None):
+        """Apply live-stage tuning to the active Kalman path."""
+        if state_noise:
+            for key in ('fixation', 'saccade', 'glissade'):
+                if key in state_noise:
+                    self.STATE_NOISE[key] = float(state_noise[key])
+            if self._current_state in self.STATE_NOISE:
+                self.measurement_noise = float(self.STATE_NOISE[self._current_state])
+        if smoothing_level is not None:
+            self.smoothing_level = int(max(1, min(5, smoothing_level)))
+        if wma_weights:
+            w0, w1, w2 = [float(v) for v in wma_weights]
+            total = max(0.0001, w0 + w1 + w2)
+            self.WMA_W0 = w0 / total
+            self.WMA_W1 = w1 / total
+            self.WMA_W2 = w2 / total
+        if smooth_when_changing_target is not None:
+            self.smooth_when_changing_target = bool(smooth_when_changing_target)
+
     def set_gaze_state(self, state: str):
         """Update the gaze state for adaptive noise.
         state: 'fixation', 'saccade', or 'glissade'
@@ -963,6 +986,35 @@ class OptiKeyGazeFilter:
             self._max_fixation_samples = 20
             self._MIN_LOCK_DURATION = 0.060
             self._fixation_min_multiplier = 0.12
+
+    def configure(self, *, damping: Optional[float] = None,
+                  fixation_radius: Optional[float] = None,
+                  lock_radius: Optional[float] = None,
+                  hysteresis_multiplier: Optional[float] = None,
+                  min_lock_duration: Optional[float] = None,
+                  fixation_min_multiplier: Optional[float] = None,
+                  edge_threshold: Optional[float] = None,
+                  edge_min_multiplier: Optional[float] = None,
+                  global_lock_deadzone: Optional[float] = None):
+        """Apply stage tuning while keeping values inside safe cursor bounds."""
+        if damping is not None:
+            self.damping = max(0.05, min(0.75, float(damping)))
+        if fixation_radius is not None:
+            self.fixation_radius = max(0.010, min(0.090, float(fixation_radius)))
+        if lock_radius is not None:
+            self.lock_radius = max(0.004, min(0.050, float(lock_radius)))
+        if hysteresis_multiplier is not None:
+            self.hysteresis_multiplier = max(1.05, min(3.0, float(hysteresis_multiplier)))
+        if min_lock_duration is not None:
+            self._MIN_LOCK_DURATION = max(0.040, min(0.250, float(min_lock_duration)))
+        if fixation_min_multiplier is not None:
+            self._fixation_min_multiplier = max(0.04, min(0.35, float(fixation_min_multiplier)))
+        if edge_threshold is not None:
+            self.EDGE_THRESHOLD = max(0.030, min(0.120, float(edge_threshold)))
+        if edge_min_multiplier is not None:
+            self.EDGE_MIN_MULTIPLIER = max(0.30, min(0.90, float(edge_min_multiplier)))
+        if global_lock_deadzone is not None:
+            self.GLOBAL_LOCK_DEADZONE = max(0.001, min(0.012, float(global_lock_deadzone)))
 
     def update(self, x: float, y: float, on_key: bool = False) -> Tuple[float, float]:
         import time as _time

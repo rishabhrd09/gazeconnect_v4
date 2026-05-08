@@ -17,6 +17,39 @@ interface BrowserViewBounds {
 
 type PageLink = { text: string; href: string };
 type EdgeScrollDirection = 'up' | 'down' | 'none';
+type ScrollMode = 'off' | 'armed';
+type YoutubeCommand = 'play' | 'play_pause' | 'next' | 'skip_ad' | 'show_controls' | 'hide_controls' | 'get_state';
+type YoutubeCommandResult = {
+    ok?: boolean;
+    status?: 'done' | 'waiting_for_skip' | 'no_ad' | 'no_next' | 'buffering' | 'stalled' | 'failed' | string;
+    detail?: string;
+    youtubeState?: string;
+};
+type BrowserDiagnostics = {
+    url: string;
+    isOpen: boolean;
+    browserViewAlive: boolean;
+    youtubeState?: string;
+    lastCommand?: string;
+    lastCommandStatus?: string;
+    openCount: number;
+    memoryMb?: number;
+    ipcPerSecond?: number;
+};
+type BrowserGazeConfig = {
+    dwellMs?: number;
+    onsetMs?: number;
+    stabilityRadiusPx?: number;
+    postClickCooldownMs?: number;
+    edgeScrollEnabled?: boolean;
+    edgeHoldMs?: number;
+    edgeZonePct?: number;
+    edgeDeadZonePct?: number;
+    edgeMinDeltaPx?: number;
+    edgeMaxDeltaPx?: number;
+    edgeThrottleMs?: number;
+    edgeMaxBurstMs?: number;
+};
 
 const getElectronAPI = () => (window as any).electronAPI;
 
@@ -30,15 +63,18 @@ export function useGazeBrowser() {
     const [highContrast, setHighContrast] = useState(false);
     const [pageLinks, setPageLinks] = useState<PageLink[]>([]);
     const [edgeScrollDirection, setEdgeScrollDirection] = useState<EdgeScrollDirection>('none');
+    const [scrollMode, setScrollModeState] = useState<ScrollMode>('off');
     const boundsRef = useRef<BrowserViewBounds | null>(null);
+    const cursorInsideRef = useRef(false);
 
     // Navigation state listener
     useEffect(() => {
         const api = getElectronAPI();
         if (!api?.on) return;
-        const handler = (state: { canGoBack: boolean; canGoForward: boolean }) => {
+        const handler = (state: { canGoBack: boolean; canGoForward: boolean; url?: string }) => {
             setCanGoBack(state.canGoBack);
             setCanGoForward(state.canGoForward);
+            if (typeof state.url === 'string') setCurrentUrl(state.url);
         };
         api.on('webview:navigation-state', handler);
         return () => api.off('webview:navigation-state', handler);
@@ -65,6 +101,26 @@ export function useGazeBrowser() {
         };
         api.on('webview:edge-scroll', handler);
         return () => api.off('webview:edge-scroll', handler);
+    }, []);
+
+    // Native BrowserView can be closed by Electron-side safety paths
+    // (reset, unresponsive renderer, render-process-gone). Mirror that state
+    // immediately so React never leaves a stale page floating over the app.
+    useEffect(() => {
+        const api = getElectronAPI();
+        if (!api?.on) return;
+        const handler = () => {
+            setIsOpen(false);
+            setCurrentUrl(null);
+            setPageLinks([]);
+            setEdgeScrollDirection('none');
+            setScrollModeState('off');
+            setHighContrast(false);
+            boundsRef.current = null;
+            cursorInsideRef.current = false;
+        };
+        api.on('webview:closed', handler);
+        return () => api.off('webview:closed', handler);
     }, []);
 
     const openPage = useCallback(async (url: string, bounds: BrowserViewBounds) => {
@@ -103,8 +159,10 @@ export function useGazeBrowser() {
         setCurrentUrl(null);
         setPageLinks([]);
         setEdgeScrollDirection('none');
+        setScrollModeState('off');
         setHighContrast(false);
         boundsRef.current = null;
+        cursorInsideRef.current = false;
     }, []);
 
     const clickAtGaze = useCallback(async (clientX: number, clientY: number) => {
@@ -119,6 +177,16 @@ export function useGazeBrowser() {
             await api.webview.click(localX, localY);
         } catch (err) {
             console.error('clickAtGaze error:', err);
+        }
+    }, []);
+
+    const clickAtViewPoint = useCallback(async (localX: number, localY: number) => {
+        const api = getElectronAPI();
+        if (!api?.webview?.click) return;
+        try {
+            await api.webview.click(Math.round(localX), Math.round(localY));
+        } catch (err) {
+            console.error('clickAtViewPoint error:', err);
         }
     }, []);
 
@@ -216,6 +284,72 @@ export function useGazeBrowser() {
         }
     }, []);
 
+    const youtubeCommand = useCallback(async (command: YoutubeCommand): Promise<YoutubeCommandResult> => {
+        const api = getElectronAPI();
+        if (!api?.webview?.youtubeCommand) return { ok: false, status: 'failed', detail: 'ipc_unavailable' };
+        try {
+            return await api.webview.youtubeCommand(command);
+        } catch (err: any) {
+            console.error('youtubeCommand error:', err?.message || err);
+            return { ok: false, status: 'failed', detail: err?.message || String(err) };
+        }
+    }, []);
+
+    const setGazeConfig = useCallback(async (config: BrowserGazeConfig) => {
+        const api = getElectronAPI();
+        if (!api?.webview?.setGazeConfig) return;
+        try {
+            await api.webview.setGazeConfig(config);
+        } catch (err) {
+            console.error('setGazeConfig error:', err);
+        }
+    }, []);
+
+    const setScrollMode = useCallback(async (mode: ScrollMode) => {
+        const api = getElectronAPI();
+        const enabled = mode === 'armed';
+        setScrollModeState(mode);
+        if (!api?.webview?.setScrollMode) return;
+        try {
+            await api.webview.setScrollMode(enabled);
+        } catch (err) {
+            console.error('setScrollMode error:', err);
+            setScrollModeState('off');
+        }
+    }, []);
+
+    const getDiagnostics = useCallback(async (): Promise<BrowserDiagnostics | null> => {
+        const api = getElectronAPI();
+        if (!api?.webview?.getDiagnostics) return null;
+        try {
+            return await api.webview.getDiagnostics();
+        } catch (err) {
+            console.error('getDiagnostics error:', err);
+            return null;
+        }
+    }, []);
+
+    const resetBrowserSession = useCallback(async (reason: string) => {
+        const api = getElectronAPI();
+        if (!api?.webview?.resetBrowserSession) {
+            await closePage();
+            return;
+        }
+        try {
+            await api.webview.resetBrowserSession(reason);
+        } catch (err) {
+            console.error('resetBrowserSession error:', err);
+        }
+        setIsOpen(false);
+        setCurrentUrl(null);
+        setPageLinks([]);
+        setEdgeScrollDirection('none');
+        setScrollModeState('off');
+        setHighContrast(false);
+        boundsRef.current = null;
+        cursorInsideRef.current = false;
+    }, [closePage]);
+
     const updateBounds = useCallback(async (bounds: BrowserViewBounds) => {
         const api = getElectronAPI();
         if (!api?.webview) return;
@@ -223,20 +357,34 @@ export function useGazeBrowser() {
         await api.webview.setBounds(bounds);
     }, []);
 
+    const hideGazeCursor = useCallback(async () => {
+        const api = getElectronAPI();
+        if (!api?.webview?.updateGaze) return;
+        cursorInsideRef.current = false;
+        try {
+            await api.webview.updateGaze(-1, -1);
+        } catch { /* ignore - may fail if page navigating */ }
+    }, []);
+
     // Send gaze position to BrowserView to show a visible cursor inside web content
-    const updateGazeCursor = useCallback(async (clientX: number, clientY: number) => {
+    const updateGazeCursor = useCallback(async (clientX: number, clientY: number, options?: { cursor?: boolean }) => {
         const api = getElectronAPI();
         if (!api?.webview?.updateGaze || !boundsRef.current) return;
         const b = boundsRef.current;
         const localX = Math.round(clientX - b.x);
         const localY = Math.round(clientY - b.y);
-        // Only update if gaze is within BrowserView bounds
-        if (localX >= 0 && localY >= 0 && localX <= b.width && localY <= b.height) {
+        const safeInsetPx = 18;
+        // Only update if gaze is within BrowserView bounds.
+        // Hide when gaze returns to app chrome so the page cursor cannot go stale.
+        if (localX >= safeInsetPx && localY >= 0 && localX <= b.width - safeInsetPx && localY <= b.height) {
+            cursorInsideRef.current = true;
             try {
-                await api.webview.updateGaze(localX, localY);
+                await api.webview.updateGaze(localX, localY, options);
             } catch { /* ignore — may fail if page navigating */ }
+        } else if (cursorInsideRef.current) {
+            await hideGazeCursor();
         }
-    }, []);
+    }, [hideGazeCursor]);
 
     return {
         isOpen,
@@ -246,6 +394,7 @@ export function useGazeBrowser() {
         openPage,
         closePage,
         clickAtGaze,
+        clickAtViewPoint,
         scrollDown,
         scrollUp,
         goBack,
@@ -256,7 +405,13 @@ export function useGazeBrowser() {
         toggleHighContrast,
         typeText,
         executeJs,
+        youtubeCommand,
+        setGazeConfig,
+        setScrollMode,
+        getDiagnostics,
+        resetBrowserSession,
         updateBounds,
+        hideGazeCursor,
         updateGazeCursor,
         canGoBack,
         canGoForward,
@@ -264,5 +419,6 @@ export function useGazeBrowser() {
         highContrast,
         pageLinks,
         edgeScrollDirection,
+        scrollMode,
     };
 }

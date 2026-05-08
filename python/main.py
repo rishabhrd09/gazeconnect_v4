@@ -135,6 +135,14 @@ try:
 except ImportError:
     AIOHTTP_AVAILABLE = False
 
+try:
+    from automation.automation import get_automation
+    AUTOMATION_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"PyAutoGUI automation unavailable: {e}")
+    get_automation = None
+    AUTOMATION_AVAILABLE = False
+
 
 # ============================================
 # DATAMUSE CACHE — In-memory LRU with TTL
@@ -505,13 +513,21 @@ class TobiiReceiver:
                 else:
                     ts_seconds = time.time()
 
+                has_left_valid = 'left_valid' in data or isinstance(data.get('left'), dict) and 'valid' in data.get('left', {})
+                has_right_valid = 'right_valid' in data or isinstance(data.get('right'), dict) and 'valid' in data.get('right', {})
+                has_eye_validity = has_left_valid or has_right_valid
+                raw_confidence = float(data.get('confidence', 1.0))
+                if not has_eye_validity:
+                    raw_confidence = min(raw_confidence, 0.75)
+
                 point = GazePoint(
                     x=p_x,
                     y=p_y,
                     timestamp=ts_seconds,
                     left_valid=data.get('left_valid', data.get('left', {}).get('valid', True)),
                     right_valid=data.get('right_valid', data.get('right', {}).get('valid', True)),
-                    confidence=data.get('confidence', 1.0)
+                    confidence=raw_confidence,
+                    validity_source='reported' if has_eye_validity else 'missing',
                 )
 
                 self.last_gaze = point
@@ -765,6 +781,56 @@ class GazeConnectBackend:
     ON_KEY_HOLD_SECONDS = 0.120
     ENABLE_MAGNET_STICKY_HANDOFF = True
     MAGNET_HANDOFF_BIAS_PX = 8.0   # v15: reduced from 14 — faster key-to-key handoff on keyboard
+    ACTIVE_PIPELINE_NAME = "optikey_kalman_v1"
+    SAMPLE_RATE_WINDOW = 120
+
+    ACTIVE_FILTER_PROFILES = {
+        'responsive': {
+            'classifier': {'fixation_threshold': 55.0, 'saccade_threshold': 135.0,
+                           'saccade_onset_count': 1, 'fixation_onset_count': 3, 'velocity_window': 3},
+            'kalman': {'state_noise': {'fixation': 2400.0, 'saccade': 120.0, 'glissade': 650.0},
+                       'smoothing_level': 1, 'wma_weights': (0.62, 0.25, 0.13)},
+            'optikey': {'damping': 0.26, 'fixation_radius': 0.034, 'lock_radius': 0.014,
+                        'hysteresis_multiplier': 1.25, 'min_lock_duration': 0.050,
+                        'fixation_min_multiplier': 0.16},
+        },
+        'balanced': {
+            'classifier': {'fixation_threshold': 65.0, 'saccade_threshold': 150.0,
+                           'saccade_onset_count': 2, 'fixation_onset_count': 4, 'velocity_window': 5},
+            'kalman': {'state_noise': {'fixation': 3500.0, 'saccade': 200.0, 'glissade': 1000.0},
+                       'smoothing_level': 1, 'wma_weights': (0.45, 0.30, 0.25)},
+            'optikey': {'damping': 0.36, 'fixation_radius': 0.040, 'lock_radius': 0.016,
+                        'hysteresis_multiplier': 1.35, 'min_lock_duration': 0.060,
+                        'fixation_min_multiplier': 0.12},
+        },
+        'als_early': {
+            'classifier': {'fixation_threshold': 72.0, 'saccade_threshold': 165.0,
+                           'saccade_onset_count': 2, 'fixation_onset_count': 5, 'velocity_window': 5},
+            'kalman': {'state_noise': {'fixation': 4300.0, 'saccade': 250.0, 'glissade': 1250.0},
+                       'smoothing_level': 1, 'wma_weights': (0.42, 0.32, 0.26)},
+            'optikey': {'damping': 0.42, 'fixation_radius': 0.044, 'lock_radius': 0.018,
+                        'hysteresis_multiplier': 1.55, 'min_lock_duration': 0.075,
+                        'fixation_min_multiplier': 0.10},
+        },
+        'als_late': {
+            'classifier': {'fixation_threshold': 82.0, 'saccade_threshold': 185.0,
+                           'saccade_onset_count': 3, 'fixation_onset_count': 6, 'velocity_window': 7},
+            'kalman': {'state_noise': {'fixation': 5600.0, 'saccade': 320.0, 'glissade': 1650.0},
+                       'smoothing_level': 2, 'wma_weights': (0.38, 0.34, 0.28)},
+            'optikey': {'damping': 0.50, 'fixation_radius': 0.050, 'lock_radius': 0.021,
+                        'hysteresis_multiplier': 1.75, 'min_lock_duration': 0.095,
+                        'fixation_min_multiplier': 0.08},
+        },
+        'stable': {
+            'classifier': {'fixation_threshold': 88.0, 'saccade_threshold': 195.0,
+                           'saccade_onset_count': 3, 'fixation_onset_count': 7, 'velocity_window': 7},
+            'kalman': {'state_noise': {'fixation': 6200.0, 'saccade': 360.0, 'glissade': 1800.0},
+                       'smoothing_level': 2, 'wma_weights': (0.36, 0.35, 0.29)},
+            'optikey': {'damping': 0.55, 'fixation_radius': 0.055, 'lock_radius': 0.023,
+                        'hysteresis_multiplier': 1.9, 'min_lock_duration': 0.110,
+                        'fixation_min_multiplier': 0.07},
+        },
+    }
 
     def __init__(self, config: Optional[ServerConfig] = None):
         self.config = config or ServerConfig()
@@ -799,6 +865,11 @@ class GazeConnectBackend:
         self.gravity_well = GravityWell()
         self.RAW_MODE = False
         self.USE_OPTIKEY_PIPELINE = True  # Set False to revert to legacy pipeline
+        self.active_filter_preset = 'balanced'
+        self.active_pipeline_name = self.ACTIVE_PIPELINE_NAME
+        self._sample_dt_history = deque(maxlen=self.SAMPLE_RATE_WINDOW)
+        self._last_sample_rate_ts: Optional[float] = None
+        self._measured_sample_rate_hz = 0.0
         self.dwell_manager = DwellManager()
         self.prediction = WordPredictionEngine()
         self.sentence_predictor = SentencePredictor(
@@ -847,6 +918,7 @@ class GazeConnectBackend:
         # Setup callbacks
         self._setup_callbacks()
         self._load_calibration_profile()
+        self._apply_active_filter_profile(self.active_filter_preset)
 
     def _setup_callbacks(self):
         """Setup internal callbacks."""
@@ -881,6 +953,46 @@ class GazeConnectBackend:
                 logger.info("[CALIB] No valid saved profile found")
         except Exception as e:
             logger.warning(f"[CALIB] Failed to load profile: {e}")
+
+    def _update_sample_rate(self, timestamp_s: float) -> float:
+        """Estimate effective Tobii sample rate from actual incoming timestamps."""
+        if self._last_sample_rate_ts is None:
+            self._last_sample_rate_ts = timestamp_s
+            return self._measured_sample_rate_hz
+
+        dt = timestamp_s - self._last_sample_rate_ts
+        self._last_sample_rate_ts = timestamp_s
+        if 0.001 <= dt <= 0.200:
+            self._sample_dt_history.append(dt)
+            ordered = sorted(self._sample_dt_history)
+            median_dt = ordered[len(ordered) // 2]
+            if median_dt > 0:
+                self._measured_sample_rate_hz = round(1.0 / median_dt, 1)
+                self.gaze_classifier.configure(sample_rate_hz=self._measured_sample_rate_hz)
+        return self._measured_sample_rate_hz
+
+    def _apply_active_filter_profile(self, preset: str):
+        """Route UI filter/stage presets into the live Kalman + OptiKey path."""
+        profile = self.ACTIVE_FILTER_PROFILES.get(preset)
+        if not profile:
+            logger.warning(f"Invalid active filter preset: {preset}")
+            return False
+
+        self.active_filter_preset = preset
+        self.gaze_classifier.configure(**profile.get('classifier', {}))
+        self.kalman_filter.configure(**profile.get('kalman', {}))
+        self.optikey_gaze_filter.set_screen_mode(self.current_screen)
+        self.optikey_gaze_filter.configure(**profile.get('optikey', {}))
+
+        logger.info(
+            f"[PIPELINE] Active preset={preset} classifier="
+            f"{self.gaze_classifier.FIXATION_THRESHOLD:.0f}/"
+            f"{self.gaze_classifier.SACCADE_THRESHOLD:.0f}dps "
+            f"kalmanR={self.kalman_filter.STATE_NOISE} "
+            f"lock={self.optikey_gaze_filter.lock_radius:.3f} "
+            f"damping={self.optikey_gaze_filter.damping:.2f}"
+        )
+        return True
 
     def _start_calibration(self):
         """Start 9-point in-app calibration session."""
@@ -1030,10 +1142,12 @@ class GazeConnectBackend:
             'right_valid': point.right_valid,
             'confidence': point.confidence,
             'is_valid': point.is_valid,
+            'validity_source': getattr(point, 'validity_source', 'reported'),
         })
         if conditioned is None:
             return
         t_conditioned = time.perf_counter()
+        measured_sample_rate_hz = self._update_sample_rate(conditioned.t)
 
         sample_age = max(0.0, now_wall - conditioned.t)
         if sample_age > self.POINT_TTL_SECONDS:
@@ -1049,7 +1163,11 @@ class GazeConnectBackend:
         gap = conditioned.t - self._last_gaze_ts
         self._last_gaze_ts = conditioned.t
 
-        if gap > self.FRAME_GAP_HOLD_SECONDS and self._last_gaze_payload is not None:
+        if (
+            gap > self.FRAME_GAP_HOLD_SECONDS
+            and self._last_gaze_payload is not None
+            and conditioned.state != GazeValidity.VALID
+        ):
             # v17: Notify classifier and frontend of tracking gap (likely blink)
             self.gaze_classifier.mark_tracking_lost()
             self._broadcast('gaze_lost', {'reason': 'gap', 'gap_ms': round(gap * 1000, 1)})
@@ -1060,6 +1178,8 @@ class GazeConnectBackend:
 
         work_x = conditioned.x
         work_y = conditioned.y
+        conditioned_x = work_x
+        conditioned_y = work_y
 
         if self.calibration_active and self.calibration_session:
             calib_x, calib_y = self._screen_to_window_normalized(work_x, work_y)
@@ -1073,13 +1193,21 @@ class GazeConnectBackend:
         kalman_y = work_y
         fx = work_x
         fy = work_y
-        pre_filter_on_key = getattr(self, '_cursor_on_target', False)
+        raw_win_x, raw_win_y = self._screen_to_window_normalized(work_x, work_y)
+        if (not self.calibration_active) and self.calibration_corrector.enabled:
+            raw_win_x, raw_win_y = self.calibration_corrector.correct(raw_win_x, raw_win_y)
+        raw_px = raw_win_x * self.screen_width
+        raw_py = raw_win_y * self.screen_height
+        pre_filter_on_key = False
+        if self.USE_OPTIKEY_PIPELINE:
+            pre_filter_on_key = self._update_on_key_state_impl(raw_px, raw_py)
 
         if self.USE_OPTIKEY_PIPELINE:
             if self._pipeline_log_count == 1:
                 logger.info("Using OptiKey-style pipeline: Classifier -> Kalman -> 4-zone filter")
 
             gaze_class = self.gaze_classifier.classify(work_x, work_y, conditioned.t)
+            classifier_state = gaze_class.value
             self.kalman_filter.set_gaze_state(gaze_class.value)
             t_classified = time.perf_counter()
 
@@ -1141,21 +1269,26 @@ class GazeConnectBackend:
             t_classified = t_calibrated
             t_kalman = t_calibrated
             t_filtered = time.perf_counter()
+            classifier_state = gaze_state
 
         if self.USE_OPTIKEY_PIPELINE and self.ENABLE_ZONE_LOCK_SEMANTICS:
             is_locked = zone in self.LOCK_ZONES
 
         stable_x, stable_y = self._screen_to_window_normalized(stable_x, stable_y)
+        mapped_x = stable_x
+        mapped_y = stable_y
+        calibration_applied = False
         if (not self.calibration_active) and self.calibration_corrector.enabled:
             stable_x, stable_y = self.calibration_corrector.correct(stable_x, stable_y)
+            calibration_applied = True
         t_mapped = time.perf_counter()
 
         is_valid = (
-            point.left_valid or point.right_valid or
             conditioned.state in (
                 GazeValidity.VALID, GazeValidity.BLINK,
                 GazeValidity.OUT_OF_BOUNDS, GazeValidity.FROZEN
             )
+            and conditioned.confidence > 0.3
         )
 
         pre_mag_x = stable_x * self.screen_width
@@ -1176,7 +1309,13 @@ class GazeConnectBackend:
             # v15: Use post-filter pixel coords (pre_mag_x/y) instead of pre-filter Kalman coords.
             # Kalman coords are less stable and lag behind the 4-zone filtered position,
             # causing on_key to detect the wrong key (right-biased from Kalman prediction).
-            current_on_key = self._update_on_key_state_px(pre_mag_x, pre_mag_y)
+            raw_to_stable_px = math.hypot(raw_px - pre_mag_x, raw_py - pre_mag_y)
+            if pre_filter_on_key or raw_to_stable_px < 96:
+                current_on_key = self._update_on_key_state_px(pre_mag_x, pre_mag_y)
+            else:
+                self._cursor_on_target = False
+                self._on_key_target_id = None
+                current_on_key = False
         else:
             self._cursor_on_target = False
             self._on_key_target_id = None
@@ -1190,13 +1329,25 @@ class GazeConnectBackend:
             'coord_space': 'window',
             'is_valid': is_valid,
             'is_fixation': is_locked,
-            'confidence': point.confidence,
+            'confidence': conditioned.confidence,
             'gaze_state': gaze_state,
             'raw_x': point.x,
             'raw_y': point.y,
+            'conditioned_x': conditioned_x,
+            'conditioned_y': conditioned_y,
+            'mapped_x': mapped_x,
+            'mapped_y': mapped_y,
+            'kalman_x': kalman_x,
+            'kalman_y': kalman_y,
             'signal_state': conditioned.state.value,
+            'classifier_state': classifier_state,
+            'active_pipeline': self.active_pipeline_name if self.USE_OPTIKEY_PIPELINE else 'legacy_one_euro_v1',
+            'active_filter_preset': self.active_filter_preset,
+            'sample_rate_hz': measured_sample_rate_hz,
             'sample_age_ms': round(sample_age * 1000.0, 2),
             'backend_zone': zone,
+            'calibration_applied': calibration_applied,
+            'validity_source': conditioned.validity_source,
         }
         if self.ENABLE_DUAL_PULL_COORDINATION_SIGNAL:
             payload['backend_on_key'] = bool(current_on_key)
@@ -1220,7 +1371,6 @@ class GazeConnectBackend:
                 and sample_age <= self.POINT_TTL_SECONDS
             )
             # v17: Detect blink specifically — pause dwell instead of cancelling
-            from services.signal_conditioner import GazeValidity
             dwell_is_blink = (
                 is_valid
                 and conditioned.state == GazeValidity.BLINK
@@ -1643,6 +1793,7 @@ class GazeConnectBackend:
                 'skip_break': lambda: self.breaks.skip_break(),
                 'set_filter_preset': lambda: self._set_filter_preset(data.get('preset', 'balanced')),
                 'set_filter_params': lambda: self._set_filter_params(data),
+                'automation_execute': lambda: self._handle_automation_execute(websocket, data),
                 'update_text': lambda: self._update_text(data.get('text', '')),
                 'save_survey': lambda: self._save_survey(data.get('survey_data', {})),
                 'load_survey': lambda: self._load_survey(websocket),
@@ -1716,6 +1867,8 @@ class GazeConnectBackend:
         # v11: Adapt filter parameters for screen context
         if self.USE_OPTIKEY_PIPELINE:
             self.optikey_gaze_filter.set_screen_mode(screen)
+            profile = self.ACTIVE_FILTER_PROFILES.get(self.active_filter_preset, {})
+            self.optikey_gaze_filter.configure(**profile.get('optikey', {}))
             logger.info(f"[PIPELINE] Screen={screen} lock_radius={self.optikey_gaze_filter.lock_radius:.3f} "
                         f"hysteresis={self.optikey_gaze_filter.hysteresis_multiplier:.1f}Ã—")
         self._broadcast('screen_changed', {'screen': screen})
@@ -2353,9 +2506,56 @@ class GazeConnectBackend:
             preset_enum = FilterPreset(preset)
             config = FilterConfig.from_preset(preset_enum)
             self.gaze_filter = GazeFilter2D(config)
+            self._apply_active_filter_profile(preset)
             logger.info(f"Gaze filter set to {preset}")
         except ValueError:
             logger.warning(f"Invalid filter preset: {preset}")
+
+    def _handle_automation_execute(self, websocket: WebSocketServerProtocol, data: Dict):
+        """Safely execute a tiny allowlist of PyAutoGUI fallback actions."""
+        request_id = data.get('request_id')
+        action_id = str(data.get('action_id', '')).strip()
+        allowed_actions = {
+            'media_play_pause',
+            'media_next',
+            'browser_back',
+            'browser_forward',
+        }
+
+        if action_id not in allowed_actions:
+            self._send(websocket, 'automation_result', {
+                'request_id': request_id,
+                'action_id': action_id,
+                'ok': False,
+                'error': 'action_not_allowed',
+            })
+            return
+
+        if not AUTOMATION_AVAILABLE or get_automation is None:
+            self._send(websocket, 'automation_result', {
+                'request_id': request_id,
+                'action_id': action_id,
+                'ok': False,
+                'error': 'pyautogui_unavailable',
+            })
+            return
+
+        try:
+            ok = bool(get_automation().execute(action_id))
+            self._send(websocket, 'automation_result', {
+                'request_id': request_id,
+                'action_id': action_id,
+                'ok': ok,
+                'error': None if ok else 'execution_failed_or_cooldown',
+            })
+        except Exception as e:
+            logger.warning(f"Automation fallback failed for {action_id}: {e}")
+            self._send(websocket, 'automation_result', {
+                'request_id': request_id,
+                'action_id': action_id,
+                'ok': False,
+                'error': str(e),
+            })
 
     def _set_filter_params(self, data: Dict):
         """Set custom gaze filter parameters from frontend settings."""

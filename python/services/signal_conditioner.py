@@ -31,6 +31,8 @@ class ConditionedSample:
     state: GazeValidity
     raw_x: float
     raw_y: float
+    confidence: float = 1.0
+    validity_source: str = "reported"
 
 
 class SignalConditioner:
@@ -127,17 +129,28 @@ class SignalConditioner:
                 f"(time.time()={time.time():.3f}, diff={abs(timestamp - time.time()):.3f}s)"
             )
 
+        validity_source = str(raw.get('validity_source', 'reported') or 'reported')
+        has_eye_validity = validity_source != 'missing'
         is_valid = raw.get('is_valid', True)
-        confidence = raw.get('confidence', 1.0)
-        left_valid = raw.get('left_valid', True)
-        right_valid = raw.get('right_valid', True)
+        try:
+            confidence = float(raw.get('confidence', 1.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        left_valid = raw.get('left_valid', None)
+        right_valid = raw.get('right_valid', None)
+        if left_valid is None and right_valid is None:
+            has_eye_validity = False
+            eyes_valid = bool(is_valid)
+        else:
+            eyes_valid = bool(left_valid) or bool(right_valid)
+        if not has_eye_validity:
+            confidence = min(confidence, 0.75)
 
         # --- 1. Validity ---
-        eyes_valid = left_valid or right_valid
         confidence_ok = (confidence > 0.3) if confidence is not None else True
 
         if not is_valid or not eyes_valid or not confidence_ok:
-            return self._handle_invalid(x, y, timestamp)
+            return self._handle_invalid(x, y, timestamp, confidence, validity_source)
 
         self._invalid_start = None
 
@@ -149,6 +162,8 @@ class SignalConditioner:
                     x=self._last_valid_x, y=self._last_valid_y,
                     t=timestamp, state=GazeValidity.OUT_OF_BOUNDS,
                     raw_x=x, raw_y=y,
+                    confidence=float(confidence or 0.0),
+                    validity_source=validity_source,
                 )
             return None
 
@@ -167,6 +182,8 @@ class SignalConditioner:
                         x=x, y=y, t=timestamp,
                         state=GazeValidity.FROZEN,
                         raw_x=x, raw_y=y,
+                        confidence=float(confidence or 0.0),
+                        validity_source=validity_source,
                     )
             else:
                 self._frozen_count = 0
@@ -187,9 +204,13 @@ class SignalConditioner:
             x=x, y=y, t=timestamp,
             state=GazeValidity.VALID,
             raw_x=raw.get('x', x), raw_y=raw.get('y', y),
+            confidence=float(confidence or 0.0),
+            validity_source=validity_source,
         )
 
-    def _handle_invalid(self, x: float, y: float, timestamp: float) -> Optional[ConditionedSample]:
+    def _handle_invalid(self, x: float, y: float, timestamp: float,
+                        confidence: float = 0.0,
+                        validity_source: str = "reported") -> Optional[ConditionedSample]:
         """Blink suppression / tracking loss."""
         if self._invalid_start is None:
             self._invalid_start = timestamp
@@ -206,12 +227,16 @@ class SignalConditioner:
                 x=self._last_valid_x, y=self._last_valid_y,
                 t=timestamp, state=GazeValidity.BLINK,
                 raw_x=x, raw_y=y,
+                confidence=confidence,
+                validity_source=validity_source,
             )
         elif invalid_duration <= self.TRACKING_LOSS_THRESHOLD and self._last_valid_x is not None:
             return ConditionedSample(
                 x=self._last_valid_x, y=self._last_valid_y,
                 t=timestamp, state=GazeValidity.BLINK,
                 raw_x=x, raw_y=y,
+                confidence=confidence,
+                validity_source=validity_source,
             )
         else:
             self.samples_discarded += 1
