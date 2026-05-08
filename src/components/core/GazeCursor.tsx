@@ -78,6 +78,10 @@ export const GazeCursor: React.FC = () => {
   const { settings: dwellSettings } = useDwellTime();
   const dwellSettingsRef = useRef(dwellSettings);
   useEffect(() => { dwellSettingsRef.current = dwellSettings; }, [dwellSettings]);
+  const lastNavigationTimestampRef = useRef(gazeControl.lastNavigationTimestamp);
+  useEffect(() => {
+    lastNavigationTimestampRef.current = gazeControl.lastNavigationTimestamp;
+  }, [gazeControl.lastNavigationTimestamp]);
   const CURSOR_SIZE = CURSOR_SIZES[settings.gazeCursorSize] || DEFAULT_CURSOR_SIZE;
   const { isLight } = useTheme();
   const isMouseMode = gazeControl.isMouseMode;
@@ -448,11 +452,7 @@ export const GazeCursor: React.FC = () => {
     // Cooldown check — uses configurable cooldown from DwellTimeContext
     const s = dwellSettingsRef.current;
     const effectiveCooldown = s.cooldownAfterActivation + 1000; // base 1000ms + configurable
-    if (now - lastClickTimeRef.current < effectiveCooldown) {
-      setDwellProgress(0);
-      frameRef.current = requestAnimationFrame(dwellFrame);
-      return;
-    }
+    const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
 
     // v18: Use RAW gaze position (pre-EMA) for keyboard key detection.
     // EMA smoothing introduces directional lag — when the eye scans left→right,
@@ -586,6 +586,10 @@ export const GazeCursor: React.FC = () => {
     }
 
     // v10: Toggle lockout — if target is toggle and within lockout or user hasn't looked away, ignore it
+    const toggleCandidate = Boolean(clickable && isToggle);
+    if (!toggleCandidate && !toggleLookedAwayRef.current) {
+      toggleLookedAwayRef.current = true;
+    }
     if (clickable && isToggle) {
       const timeSinceToggle = now - lastToggleTimeRef.current;
       if (timeSinceToggle < TOGGLE_LOCKOUT_MS || !toggleLookedAwayRef.current) {
@@ -594,21 +598,17 @@ export const GazeCursor: React.FC = () => {
         isAlwaysActive = false;
       }
     }
-    // v10: If target is NOT toggle, mark that user has looked away from toggle
-    if (clickable && !isToggle) {
-      toggleLookedAwayRef.current = true;
-    }
-
     // Navigation cooldown: freeze dwell for POST_NAVIGATION_COOLDOWN_MS after screen change
     // (Smart Pause mode). Skip freeze for always-active elements (toggle, emergency).
-    const inNavCooldown = gazeControl.lastNavigationTimestamp > 0
-      && Date.now() - gazeControl.lastNavigationTimestamp < POST_NAVIGATION_COOLDOWN_MS;
+    const lastNavigationTimestamp = lastNavigationTimestampRef.current;
+    const inNavCooldown = lastNavigationTimestamp > 0
+      && Date.now() - lastNavigationTimestamp < POST_NAVIGATION_COOLDOWN_MS;
 
     // Only dwell if:
     // - Element is clickable AND
     // - (Gaze is enabled OR element is always-active) AND
     // - (Not in navigation cooldown OR element is always-active)
-    if (!clickable || (!enabled && !isAlwaysActive) || (inNavCooldown && !isAlwaysActive)) {
+    if (!clickable || (!enabled && !isAlwaysActive) || (inClickCooldown && !isToggle) || (inNavCooldown && !isAlwaysActive)) {
       // === INCOMPLETE FIXATION TTL ===
       // Save progress when gaze leaves so it can be resumed if user looks back
       if (dwellTargetRef.current && dwellStartTimeRef.current > 0 && onsetCompletedRef.current) {
@@ -849,19 +849,26 @@ export const GazeCursor: React.FC = () => {
     // Matches OptiKey's SmoothWhenChangingGazeTarget: weighted average of current + 2 previous.
     // Reduces directional EMA lag bias by pre-centering the input signal.
     // v16: Extended to ALL screens — cursor stability benefits every screen, not just keyboard.
-    if (!preSmoothInitRef.current) {
+    const backendOwnsStability = backendLocked || backendOnKey || backendMagnetPx > BACKEND_MAGNET_ACTIVE_PX;
+    if (!backendOwnsStability) {
+      if (!preSmoothInitRef.current) {
+        preSmoothPrev1Ref.current = { x: rawX, y: rawY };
+        preSmoothPrev2Ref.current = { x: rawX, y: rawY };
+        preSmoothInitRef.current = true;
+      }
+      const pre1 = preSmoothPrev1Ref.current;
+      const pre2 = preSmoothPrev2Ref.current;
+      const smoothedX = rawX * 0.45 + pre1.x * 0.30 + pre2.x * 0.25;
+      const smoothedY = rawY * 0.45 + pre1.y * 0.30 + pre2.y * 0.25;
+      preSmoothPrev2Ref.current = { x: pre1.x, y: pre1.y };
+      preSmoothPrev1Ref.current = { x: rawX, y: rawY };
+      rawX = smoothedX;
+      rawY = smoothedY;
+    } else {
       preSmoothPrev1Ref.current = { x: rawX, y: rawY };
       preSmoothPrev2Ref.current = { x: rawX, y: rawY };
       preSmoothInitRef.current = true;
     }
-    const pre1 = preSmoothPrev1Ref.current;
-    const pre2 = preSmoothPrev2Ref.current;
-    const smoothedX = rawX * 0.45 + pre1.x * 0.30 + pre2.x * 0.25;
-    const smoothedY = rawY * 0.45 + pre1.y * 0.30 + pre2.y * 0.25;
-    preSmoothPrev2Ref.current = { x: pre1.x, y: pre1.y };
-    preSmoothPrev1Ref.current = { x: rawX, y: rawY };
-    rawX = smoothedX;
-    rawY = smoothedY;
 
     const prevRaw = lastRawPointRef.current;
     const rawJumpPx = Math.hypot(rawX - prevRaw.x, rawY - prevRaw.y);
@@ -880,7 +887,7 @@ export const GazeCursor: React.FC = () => {
     // Backend on_key uses pre-filter Kalman coords that are less accurate than post-filter.
     // Suppressing snapping removed the one mechanism that pulled cursor toward button centers.
     // The dual-pull concern is mitigated by reduced snap strength (0.22) and backend magnetism (0.32).
-    const suppressFrontendPull = false;
+    const suppressFrontendPull = backendOwnsStability || inIntentBypass;
 
     // === SEMANTIC SNAPPING ===
     // Apply only when backend is not hard-locked.
@@ -919,7 +926,7 @@ export const GazeCursor: React.FC = () => {
 
     if (backendLocked) {
       // === BACKEND LOCKED ===
-      alpha = distance < STABLE_ZONE ? 0.0 : 0.95;
+      alpha = distance < 1 ? 0.0 : 1.0;
     } else if (state === 'saccade') {
       // Saccade: track eye movement quickly to reach new target
       alpha = 0.90;

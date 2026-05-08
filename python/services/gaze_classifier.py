@@ -56,6 +56,7 @@ class GazeClassifier:
     def __init__(self, screen_params: Optional[ScreenParams] = None):
         self.screen = screen_params or ScreenParams()
         self.state = GazeState.FIXATION
+        self.fallback_dt = 1.0 / 133.0
 
         self._prev_x: Optional[float] = None
         self._prev_y: Optional[float] = None
@@ -95,7 +96,7 @@ class GazeClassifier:
 
         dt = timestamp - self._prev_t
         if dt <= 0 or dt > 1.0:
-            dt = 1.0 / 133.0  # Assume 133Hz
+            dt = self.fallback_dt
 
         velocity = self._compute_velocity(x_norm, y_norm, dt)
 
@@ -179,6 +180,29 @@ class GazeClassifier:
         if width_mm is not None: self.screen.width_mm = width_mm
         if height_mm is not None: self.screen.height_mm = height_mm
         if viewing_distance_mm is not None: self.screen.viewing_distance_mm = viewing_distance_mm
+
+    def configure(self, *, fixation_threshold: Optional[float] = None,
+                  saccade_threshold: Optional[float] = None,
+                  saccade_onset_count: Optional[int] = None,
+                  fixation_onset_count: Optional[int] = None,
+                  velocity_window: Optional[int] = None,
+                  sample_rate_hz: Optional[float] = None):
+        """Apply live-stage tuning to classifier thresholds and debounce."""
+        if fixation_threshold is not None:
+            self.FIXATION_THRESHOLD = float(max(20.0, min(120.0, fixation_threshold)))
+        if saccade_threshold is not None:
+            self.SACCADE_THRESHOLD = float(max(self.FIXATION_THRESHOLD + 20.0, min(300.0, saccade_threshold)))
+        if saccade_onset_count is not None:
+            self.SACCADE_ONSET_COUNT = int(max(1, min(6, saccade_onset_count)))
+        if fixation_onset_count is not None:
+            self.FIXATION_ONSET_COUNT = int(max(2, min(12, fixation_onset_count)))
+        if velocity_window is not None:
+            window = int(max(3, min(15, velocity_window)))
+            if window != self._velocity_history.maxlen:
+                self.VELOCITY_WINDOW = window
+                self._velocity_history = deque(list(self._velocity_history)[-window:], maxlen=window)
+        if sample_rate_hz is not None and sample_rate_hz > 1:
+            self.fallback_dt = 1.0 / float(max(15.0, min(200.0, sample_rate_hz)))
 
     def reset(self):
         self.state = GazeState.FIXATION

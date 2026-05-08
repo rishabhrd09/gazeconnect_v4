@@ -535,7 +535,7 @@ const GazeButton: React.FC<GazeButtonProps> = ({
         setIsActivated(false);
       }, 150);
     }, effectiveDwell);
-  }, [disabled, gazeEnabled, alwaysActive, isMouseOnlyMode, gazeEnabledTimestamp, onDwellStart, onDwellComplete, onClick, effectiveDwell, onsetDelay, updateProgress, id, repeatWindow]);
+  }, [disabled, gazeEnabled, alwaysActive, isMouseOnlyMode, gazeEnabledTimestamp, lastNavigationTimestamp, onDwellStart, onDwellComplete, onClick, effectiveDwell, onsetDelay, updateProgress, id, repeatWindow]);
 
   // Handle hover leave — slow decay instead of instant cancel
   const handleLeave = useCallback(() => {

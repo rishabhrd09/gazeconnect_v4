@@ -38,6 +38,18 @@ export interface GazeData {
   raw_x?: number;
   /** Raw (pre-filter) normalized y */
   raw_y?: number;
+  conditioned_x?: number;
+  conditioned_y?: number;
+  mapped_x?: number;
+  mapped_y?: number;
+  kalman_x?: number;
+  kalman_y?: number;
+  classifier_state?: string;
+  active_pipeline?: string;
+  active_filter_preset?: string;
+  sample_rate_hz?: number;
+  calibration_applied?: boolean;
+  validity_source?: string;
   /** Backend reports if filter considered gaze "on key" (for dual-pull coordination) */
   backend_on_key?: boolean;
   /** Backend magnetism pull applied this frame in pixels */
@@ -112,6 +124,7 @@ export interface WebSocketContextValue {
   skipBreak: () => void;
   setFilterPreset: (preset: string) => void;
   sendFilterParams: (params: { preset?: string; min_cutoff?: number; beta?: number; d_cutoff?: number }) => void;
+  executeAutomation: (actionId: 'media_play_pause' | 'media_next' | 'browser_back' | 'browser_forward') => void;
   setGazeOffset: (offsetX: number, offsetY: number) => void;
   updateText: (text: string) => void;
   saveSurvey: (data: any) => void;
@@ -277,6 +290,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           velocity: data.velocity,
           raw_x: data.raw_x,
           raw_y: data.raw_y,
+          conditioned_x: data.conditioned_x,
+          conditioned_y: data.conditioned_y,
+          mapped_x: data.mapped_x,
+          mapped_y: data.mapped_y,
+          kalman_x: data.kalman_x,
+          kalman_y: data.kalman_y,
+          classifier_state: data.classifier_state,
+          active_pipeline: data.active_pipeline,
+          active_filter_preset: data.active_filter_preset,
+          sample_rate_hz: data.sample_rate_hz,
+          calibration_applied: data.calibration_applied,
+          validity_source: data.validity_source,
           backend_on_key: data.backend_on_key,
           backend_magnet_px: data.backend_magnet_px,
         };
@@ -409,6 +434,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           break;
 
         case 'pong':
+          break;
+
+        case 'automation_result':
+          if (!data.ok) {
+            console.warn('Automation fallback failed:', data.action_id, data.error);
+          }
           break;
 
         default:
@@ -584,6 +615,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     skipBreak: () => send('skip_break'),
     setFilterPreset: (preset) => send('set_filter_preset', { preset }),
     sendFilterParams: (params) => send('set_filter_params', params),
+    executeAutomation: (actionId) => send('automation_execute', {
+      action_id: actionId,
+      request_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    }),
     setGazeOffset: (offsetX: number, offsetY: number) => send('set_gaze_offset', { offsetX, offsetY }),
     updateText: (text) => send('update_text', { text }),
     saveSurvey: (data) => send('save_survey', { survey_data: data }),

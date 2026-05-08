@@ -11,6 +11,7 @@ import { useGazeBrowser } from '../hooks/useGazeBrowser';
 import { useRealGaze } from '../contexts/RealGazeContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
+import { useDwellTime } from '../contexts/DwellTimeContext';
 import {
     BackIcon,
     BrainIcon,
@@ -155,6 +156,14 @@ const ArrowDownIcon: React.FC<WebIconProps> = ({ size = 24, color = 'currentColo
     <svg width={size} height={size} viewBox="0 0 96 96" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
         <path d="M48 20v56" />
         <path d="M28 56l20 20 20-20" />
+    </svg>
+);
+
+const NextIcon: React.FC<WebIconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => (
+    <svg width={size} height={size} viewBox="0 0 96 96" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
+        <path d="M22 25l34 23-34 23V25Z" fill={color} fillOpacity="0.08" />
+        <path d="M22 25l34 23-34 23V25Z" />
+        <path d="M64 25v46" />
     </svg>
 );
 
@@ -471,18 +480,21 @@ const toolbarBtnConnected = (role: ToolbarRole, hidden: boolean, position: 'firs
 // three are "video state" controls (scroll position + window state).
 type ScrollDockProps = {
     onUp: () => void;
+    onToggleAutoScroll?: () => void;
+    autoScrollEnabled?: boolean;
     onMaximize?: () => void;
     onDown: () => void;
     gazeEnabled: boolean;
     gazeTimestamp: number;
 };
 
-const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onMaximize, onDown, gazeEnabled, gazeTimestamp }) => {
+const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll, autoScrollEnabled = false, onMaximize, onDown, gazeEnabled, gazeTimestamp }) => {
     const hasMax = !!onMaximize;
+    const hasAutoScroll = !!onToggleAutoScroll;
     const buttonStyle: React.CSSProperties = {
         width: '100%',
         flex: '1 1 0',
-        minHeight: hasMax ? 'clamp(96px, 12vh, 152px)' : 'clamp(120px, 16vh, 200px)',
+        minHeight: hasMax || hasAutoScroll ? 'clamp(86px, 10.5vh, 140px)' : 'clamp(120px, 16vh, 200px)',
         background: 'rgba(24, 29, 36, 0.78)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
@@ -502,7 +514,7 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onMaximize, onDown
         boxShadow: '0 10px 22px rgba(0,0,0,0.36)',
         transition: 'opacity 200ms ease, transform 150ms ease, background 150ms ease',
     };
-    const iconSize = hasMax ? 38 : 42;
+    const iconSize = hasMax || hasAutoScroll ? 36 : 42;
     return (
         <div style={{
             flex: '0 0 clamp(150px, 12vw, 180px)',
@@ -518,6 +530,20 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onMaximize, onDown
                 <ArrowUpIcon size={iconSize} color="currentColor" strokeWidth={2.4} />
                 <span>Up</span>
             </GazeButton>
+            {onToggleAutoScroll && (
+                <GazeButton id="content-auto-scroll" onClick={onToggleAutoScroll}
+                    gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
+                    dwellCategory="navigationButton"
+                    style={{
+                        ...buttonStyle,
+                        color: autoScrollEnabled ? '#86F0D3' : '#D8DEE6',
+                        borderColor: autoScrollEnabled ? 'rgba(134, 240, 211, 0.46)' : 'rgba(180, 195, 220, 0.18)',
+                        background: autoScrollEnabled ? 'rgba(22, 96, 78, 0.36)' : buttonStyle.background,
+                    }}>
+                    <PointerIcon size={iconSize} color="currentColor" strokeWidth={2.3} />
+                    <span>{autoScrollEnabled ? 'Scroll On' : 'Scroll'}</span>
+                </GazeButton>
+            )}
             {onMaximize && (
                 <GazeButton id="content-maximize" onClick={onMaximize}
                     gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
@@ -1603,50 +1629,123 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     void T_chromeText; void T_chromeTextMuted; void T_watchModeBg; void T_watchModeText; void T_controlModeBg; void T_controlModeText;
     const [catId, setCatId] = useState('old_songs');
     const [playing, setPlaying] = useState<any>(null);
+    const [youtubeState, setYoutubeState] = useState<string>('idle');
     const viewRef = useRef<HTMLDivElement>(null);
+    const autoPlayUrlRef = useRef('');
     const cat = YT_CATS.find(c => c.id === catId) || YT_CATS[0];
     const toolbarGazeEnabled = isNavHidden ? true : ige;
     const toolbarGazeTimestamp = isNavHidden ? 0 : ts;
     const toolbarIconSize = isNavHidden ? 38 : browserToolbarIconSize;
     const isWatchMode = browserInteractionMode === 'watch';
+    const currentBrowserUrl = browser.currentUrl || '';
+    const isYouTubeWatchPage = /(?:youtube\.com\/(?:watch|shorts)|youtu\.be\/)/i.test(currentBrowserUrl);
+    const isPlayableYouTubePage = isYouTubeWatchPage && ['playing', 'paused', 'ready', 'ad_waiting'].includes(youtubeState);
     const toggleBrowserInteractionMode = useCallback(() => {
+        if (!isWatchMode && !isPlayableYouTubePage) return;
         onBrowserInteractionModeChange(isWatchMode ? 'control' : 'watch');
-    }, [isWatchMode, onBrowserInteractionModeChange]);
+    }, [isPlayableYouTubePage, isWatchMode, onBrowserInteractionModeChange]);
+    const browserStateRef = useRef({ isOpen: false, currentUrl: '' });
+
+    useEffect(() => {
+        browserStateRef.current = {
+            isOpen: browser.isOpen,
+            currentUrl: browser.currentUrl || '',
+        };
+    }, [browser.currentUrl, browser.isOpen]);
 
     useEffect(() => {
         onVideoActive?.(!!playing);
-    }, [playing, onVideoActive]);
+        if (playing) onNavHiddenToggle?.(true);
+    }, [playing, onNavHiddenToggle, onVideoActive]);
+
+    useEffect(() => () => {
+        const state = browserStateRef.current;
+        if (state.isOpen && /(?:youtube\.com|youtu\.be)/i.test(state.currentUrl)) {
+            void browser.resetBrowserSession('youtube-panel-unmount');
+        }
+    }, [browser.resetBrowserSession]);
 
     useEffect(() => {
-        if (playing) onBrowserInteractionModeChange('watch');
-    }, [playing?.id, onBrowserInteractionModeChange]);
+        if (playing || !browser.isOpen) return;
+        if (/(?:youtube\.com|youtu\.be)/i.test(currentBrowserUrl)) {
+            void browser.resetBrowserSession('youtube-panel-idle');
+        }
+    }, [browser.isOpen, browser.resetBrowserSession, currentBrowserUrl, playing]);
 
-    // Open BrowserView AFTER player div renders — use requestAnimationFrame for paint.
-    // Auto-maximize: inject the YT_MAXIMIZE_SCRIPT 2500ms after page-load settling.
-    // JS injection with userGesture=true is reliable; keyboard shortcuts ('f') are not.
+    useEffect(() => {
+        if (!playing) return;
+        onBrowserInteractionModeChange(isPlayableYouTubePage ? 'watch' : 'control');
+    }, [isPlayableYouTubePage, playing, onBrowserInteractionModeChange]);
+
+    useEffect(() => {
+        if (!playing || !browser.isOpen) {
+            setYoutubeState('idle');
+            return;
+        }
+        let cancelled = false;
+        const poll = async () => {
+            const result = await browser.youtubeCommand('get_state');
+            if (!cancelled) setYoutubeState(result?.youtubeState || result?.detail || 'idle');
+        };
+        poll();
+        const timer = setInterval(poll, 1200);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [browser.youtubeCommand, browser.isOpen, playing]);
+
+    useEffect(() => {
+        if (!playing || !browser.isOpen || !isYouTubeWatchPage || !currentBrowserUrl) return;
+        if (autoPlayUrlRef.current === currentBrowserUrl) return;
+        autoPlayUrlRef.current = currentBrowserUrl;
+        let cancelled = false;
+        let attempts = 0;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        const recoverPlayback = async () => {
+            if (cancelled) return;
+            attempts += 1;
+
+            const state = await browser.youtubeCommand('get_state');
+            if (cancelled) return;
+            const nextState = state?.youtubeState || state?.detail || 'idle';
+            setYoutubeState(nextState);
+            let observedState = nextState;
+
+            if (['ready', 'paused', 'stalled', 'buffering', 'ended'].includes(nextState)) {
+                const playResult = await browser.youtubeCommand('play');
+                observedState = playResult?.youtubeState || observedState;
+                setYoutubeState(observedState);
+            }
+
+            if (observedState === 'playing' || observedState === 'ad_waiting' || attempts >= 8) return;
+            timer = setTimeout(recoverPlayback, attempts < 4 ? 900 : 1500);
+        };
+
+        timer = setTimeout(recoverPlayback, 700);
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [browser.youtubeCommand, browser.isOpen, currentBrowserUrl, isYouTubeWatchPage, playing]);
+
+    // Open BrowserView AFTER player div renders. Keep the page in control mode
+    // while YouTube loads so the in-page gaze cursor can still recover/choose.
     useEffect(() => {
         if (!playing) return;
         let cancelled = false;
-        let maxTimer: ReturnType<typeof setTimeout> | null = null;
         const raf = requestAnimationFrame(() => {
             if (cancelled || !viewRef.current) return;
             const r = viewRef.current.getBoundingClientRect();
             if (r.width > 50 && r.height > 50) {
                 const url = resolveYouTubeUrl(playing);
                 browser.openPage(url, { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) });
-                maxTimer = setTimeout(async () => {
-                    if (cancelled) return;
-                    const result = await browser.executeJs(YT_MAXIMIZE_SCRIPT);
-                    if (!result || result.success === false) {
-                        browser.typeText('f');
-                    }
-                }, 2500);
             }
         });
         return () => {
             cancelled = true;
             cancelAnimationFrame(raf);
-            if (maxTimer) clearTimeout(maxTimer);
         };
     }, [playing]);
 
@@ -1656,20 +1755,122 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     // same action both maximizes and minimizes (depending on current state).
     // Falls back to keyboard 'f' if executeJs IPC isn't available yet.
     const maximizeVideo = useCallback(async () => {
-        const result = await browser.executeJs(YT_MAXIMIZE_SCRIPT);
-        if (!result || result.success === false) {
-            browser.typeText('f');
+        await browser.executeJs(YT_MAXIMIZE_SCRIPT);
+    }, [browser]);
+
+    const skipYouTubeAd = useCallback(async () => {
+        await browser.youtubeCommand('skip_ad');
+        return;
+        const findSkipButtonScript = `
+          (function() {
+            const player = document.querySelector('#movie_player') || document;
+            const roots = [player, document];
+            const selectors = [
+              '.ytp-ad-skip-button',
+              '.ytp-ad-skip-button-modern',
+              '.ytp-skip-ad-button',
+              '.ytp-ad-skip-button-container button',
+              '.ytp-ad-preview-container button',
+              '.videoAdUiSkipButton',
+              'button[class*="skip" i]',
+              '[role="button"][class*="skip" i]',
+              'button[aria-label*="Skip" i]',
+              '[role="button"][aria-label*="Skip" i]',
+              '[title*="Skip" i]',
+              '[data-title-no-tooltip*="Skip" i]'
+            ];
+            const seen = new Set();
+            const isVisible = (el) => {
+              if (!el || seen.has(el)) return false;
+              seen.add(el);
+              const rect = el.getBoundingClientRect();
+              const style = window.getComputedStyle(el);
+              return rect.width >= 12 && rect.height >= 12 &&
+                style.visibility !== 'hidden' &&
+                style.display !== 'none' &&
+                style.pointerEvents !== 'none' &&
+                !el.disabled &&
+                el.getAttribute('aria-disabled') !== 'true';
+            };
+            const normalizeTarget = (el) =>
+              el && (el.closest('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button') || el);
+            const candidates = [];
+            for (const root of roots) {
+              for (const selector of selectors) {
+                try {
+                  root.querySelectorAll(selector).forEach((el) => candidates.push(normalizeTarget(el)));
+                } catch (_) {}
+              }
+            }
+            document.querySelectorAll('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button')
+              .forEach((el) => {
+                const text = [
+                  el.textContent || '',
+                  el.getAttribute('aria-label') || '',
+                  el.getAttribute('title') || ''
+                ].join(' ').trim();
+                if (/skip|छोड़|छोड|छोड़/i.test(text)) candidates.push(normalizeTarget(el));
+              });
+            for (const candidate of candidates) {
+              if (!isVisible(candidate)) continue;
+              const rect = candidate.getBoundingClientRect();
+              return {
+                found: true,
+                x: Math.round(rect.left + rect.width / 2),
+                y: Math.round(rect.top + rect.height / 2),
+                label: (candidate.textContent || candidate.getAttribute('aria-label') || candidate.className || '').toString().slice(0, 80)
+              };
+            }
+            return { found: false };
+          })();
+        `;
+        const result = await browser.executeJs(findSkipButtonScript);
+        const point = result?.result;
+        if (point?.found && typeof point.x === 'number' && typeof point.y === 'number') {
+            await browser.clickAtViewPoint(point.x, point.y);
+        }
+    }, [browser]);
+
+    const playPauseYouTube = useCallback(async () => {
+        const result = await browser.youtubeCommand('play_pause');
+        if (!result?.ok) setYoutubeState(result?.youtubeState || result?.detail || 'error');
+    }, [browser]);
+
+    const nextYouTubeVideo = useCallback(async () => {
+        const result = await browser.youtubeCommand('next');
+        if (!result?.ok) setYoutubeState(result?.youtubeState || result?.status || 'ready');
+    }, [browser]);
+
+    const skipYouTubeAdReliable = useCallback(async () => {
+        const result = await browser.youtubeCommand('skip_ad');
+        setYoutubeState(result?.youtubeState || result?.status || 'idle');
+        if (result?.ok) {
+            window.setTimeout(async () => {
+                const state = await browser.youtubeCommand('get_state');
+                const nextState = state?.youtubeState || state?.detail || 'idle';
+                setYoutubeState(nextState);
+                if (['stalled', 'buffering', 'ready', 'paused'].includes(nextState)) {
+                    const playResult = await browser.youtubeCommand('play');
+                    setYoutubeState(playResult?.youtubeState || nextState);
+                }
+            }, 800);
         }
     }, [browser]);
 
     useBrowserViewBoundsSync(viewRef, browser.updateBounds, !!playing && browser.isOpen);
 
     const stop = useCallback(() => {
-        browser.closePage();
+        void browser.resetBrowserSession('youtube-stop');
         setPlaying(null);
+        setYoutubeState('idle');
+        autoPlayUrlRef.current = '';
         onNavHiddenToggle?.(false);
         onBrowserInteractionModeChange('control');
-    }, [browser, onBrowserInteractionModeChange, onNavHiddenToggle]);
+    }, [browser.resetBrowserSession, onBrowserInteractionModeChange, onNavHiddenToggle]);
+
+    const handleYouTubeBack = useCallback(() => {
+        stop();
+    }, [stop]);
 
     if (playing) return (
         <div style={{
@@ -1689,11 +1890,23 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Emergency</span>
                     </GazeButton>}
-                    <GazeButton id="yt-playpause" onClick={() => browser.typeText('k')}
+                    <GazeButton id="yt-watch-back" onClick={handleYouTubeBack}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
-                        style={toolbarBtnConnected('secondary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
+                        style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
+                        <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                        <span>Back</span>
+                    </GazeButton>
+                    <GazeButton id="yt-playpause" onClick={playPauseYouTube}
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Pause / Play</span>
+                    </GazeButton>
+                    <GazeButton id="yt-next" onClick={nextYouTubeVideo}
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+                        <NextIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                        <span>Next</span>
                     </GazeButton>
                     <GazeButton id="yt-show-controls" onClick={toggleBrowserInteractionMode}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
@@ -1703,7 +1916,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                     </GazeButton>
                 </>}
 
-                {/* CONTROL MODE — 5 buttons (Emergency · Back · Pause/Play · Hide Controls · Show Nav) */}
+                {/* CONTROL MODE — large AAC controls for reliable video use */}
                 {!isWatchMode && <>
                     {isNavHidden && <GazeButton id="yt-emergency-c" onClick={onEmergency}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
@@ -1711,24 +1924,31 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Emergency</span>
                     </GazeButton>}
-                    <GazeButton id="yt-back" onClick={isNavHidden ? () => browser.goBack() : stop}
+                    <GazeButton id="yt-back" onClick={isNavHidden ? handleYouTubeBack : stop}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
                         style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
                         <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>{isNavHidden ? 'Back' : 'Close'}</span>
                     </GazeButton>
-                    <GazeButton id="yt-playpause-c" onClick={() => browser.typeText('k')}
+                    <GazeButton id="yt-playpause-c" onClick={playPauseYouTube}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Pause / Play</span>
                     </GazeButton>
-                    <GazeButton id="yt-hide-controls" onClick={toggleBrowserInteractionMode}
+                    <GazeButton id="yt-skip-ad" onClick={skipYouTubeAdReliable}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
-                        style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
-                        <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                        <span>Hide Controls</span>
+                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+                        <span>Skip Ad</span>
                     </GazeButton>
+                    {isYouTubeWatchPage && isPlayableYouTubePage && <>
+                        <GazeButton id="yt-hide-controls" onClick={toggleBrowserInteractionMode}
+                            gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                            style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
+                            <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
+                            <span>Hide Controls</span>
+                        </GazeButton>
+                    </>}
                     {isNavHidden && <GazeButton id="yt-toggle-nav" onClick={() => onNavHiddenToggle?.(!isNavHidden)}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
                         style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
@@ -1775,7 +1995,9 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                 {!isWatchMode && (
                     <ContentScrollDock
                         onUp={() => browser.scrollUp()}
-                        onMaximize={maximizeVideo}
+                        onToggleAutoScroll={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
+                        autoScrollEnabled={browser.scrollMode === 'armed'}
+                        onMaximize={isYouTubeWatchPage ? maximizeVideo : undefined}
                         onDown={() => browser.scrollDown()}
                         gazeEnabled={toolbarGazeEnabled}
                         gazeTimestamp={toolbarGazeTimestamp}
@@ -2257,6 +2479,12 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                 <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Pause / Play</span>
                             </GazeButton>
+                            <GazeButton id="bv-scroll-r" onClick={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                style={toolbarBtnConnected(browser.scrollMode === 'armed' ? 'secondary' : 'primary', !!isNavHidden, 'middle')}>
+                                <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
+                                <span>{browser.scrollMode === 'armed' ? 'Scroll On' : 'Scroll'}</span>
+                            </GazeButton>
                             <GazeButton id="bv-show-controls" onClick={toggleBrowserInteractionMode}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
                                 style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
@@ -2373,6 +2601,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     </div>
                     <ContentScrollDock
                         onUp={() => browser.scrollUp()}
+                        onToggleAutoScroll={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
+                        autoScrollEnabled={browser.scrollMode === 'armed'}
                         onDown={() => browser.scrollDown()}
                         gazeEnabled={toolbarGazeEnabled}
                         gazeTimestamp={toolbarGazeTimestamp}
@@ -2950,6 +3180,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const { isGazeEnabled: ige, lastEnabledTimestamp: ts, disableGaze, enableGaze } = useGazeControl();
     const browser = useGazeBrowser();
     const ws = useWS();
+    const { settings: dwellSettings, currentStage } = useDwellTime();
     const { hasRealGaze } = useRealGaze();
     const [gp, setGp] = useState({ x: 0, y: 0 });
     const gpRef = useRef({ x: 0, y: 0 });
@@ -2961,6 +3192,22 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const [browserInteractionMode, setBrowserInteractionMode] = useState<BrowserInteractionMode>('control');
     const isEmbeddedBrowserActive = (view === 'search' && isQsTopicActive) || (view === 'youtube' && isYtVideoActive);
     const isBrowserWatchMode = isEmbeddedBrowserActive && browserInteractionMode === 'watch';
+
+    useEffect(() => {
+        const stageFactor = currentStage === 'late_als' ? 1.35 : currentStage === 'mid_als' ? 1.15 : currentStage === 'caregiver' ? 0.85 : 1.0;
+        browser.setGazeConfig({
+            dwellMs: Math.max(850, Math.min(2800, dwellSettings.standardButton)),
+            onsetMs: Math.max(150, Math.min(700, dwellSettings.onsetDelay)),
+            stabilityRadiusPx: Math.round(48 * stageFactor),
+            postClickCooldownMs: Math.max(800, Math.min(1800, dwellSettings.cooldownAfterActivation)),
+            edgeHoldMs: Math.round(Math.max(450, Math.min(1300, dwellSettings.onsetDelay + 350 * stageFactor))),
+            edgeZonePct: 0.20,
+            edgeMinDeltaPx: currentStage === 'caregiver' ? 22 : 16,
+            edgeMaxDeltaPx: currentStage === 'caregiver' ? 42 : currentStage === 'late_als' ? 28 : 36,
+            edgeThrottleMs: currentStage === 'caregiver' ? 100 : 130,
+            edgeMaxBurstMs: currentStage === 'late_als' ? 5200 : 6000,
+        });
+    }, [browser.setGazeConfig, currentStage, dwellSettings.cooldownAfterActivation, dwellSettings.onsetDelay, dwellSettings.standardButton]);
 
     // Tier 0 A — single-dwell gaze toggle for hidden-nav embedded browser strip
     const toggleGaze = useCallback(() => {
@@ -2989,12 +3236,20 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     }, [view]);
 
     useEffect(() => {
-        if (isEmbeddedBrowserActive) {
-            setBrowserInteractionMode('watch');
+        if (view === 'grid' && browser.isOpen) {
+            void browser.resetBrowserSession('web-grid');
+        }
+    }, [browser.isOpen, browser.resetBrowserSession, view]);
+
+    useEffect(() => {
+        if (!isEmbeddedBrowserActive) {
+            setBrowserInteractionMode('control');
             return;
         }
-        setBrowserInteractionMode('control');
-    }, [isEmbeddedBrowserActive]);
+        if (view === 'search') {
+            setBrowserInteractionMode('watch');
+        }
+    }, [isEmbeddedBrowserActive, view]);
 
     useEffect(() => {
         if (isEmbeddedBrowserActive && isNavHidden && !ige) {
@@ -3068,42 +3323,36 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         return () => window.removeEventListener('mousemove', h);
     }, [hasRealGaze]);
 
-    // ── FORWARD GAZE POSITION into BrowserView cursor (v18 stability profile) ──
-    // Calibrated against the Keyboard screen's "excellent" feel which uses
-    // alpha=0.38 smoothing + 90px/0.10 snap. This filter brings the Web Browsing
-    // experience closer to that responsiveness without compounding the in-page
-    // 70px / 800ms dwell gate.
-    //
-    //  Stage A — Saccade (>55px): clear intent to look elsewhere. Snap cursor
-    //    immediately and start a fresh fixation timer. Threshold lowered 60→55
-    //    so re-fixation feels snappier without losing blink absorption.
-    //  Stage B — Tremor gate (<12px): natural ALS pupil/eyelid micro-tremor.
-    //    Cursor stays frozen. Fixation timer keeps running. Tightened 15→12
-    //    because heavier smoothing already absorbs small drift.
-    //  Stage C — Fixation lock (after 130ms, drift <50px): once patient has
-    //    fixated for 130ms, hold cursor — wider 50px drift tolerance keeps
-    //    the in-page 70px stability gate satisfied through ALS micro-saccades.
-    //    Lock activation 200→130ms = patient feels stability ~70ms sooner.
-    //  Stage D — Smoothing (12-55px, pre-lock): EWMA alpha=0.30 — twice as
-    //    responsive as previous 0.16. Cursor visually tracks gaze with ~3
-    //    frame delay (~100ms) instead of the prior ~200ms.
-    //
-    // Combined timing budget (worst case, target acquisition):
-    //   saccade snap (instant) → fixation 130ms → in-page dwell 800ms = 930ms
-    //   vs previous: 200ms + 1000ms = 1200ms (22% faster).
-    const smoothedGazeRef = useRef<{ x: number; y: number; fixationStartedAt: number } | null>(null);
+    // Forward gaze into BrowserView using an accuracy-first page cursor filter.
+    // Backend Kalman/OptiKey already stabilizes gaze, and the injected page cursor
+    // has its own dwell radius. Avoid a second hard fixation lock here because it
+    // can make the page cursor appear offset from the user's actual gaze.
+    // Keep only a tiny 1.5px jitter gate, snap large moves (>18px), and otherwise
+    // use high-alpha EWMA so dense web and YouTube controls track promptly.
+    const smoothedGazeRef = useRef<{ x: number; y: number } | null>(null);
     useEffect(() => {
         if (!browser.isOpen) return;
         smoothedGazeRef.current = null;
         const interval = setInterval(() => {
-            if (!ige || isBrowserWatchMode) return;
+            const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed' && view !== 'youtube';
+            if (!ige || (isBrowserWatchMode && !allowWatchScroll)) {
+                smoothedGazeRef.current = null;
+                browser.hideGazeCursor();
+                return;
+            }
             const raw = gpRef.current;
             const prev = smoothedGazeRef.current;
-            const now = performance.now();
+            const activeBounds = browser.boundsRef.current;
+
+            if (view === 'youtube' && isYtVideoActive && activeBounds && raw.y < activeBounds.y + 96) {
+                smoothedGazeRef.current = null;
+                browser.hideGazeCursor();
+                return;
+            }
 
             if (!prev) {
-                smoothedGazeRef.current = { x: raw.x, y: raw.y, fixationStartedAt: now };
-                browser.updateGazeCursor(raw.x, raw.y);
+                smoothedGazeRef.current = { x: raw.x, y: raw.y };
+                browser.updateGazeCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
@@ -3111,38 +3360,30 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             const dy = raw.y - prev.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Stage A: Saccade — snap to new position, reset fixation
-            if (dist > 55) {
-                smoothedGazeRef.current = { x: raw.x, y: raw.y, fixationStartedAt: now };
-                browser.updateGazeCursor(raw.x, raw.y);
+            // Large move: snap to the new point.
+            if (dist > 18) {
+                smoothedGazeRef.current = { x: raw.x, y: raw.y };
+                browser.updateGazeCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
-            // Stage B: Tremor gate — freeze on small drift
-            if (dist < 12) {
-                browser.updateGazeCursor(prev.x, prev.y);
+            // Tiny jitter: hold the rendered point.
+            if (dist < 1.5) {
+                browser.updateGazeCursor(prev.x, prev.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
-            // Stage C: Fixation lock — fast activation, wide drift tolerance
-            const fixationMs = now - prev.fixationStartedAt;
-            if (fixationMs > 130 && dist < 50) {
-                browser.updateGazeCursor(prev.x, prev.y);
-                return;
-            }
-
-            // Stage D: Responsive EWMA — alpha=0.30 (was 0.16)
-            const alpha = 0.30;
+            // Medium move: follow quickly without a hard browser-side lock.
+            const alpha = dist > 8 ? 0.9 : 0.74;
             const next = {
                 x: prev.x + dx * alpha,
                 y: prev.y + dy * alpha,
-                fixationStartedAt: now,
             };
             smoothedGazeRef.current = next;
-            browser.updateGazeCursor(next.x, next.y);
+            browser.updateGazeCursor(next.x, next.y, allowWatchScroll ? { cursor: false } : undefined);
         }, 33);
         return () => clearInterval(interval);
-    }, [browser.isOpen, ige, isBrowserWatchMode]);
+    }, [browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
 
     const goBack = useCallback(() => {
         browser.closePage();
