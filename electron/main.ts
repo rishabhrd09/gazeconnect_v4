@@ -19,6 +19,7 @@ import {
   BROWSER_CURSOR_CSS,
   BROWSER_CURSOR_HIDE_SCRIPT,
   BROWSER_CURSOR_RESET_SCRIPT,
+  buildBrowserCursorBlockScript,
   buildBrowserCursorInjectionScript,
   buildGazeUpdateAndPollScript,
 } from './browser/browserGazeController';
@@ -71,6 +72,10 @@ type BrowserGazeConfig = {
   onsetMs: number;
   stabilityRadiusPx: number;
   postClickCooldownMs: number;
+  targetRegionSlackPx: number;
+  youtubeCardHitZonePx: number;
+  youtubeSkipSnapPx: number;
+  youtubeCardStabilityRadiusPx: number;
   edgeScrollEnabled: boolean;
   edgeHoldMs: number;
   edgeZonePct: number;
@@ -86,6 +91,10 @@ let browserGazeConfig: BrowserGazeConfig = {
   onsetMs: 300,
   stabilityRadiusPx: 50,
   postClickCooldownMs: 900,
+  targetRegionSlackPx: 24,
+  youtubeCardHitZonePx: 120,
+  youtubeSkipSnapPx: 130,
+  youtubeCardStabilityRadiusPx: 110,
   edgeScrollEnabled: false,
   edgeHoldMs: 650,
   edgeZonePct: 0.20,
@@ -116,7 +125,14 @@ function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activ
   if (!view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
   const cx = Math.round(x);
   const cy = Math.round(y);
-  view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+  // Suspend the in-page dwell cursor for the duration of the post-click
+  // cooldown. Previously we reset the dwell which also zeroed
+  // `blockedUntil`, defeating the cooldown — letting the gaze fire a
+  // second click on the video right after a YouTube command landed,
+  // toggling play/pause.
+  view.webContents.executeJavaScript(
+    buildBrowserCursorBlockScript(browserGazeConfig.postClickCooldownMs)
+  ).catch(() => { });
   view.webContents.sendInputEvent({ type: 'mouseMove', x: cx, y: cy } as any);
   setTimeout(() => {
     if (activeBrowserView !== view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
@@ -1192,6 +1208,23 @@ function setupIpcHandlers(): void {
         applyAacBrowsingMode();
         view.webContents.insertCSS(BROWSER_CURSOR_CSS)
           .catch((e) => browserDiagnostics.warn('cursor-css', `[Main] Cursor CSS injection failed: ${e?.message || e}`));
+        // Seed window.gcConfig with the latest live values BEFORE the
+        // cursor IIFE runs — the IIFE merges existing window.gcConfig
+        // over its built-in defaults, so this is how any user-tuned
+        // dwell / snap settings take effect on a fresh page.
+        const seedConfig = JSON.stringify({
+          dwellMs: browserGazeConfig.dwellMs,
+          onsetMs: browserGazeConfig.onsetMs,
+          stabilityRadiusPx: browserGazeConfig.stabilityRadiusPx,
+          postClickCooldownMs: browserGazeConfig.postClickCooldownMs,
+          targetRegionSlackPx: browserGazeConfig.targetRegionSlackPx,
+          youtubeCardHitZonePx: browserGazeConfig.youtubeCardHitZonePx,
+          youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
+          youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
+        });
+        view.webContents.executeJavaScript(
+          `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
+        ).catch(() => { });
         view.webContents.executeJavaScript(buildBrowserCursorInjectionScript())
           .catch((e) => browserDiagnostics.warn('cursor-js', `[Main] Cursor JS injection failed: ${e?.message || e}`));
         sendBrowserNavState(true);
@@ -1370,9 +1403,22 @@ function setupIpcHandlers(): void {
         return { ok: false, status: 'failed', detail: 'stale_browser_view' };
       }
       const safeResult = result || { ok: false, status: 'failed', detail: 'empty_result' };
-      const point = safeResult.trustedClick;
+      const blockMs = Math.max(
+        0,
+        Math.min(8000, Number((safeResult as YoutubeCommandResult).blockDwellMs) || 0)
+      );
+      const point = (safeResult as YoutubeCommandResult).trustedClick;
       if (point && Number.isFinite(point.x) && Number.isFinite(point.y)) {
         sendTrustedBrowserClick(point.x, point.y, sessionId);
+      } else if (blockMs > 0) {
+        // No coordinate-based click was needed — the script already
+        // dispatched a synthetic click directly on the target. Suspend
+        // the in-page dwell cursor for the requested duration so the
+        // user's gaze can't immediately fire a second click on the
+        // video (which YouTube would interpret as play/pause).
+        view.webContents.executeJavaScript(
+          buildBrowserCursorBlockScript(blockMs)
+        ).catch(() => { });
       }
       browserDiagnostics.recordCommand(command, safeResult.status || 'failed', safeResult.youtubeState);
       return safeResult;
@@ -1579,6 +1625,10 @@ function setupIpcHandlers(): void {
       onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
       stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),
+      targetRegionSlackPx: clampNumber(config?.targetRegionSlackPx, browserGazeConfig.targetRegionSlackPx, 8, 60),
+      youtubeCardHitZonePx: clampNumber(config?.youtubeCardHitZonePx, browserGazeConfig.youtubeCardHitZonePx, 60, 200),
+      youtubeSkipSnapPx: clampNumber(config?.youtubeSkipSnapPx, browserGazeConfig.youtubeSkipSnapPx, 60, 200),
+      youtubeCardStabilityRadiusPx: clampNumber(config?.youtubeCardStabilityRadiusPx, browserGazeConfig.youtubeCardStabilityRadiusPx, 50, 180),
       edgeScrollEnabled: typeof config?.edgeScrollEnabled === 'boolean' ? config.edgeScrollEnabled : browserGazeConfig.edgeScrollEnabled,
       edgeHoldMs: clampNumber(config?.edgeHoldMs, browserGazeConfig.edgeHoldMs, 300, 1600),
       edgeZonePct: clampNumber(config?.edgeZonePct, browserGazeConfig.edgeZonePct, 0.06, 0.22),
@@ -1595,6 +1645,10 @@ function setupIpcHandlers(): void {
         onsetMs: browserGazeConfig.onsetMs,
         stabilityRadiusPx: browserGazeConfig.stabilityRadiusPx,
         postClickCooldownMs: browserGazeConfig.postClickCooldownMs,
+        targetRegionSlackPx: browserGazeConfig.targetRegionSlackPx,
+        youtubeCardHitZonePx: browserGazeConfig.youtubeCardHitZonePx,
+        youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
+        youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(

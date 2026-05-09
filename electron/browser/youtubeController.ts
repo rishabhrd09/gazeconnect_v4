@@ -22,6 +22,7 @@ export type YoutubeCommandResult = {
   detail?: string;
   youtubeState?: YoutubeState;
   trustedClick?: { x: number; y: number };
+  blockDwellMs?: number;
 };
 
 export const YOUTUBE_COMMANDS = new Set<YoutubeCommand>([
@@ -53,6 +54,7 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
           rect.height >= 10 &&
           style.display !== 'none' &&
           style.visibility !== 'hidden' &&
+          style.pointerEvents !== 'none' &&
           Number(style.opacity || 1) > 0.05 &&
           !el.disabled &&
           el.getAttribute('aria-disabled') !== 'true';
@@ -66,8 +68,69 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
         };
       };
 
-      const normalizeButton = (el) =>
-        el && (el.closest('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .ytp-next-button, .ytp-play-button') || el);
+      // Walk UP only to button/role=button or known skip-ad classes —
+      // never to .ytp-play-button or .ytp-next-button so a stray "skip"
+      // match nested inside the play surface can't snap to play/pause.
+      const normalizeSkipButton = (el) =>
+        el && (el.closest('.ytp-ad-skip-button-modern, .ytp-skip-ad-button-modern, .ytp-ad-skip-button, .ytp-skip-ad-button, button, [role="button"]') || el);
+
+      const SKIP_AD_CLASS_TOKENS = [
+        'ytp-ad-skip-button',
+        'ytp-ad-skip-button-modern',
+        'ytp-skip-ad-button',
+        'ytp-skip-ad-button-modern',
+        'videoAdUiSkipButton'
+      ];
+      const skipAdTextPattern = /skip\\s*ad|ad\\s*skip|\\u091b\\u094b\\u0921\\s*\\u0935\\u093f\\u091c\\u094d\\u091e\\u093e\\u092a\\u0928|\\u0935\\u093f\\u091c\\u094d\\u091e\\u093e\\u092a\\u0928\\s*\\u091b\\u094b\\u0921/i;
+      const countdownPattern = /\\b\\d+\\s*$|in\\s*\\d|skip\\s*in/i;
+
+      const hasSkipAdClass = (el) => {
+        if (!el) return false;
+        const cls = String(el.className || '');
+        return SKIP_AD_CLASS_TOKENS.some((token) => cls.indexOf(token) !== -1);
+      };
+
+      const labelOf = (el) => {
+        if (!el) return '';
+        return [
+          el.textContent || '',
+          el.getAttribute?.('aria-label') || '',
+          el.getAttribute?.('title') || '',
+          el.getAttribute?.('data-title-no-tooltip') || ''
+        ].join(' ').replace(/\\s+/g, ' ').trim();
+      };
+
+      // Skip-ad geometry sanity check. Real skip buttons are pill-shaped
+      // ~50–320px wide and ~24–96px tall, sit in the lower-right of the
+      // player. Anything wildly outside (e.g. the .ytp-ad-preview-container
+      // which spans the full width) is rejected — clicking its center
+      // lands on the video and toggles play/pause.
+      const looksLikeSkipButtonRect = (rect) => {
+        if (!rect) return false;
+        if (rect.width < 50 || rect.width > 320) return false;
+        if (rect.height < 20 || rect.height > 96) return false;
+        const playerRect = (player.getBoundingClientRect && player !== document)
+          ? player.getBoundingClientRect()
+          : null;
+        if (!playerRect || playerRect.width < 80 || playerRect.height < 80) return true;
+        const cyRect = rect.top + rect.height / 2;
+        const cxRect = rect.left + rect.width / 2;
+        const playerMidY = playerRect.top + playerRect.height * 0.45;
+        if (cyRect < playerMidY - 24) return false;
+        const playerRightStart = playerRect.left + playerRect.width * 0.40;
+        if (cxRect < playerRightStart) return false;
+        return true;
+      };
+
+      const looksLikeSkipButton = (el) => {
+        if (!visible(el)) return false;
+        if (hasSkipAdClass(el)) return true;
+        const label = labelOf(el);
+        if (!skipAdTextPattern.test(label)) return false;
+        // "Skip ad in 5" — countdown text is NOT a click target.
+        if (countdownPattern.test(label)) return false;
+        return true;
+      };
 
       const adPresent = () =>
         !!document.querySelector('.ad-showing, .ytp-ad-player-overlay, .ytp-ad-module, .video-ads, .ytp-ad-text, .ytp-ad-preview-container');
@@ -100,54 +163,110 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
         }
       };
 
+      // Strict skip-ad finder. Only selectors that uniquely identify the
+      // ad skip button are considered, plus a final sanity check on the
+      // resulting rect.
       const findSkipButton = () => {
         const selectors = [
-          '.ytp-ad-skip-button',
           '.ytp-ad-skip-button-modern',
+          '.ytp-skip-ad-button-modern',
+          '.ytp-ad-skip-button',
           '.ytp-skip-ad-button',
           '.ytp-ad-skip-button-container button',
+          '.ytp-skip-ad-button-container button',
           '.videoAdUiSkipButton',
-          'button[aria-label*="Skip" i]',
-          '[role="button"][aria-label*="Skip" i]',
-          '[title*="Skip" i]',
-          '[data-title-no-tooltip*="Skip" i]'
+          'button.ytp-ad-skip-button',
+          'button.ytp-skip-ad-button'
         ];
-        const skipTextPattern = /skip|\\u091b\\u094b\\u0921|\\u091b\\u094b\\u095c/i;
-        const hasSkipIntent = (el) => {
-          if (!el) return false;
-          const text = [
-            el.textContent || '',
-            el.getAttribute?.('aria-label') || '',
-            el.getAttribute?.('title') || '',
-            el.getAttribute?.('data-title-no-tooltip') || '',
-            el.className || ''
-          ].join(' ');
-          return skipTextPattern.test(text);
-        };
         const roots = [player, document];
+        const seen = new Set();
         const candidates = [];
+
         for (const root of roots) {
           for (const selector of selectors) {
-            try { root.querySelectorAll(selector).forEach((el) => candidates.push(normalizeButton(el))); } catch (_) {}
+            try {
+              root.querySelectorAll(selector).forEach((el) => {
+                const norm = normalizeSkipButton(el);
+                if (norm && !seen.has(norm)) {
+                  seen.add(norm);
+                  candidates.push(norm);
+                }
+              });
+            } catch (_) {}
           }
         }
-        document.querySelectorAll('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button')
-          .forEach((el) => {
-            const text = [
-              el.textContent || '',
-              el.getAttribute('aria-label') || '',
-              el.getAttribute('title') || '',
-              el.getAttribute('data-title-no-tooltip') || ''
-            ].join(' ');
-            if (skipTextPattern.test(text)) candidates.push(normalizeButton(el));
-          });
-        const seen = new Set();
+
+        // Aria-label fallback restricted to "skip ad" wording so chapter
+        // skip / skip-intro / unrelated buttons don't slip through.
+        try {
+          document.querySelectorAll('button[aria-label*="Skip" i], [role="button"][aria-label*="Skip" i], [title*="Skip" i]')
+            .forEach((el) => {
+              if (!skipAdTextPattern.test(labelOf(el))) return;
+              const norm = normalizeSkipButton(el);
+              if (norm && !seen.has(norm)) {
+                seen.add(norm);
+                candidates.push(norm);
+              }
+            });
+        } catch (_) {}
+
         for (const candidate of candidates) {
-          if (!candidate || seen.has(candidate)) continue;
-          seen.add(candidate);
-          if (visible(candidate) && hasSkipIntent(candidate)) return candidate;
+          if (!looksLikeSkipButton(candidate)) continue;
+          const rect = candidate.getBoundingClientRect();
+          if (!looksLikeSkipButtonRect(rect)) continue;
+          return candidate;
         }
         return null;
+      };
+
+      // Synthetic click sequence on a known DOM element. Primary skip-ad
+      // strategy — bypasses any coordinate hit-test ambiguity (overlapping
+      // iframes, transformed surfaces). executeJavaScript runs with
+      // userGesture=true from main.ts so YouTube's gesture-gated handlers
+      // accept it.
+      const pressElement = (el) => {
+        if (!el) return false;
+        try { el.scrollIntoView?.({ block: 'center', inline: 'center' }); } catch (_) {}
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const baseInit = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view: window,
+          button: 0,
+          buttons: 1,
+          clientX: cx,
+          clientY: cy,
+          screenX: cx,
+          screenY: cy
+        };
+        const sequence = [
+          ['pointerover', 'PointerEvent'],
+          ['pointerenter', 'PointerEvent'],
+          ['mouseover', 'MouseEvent'],
+          ['mouseenter', 'MouseEvent'],
+          ['pointerdown', 'PointerEvent'],
+          ['mousedown', 'MouseEvent'],
+          ['pointerup', 'PointerEvent'],
+          ['mouseup', 'MouseEvent'],
+          ['click', 'MouseEvent']
+        ];
+        for (const [type, kind] of sequence) {
+          try {
+            const init = (type === 'pointerup' || type === 'mouseup' || type === 'click')
+              ? Object.assign({}, baseInit, { buttons: 0 })
+              : baseInit;
+            const Ctor = (kind === 'PointerEvent' && typeof PointerEvent === 'function')
+              ? PointerEvent
+              : MouseEvent;
+            el.dispatchEvent(new Ctor(type, Object.assign({ pointerType: 'mouse' }, init)));
+          } catch (_) {}
+        }
+        try { el.click?.(); } catch (_) {}
+        try { el.focus?.({ preventScroll: true }); } catch (_) {}
+        return true;
       };
 
       const youtubeState = getYoutubeState();
@@ -159,7 +278,20 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
       if (command === 'skip_ad') {
         const button = findSkipButton();
         if (button) {
-          return { ok: true, status: 'done', detail: 'skip_trusted_click', youtubeState: getYoutubeState(), trustedClick: centerOf(button) };
+          // Synthetic click is the primary strategy. Dispatching directly
+          // on the button bypasses coordinate hit-tests so the click can
+          // never accidentally land on the video element. We deliberately
+          // do NOT return a trustedClick — a follow-up OS-level click at
+          // the same coords would, after the ad disappears, hit the video
+          // and toggle play/pause (the regression we are fixing).
+          pressElement(button);
+          return {
+            ok: true,
+            status: 'done',
+            detail: 'skip_synthetic_click',
+            youtubeState: getYoutubeState(),
+            blockDwellMs: 1500
+          };
         }
         return { ok: false, status: adPresent() ? 'waiting_for_skip' : 'no_ad', youtubeState };
       }
@@ -175,14 +307,14 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
               player.playVideo();
               try { video?.play?.(); } catch (_) {}
               const afterState = getYoutubeState();
-              const buttonAfterApi = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
-              if (afterState !== 'playing' && visible(buttonAfterApi)) {
-                return { ok: true, status: 'done', detail: 'player_recover_trusted_click', youtubeState: afterState, trustedClick: centerOf(buttonAfterApi) };
+              const playButton = player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button');
+              if (afterState !== 'playing' && visible(playButton)) {
+                pressElement(playButton);
               }
-              return { ok: true, status: stalledAtStart ? 'stalled' : 'done', detail: 'player_recover_play', youtubeState: getYoutubeState() };
+              return { ok: true, status: stalledAtStart ? 'stalled' : 'done', detail: 'player_recover_play', youtubeState: getYoutubeState(), blockDwellMs: 900 };
             }
             if (s === 1) player.pauseVideo(); else player.playVideo();
-            return { ok: true, status: 'done', detail: 'player_api', youtubeState: getYoutubeState() };
+            return { ok: true, status: 'done', detail: 'player_api', youtubeState: getYoutubeState(), blockDwellMs: 900 };
           }
         } catch (_) {}
 
@@ -190,17 +322,18 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
           try {
             if (stalledAtStart || video.paused) video.play?.(); else video.pause?.();
             const afterState = getYoutubeState();
-            const buttonAfterVideo = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
-            if ((stalledAtStart || afterState !== 'playing') && visible(buttonAfterVideo)) {
-              return { ok: true, status: 'done', detail: 'video_recover_trusted_click', youtubeState: afterState, trustedClick: centerOf(buttonAfterVideo) };
+            const playButton = player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button');
+            if ((stalledAtStart || afterState !== 'playing') && visible(playButton)) {
+              pressElement(playButton);
             }
-            return { ok: true, status: stalledAtStart ? 'stalled' : 'done', detail: 'video_element', youtubeState: getYoutubeState() };
+            return { ok: true, status: stalledAtStart ? 'stalled' : 'done', detail: 'video_element', youtubeState: getYoutubeState(), blockDwellMs: 900 };
           } catch (_) {}
         }
 
-        const playButton = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
+        const playButton = player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button');
         if (visible(playButton)) {
-          return { ok: true, status: 'done', detail: 'play_button', youtubeState, trustedClick: centerOf(playButton) };
+          pressElement(playButton);
+          return { ok: true, status: 'done', detail: 'play_button_synthetic', youtubeState: getYoutubeState(), blockDwellMs: 900 };
         }
         return { ok: false, status: 'failed', detail: 'no_play_target', youtubeState };
       }
@@ -213,11 +346,11 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
             player.playVideo();
             try { video?.play?.(); } catch (_) {}
             const afterState = getYoutubeState();
-            const buttonAfterApi = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
-            if (afterState !== 'playing' && visible(buttonAfterApi)) {
-              return { ok: true, status: 'done', detail: 'player_api_trusted_click', youtubeState: afterState, trustedClick: centerOf(buttonAfterApi) };
+            const playButton = player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button');
+            if (afterState !== 'playing' && visible(playButton)) {
+              pressElement(playButton);
             }
-            return { ok: true, status: 'done', detail: 'player_api_play', youtubeState: afterState };
+            return { ok: true, status: 'done', detail: 'player_api_play', youtubeState: getYoutubeState(), blockDwellMs: 900 };
           }
         } catch (_) {}
 
@@ -226,17 +359,18 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
             if (!video.paused) return { ok: true, status: 'done', detail: 'already_playing', youtubeState: getYoutubeState() };
             video.play?.();
             const afterState = getYoutubeState();
-            const buttonAfterVideo = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
-            if (afterState !== 'playing' && visible(buttonAfterVideo)) {
-              return { ok: true, status: 'done', detail: 'video_element_trusted_click', youtubeState: afterState, trustedClick: centerOf(buttonAfterVideo) };
+            const playButton = player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button');
+            if (afterState !== 'playing' && visible(playButton)) {
+              pressElement(playButton);
             }
-            return { ok: true, status: 'done', detail: 'video_element_play', youtubeState: afterState };
+            return { ok: true, status: 'done', detail: 'video_element_play', youtubeState: getYoutubeState(), blockDwellMs: 900 };
           } catch (_) {}
         }
 
-        const playButton = normalizeButton(player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button'));
+        const playButton = player.querySelector?.('.ytp-play-button') || document.querySelector('.ytp-play-button');
         if (visible(playButton)) {
-          return { ok: true, status: 'done', detail: 'play_button', youtubeState, trustedClick: centerOf(playButton) };
+          pressElement(playButton);
+          return { ok: true, status: 'done', detail: 'play_button_synthetic', youtubeState: getYoutubeState(), blockDwellMs: 900 };
         }
         return { ok: false, status: 'failed', detail: 'no_play_target', youtubeState };
       }
@@ -245,18 +379,20 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
         try {
           if (player && typeof player.nextVideo === 'function') {
             player.nextVideo();
-            return { ok: true, status: 'done', detail: 'player_api', youtubeState: getYoutubeState() };
+            return { ok: true, status: 'done', detail: 'player_api', youtubeState: getYoutubeState(), blockDwellMs: 1200 };
           }
         } catch (_) {}
 
-        const nextButton = normalizeButton(player.querySelector?.('.ytp-next-button') || document.querySelector('.ytp-next-button'));
+        const nextButton = player.querySelector?.('.ytp-next-button') || document.querySelector('.ytp-next-button');
         if (visible(nextButton) && nextButton.getAttribute('aria-disabled') !== 'true') {
-          return { ok: true, status: 'done', detail: 'next_button', youtubeState, trustedClick: centerOf(nextButton) };
+          pressElement(nextButton);
+          return { ok: true, status: 'done', detail: 'next_button_synthetic', youtubeState: getYoutubeState(), blockDwellMs: 1200 };
         }
 
         const playlistItem = document.querySelector('ytd-playlist-panel-video-renderer:not([selected]) a#thumbnail[href*="/watch"], ytd-compact-video-renderer a#thumbnail[href*="/watch"], ytd-video-renderer a#thumbnail[href*="/watch"]');
         if (visible(playlistItem)) {
-          return { ok: true, status: 'done', detail: 'playlist_fallback', youtubeState, trustedClick: centerOf(playlistItem) };
+          pressElement(playlistItem);
+          return { ok: true, status: 'done', detail: 'playlist_fallback_synthetic', youtubeState: getYoutubeState(), blockDwellMs: 1200 };
         }
         return { ok: false, status: 'no_next', detail: 'no_next_target', youtubeState };
       }

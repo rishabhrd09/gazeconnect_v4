@@ -31,7 +31,9 @@ export function buildBrowserCursorInjectionScript(): string {
         clicked: false,
         clickSeq: 0,
         lastClickKey: '',
-        blockedUntil: 0
+        blockedUntil: 0,
+        targetKey: '',
+        targetRect: null
       };
 
       window.gcConfig = Object.assign({
@@ -39,7 +41,10 @@ export function buildBrowserCursorInjectionScript(): string {
         onsetMs: 300,
         stabilityRadiusPx: 50,
         postClickCooldownMs: 900,
-        youtubeCardHitZonePx: 112
+        targetRegionSlackPx: 24,
+        youtubeCardHitZonePx: 120,
+        youtubeSkipSnapPx: 130,
+        youtubeCardStabilityRadiusPx: 110
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -78,48 +83,191 @@ export function buildBrowserCursorInjectionScript(): string {
         'a[href*="/shorts/"]'
       ].join(',');
 
-      const isVisible = (el) => {
-        if (!el || !el.getBoundingClientRect) return false;
-        const rect = el.getBoundingClientRect();
-        const style = window.getComputedStyle(el);
-        return rect.width >= 8 &&
-          rect.height >= 8 &&
-          style.display !== 'none' &&
-          style.visibility !== 'hidden' &&
-          Number(style.opacity || 1) > 0.04;
-      };
+      const skipButtonSelector = [
+        '.ytp-ad-skip-button-modern',
+        '.ytp-skip-ad-button-modern',
+        '.ytp-ad-skip-button',
+        '.ytp-skip-ad-button',
+        '.ytp-ad-skip-button-container button',
+        '.ytp-skip-ad-button-container button',
+        '.videoAdUiSkipButton'
+      ].join(',');
 
-      const centerOf = (el) => {
+      const SKIP_AD_CLASS_TOKENS = [
+        'ytp-ad-skip-button',
+        'ytp-ad-skip-button-modern',
+        'ytp-skip-ad-button',
+        'ytp-skip-ad-button-modern',
+        'videoAdUiSkipButton'
+      ];
+
+      const skipAdTextPattern = /skip\\s*ad|ad\\s*skip/i;
+      const countdownPattern = /\\b\\d+\\s*$|in\\s*\\d|skip\\s*in/i;
+
+      const safeRect = (el) => {
+        if (!el || !el.getBoundingClientRect) return null;
         const rect = el.getBoundingClientRect();
+        if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return null;
         return {
-          x: Math.round(rect.left + rect.width / 2),
-          y: Math.round(rect.top + rect.height / 2)
+          left: Math.round(rect.left),
+          top: Math.round(rect.top),
+          right: Math.round(rect.right),
+          bottom: Math.round(rect.bottom),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
         };
       };
 
+      const isVisible = (el) => {
+        const rect = safeRect(el);
+        if (!rect) return false;
+        if (rect.width < 8 || rect.height < 8) return false;
+        let style = null;
+        try { style = window.getComputedStyle(el); } catch (_) {}
+        if (!style) return true;
+        return style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.pointerEvents !== 'none' &&
+          Number(style.opacity || 1) > 0.04 &&
+          !el.disabled &&
+          el.getAttribute?.('aria-disabled') !== 'true';
+      };
+
+      const labelOf = (el) => {
+        if (!el) return '';
+        return [
+          el.textContent || '',
+          el.getAttribute?.('aria-label') || '',
+          el.getAttribute?.('title') || '',
+          el.getAttribute?.('data-title-no-tooltip') || ''
+        ].join(' ').replace(/\\s+/g, ' ').trim();
+      };
+
+      const centerOf = (el) => {
+        const rect = safeRect(el);
+        return rect
+          ? { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) }
+          : { x: 0, y: 0 };
+      };
+
       const distanceToRect = (x, y, rect) => {
+        if (!rect) return Infinity;
         const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
         const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
         return Math.hypot(dx, dy);
       };
 
+      const pointInsideRect = (x, y, rect, slack) => {
+        if (!rect) return false;
+        return x >= rect.left - slack &&
+          x <= rect.right + slack &&
+          y >= rect.top - slack &&
+          y <= rect.bottom + slack;
+      };
+
+      const stableKeyFor = (target, kind, href, label, rect) => [
+        kind,
+        href || '',
+        label || '',
+        target?.id || '',
+        target?.getAttribute?.('role') || '',
+        target?.getAttribute?.('aria-label') || '',
+        target?.tagName || '',
+        rect ? Math.round(rect.left / 4) * 4 : '',
+        rect ? Math.round(rect.top / 4) * 4 : '',
+        rect ? Math.round(rect.width / 4) * 4 : '',
+        rect ? Math.round(rect.height / 4) * 4 : ''
+      ].join('|');
+
       const clickRequestFor = (target, x, y, kind, preferCenter) => {
         if (!target || !isVisible(target)) return null;
+        const rect = safeRect(target);
+        if (!rect) return null;
         const point = preferCenter ? centerOf(target) : { x: Math.round(x), y: Math.round(y) };
         const href = target.href || target.getAttribute?.('href') || '';
-        const label = (target.textContent || target.getAttribute?.('aria-label') || target.id || target.tagName || '')
-          .toString()
-          .trim()
-          .slice(0, 80);
+        const label = labelOf(target).slice(0, 80);
         try { target.focus?.({ preventScroll: true }); } catch (_) {}
         return {
           x: point.x,
           y: point.y,
           kind,
-          key: [kind, href, label, point.x, point.y].join('|'),
+          key: stableKeyFor(target, kind, href, label, rect),
           href,
-          label
+          label,
+          rect
         };
+      };
+
+      // Skip-ad-aware helpers (mirror of youtubeController.ts so the
+      // in-page dwell can land on the skip button and short-circuit
+      // the play/pause toggle that happens when clicks hit the video).
+      const normalizeSkipCandidate = (el) =>
+        el && (el.closest?.('.ytp-ad-skip-button-modern, .ytp-skip-ad-button-modern, .ytp-ad-skip-button, .ytp-skip-ad-button, button, [role="button"]') || el);
+
+      const hasSkipAdClass = (el) => {
+        if (!el) return false;
+        const cls = String(el.className || '');
+        return SKIP_AD_CLASS_TOKENS.some((token) => cls.indexOf(token) !== -1);
+      };
+
+      const isLikelySkipAdNode = (el) => {
+        if (!el || !isVisible(el)) return false;
+        if (hasSkipAdClass(el)) return true;
+        const label = labelOf(el);
+        if (!skipAdTextPattern.test(label)) return false;
+        if (countdownPattern.test(label)) return false;
+        return true;
+      };
+
+      const looksLikeSkipButtonRect = (rect) => {
+        if (!rect) return false;
+        if (rect.width < 50 || rect.width > 320) return false;
+        if (rect.height < 20 || rect.height > 96) return false;
+        const player = document.querySelector('#movie_player');
+        if (!player) return true;
+        const playerRect = safeRect(player);
+        if (!playerRect || playerRect.width < 80 || playerRect.height < 80) return true;
+        const cy = rect.top + rect.height / 2;
+        const cx = rect.left + rect.width / 2;
+        if (cy < playerRect.top + playerRect.height * 0.45 - 24) return false;
+        if (cx < playerRect.left + playerRect.width * 0.40) return false;
+        return true;
+      };
+
+      const findYoutubeSkipButton = () => {
+        const player = document.querySelector('#movie_player') || document;
+        const roots = [player, document];
+        const seen = new Set();
+        const candidates = [];
+        for (const root of roots) {
+          try {
+            root.querySelectorAll(skipButtonSelector).forEach((el) => {
+              const norm = normalizeSkipCandidate(el);
+              if (norm && !seen.has(norm)) {
+                seen.add(norm);
+                candidates.push(norm);
+              }
+            });
+          } catch (_) {}
+        }
+        try {
+          document.querySelectorAll('button[aria-label*="Skip" i], [role="button"][aria-label*="Skip" i], [title*="Skip" i]')
+            .forEach((el) => {
+              if (!skipAdTextPattern.test(labelOf(el))) return;
+              const norm = normalizeSkipCandidate(el);
+              if (norm && !seen.has(norm)) {
+                seen.add(norm);
+                candidates.push(norm);
+              }
+            });
+        } catch (_) {}
+        for (const candidate of candidates) {
+          if (!isLikelySkipAdNode(candidate)) continue;
+          const rect = safeRect(candidate);
+          if (!looksLikeSkipButtonRect(rect)) continue;
+          return candidate;
+        }
+        return null;
       };
 
       const youtubeTargetFromElement = (el, x, y) => {
@@ -135,7 +283,7 @@ export function buildBrowserCursorInjectionScript(): string {
       };
 
       const nearestYoutubeCard = (x, y) => {
-        const maxDistance = Number(window.gcConfig?.youtubeCardHitZonePx || 112);
+        const maxDistance = Number(window.gcConfig?.youtubeCardHitZonePx || 120);
         let best = null;
         let bestDistance = Infinity;
         const cards = Array.from(document.querySelectorAll(videoCardSelector)).slice(0, 80);
@@ -143,7 +291,7 @@ export function buildBrowserCursorInjectionScript(): string {
           if (!isVisible(card)) continue;
           const anchor = card.querySelector(videoAnchorSelector);
           if (!anchor || !isVisible(anchor)) continue;
-          const rect = card.getBoundingClientRect();
+          const rect = safeRect(card);
           const distance = distanceToRect(x, y, rect);
           if (distance <= maxDistance && distance < bestDistance) {
             bestDistance = distance;
@@ -153,8 +301,30 @@ export function buildBrowserCursorInjectionScript(): string {
         return best ? clickRequestFor(best, x, y, 'youtube_nearest_card', true) : null;
       };
 
+      const isYoutubeVideoSurface = (el) =>
+        !!el?.closest?.('#movie_player, .html5-video-player, video.video-stream, .ytp-player-content');
+
       const resolveClickRequest = (x, y) => {
         const el = document.elementFromPoint(x, y);
+
+        // Skip-ad button gets priority. If the gaze is anywhere within
+        // skipSnapPx of the visible skip button, snap to it. This both
+        // makes the skip button easier to dwell on AND prevents the
+        // alternative — clicking the video underneath, which YouTube
+        // interprets as play/pause.
+        const skipButton = findYoutubeSkipButton();
+        if (skipButton) {
+          const skipSnapPx = Number(window.gcConfig?.youtubeSkipSnapPx || 130);
+          const skipRect = safeRect(skipButton);
+          const directSkipHit = !!(el && (el === skipButton || skipButton.contains?.(el) || el.closest?.(skipButtonSelector) === skipButton));
+          if (directSkipHit || distanceToRect(x, y, skipRect) <= skipSnapPx) {
+            return clickRequestFor(skipButton, x, y, 'youtube_skip_ad', true);
+          }
+          // Don't fall through to a video-surface click when an ad with
+          // a skip button is showing — clicking the video would just
+          // pause playback.
+          if (el && isYoutubeVideoSurface(el)) return null;
+        }
 
         const ytAtPoint = youtubeTargetFromElement(el, x, y);
         if (ytAtPoint) return ytAtPoint;
@@ -168,8 +338,9 @@ export function buildBrowserCursorInjectionScript(): string {
         }
 
         if (el && isVisible(el)) {
-          const style = window.getComputedStyle(el);
-          if (style.cursor === 'pointer') {
+          let style = null;
+          try { style = window.getComputedStyle(el); } catch (_) {}
+          if (style && style.cursor === 'pointer') {
             return clickRequestFor(el, x, y, 'pointer_fallback', false);
           }
         }
@@ -187,13 +358,33 @@ export function buildBrowserCursorInjectionScript(): string {
         state.clicked = false;
         state.lastClickKey = '';
         state.blockedUntil = 0;
+        state.targetKey = '';
+        state.targetRect = null;
       };
 
+      // Reset dwell WITHOUT clearing blockedUntil — used after a click
+      // we just performed so the cooldown still applies.
       window.gcResetDwell = () => {
         state.start = Date.now();
         state.clicked = false;
         state.lastClickKey = '';
-        state.blockedUntil = 0;
+        state.targetKey = '';
+        state.targetRect = null;
+        cursor.classList.remove('dwelling');
+        cursor.classList.remove('clicking');
+      };
+
+      // Suspend dwell-click activity for a window of time. Used after
+      // toolbar-driven YouTube commands (skip ad / play / next) so the
+      // gaze cursor can't immediately fire a follow-up click while the
+      // page is still settling.
+      window.gcBlockDwell = (durationMs) => {
+        const ms = Math.max(0, Math.min(8000, Number(durationMs) || 0));
+        state.blockedUntil = Date.now() + ms;
+        state.start = Date.now();
+        state.clicked = false;
+        state.targetKey = '';
+        state.targetRect = null;
         cursor.classList.remove('dwelling');
         cursor.classList.remove('clicking');
       };
@@ -216,46 +407,94 @@ export function buildBrowserCursorInjectionScript(): string {
 
         const now = Date.now();
         const cfg = window.gcConfig || {};
-        const stabilityRadius = Number(cfg.stabilityRadiusPx || 50);
+        const baseStability = Number(cfg.stabilityRadiusPx || 50);
+        const cardStability = Number(cfg.youtubeCardStabilityRadiusPx || 110);
+        const skipSnapPx = Number(cfg.youtubeSkipSnapPx || 130);
         const dwellMs = Number(cfg.dwellMs || 1200);
         const onsetMs = Number(cfg.onsetMs || 300);
         const postClickCooldownMs = Number(cfg.postClickCooldownMs || 900);
+        const targetRegionSlackPx = Number(cfg.targetRegionSlackPx || 24);
+
+        if (now < state.blockedUntil) {
+          cursor.classList.remove('dwelling');
+          return null;
+        }
+
+        const clickReq = resolveClickRequest(x, y);
         const dist = Math.hypot(x - state.x, y - state.y);
 
-        if (dist < stabilityRadius) {
-          const elapsed = now - state.start;
-          if (elapsed > onsetMs && !state.clicked) cursor.classList.add('dwelling');
-          if (elapsed > dwellMs && !state.clicked) {
-            const clickReq = resolveClickRequest(x, y);
-            if (clickReq) {
-              if (now < state.blockedUntil && clickReq.key === state.lastClickKey) {
-                return null;
-              }
-              state.clicked = true;
-              state.clickSeq += 1;
-              state.lastClickKey = clickReq.key || '';
-              state.blockedUntil = now + postClickCooldownMs;
-              clickReq.id = state.clickSeq;
-              cursor.classList.remove('dwelling');
-              cursor.classList.add('clicking');
-              setTimeout(() => {
-                cursor.classList.remove('clicking');
-                state.clicked = false;
-                state.start = Date.now();
-              }, postClickCooldownMs);
-              return clickReq;
-            }
-            if (elapsed > 2000) state.start = now;
+        // Target-aware stability: when the same click target is still
+        // resolved at the new gaze position AND that gaze is inside the
+        // target region (rect + slack OR snap zone), allow the dwell to
+        // continue even if the gaze drifted outside the strict 50px
+        // anchor circle. This is the key fix for "hard to dwell on
+        // YouTube videos" — large cards and the skip button get a
+        // dwell tolerance that matches their visible size.
+        let stabilityRadius = baseStability;
+        if (clickReq) {
+          if (clickReq.kind === 'youtube_skip_ad') {
+            stabilityRadius = Math.max(baseStability, skipSnapPx);
+          } else if (clickReq.kind === 'youtube_anchor' || clickReq.kind === 'youtube_card' || clickReq.kind === 'youtube_nearest_card') {
+            stabilityRadius = Math.max(baseStability, cardStability);
           }
-        } else {
+        }
+
+        const sameTarget = !!clickReq &&
+          !!state.targetKey &&
+          clickReq.key === state.targetKey;
+
+        const insideTargetRegion = sameTarget && pointInsideRect(
+          x, y,
+          state.targetRect || clickReq.rect,
+          targetRegionSlackPx
+        );
+
+        const stabilityHeld = dist < stabilityRadius || (sameTarget && insideTargetRegion);
+
+        if (state.start <= 0 || !stabilityHeld) {
           state.x = x;
           state.y = y;
           state.start = now;
           state.clicked = false;
-          state.lastClickKey = '';
-          state.blockedUntil = 0;
+          state.targetKey = clickReq?.key || '';
+          state.targetRect = clickReq?.rect || null;
           cursor.classList.remove('dwelling');
           cursor.classList.remove('clicking');
+          return null;
+        }
+
+        if (sameTarget && clickReq?.rect) {
+          // Refresh the rect — page content can shift while the user
+          // dwells (lazy load, animations, ad insertion). Without
+          // this, a slightly-moved target would fail the
+          // pointInsideRect check and reset the dwell.
+          state.targetRect = clickReq.rect;
+        }
+
+        const elapsed = now - state.start;
+        if (elapsed > onsetMs && !state.clicked) cursor.classList.add('dwelling');
+
+        if (elapsed > dwellMs && !state.clicked && clickReq) {
+          // Per-target cooldown — if the same target was just clicked,
+          // hold off so we don't immediately re-fire.
+          if (clickReq.key === state.lastClickKey && now < state.blockedUntil + 300) {
+            return null;
+          }
+          state.clicked = true;
+          state.clickSeq += 1;
+          state.lastClickKey = clickReq.key || '';
+          state.blockedUntil = now + postClickCooldownMs;
+          clickReq.id = state.clickSeq;
+          cursor.classList.remove('dwelling');
+          cursor.classList.add('clicking');
+          setTimeout(() => {
+            cursor.classList.remove('clicking');
+            state.clicked = false;
+            state.start = Date.now();
+            state.targetKey = '';
+            state.targetRect = null;
+          }, postClickCooldownMs);
+          return clickReq;
         }
 
         return null;
@@ -278,3 +517,8 @@ export function buildGazeUpdateAndPollScript(x: number, y: number, cursorEnabled
 
 export const BROWSER_CURSOR_HIDE_SCRIPT = `if (window.gcHide) window.gcHide();`;
 export const BROWSER_CURSOR_RESET_SCRIPT = `if (window.gcResetDwell) window.gcResetDwell();`;
+
+export function buildBrowserCursorBlockScript(durationMs: number): string {
+  const safe = Math.max(0, Math.min(8000, Math.round(Number(durationMs) || 0)));
+  return `if (window.gcBlockDwell) window.gcBlockDwell(${safe});`;
+}
