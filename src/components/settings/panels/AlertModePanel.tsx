@@ -170,7 +170,7 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                     onClick={handleSave}
                     style={{
                         padding: '10px 28px', borderRadius: 8, border: 'none',
-                        background: saved ? '#10B981' : '#3882B8',
+                        background: saved ? '#497775' : '#3882B8',
                         color: '#fff', fontWeight: 700, fontSize: 14,
                         cursor: 'pointer', transition: 'background 200ms', fontFamily: 'inherit',
                     }}

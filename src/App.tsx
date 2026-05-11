@@ -25,7 +25,9 @@ import { AlertModeProvider, useAlertMode } from './contexts/AlertModeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useTheme } from './contexts/ThemeContext';
 import SarvamBloom from './components/SarvamBloom';
+import SvgDefs from './components/SvgDefs';
 import './lightmode.css';
+import './warmmode.css';
 
 import HomeScreen from './screens/HomeScreen';
 import KeyboardScreen from './screens/KeyboardScreen';
@@ -529,6 +531,7 @@ const App: React.FC = () => (
                 <GazeControlProvider initialEnabled={false}>
                   <GazeCursor />
                   <InnerApp />
+                  <SvgDefs />
                   <SarvamBloom />
                   <GazeDebugOverlay />
                   <DevDebugOverlay />

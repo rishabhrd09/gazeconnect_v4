@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { darkColors, lightColors, typography, spacing, screenThemes } from '../utils/design';
+import { darkColors, lightColors, warmColors, warmScreenTokens, typography, spacing, screenThemes } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import {
   FamilyIcon, MessageIcon, MedicalCrossIcon,
@@ -61,7 +61,8 @@ const SECTIONS: SidebarSection[] = [
 ];
 
 // Theme from design.ts
-const THEME = screenThemes.settings;
+const THEME_DARK = screenThemes.settings;
+const THEME_WARM = warmScreenTokens.settings;
 
 // ============================================
 // TOAST COMPONENT
@@ -131,8 +132,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   isDarkMode = true,
 }) => {
   const { exportJSON, importJSON, resetToDefaults } = useCustomization();
-  const { isLight } = useTheme();
-  const colors = isDarkMode ? darkColors : lightColors;
+  const { isLight, isWarm } = useTheme();
+  const colors = isWarm ? warmColors : isDarkMode ? darkColors : lightColors;
+  const THEME = isWarm ? THEME_WARM : THEME_DARK;
 
   const [selectedSection, setSelectedSection] = useState<SectionId>('appsettings');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -262,7 +264,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   return (
-    <div className={`settings-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`settings-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',

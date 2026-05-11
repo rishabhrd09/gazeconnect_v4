@@ -58,7 +58,7 @@ const OVERLAY_DARK: Record<string, OverlayPalette> = {
     headerBg: '#351715',
     headerText: '#CFA094',
     cardBg: '#4B211E',
-    cardBorder: '#8A463D',
+    cardBorder: '#8B3A36',
     cardText: '#F5F0EE',
     hindiText: 'rgba(255, 210, 140, 0.95)',
     activeBorder: 'rgba(255,255,255,0.85)',
@@ -287,14 +287,18 @@ export interface QuickWordsGridProps {
   presentation?: 'overlay' | 'standalone';
 }
 
-const getStandaloneTone = (categoryId: string, isMix: boolean, isDarkMode: boolean): StandaloneTone => {
+const getStandaloneTone = (categoryId: string, isMix: boolean, isDarkMode: boolean, isWarm: boolean = false): StandaloneTone => {
   const colorCategoryId = getStandaloneColorCategoryId(categoryId);
+  // TODO(warm-mode): unique warm palette tables — for v1, route warm to LIGHT
+  if (isWarm) return STANDALONE_LIGHT[colorCategoryId] ?? STANDALONE_LIGHT.daily;
   if (isMix) return STANDALONE_MIX[colorCategoryId] ?? STANDALONE_MIX.daily;
   if (isDarkMode) return STANDALONE_DARK[colorCategoryId] ?? STANDALONE_DARK.daily;
   return STANDALONE_LIGHT[colorCategoryId] ?? STANDALONE_LIGHT.daily;
 };
 
-const getOverlayPalette = (categoryId: string, isMix: boolean, isDarkMode: boolean): OverlayPalette => {
+const getOverlayPalette = (categoryId: string, isMix: boolean, isDarkMode: boolean, isWarm: boolean = false): OverlayPalette => {
+  // TODO(warm-mode): unique warm palette tables — for v1, route warm to LIGHT
+  if (isWarm) return OVERLAY_LIGHT[categoryId] ?? OVERLAY_LIGHT.daily;
   if (isMix) return OVERLAY_MIX[categoryId] ?? OVERLAY_MIX.daily;
   if (isDarkMode) return OVERLAY_DARK[categoryId] ?? OVERLAY_DARK.daily;
   return OVERLAY_LIGHT[categoryId] ?? OVERLAY_LIGHT.daily;
@@ -347,8 +351,9 @@ const STANDALONE_ICON_COLORS = {
   },
 } as const;
 
-const getStandaloneIconColor = (categoryId: string, isMix: boolean, isDarkMode: boolean) => {
-  const mode = isMix ? 'mix' : isDarkMode ? 'dark' : 'light';
+const getStandaloneIconColor = (categoryId: string, isMix: boolean, isDarkMode: boolean, isWarm: boolean = false) => {
+  // TODO(warm-mode): unique warm palette tables — for v1, route warm to LIGHT
+  const mode = isMix ? 'mix' : isWarm ? 'light' : isDarkMode ? 'dark' : 'light';
   const palette = STANDALONE_ICON_COLORS[mode];
   const colorCategoryId = getStandaloneColorCategoryId(categoryId);
   return palette[colorCategoryId as keyof typeof palette] ?? palette.daily;
@@ -364,7 +369,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
   idPrefix = 'qwg',
   presentation = 'overlay',
 }) => {
-  const { isMix } = useTheme();
+  const { isMix, isWarm } = useTheme();
   const [activatedKey, setActivatedKey] = useState<string | null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -396,8 +401,8 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
     }}>
       {orderedCategories.map((category) => {
         const words = category.words.filter((word) => word.enabled).slice(0, MAX_WORDS);
-        const overlayPalette = getOverlayPalette(category.id, isMix, isDarkMode);
-        const standaloneTone = getStandaloneTone(category.id, isMix, isDarkMode);
+        const overlayPalette = getOverlayPalette(category.id, isMix, isDarkMode, isWarm);
+        const standaloneTone = getStandaloneTone(category.id, isMix, isDarkMode, isWarm);
         const categoryName = category.heading || category.id.charAt(0).toUpperCase() + category.id.slice(1);
         const categoryIconSrc = CATEGORY_ICON_ASSETS[category.id];
 
@@ -513,7 +518,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                         opacity: 0.9,
                         pointerEvents: 'none',
                         userSelect: 'none',
-                        backgroundColor: getStandaloneIconColor(category.id, isMix, isDarkMode),
+                        backgroundColor: getStandaloneIconColor(category.id, isMix, isDarkMode, isWarm),
                         WebkitMaskImage: `url(${categoryIconSrc})`,
                         maskImage: `url(${categoryIconSrc})`,
                         WebkitMaskRepeat: 'no-repeat',

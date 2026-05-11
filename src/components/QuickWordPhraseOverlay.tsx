@@ -42,7 +42,46 @@ const BackArrowIcon: React.FC<{ size?: number; color?: string; strokeWidth?: num
   </svg>
 );
 
-const getTone = (wordId?: string | null, isLight = false, isMix = false) => {
+const getTone = (wordId?: string | null, isLight = false, isMix = false, isWarm = false) => {
+  if (isWarm) {
+    if (wordId?.startsWith('position_')) {
+      return {
+        accent: '#7D9475',
+        panelBg: 'rgba(247, 242, 232, 0.98)',
+        panelBorder: 'rgba(125, 148, 117, 0.32)',
+        title: '#2F2A26',
+        helper: '#6A625B',
+        cardBg: '#FFFDF8',
+        cardBorder: '#DED2C2',
+        cardText: '#2F2A26',
+        chipBg: '#E9EFE6',
+      };
+    }
+    if (wordId?.startsWith('daily_')) {
+      return {
+        accent: '#C9A96B',
+        panelBg: 'rgba(247, 242, 232, 0.98)',
+        panelBorder: 'rgba(201, 169, 107, 0.32)',
+        title: '#2F2A26',
+        helper: '#6A625B',
+        cardBg: '#FFFDF8',
+        cardBorder: '#DED2C2',
+        cardText: '#2F2A26',
+        chipBg: '#F3E8D1',
+      };
+    }
+    return {
+      accent: '#497775',
+      panelBg: 'rgba(247, 242, 232, 0.98)',
+      panelBorder: 'rgba(73, 119, 117, 0.32)',
+      title: '#2F2A26',
+      helper: '#6A625B',
+      cardBg: '#FFFDF8',
+      cardBorder: '#DED2C2',
+      cardText: '#2F2A26',
+      chipBg: '#E7EEEA',
+    };
+  }
   if (wordId?.startsWith('position_')) {
     return isLight
       ? {
@@ -136,7 +175,7 @@ const getTone = (wordId?: string | null, isLight = false, isMix = false) => {
         accent: '#B06A5A',
         panelBg: 'rgba(41, 31, 28, 0.98)',
         panelBorder: 'rgba(176, 106, 90, 0.22)',
-        title: '#F0E2C4',
+        title: '#FFFCF1',
         helper: '#D8BCAF',
         cardBg: mixColors.home.tileSurfaces.ph,
         cardBorder: mixColors.home.cardBorder,
@@ -183,7 +222,7 @@ const QuickWordPhraseOverlay: React.FC<QuickWordPhraseOverlayProps> = ({
   gazeEnabledTimestamp,
   showHindi = false,
 }) => {
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
 
   const phrases = useMemo(() => {
     if (!word) return [];
@@ -192,7 +231,7 @@ const QuickWordPhraseOverlay: React.FC<QuickWordPhraseOverlayProps> = ({
   const visiblePhrases = useMemo(() => phrases.slice(0, 4), [phrases]);
   const visibleRelatedWords = useMemo(() => relatedWords.slice(0, 3), [relatedWords]);
 
-  const tone = useMemo(() => getTone(word?.id, isLight, isMix), [word?.id, isLight, isMix]);
+  const tone = useMemo(() => getTone(word?.id, isLight, isMix, isWarm), [word?.id, isLight, isMix, isWarm]);
   const phraseCount = visiblePhrases.length;
   const phraseGridColumns = phraseCount === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))';
   const phraseGridRows = phraseCount <= 2 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))';
@@ -216,7 +255,7 @@ const QuickWordPhraseOverlay: React.FC<QuickWordPhraseOverlayProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 40,
-        background: isLight ? 'rgba(232, 225, 214, 0.78)' : 'rgba(5, 7, 6, 0.82)',
+        background: isLight ? 'rgba(232, 225, 214, 0.78)' : isWarm ? 'rgba(247, 242, 232, 0.78)' : 'rgba(5, 7, 6, 0.82)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',

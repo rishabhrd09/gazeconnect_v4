@@ -33,20 +33,24 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
 }) => {
   const { data: { quickWords } } = useCustomization();
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const isWarmMode = isDarkMode && !isLight;
   const dismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pageBg = isMix
     ? '#17130F'
-    : isWarmMode
-      ? '#131412'
-      : lightColors.background.primary;
+    : isWarm
+      ? '#F7F2E8'
+      : isWarmMode
+        ? '#131412'
+        : lightColors.background.primary;
   const shellAccent = isLight
     ? '#D6C6B3'
-    : isMix
-      ? 'rgba(180,147,98,0.22)'
-      : 'rgba(213,216,188,0.12)';
+    : isWarm
+      ? 'rgba(73, 119, 117, 0.22)'
+      : isMix
+        ? 'rgba(180,147,98,0.22)'
+        : 'rgba(213,216,188,0.12)';
   const categories = quickWords?.categories ?? [];
   const [lastSpoken, setLastSpoken] = useState<{ en: string; hi?: string } | null>(null);
   const [activeWord, setActiveWord] = useState<QuickWord | null>(null);
@@ -103,7 +107,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
 
   return (
     <div
-      className={`quickwords-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`}
+      className={`quickwords-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -144,7 +148,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
             background: isLight ? 'rgba(240, 226, 196, 0.98)' : isMix ? 'rgba(36, 31, 24, 0.98)' : 'rgba(22, 23, 21, 0.98)',
             border: `1.5px solid ${shellAccent}`,
             borderRadius: '22px',
-            color: isLight ? lightColors.text.primary : isMix ? '#F0E2C4' : '#ECEDE3',
+            color: isLight ? lightColors.text.primary : isMix ? '#FFFCF1' : '#ECEDE3',
             boxShadow: isLight ? '0 8px 20px rgba(82, 66, 45, 0.10)' : '0 10px 26px rgba(0,0,0,0.24)',
             display: 'flex',
             flexDirection: 'column',

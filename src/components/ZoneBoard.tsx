@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import GazeButton from './core/GazeButton';
 import { useDwellTime } from '../contexts/DwellTimeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { screenThemes, typography } from '../utils/design';
 
 /*
@@ -74,6 +75,28 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
   const [activeZone, setActiveZone] = useState<ZoneData | null>(null);
   const { settings } = useDwellTime();
   const [interactionEnabled, setInteractionEnabled] = useState(true);
+  const { isLight, isWarm } = useTheme();
+  // Theme-aware tokens — research-grounded AAC zone palette.
+  // Citations: Tobii Communicator 5 / Smartbox Grid 3 (colored borders on
+  // neutral fills), Modified Fitzgerald Key (red=corrective, green=positive),
+  // Wilkinson/Thistle PMC4599784 (muted tints + colored borders > saturated).
+  const isPaper = isLight || isWarm;
+  const T_BORDER = isPaper ? '#DED2C2' : BORDER;
+  const T_PANEL_BG = isLight ? '#EEE9DC' : isWarm ? '#F8F1DF' : PANEL_BG;
+  const T_CELL_BG = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : CELL_BG;
+  const T_TEXT_MAIN = isPaper ? '#2F2A26' : TEXT_MAIN;
+  const T_TEXT_SUB = isPaper ? '#6A625B' : TEXT_SUB;
+  const T_TEXT_DIM = isPaper ? '#6A625B' : TEXT_DIM;
+  // Speak / positive — sage (Modified Fitzgerald)
+  const T_SUCCESS_BG = isPaper ? '#DFE8DC' : SUCCESS_BG;
+  const T_SUCCESS_BORDER = isPaper ? '#5F7C58' : SUCCESS_BORDER;       // deeper sage
+  const T_SUCCESS_TEXT = isPaper ? '#3F5A38' : SUCCESS_TEXT;            // sage text-safe
+  // Backspace / corrective — coral
+  const T_DELETE_BG = isPaper ? '#F1DBD1' : DELETE_BG;
+  const T_DELETE_BORDER = isPaper ? '#A56D55' : DELETE_BORDER;          // deeper coral
+  const T_DELETE_TEXT = isPaper ? '#7A312E' : DELETE_TEXT;              // deeper warm maroon
+  // Letter hover — subtle warm-amber lift (Solarized)
+  const T_KEY_HOVER_BG = isLight ? '#F2E6C7' : isWarm ? '#F5EAC8' : KEYBOARD_THEME.keyHoverBg;
 
   // Buffer time when entering a zone to prevent accidental clicks
   useEffect(() => {
@@ -125,10 +148,10 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
         gridTemplateColumns: '1fr 1fr 1fr',
         gridTemplateRows: '1fr 1.06fr 0.72fr', // Give the current-word row slightly more room without materially shrinking functional keys
         gap: '1px', // Thin separator
-        backgroundColor: BORDER,
+        backgroundColor: T_BORDER,
         borderRadius: '14px', // Rounded outer corners for the whole unit
         overflow: 'hidden',
-        border: `1px solid ${BORDER}`,
+        border: `1px solid ${T_BORDER}`,
         ...style,
       }}>
         {/* ZONES */}
@@ -144,7 +167,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
               gridArea: zone.area,
               width: '100%',
               height: '100%',
-              backgroundColor: CELL_BG,
+              backgroundColor: T_CELL_BG,
               border: 'none',
               display: 'flex',
               flexDirection: 'column',
@@ -159,7 +182,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
             <div style={{
               fontSize: 'clamp(14px, 1.45vh, 18px)',
               fontWeight: 760,
-              color: TEXT_DIM,
+              color: T_TEXT_DIM,
               marginBottom: '6px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
@@ -178,7 +201,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
                 <span key={l} style={{
                   fontSize: 'clamp(38px, 4.5vh, 56px)',
                   fontWeight: 800,
-                  color: TEXT_MAIN,
+                  color: T_TEXT_MAIN,
                   width: '40px',
                   textAlign: 'center',
                   fontFamily: UI_FONT,
@@ -191,7 +214,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
         {/* DEAD ZONE */}
         <div style={{
           gridArea: 'center',
-          backgroundColor: PANEL_BG,
+          backgroundColor: T_PANEL_BG,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -203,7 +226,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
               <div style={{
                 fontSize: 'clamp(14px, 1.45vh, 18px)',
                 fontWeight: 760,
-                color: TEXT_DIM,
+                color: T_TEXT_DIM,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 fontFamily: UI_FONT,
@@ -213,7 +236,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
               <div style={{
                 fontSize: 'clamp(44px, 5.3vh, 62px)',
                 fontWeight: 820,
-                color: TEXT_MAIN,
+                color: T_TEXT_MAIN,
                 textAlign: 'center',
                 lineHeight: 1.02,
                 padding: '0 18px',
@@ -229,7 +252,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
               width: '12px',
               height: '12px',
               borderRadius: '50%',
-              backgroundColor: BORDER,
+              backgroundColor: T_BORDER,
               opacity: 0.5
             }} />
           )}
@@ -241,7 +264,7 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
           display: 'grid',
           gridTemplateColumns: '1.25fr 1fr 1fr 1fr 1fr 1fr 1.25fr', // Reduced DEL/SPACE width to widen numbers
           gap: '1px', // Keep the thin lines
-          backgroundColor: BORDER,
+          backgroundColor: T_BORDER,
           width: '100%',
           height: '100%',
         }}>
@@ -252,9 +275,9 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
             gazeEnabledTimestamp={gazeEnabledTimestamp}
             onClick={onDelete}
             style={{
-              backgroundColor: DELETE_BG,
-              border: `1px solid ${DELETE_BORDER}`,
-              color: DELETE_TEXT,
+              backgroundColor: T_DELETE_BG,
+              border: `1px solid ${T_DELETE_BORDER}`,
+              color: T_DELETE_TEXT,
               fontWeight: 800,
               fontSize: 'clamp(22px, 2.5vh, 32px)',
               width: '100%', height: '100%',
@@ -272,9 +295,9 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
               gazeEnabledTimestamp={gazeEnabledTimestamp}
               onClick={() => onNumberSelected?.(val)}
               style={{
-                backgroundColor: CELL_BG,
-                border: `1px solid ${BORDER}`,
-                color: TEXT_MAIN,
+                backgroundColor: T_CELL_BG,
+                border: `1px solid ${T_BORDER}`,
+                color: T_TEXT_MAIN,
                 fontWeight: 800,
                 fontSize: 'clamp(34px, 4vh, 46px)',
                 width: '100%', height: '100%',
@@ -291,9 +314,9 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
             gazeEnabledTimestamp={gazeEnabledTimestamp}
             onClick={onSpace}
             style={{
-              backgroundColor: SUCCESS_BG,
-              color: SUCCESS_TEXT,
-              border: `1px solid ${SUCCESS_BORDER}`,
+              backgroundColor: T_SUCCESS_BG,
+              color: T_SUCCESS_TEXT,
+              border: `1px solid ${T_SUCCESS_BORDER}`,
               fontWeight: 800,
               fontSize: 'clamp(24px, 2.9vh, 36px)',
               width: '100%', height: '100%',
@@ -319,10 +342,10 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
         gridTemplateColumns: '1fr 1fr 1fr',
         gridTemplateRows: zone.letters.length > 5 ? '1fr 1fr 0.5fr' : '1fr 1fr',
         gap: '1px',
-        backgroundColor: BORDER,
+        backgroundColor: T_BORDER,
         borderRadius: '14px',
         overflow: 'hidden',
-        border: `1px solid ${BORDER}`,
+        border: `1px solid ${T_BORDER}`,
       }}>
         {/* Letters */}
         {zone.letters.map((char) => (
@@ -333,9 +356,9 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
             gazeEnabledTimestamp={gazeEnabledTimestamp}
             onClick={() => handleLetterClick(char)}
             style={{
-              backgroundColor: CELL_BG,
-              border: `1px solid ${BORDER}`,
-              color: TEXT_MAIN,
+              backgroundColor: T_CELL_BG,
+              border: `1px solid ${T_BORDER}`,
+              color: T_TEXT_MAIN,
               fontSize: 'clamp(66px, 11.2vh, 108px)',
               fontWeight: 800,
               width: '100%', height: '100%',
@@ -356,9 +379,9 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
           dwellCategory="navigationButton"
           style={{
             gridColumn: zone.letters.length > 5 ? '1 / -1' : 'auto', // Span if needed
-            backgroundColor: KEYBOARD_THEME.keyHoverBg,
-            border: `1px solid ${BORDER}`,
-            color: TEXT_SUB,
+            backgroundColor: T_KEY_HOVER_BG,
+            border: `1px solid ${T_BORDER}`,
+            color: T_TEXT_SUB,
             fontSize: 'clamp(28px, 3.2vh, 40px)',
             fontWeight: 700,
             textTransform: 'uppercase',

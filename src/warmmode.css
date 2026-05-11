@@ -1,0 +1,947 @@
+/**
+ * GazeConnect Pro - Warm Mode (Warm Paper / Medical-Grade Aesthetic)
+ * ===================================================================
+ * CSS-only overrides scoped to [data-theme="warm"].
+ * Uses !important to override inline styles from JSX.
+ *
+ * FROZEN — ONLY these properties may change:
+ *   background / background-color / background-image (gradients)
+ *   color (text only)
+ *   font-family (NOT font-size, NOT font-weight)
+ *   border-color (NOT border-width or border-style)
+ *   box-shadow
+ *   backdrop-filter
+ *   opacity of decorative non-interactive elements
+ *   fill/stroke of decorative SVGs only
+ *
+ * AAC REQUIREMENTS:
+ *   All text contrast >= 4.5:1 against warm-paper backgrounds
+ *   Gaze cursor: warm dark on cream with teal-grey dwell ring
+ *   Dwell ring: muted teal-grey on light backgrounds
+ *   No decorative element within 40px of any gaze target
+ *   All decorative SVGs: pointer-events:none, z-index:0
+ *   No new transition longer than 300ms
+ *
+ * REFERENCE PALETTE: WARM_PAPER_PALETTE.md (research team color document)
+ */
+
+/* ═══════════════════════════════════════════════════════
+   CSS CUSTOM PROPERTIES — WARM MODE ONLY
+   ═══════════════════════════════════════════════════════ */
+[data-theme="warm"] {
+  /* Surfaces */
+  --wm-root:           #F5EEDF;   /* page bg */
+  --wm-bg-start:       #FCF4DD;   /* gradient top/center — warm peach */
+  --wm-bg-end:         #EBDDC2;   /* gradient outer — deeper warm cream */
+  --wm-surface:        #FBF5E5;   /* main cards */
+  --wm-surface-soft:   #F8F0DC;   /* secondary cards */
+  --wm-surface-alt:    #F8F1DF;   /* panels */
+  --wm-elevated:       #FBF5E5;   /* modals / floats */
+  --wm-sunken:         #EDE3CD;   /* nav rails / inputs */
+  --wm-header:         #F8F1DF;   /* top bar */
+  --wm-sidebar:        #F8F1DF;   /* left nav */
+
+  /* ─── SURFACE FILLS (intentionally flat — paper, not glossy) ─── */
+  /* Earlier 3-stop white→cream gradients on cards read as wet/glossy and broke
+     the medical-paper feel. Reverted to flat fills; the eye reads consistent
+     paper as calmer than any gradient could. */
+  --wm-surface-grad:        var(--wm-surface);
+  --wm-surface-soft-grad:   var(--wm-surface-soft);
+  --wm-panel-grad:          var(--wm-surface-alt);
+  --wm-header-grad:         var(--wm-header);
+  /* Page background keeps a very mild radial only on Home (already wired) */
+  --wm-page-grad:
+    radial-gradient(ellipse at 50% 0%,
+      var(--wm-bg-start) 0%,
+      var(--wm-root) 50%,
+      var(--wm-bg-end) 100%);
+
+  /* Text */
+  --wm-text:           #2F2A26;   /* ~6.8:1 on #F5EEDF, ~13.96:1 on #FBF5E5 cards (master palette canonical) */
+  --wm-text-2:         #6A625B;
+  --wm-text-3:         #8A7C6B;
+  --wm-text-disabled:  #A69A8E;
+  --wm-text-hindi:     #5C4F44;
+  --wm-text-on-maroon: #FFF7EF;
+  --wm-text-on-teal:   #FBF5E5;
+  --wm-text-on-gold:   #2F2A26;
+  --wm-icon:           #2F2A26;
+  --wm-icon-warm:      #7A5638;          /* deeper warm brown — matches palette */
+
+  /* Borders — hairline, lets gradient + shadow do the work */
+  --wm-border:         rgba(122, 99, 71, 0.16);
+  --wm-border-light:   rgba(122, 99, 71, 0.10);
+  --wm-border-strong:  rgba(122, 99, 71, 0.28);
+  --wm-border-focus:   #6E8F8B;
+  --wm-divider:        rgba(122, 99, 71, 0.22);
+
+  /* Accents — DEEPER, RICHER warm-muted palette for premium-medical feel.
+     Each accent is the saturated/darkened "richer" version of its prior
+     pastel. Sky-blue (--wm-sky) is added as a first-class accent and used
+     more often across the UI for variety + the "global / configuration"
+     metaphor. Coral / brown / umber are also promoted to first-class so
+     screens can pull from a richer cross-screen palette. */
+  --wm-teal:           #3F6968;          /* deeper muted teal — primary action */
+  --wm-teal-hover:     #355956;
+  --wm-teal-soft:      #DCE7E5;
+  --wm-teal-ring:      #6E8F8B;
+  --wm-emergency:      #7A312E;          /* deeper warm maroon */
+  --wm-emergency-hover:#682825;
+  --wm-emergency-deep: #4F1E1F;
+  --wm-emergency-soft: #F1DBD1;
+  --wm-gold:           #85703D;          /* deeper rich gold (was #C9A96B) */
+  --wm-gold-strong:    #6E5C32;
+  --wm-gold-soft:      #EFE3C8;
+  --wm-sage:           #5F7C58;          /* deeper sage */
+  --wm-sage-soft:      #DFE8DC;
+  --wm-peach:          #D89B7E;          /* deeper peach */
+  --wm-peach-soft:     #F1DBCB;
+  --wm-rose:           #8B5E5F;
+  --wm-coral:          #A56D55;          /* deeper warm coral */
+  --wm-coral-soft:     #F1DBD1;
+  --wm-sky:            #4F7388;          /* deeper dusty sky blue (NEW first-class) */
+  --wm-sky-soft:       #E2ECEF;
+  --wm-sky-text:       #3D5E73;          /* sky text-safe variant */
+  --wm-info:           #4F7388;          /* info uses sky blue */
+  --wm-umber:          #65543E;          /* deeper umber */
+  --wm-brown:          #7A5638;          /* deeper warm brown */
+  --wm-lavender:       #6B5F84;          /* deeper muted lavender */
+
+  /* ─── ELEVATION (restrained, medical-grade — no shine, no halo) ─── */
+  /* Tobii Dynavox / Apple Health style: barely-perceptible single shadow.
+     Depth comes from hairline borders + clean spacing, NOT from layered glow. */
+  --wm-shadow-sm:    0 1px 2px rgba(82, 65, 48, 0.04);
+  --wm-shadow-card:  0 1px 2px rgba(82, 65, 48, 0.05);
+  --wm-shadow-hover: 0 2px 6px rgba(82, 65, 48, 0.07);
+  --wm-shadow-float: 0 4px 12px rgba(82, 65, 48, 0.10);
+  /* Inner halo intentionally empty — the bright top edge read as "shine"
+     and broke the medical-paper feel. Depth is now from border + flat fill. */
+  --wm-shadow-inner-halo: none;
+
+  /* Fonts (family only — no size/weight changes) */
+  --wm-font-en:   'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif;
+  --wm-font-hi:   'Baloo 2', 'Noto Sans Devanagari', sans-serif;
+  --wm-font-num:  'Orbitron', monospace;
+
+  /* ─── TYPOGRAPHY (warm only — restrained, medical-grade) ─── */
+  /* Tracking is gentle, not editorial-tight. Leading favors readability over
+     density. Weights stay in calm 500-700 range — no inflated 820 display
+     weights that read as "marketing site" rather than "medical software". */
+  --wm-tracking-title:   0;          /* H2/H3 — neutral, no character squeeze */
+  --wm-tracking-body:    0.005em;    /* Body — slightly loose for readability */
+  --wm-tracking-label:   0.03em;     /* All-caps labels — gentle open */
+  --wm-tracking-hindi:   0.015em;    /* Devanagari needs a touch of breathing room */
+  --wm-leading-title:    1.20;
+  --wm-leading-body:     1.55;
+  --wm-leading-label:    1.0;
+  --wm-leading-hindi:    1.4;
+
+  /* ─── MOTION (warm only) ─── */
+  --wm-ease:        cubic-bezier(0.22, 0.61, 0.36, 1);
+  --wm-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --wm-duration-fast: 160ms;
+  --wm-duration-mid:  240ms;
+  --wm-duration-slow: 360ms;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLOBAL BODY OVERRIDE
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] body,
+html.theme-warm body {
+  background-color: var(--wm-root) !important;
+  color: var(--wm-text) !important;
+}
+
+/* Scrollbar */
+html[data-theme="warm"] ::-webkit-scrollbar-track,
+html.theme-warm ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+html[data-theme="warm"] ::-webkit-scrollbar-thumb,
+html.theme-warm ::-webkit-scrollbar-thumb {
+  background: var(--wm-border-strong) !important;
+}
+html[data-theme="warm"] ::-webkit-scrollbar-thumb:hover,
+html.theme-warm ::-webkit-scrollbar-thumb:hover {
+  background: var(--wm-teal-ring) !important;
+}
+
+/* Focus ring */
+html[data-theme="warm"] :focus-visible,
+html.theme-warm :focus-visible {
+  outline-color: var(--wm-teal) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   HOME SCREEN
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .home-screen,
+html.theme-warm .home-screen {
+  background:
+    radial-gradient(circle at 50% 8%, var(--wm-bg-start) 0%, var(--wm-root) 52%, var(--wm-bg-end) 100%) !important;
+}
+
+html[data-theme="warm"] .brand-title,
+html.theme-warm .brand-title {
+  color: var(--wm-text-2) !important;
+  font-family: var(--wm-font-en) !important;
+  font-style: italic !important;
+}
+
+html[data-theme="warm"] .grid-card,
+html.theme-warm .grid-card {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .grid-card-communication,
+html[data-theme="warm"] .grid-card-keyboard,
+html[data-theme="warm"] .grid-card-people,
+html[data-theme="warm"] .grid-card-web,
+html[data-theme="warm"] .grid-card-design,
+html[data-theme="warm"] .grid-card-activities,
+html[data-theme="warm"] .grid-card-settings,
+html[data-theme="warm"] .grid-card-assistance,
+html.theme-warm .grid-card-communication,
+html.theme-warm .grid-card-keyboard,
+html.theme-warm .grid-card-people,
+html.theme-warm .grid-card-web,
+html.theme-warm .grid-card-design,
+html.theme-warm .grid-card-activities,
+html.theme-warm .grid-card-settings,
+html.theme-warm .grid-card-assistance {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+}
+
+html[data-theme="warm"] .grid-card-label,
+html.theme-warm .grid-card-label {
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .grid-card:hover,
+html.theme-warm .grid-card:hover {
+  box-shadow: var(--wm-shadow-hover) !important;
+  border-color: var(--wm-border-strong) !important;
+  transition: box-shadow 220ms ease-out, transform 220ms ease-out, border-color 220ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="warm"] .grid-card:hover,
+  html.theme-warm .grid-card:hover {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Quick access pill buttons (Pain, Fever, Yes, No, etc.) */
+html[data-theme="warm"] .quick-access-btn,
+html.theme-warm .quick-access-btn {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-sm) !important;
+  color: var(--wm-text) !important;
+}
+
+html[data-theme="warm"] .quick-access-btn:hover,
+html.theme-warm .quick-access-btn:hover {
+  box-shadow: var(--wm-shadow-card) !important;
+  background: var(--wm-surface-soft-grad) !important;
+}
+
+/* YES / ENABLEGAZE / NO buttons */
+html[data-theme="warm"] .yes-btn,
+html.theme-warm .yes-btn {
+  background: var(--wm-sage) !important;
+  border-color: rgba(125, 148, 117, 0.72) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-text-on-teal) !important;
+}
+
+html[data-theme="warm"] .enablegaze-btn,
+html.theme-warm .enablegaze-btn {
+  background: var(--wm-teal-soft) !important;
+  border-color: rgba(73, 119, 117, 0.55) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-teal) !important;
+}
+
+html[data-theme="warm"] .no-btn,
+html.theme-warm .no-btn {
+  background: var(--wm-rose) !important;
+  border-color: rgba(169, 107, 108, 0.78) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-text-on-teal) !important;
+}
+
+/* Magnify overlay */
+html[data-theme="warm"] .magnify-overlay,
+html.theme-warm .magnify-overlay {
+  background: rgba(255, 253, 248, 0.96) !important;
+  border-color: rgba(73, 119, 117, 0.32) !important;
+  box-shadow: var(--wm-shadow-float) !important;
+  backdrop-filter: blur(12px) !important;
+  color: var(--wm-text) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLOBAL NAV BAR
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .nav-pill,
+html.theme-warm .nav-pill {
+  background: var(--wm-header-grad) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-sm) !important;
+}
+
+html[data-theme="warm"] .nav-pill .nav-btn,
+html.theme-warm .nav-pill .nav-btn {
+  color: var(--wm-text-2) !important;
+  background: transparent !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .nav-pill .nav-btn:hover,
+html.theme-warm .nav-pill .nav-btn:hover {
+  background: var(--wm-surface-soft-grad) !important;
+  color: var(--wm-text) !important;
+}
+
+html[data-theme="warm"] .nav-pill .nav-btn-active,
+html.theme-warm .nav-pill .nav-btn-active {
+  color: var(--wm-text-on-teal) !important;
+  background: var(--wm-teal) !important;
+  border-color: var(--wm-teal-hover) !important;
+  box-shadow: inset 0 0 0 1px rgba(73, 119, 117, 0.30) !important;
+  border-radius: 10px !important;
+}
+
+html[data-theme="warm"] .nav-pill .nav-btn-back,
+html.theme-warm .nav-pill .nav-btn-back {
+  background: var(--wm-panel-grad) !important;
+  border-color: var(--wm-border) !important;
+  color: var(--wm-text-2) !important;
+}
+
+html[data-theme="warm"] .nav-pill .nav-btn-back:hover,
+html.theme-warm .nav-pill .nav-btn-back:hover {
+  background: var(--wm-sunken) !important;
+  color: var(--wm-text) !important;
+}
+
+html[data-theme="warm"] .window-control-btn,
+html.theme-warm .window-control-btn {
+  background: var(--wm-panel-grad) !important;
+  color: var(--wm-text-2) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PHRASES / MEDICAL / FEELINGS / NEEDS / ACTIVITIES / PEOPLE
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .phrases-screen,
+html[data-theme="warm"] .medical-screen,
+html[data-theme="warm"] .feelings-screen,
+html[data-theme="warm"] .needs-screen,
+html[data-theme="warm"] .activities-screen,
+html[data-theme="warm"] .people-screen,
+html[data-theme="warm"] .quickwords-screen,
+html.theme-warm .phrases-screen,
+html.theme-warm .medical-screen,
+html.theme-warm .feelings-screen,
+html.theme-warm .needs-screen,
+html.theme-warm .activities-screen,
+html.theme-warm .people-screen,
+html.theme-warm .quickwords-screen {
+  background: var(--wm-root) !important;
+  color: var(--wm-text) !important;
+}
+
+html[data-theme="warm"] .phrase-card,
+html[data-theme="warm"] .medical-card,
+html[data-theme="warm"] .feeling-card,
+html[data-theme="warm"] .need-card,
+html[data-theme="warm"] .activity-card,
+html.theme-warm .phrase-card,
+html.theme-warm .medical-card,
+html.theme-warm .feeling-card,
+html.theme-warm .need-card,
+html.theme-warm .activity-card {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .phrase-card:hover,
+html[data-theme="warm"] .medical-card:hover,
+html[data-theme="warm"] .feeling-card:hover,
+html[data-theme="warm"] .need-card:hover,
+html[data-theme="warm"] .activity-card:hover,
+html.theme-warm .phrase-card:hover,
+html.theme-warm .medical-card:hover,
+html.theme-warm .feeling-card:hover,
+html.theme-warm .need-card:hover,
+html.theme-warm .activity-card:hover {
+  box-shadow: var(--wm-shadow-hover) !important;
+  border-color: var(--wm-border-strong) !important;
+  transition: box-shadow 220ms ease-out, transform 220ms ease-out, border-color 220ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="warm"] .phrase-card:hover,
+  html[data-theme="warm"] .medical-card:hover,
+  html[data-theme="warm"] .feeling-card:hover,
+  html[data-theme="warm"] .need-card:hover,
+  html[data-theme="warm"] .activity-card:hover,
+  html.theme-warm .phrase-card:hover,
+  html.theme-warm .medical-card:hover,
+  html.theme-warm .feeling-card:hover,
+  html.theme-warm .need-card:hover,
+  html.theme-warm .activity-card:hover {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+html[data-theme="warm"] .category-sidebar,
+html.theme-warm .category-sidebar {
+  background: var(--wm-sidebar) !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-sm) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIVE CLOCK
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .live-clock-day,
+html.theme-warm .live-clock-day {
+  color: var(--wm-text-2) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .live-clock-time,
+html.theme-warm .live-clock-time {
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-num) !important;
+}
+
+html[data-theme="warm"] .live-clock-time-shadow,
+html.theme-warm .live-clock-time-shadow {
+  text-shadow: none !important;
+}
+
+html[data-theme="warm"] .live-clock-ampm,
+html.theme-warm .live-clock-ampm {
+  color: var(--wm-text-2) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GAZE CURSOR — MUST REMAIN VISIBLE ON WARM PAPER
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .gaze-cursor-ring,
+html.theme-warm .gaze-cursor-ring {
+  border-color: rgba(47, 42, 38, 0.62) !important;
+  background-color: rgba(255, 253, 248, 0.78) !important;
+  box-shadow: 0 2px 8px rgba(122, 99, 71, 0.10) !important;
+}
+
+html[data-theme="warm"] .gaze-cursor-ring.dwelling,
+html.theme-warm .gaze-cursor-ring.dwelling {
+  border-color: var(--wm-teal-ring) !important;
+  background-color: rgba(110, 143, 139, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(110, 143, 139, 0.18) !important;
+}
+
+html[data-theme="warm"] .gaze-cursor-ring.locked,
+html.theme-warm .gaze-cursor-ring.locked {
+  border-color: var(--wm-teal) !important;
+  background-color: rgba(73, 119, 117, 0.10) !important;
+  box-shadow: 0 2px 8px rgba(73, 119, 117, 0.18) !important;
+}
+
+html[data-theme="warm"] .dwell-ring-svg circle,
+html.theme-warm .dwell-ring-svg circle {
+  stroke: var(--wm-teal-ring) !important;
+}
+
+html[data-theme="warm"] .gaze-cursor-dot,
+html.theme-warm .gaze-cursor-dot {
+  background-color: rgba(47, 42, 38, 0.85) !important;
+}
+
+html[data-theme="warm"] .gaze-cursor-dot.dwelling,
+html.theme-warm .gaze-cursor-dot.dwelling {
+  background-color: var(--wm-teal-ring) !important;
+}
+
+html[data-theme="warm"] .gaze-cursor-dot.locked,
+html.theme-warm .gaze-cursor-dot.locked {
+  background-color: var(--wm-teal) !important;
+}
+
+html[data-theme="warm"] .gaze-status-indicator,
+html.theme-warm .gaze-status-indicator {
+  background-color: var(--wm-surface) !important;
+  color: var(--wm-text) !important;
+  border-color: var(--wm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CONNECTION INDICATOR
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .connection-indicator,
+html.theme-warm .connection-indicator {
+  background-color: rgba(125, 148, 117, 0.14) !important;
+  border-color: rgba(125, 148, 117, 0.55) !important;
+  color: var(--wm-sage) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   THEME TOGGLE PILL (Settings screen)
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .theme-toggle-pill,
+html.theme-warm .theme-toggle-pill {
+  background: var(--wm-panel-grad) !important;
+  border-color: var(--wm-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   WEB BROWSING HUB SCREEN
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .web-hub-screen,
+html.theme-warm .web-hub-screen {
+  background: var(--wm-root) !important;
+}
+
+html[data-theme="warm"] .hub-card,
+html.theme-warm .hub-card {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .hub-card-news,
+html[data-theme="warm"] .hub-card-knowledge,
+html[data-theme="warm"] .hub-card-whatsapp,
+html.theme-warm .hub-card-news,
+html.theme-warm .hub-card-knowledge,
+html.theme-warm .hub-card-whatsapp {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+}
+
+html[data-theme="warm"] .hub-card-youtube,
+html.theme-warm .hub-card-youtube {
+  background: var(--wm-peach-soft) !important;
+  border-color: rgba(169, 107, 108, 0.32) !important;
+}
+
+html[data-theme="warm"] .hub-card-search,
+html.theme-warm .hub-card-search {
+  background: var(--wm-sage-soft) !important;
+  border-color: rgba(125, 148, 117, 0.32) !important;
+}
+
+html[data-theme="warm"] .hub-card-social,
+html.theme-warm .hub-card-social {
+  background: var(--wm-teal-soft) !important;
+  border-color: rgba(95, 127, 121, 0.32) !important;
+}
+
+html[data-theme="warm"] .hub-card-label,
+html.theme-warm .hub-card-label {
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .hub-card-label-hi,
+html.theme-warm .hub-card-label-hi {
+  color: var(--wm-text-hindi) !important;
+  font-family: var(--wm-font-hi) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   KEYBOARD SCREEN — Research-grounded AAC zone coloring
+   ═══════════════════════════════════════════════════════
+   Color zones follow:
+   - Tobii Communicator 5 + Smartbox Grid 3: colored borders on neutral fills
+     (preserves background continuity, avoids fatigue)
+   - Wilkinson/Thistle PMC4599784: muted tints + colored borders > saturated fills
+     (saturated bg slows scan; muted maintains scan speed)
+   - Modified Fitzgerald Key (Goossens / PrAACtical AAC):
+       Red/coral = corrective/negation (Backspace, Delete)
+       Green/sage = positive/affirmative (Speak)
+       Blue = primary action / configuration (Quick Words, Space-teal)
+       Yellow/gold = alternate input (Word, 123)
+   - Solarized + PMC11175232: warm hues = lower fatigue, higher blink rate
+       (good for ALS users with reduced blink rate 3-7/min)
+   - WCAG 2.1 SC 1.4.11: 3:1 boundary contrast between zones,
+       4.5:1 text contrast on action keys
+   =================================================================== */
+html[data-theme="warm"] .keyboard-screen,
+html.theme-warm .keyboard-screen {
+  background: var(--wm-root) !important;
+}
+
+/* Default letter key — neutral paper-cream (Solarized base3 territory).
+   No per-letter color: meaning is carried by position, not color
+   (research: vowel/consonant tinting has no documented benefit). */
+html[data-theme="warm"] .keyboard-key,
+html.theme-warm .keyboard-key {
+  background: var(--wm-surface) !important;
+  border: 2px solid var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-sm) !important;
+  color: var(--wm-text) !important;
+  font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+html[data-theme="warm"] .keyboard-key[data-action="letter"]:hover,
+html.theme-warm .keyboard-key[data-action="letter"]:hover {
+  /* ~3% darker warm-amber lift — perceptible without flashing.
+     Research (Schlosser 2015): subtle hover state reduces fixation errors. */
+  background: #F5EAC8 !important;
+  border-color: var(--wm-border-strong) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+}
+
+/* ── BACKSPACE / DELETE WORD — Modified Fitzgerald "corrective red".
+   Muted coral fill (NOT saturated) per Wilkinson/Thistle. */
+html[data-theme="warm"] .keyboard-key[data-action="backspace"],
+html[data-theme="warm"] .keyboard-key[data-action="deleteWord"],
+html.theme-warm .keyboard-key[data-action="backspace"],
+html.theme-warm .keyboard-key[data-action="deleteWord"] {
+  background: #F1DBD1 !important;        /* warm coral tint */
+  border: 2px solid var(--wm-coral) !important;       /* deeper coral border */
+  color: var(--wm-emergency) !important; /* deeper warm maroon text — 6.85:1 AAA */
+}
+html[data-theme="warm"] .keyboard-key[data-action="backspace"]:hover,
+html[data-theme="warm"] .keyboard-key[data-action="deleteWord"]:hover,
+html.theme-warm .keyboard-key[data-action="backspace"]:hover,
+html.theme-warm .keyboard-key[data-action="deleteWord"]:hover {
+  background: #ECC9BD !important;        /* deeper coral tint on hover */
+  border-color: var(--wm-emergency) !important;
+}
+
+/* ── SPEAK — Modified Fitzgerald "positive sage". */
+html[data-theme="warm"] .keyboard-key[data-action="speak"],
+html.theme-warm .keyboard-key[data-action="speak"] {
+  background: var(--wm-sage-soft) !important;   /* sage tint */
+  border: 2px solid var(--wm-sage) !important;  /* deeper sage border */
+  color: #3F5A38 !important;                    /* sage text-safe ~5.5:1 */
+}
+html[data-theme="warm"] .keyboard-key[data-action="speak"]:hover,
+html.theme-warm .keyboard-key[data-action="speak"]:hover {
+  background: #D2DECE !important;
+  border-color: #4F6B47 !important;
+}
+
+/* ── QUICK WORDS — Alt input, sky-blue per diversification.
+   Distinct from Speak (green) and Backspace (red); used heavily. */
+html[data-theme="warm"] .keyboard-key[data-action="quickWords"],
+html.theme-warm .keyboard-key[data-action="quickWords"] {
+  background: var(--wm-sky-soft) !important;    /* very light sky tint */
+  border: 2px solid var(--wm-sky) !important;   /* deeper sky blue border */
+  color: var(--wm-sky-text) !important;         /* sky text-safe ~6:1 */
+}
+html[data-theme="warm"] .keyboard-key[data-action="quickWords"]:hover,
+html.theme-warm .keyboard-key[data-action="quickWords"]:hover {
+  background: #D6E2E8 !important;
+  border-color: var(--wm-sky-text) !important;
+}
+
+/* ── SHIFT — Modifier key, neutral warm tan (no Fitzgerald color). */
+html[data-theme="warm"] .keyboard-key[data-action="shift"],
+html.theme-warm .keyboard-key[data-action="shift"] {
+  background: #F4ECD8 !important;        /* neutral warm tan */
+  border: 2px solid var(--wm-border-strong) !important;
+  color: var(--wm-text) !important;
+}
+html[data-theme="warm"] .keyboard-key[data-action="shift"]:hover,
+html.theme-warm .keyboard-key[data-action="shift"]:hover {
+  background: #EBDFC0 !important;
+  border-color: var(--wm-umber) !important;
+}
+
+/* ── 123 — Alt input, deeper umber border. */
+html[data-theme="warm"] .keyboard-key[data-action="toggleNumbers"],
+html.theme-warm .keyboard-key[data-action="toggleNumbers"] {
+  background: var(--wm-surface) !important;
+  border: 2px solid var(--wm-umber) !important;
+  color: var(--wm-umber) !important;
+}
+html[data-theme="warm"] .keyboard-key[data-action="toggleNumbers"]:hover,
+html.theme-warm .keyboard-key[data-action="toggleNumbers"]:hover {
+  background: #F1E8D2 !important;
+  border-color: #4F4231 !important;
+}
+
+/* ── SPACE — Primary action, distinct neutral surface with teal accent. */
+html[data-theme="warm"] .keyboard-key[data-action="space"],
+html.theme-warm .keyboard-key[data-action="space"] {
+  background: var(--wm-surface) !important;
+  border: 2px solid var(--wm-teal) !important;          /* deeper teal — primary */
+  color: var(--wm-text) !important;
+}
+html[data-theme="warm"] .keyboard-key[data-action="space"]:hover,
+html.theme-warm .keyboard-key[data-action="space"]:hover {
+  background: var(--wm-teal-soft) !important;
+  border-color: var(--wm-teal-hover) !important;
+}
+
+/* Prediction bar — slightly recessed warm tone, distinct from letter zone.
+   Research (Wilkinson/Thistle): zone separation improves scan time when
+   contrast is restrained (3:1 cluster boundary, not 4.5:1). */
+html[data-theme="warm"] .keyboard-prediction-bar,
+html.theme-warm .keyboard-prediction-bar {
+  background: #F4ECD8 !important;       /* recessed warm zone */
+  backdrop-filter: none !important;
+  border: 1px solid var(--wm-border-strong) !important;
+}
+
+html[data-theme="warm"] .prediction-word,
+html.theme-warm .prediction-word {
+  color: #5C4A2A !important;           /* warm dark-brown ~7.5:1 AAA */
+  font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+/* Text area / typed-text display — sunken paper affordance.
+   Recessed surface signals "output zone" vs raised letter keys. */
+html[data-theme="warm"] .keyboard-text-area,
+html.theme-warm .keyboard-text-area {
+  background: var(--wm-surface) !important;
+  color: var(--wm-text) !important;
+  border: 1px solid var(--wm-border-strong) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SETTINGS SCREEN
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .settings-screen,
+html.theme-warm .settings-screen {
+  background: var(--wm-root) !important;
+}
+
+html[data-theme="warm"] .settings-sidebar,
+html.theme-warm .settings-sidebar {
+  background: var(--wm-sidebar) !important;
+  border-color: var(--wm-border) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme="warm"] .settings-panel,
+html.theme-warm .settings-panel {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  color: var(--wm-text) !important;
+}
+
+html[data-theme="warm"] .settings-section-heading,
+html.theme-warm .settings-section-heading {
+  color: var(--wm-text-2) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .mouse-only-banner,
+html.theme-warm .mouse-only-banner {
+  background: var(--wm-gold-soft) !important;
+  border-color: rgba(201, 169, 107, 0.45) !important;
+  color: var(--wm-text) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   DESIGN HOME / FLOOR PLAN / SURVEY / COMPASS
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .design-home-screen,
+html[data-theme="warm"] .floor-plan-screen,
+html[data-theme="warm"] .survey-screen,
+html[data-theme="warm"] .compass-screen,
+html[data-theme="warm"] .advanced-map-screen,
+html.theme-warm .design-home-screen,
+html.theme-warm .floor-plan-screen,
+html.theme-warm .survey-screen,
+html.theme-warm .compass-screen,
+html.theme-warm .advanced-map-screen {
+  background: var(--wm-root) !important;
+}
+
+html[data-theme="warm"] .design-card,
+html.theme-warm .design-card {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .design-card-title,
+html.theme-warm .design-card-title {
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .design-card-desc,
+html.theme-warm .design-card-desc {
+  color: var(--wm-text-2) !important;
+}
+
+/* Survey buttons */
+html[data-theme="warm"] .survey-option-btn,
+html.theme-warm .survey-option-btn {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  color: var(--wm-text) !important;
+  box-shadow: var(--wm-shadow-sm) !important;
+  font-family: var(--wm-font-en) !important;
+}
+
+html[data-theme="warm"] .survey-option-btn.selected,
+html.theme-warm .survey-option-btn.selected {
+  background: var(--wm-teal-soft) !important;
+  border-color: var(--wm-teal) !important;
+  color: var(--wm-teal) !important;
+}
+
+html[data-theme="warm"] .survey-action-btn,
+html.theme-warm .survey-action-btn {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  color: var(--wm-text) !important;
+  font-family: var(--wm-font-en) !important;
+  box-shadow: var(--wm-shadow-sm) !important;
+}
+
+html[data-theme="warm"] .survey-action-btn.primary,
+html.theme-warm .survey-action-btn.primary {
+  background: var(--wm-teal) !important;
+  color: var(--wm-text-on-teal) !important;
+  border-color: var(--wm-teal-hover) !important;
+  box-shadow: var(--wm-shadow-card) !important;
+}
+
+/* Compass cells */
+html[data-theme="warm"] .compass-cell,
+html.theme-warm .compass-cell {
+  background: var(--wm-surface-grad) !important;
+  border-color: var(--wm-border) !important;
+  color: var(--wm-text-2) !important;
+}
+
+html[data-theme="warm"] .compass-cell.occupied,
+html.theme-warm .compass-cell.occupied {
+  background: var(--wm-teal-soft) !important;
+  border-color: var(--wm-teal) !important;
+  color: var(--wm-text) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SARVAM BLOOM DECORATIVE SVG
+   ═══════════════════════════════════════════════════════ */
+html[data-theme="warm"] .sarvam-bloom,
+html.theme-warm .sarvam-bloom {
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+}
+
+/* ═══════════════════════════════════════════════════════
+   EMERGENCY BUTTON — ALWAYS HIGH CONTRAST IN WARM MODE
+   ═══════════════════════════════════════════════════════ */
+/* Emergency styles intentionally NOT muted in warm mode.
+   They use the inline styles set by the JSX which the screens
+   already point at warm-maroon (#8A3B38) for warm theme. */
+
+/* ═══════════════════════════════════════════════════════
+   TYPOGRAPHY (warm only — restrained, medical-grade)
+   ═══════════════════════════════════════════════════════ */
+/* Card titles — keep weight calm (700 not 820). Tight tracking removed; on
+   a paper surface, neutral tracking reads as "publication", tight tracking
+   reads as "marketing landing page". */
+html[data-theme="warm"] .grid-card-label,
+html[data-theme="warm"] .design-card-title,
+html[data-theme="warm"] .hub-card-label,
+html.theme-warm .grid-card-label,
+html.theme-warm .design-card-title,
+html.theme-warm .hub-card-label {
+  letter-spacing: var(--wm-tracking-title) !important;
+  line-height: var(--wm-leading-title) !important;
+}
+
+/* Body / subtitles — slightly loose tracking aids long-duration readability */
+html[data-theme="warm"] .design-card-desc,
+html[data-theme="warm"] .lp-card .card-sub,
+html.theme-warm .design-card-desc,
+html.theme-warm .lp-card .card-sub {
+  letter-spacing: var(--wm-tracking-body) !important;
+  line-height: var(--wm-leading-body) !important;
+}
+
+/* Devanagari — Hindi text needs a touch of breathing room */
+html[data-theme="warm"] [lang="hi"],
+html[data-theme="warm"] .hub-card-label-hi,
+html.theme-warm [lang="hi"],
+html.theme-warm .hub-card-label-hi {
+  letter-spacing: var(--wm-tracking-hindi) !important;
+  line-height: var(--wm-leading-hindi) !important;
+}
+
+/* Antialiasing for the warm-paper surface — softer than default subpixel */
+html[data-theme="warm"] body,
+html.theme-warm body {
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   MOTION (warm only — quiet, no announced lift)
+   ═══════════════════════════════════════════════════════ */
+/* Cards change shadow + border quietly; no transform, no glow pulse.
+   The interface should feel still and stable for long-duration gaze. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="warm"] .grid-card,
+  html[data-theme="warm"] .phrase-card,
+  html[data-theme="warm"] .medical-card,
+  html[data-theme="warm"] .feeling-card,
+  html[data-theme="warm"] .need-card,
+  html[data-theme="warm"] .activity-card,
+  html[data-theme="warm"] .hub-card,
+  html[data-theme="warm"] .design-card,
+  html.theme-warm .grid-card,
+  html.theme-warm .phrase-card,
+  html.theme-warm .medical-card,
+  html.theme-warm .feeling-card,
+  html.theme-warm .need-card,
+  html.theme-warm .activity-card,
+  html.theme-warm .hub-card,
+  html.theme-warm .design-card {
+    transition:
+      box-shadow var(--wm-duration-mid) var(--wm-ease-out),
+      border-color var(--wm-duration-fast) var(--wm-ease-out)
+      !important;
+  }
+
+  html[data-theme="warm"] .nav-btn,
+  html.theme-warm .nav-btn {
+    transition:
+      background var(--wm-duration-fast) var(--wm-ease),
+      color var(--wm-duration-fast) var(--wm-ease)
+      !important;
+  }
+}
+
+/* Reduced motion — strip all transitions */
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="warm"] *,
+  html.theme-warm * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

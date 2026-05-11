@@ -157,34 +157,40 @@ export function FloorPlanViewerModal({
   initialCustomNotes = '',
 }: FloorPlanViewerProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
   const T_overlayBg = isLight
     ? 'rgba(74, 58, 42, 0.55)'
-    : isMix
-      ? 'rgba(0,0,0,0.78)'
-      : 'rgba(0,0,0,0.94)';
-  const T_modalBg = isLight ? '#EBE0CC' : isMix ? '#1A1611' : T.bg;
-  const T_panel = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.panel;
-  const T_card = isLight ? '#F5EDDB' : isMix ? '#2A2419' : T.card;
+    : isWarm
+      ? 'rgba(47, 42, 38, 0.50)'
+      : isMix
+        ? 'rgba(0,0,0,0.78)'
+        : 'rgba(0,0,0,0.94)';
+  const T_modalBg = isLight ? '#F2EDE0' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : T.bg;
+  const T_panel = isLight ? '#FAF5E8' : isWarm ? '#F8F1DF' : isMix ? '#241F18' : T.panel;
+  const T_card = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#2A2419' : T.card;
   const T_border = isLight
-    ? '#A89478'
-    : isMix
-      ? 'rgba(180, 147, 98, 0.42)'
-      : T.border;
-  const T_text = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.text;
-  const T_sub = isLight ? '#76624A' : isMix ? '#C4B697' : T.sub;
-  const T_dim = isLight ? '#9A8568' : isMix ? '#8E7E62' : T.dim;
-  const T_accent = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : T.accent;
+    ? '#D6CAB7'
+    : isWarm
+      ? '#DED2C2'
+      : isMix
+        ? 'rgba(180, 147, 98, 0.42)'
+        : T.border;
+  const T_text = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : T.text;
+  const T_sub = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : T.sub;
+  const T_dim = isLight ? '#9A8568' : isWarm ? '#8A7C6B' : isMix ? '#8E7E62' : T.dim;
+  const T_accent = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : T.accent;
   const T_accentSubtle = isLight
     ? 'rgba(31, 107, 126, 0.14)'
-    : isMix
-      ? 'rgba(94, 156, 168, 0.16)'
-      : T.accentSubtle;
-  const T_danger = isLight ? '#7A363A' : isMix ? '#9C5A53' : T.danger;
-  const T_blue = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : T.blue;
-  const T_elevated = isLight ? '#F5EDDB' : isMix ? '#2A2419' : T.elevatedBg;
+    : isWarm
+      ? '#E7EEEA'
+      : isMix
+        ? 'rgba(94, 156, 168, 0.16)'
+        : T.accentSubtle;
+  const T_danger = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#9C5A53' : T.danger;
+  const T_blue = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : T.blue;
+  const T_elevated = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#2A2419' : T.elevatedBg;
 
   const [style, setStyle] = useState<FloorPlanStyle>('modern');
   const [floor, setFloor] = useState<'ground' | 'first'>('ground');
@@ -371,9 +377,9 @@ export function FloorPlanViewerModal({
               floor={floor}
               miniBg={T_modalBg}
               miniBorder={T_border}
-              miniEmptyCellBg={isLight ? '#F5EDDB' : isMix ? '#241E16' : undefined}
+              miniEmptyCellBg={isLight ? '#FAF5E8' : isMix ? '#241E16' : undefined}
               miniEmptyText={isLight ? '#9A8568' : isMix ? '#8E7E62' : undefined}
-              miniDataText={isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : undefined}
+              miniDataText={isLight ? '#FBE9DE' : isMix ? '#FFFCF1' : undefined}
             />
           </div>
 

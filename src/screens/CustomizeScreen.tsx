@@ -405,7 +405,7 @@ const CustomizeScreen: React.FC<Props> = ({ onNavigate, isDarkMode = true }) => 
         </h1>
         <div style={{ flex: 1 }} />
         {isDirty && (
-          <span style={{ fontSize: 13, color: colors.warning.main, fontWeight: 600 }}>
+          <span style={{ fontSize: 13, color: colors.accentText.gold, fontWeight: 600 }}>
             Unsaved changes
           </span>
         )}

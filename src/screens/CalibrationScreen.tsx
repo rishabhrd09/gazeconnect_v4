@@ -296,7 +296,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
           <div style={{
             ...styles.resultsBadge,
             backgroundColor: isGood ? 'rgba(0, 229, 160, 0.15)' : 'rgba(255, 180, 50, 0.15)',
-            borderColor: isGood ? '#00E5A0' : '#FFB432',
+            borderColor: isGood ? '#497775' : '#D39C5C',
           }}>
             <span style={{ fontSize: '36px' }}>{isGood ? '✓' : '~'}</span>
           </div>
@@ -307,7 +307,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
 
           <p style={styles.resultsSubtitle}>
             Accuracy improved by{' '}
-            <span style={{ color: '#00E5A0', fontWeight: 700 }}>
+            <span style={{ color: '#497775', fontWeight: 700 }}>
               {Math.round(results.improvement_pct)}%
             </span>
           </p>
@@ -319,7 +319,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
               const top = pt.target[1] * 100;
               const offsetX = pt.offset[0] * 200; // Scale for visibility
               const offsetY = pt.offset[1] * 200;
-              const errColor = pt.accuracy_px < 40 ? '#00E5A0' : pt.accuracy_px < 80 ? '#FFB432' : '#FF4D4D';
+              const errColor = pt.accuracy_px < 40 ? '#497775' : pt.accuracy_px < 80 ? '#D39C5C' : '#FF4D4D';
 
               return (
                 <div
@@ -371,7 +371,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             <div style={styles.statArrow}>→</div>
             <div style={styles.statItem}>
               <span style={styles.statLabel}>After</span>
-              <span style={{ ...styles.statValue, color: '#00E5A0' }}>
+              <span style={{ ...styles.statValue, color: '#497775' }}>
                 {Math.round(results.post_correction_error_px || results.validation_error_px)}px
               </span>
             </div>
@@ -467,7 +467,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 style={{
                   ...styles.miniDot,
                   backgroundColor: completedPoints.includes(i)
-                    ? '#00E5A0'
+                    ? '#497775'
                     : i === currentTarget.index && !isDone
                     ? '#ffffff'
                     : 'rgba(255,255,255,0.2)',
@@ -521,7 +521,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 cy={PROGRESS_RING_SIZE / 2}
                 r={PROGRESS_RING_SIZE / 2 - 4}
                 fill="none"
-                stroke={isValidation ? '#FFB432' : '#00E5A0'}
+                stroke={isValidation ? '#D39C5C' : '#497775'}
                 strokeWidth="3"
                 strokeDasharray={`${2 * Math.PI * (PROGRESS_RING_SIZE / 2 - 4)}`}
                 strokeDashoffset={`${2 * Math.PI * (PROGRESS_RING_SIZE / 2 - 4) * (1 - progress)}`}
@@ -543,7 +543,7 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                   width: dynamicSize,
                   height: dynamicSize,
                   borderRadius: '50%',
-                  border: `2.5px solid ${isValidation ? '#FFB432' : isCollecting ? '#00E5A0' : 'rgba(255,255,255,0.5)'}`,
+                  border: `2.5px solid ${isValidation ? '#D39C5C' : isCollecting ? '#497775' : 'rgba(255,255,255,0.5)'}`,
                   position: 'absolute',
                   left: -dynamicSize / 2,
                   top: -dynamicSize / 2,
@@ -558,11 +558,11 @@ const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                   width: TARGET_DOT_SIZE,
                   height: TARGET_DOT_SIZE,
                   borderRadius: '50%',
-                  backgroundColor: isValidation ? '#FFB432' : isCollecting ? '#00E5A0' : '#ffffff',
+                  backgroundColor: isValidation ? '#D39C5C' : isCollecting ? '#497775' : '#ffffff',
                   position: 'absolute',
                   left: -TARGET_DOT_SIZE / 2,
                   top: -TARGET_DOT_SIZE / 2,
-                  boxShadow: `0 0 ${isCollecting ? 20 : 10}px ${isValidation ? '#FFB432' : isCollecting ? '#00E5A0' : 'rgba(255,255,255,0.3)'}`,
+                  boxShadow: `0 0 ${isCollecting ? 20 : 10}px ${isValidation ? '#D39C5C' : isCollecting ? '#497775' : 'rgba(255,255,255,0.3)'}`,
                   transition: 'background-color 0.3s, box-shadow 0.3s',
                 }}
               />
@@ -642,7 +642,7 @@ const styles: Record<string, React.CSSProperties> = {
   countdownNumber: {
     fontSize: 36,
     fontWeight: 700,
-    color: '#00E5A0',
+    color: '#497775',
     fontVariantNumeric: 'tabular-nums',
   },
   introHint: {
@@ -691,7 +691,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 48,
     height: 48,
     borderRadius: '50%',
-    backgroundColor: '#00E5A0',
+    backgroundColor: '#497775',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -783,7 +783,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: CAL_DIM,
   },
   continueButton: {
-    background: '#00E5A0',
+    background: '#497775',
     border: 'none',
     borderRadius: 12,
     color: CAL_BG,

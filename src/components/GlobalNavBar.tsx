@@ -151,7 +151,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     };
     const navigationColors = useHomeNavPalette ? homeNavigationColors : colors.navigation;
     const homeEmergencyStyle = theme === 'light'
-        ? { background: '#7A363A', text: '#FBE9DE', border: 'rgba(122, 54, 58, 0.6)' }
+        ? { background: '#8A3B38', text: '#FBE9DE', border: 'rgba(122, 54, 58, 0.6)' }
         : { background: '#4A2023', text: '#F0A5A5', border: '#8A3B38' };
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)
@@ -379,11 +379,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 justifyContent: 'center',
                                 gap: 'clamp(10px, 1.1vw, 18px)',
                                 transform: 'translateX(clamp(6px, 0.9vw, 16px))',
-                                color: theme === 'light' ? '#7A6347' : theme === 'mix' ? '#B49362' : '#B4AB96',
+                                color: theme === 'light' ? '#5A4530' : theme === 'warm' ? '#5A4530' : theme === 'mix' ? '#B49362' : '#B4AB96',
                                 fontFamily: navFontFamily,
-                                fontSize: theme === 'light' ? 'clamp(28px, 4vh, 48px)' : 'clamp(30px, 4.4vh, 54px)',
+                                fontSize: (theme === 'light' || theme === 'warm') ? 'clamp(28px, 4vh, 48px)' : 'clamp(30px, 4.4vh, 54px)',
                                 fontWeight: 850,
-                                letterSpacing: theme === 'light' ? '0.14em' : '0.18em',
+                                letterSpacing: (theme === 'light' || theme === 'warm') ? '0.14em' : '0.18em',
                                 textTransform: 'uppercase',
                                 lineHeight: 1,
                                 userSelect: 'none',

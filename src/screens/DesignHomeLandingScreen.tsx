@@ -36,11 +36,11 @@ const DARK_PAGE = {
 
 function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: DesignHomeLandingScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
 
   const pageTheme = isMix ? {
     bg: mixColors.home.root,
-    title: '#F0E2C4',
+    title: '#FFFCF1',
     subtitle: '#CDB98E',
     cardBg: mixColors.home.tileSurfaces.fp,
     cardBorder: mixColors.home.cardBorder,
@@ -50,18 +50,30 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
     iconBorder: 'rgba(78, 110, 105, 0.24)',
     titleText: mixColors.home.text,
     bodyText: mixColors.home.subtleText,
+  } : isWarm ? {
+    bg: '#F7F2E8',
+    title: '#2F2A26',
+    subtitle: '#6A625B',
+    cardBg: '#FFFDF8',
+    cardBorder: '#DED2C2',
+    cardShadow: '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)',
+    icon: '#497775',
+    iconBg: '#E7EEEA',
+    iconBorder: 'rgba(73, 119, 117, 0.32)',
+    titleText: '#2F2A26',
+    bodyText: '#6A625B',
   } : isLight ? {
-    bg: '#E6D7BA',
+    bg: '#F2EDE0',
     title: '#5A4530',
-    subtitle: '#6E5A42',
-    cardBg: '#BFB694',
-    cardBorder: 'rgba(122, 99, 71, 0.32)',
-    cardShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), 0 8px 18px rgba(82, 62, 38, 0.14)',
-    icon: '#3F5E5A',
-    iconBg: 'rgba(63, 94, 90, 0.08)',
-    iconBorder: 'rgba(63, 94, 90, 0.22)',
-    titleText: '#3B2D20',
-    bodyText: '#6E5A42',
+    subtitle: '#6A625B',
+    cardBg: '#FAF5E8',
+    cardBorder: 'rgba(122, 99, 71, 0.22)',
+    cardShadow: '0 6px 16px rgba(82, 65, 48, 0.10), 0 1px 3px rgba(82, 65, 48, 0.06)',
+    icon: '#497775',
+    iconBg: '#E7EEEA',
+    iconBorder: 'rgba(73, 119, 117, 0.32)',
+    titleText: '#2F2A26',
+    bodyText: '#6A625B',
   } : DARK_PAGE;
 
   const handleTileNavigate = useCallback((screen: string, title: string) => {
@@ -102,7 +114,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
   ];
 
   return (
-    <div className={`design-home-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
+    <div className={`design-home-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
       width: '100vw',
       height: '100vh',
       overflow: 'hidden',

@@ -1,9 +1,9 @@
 /**
- * ThemeContext — Dark/Light/Mix theme with maximum cascade coverage
- * ==============================================================
+ * ThemeContext — Dark/Light/Mix/Warm theme with maximum cascade coverage
+ * ======================================================================
  * Sets data-theme attribute on BOTH html AND body elements.
- * Also sets .theme-light / .theme-dark / .theme-mix classes as backup selectors.
- * Persists to localStorage for anti-flash on reload.
+ * Also sets .theme-light / .theme-dark / .theme-mix / .theme-warm classes
+ * as backup selectors. Persists to localStorage for anti-flash on reload.
  *
  * RULES:
  * - No layout, spacing, content, or functionality changes
@@ -20,13 +20,14 @@ import React, {
   type ReactNode,
 } from 'react';
 
-export type Theme = 'dark' | 'light' | 'mix';
+export type Theme = 'dark' | 'light' | 'mix' | 'warm';
 
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (t: Theme) => void;
   isLight: boolean;
   isMix: boolean;
+  isWarm: boolean;
 }
 
 export const ThemeContext = createContext<ThemeContextValue>({
@@ -34,6 +35,7 @@ export const ThemeContext = createContext<ThemeContextValue>({
   setTheme: () => {},
   isLight: false,
   isMix: false,
+  isWarm: false,
 });
 
 function applyTheme(theme: Theme) {
@@ -46,16 +48,20 @@ function applyTheme(theme: Theme) {
   html.classList.toggle('theme-light', theme === 'light');
   html.classList.toggle('theme-dark', theme === 'dark');
   html.classList.toggle('theme-mix', theme === 'mix');
+  html.classList.toggle('theme-warm', theme === 'warm');
   body.classList.toggle('theme-light', theme === 'light');
   body.classList.toggle('theme-dark', theme === 'dark');
   body.classList.toggle('theme-mix', theme === 'mix');
+  body.classList.toggle('theme-warm', theme === 'warm');
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     try {
       const saved = localStorage.getItem('gc-theme') as Theme;
-      return saved === 'light' || saved === 'mix' ? saved : 'dark';
+      return saved === 'light' || saved === 'mix' || saved === 'warm'
+        ? saved
+        : 'dark';
     } catch {
       return 'dark';
     }
@@ -85,6 +91,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme,
       isLight: theme === 'light',
       isMix: theme === 'mix',
+      isWarm: theme === 'warm',
     }}>
       {children}
     </ThemeContext.Provider>
