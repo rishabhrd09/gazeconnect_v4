@@ -1,5 +1,6 @@
 import React from 'react';
-import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
+import { darkColors, lightColors, warmColors, layout, typography, spacing } from '../../../utils/design';
+import { useTheme } from '../../../contexts/ThemeContext';
 import GazeButton from '../../core/GazeButton';
 
 interface SelectSettingProps {
@@ -19,12 +20,13 @@ const SelectSetting: React.FC<SelectSettingProps> = ({
   onChange,
   isDarkMode,
 }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const { isWarm } = useTheme();
+  const colors = isWarm ? warmColors : isDarkMode ? darkColors : lightColors;
 
   return (
     <div style={{
       padding: spacing[4],
-      backgroundColor: colors.background.secondary,
+      backgroundColor: isWarm ? warmColors.background.elevated : colors.background.secondary,
       borderRadius: layout.borderRadius.lg,
       border: `1px solid ${colors.border.main}`,
     }}>

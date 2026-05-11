@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GazeButton from '../components/core/GazeButton';
 import { darkColors, screenThemes, typography } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
+import { useTheme } from '../contexts/ThemeContext';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import ZoneBoard from '../components/ZoneBoard';
 import QuickWordsOverlay from '../components/QuickWordsOverlay';
@@ -79,12 +80,18 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
   fontSize = 'clamp(30px, 3.35vh, 42px)',
   style,
 }) => {
+  const { isLight, isWarm } = useTheme();
+  const isPaper = isLight || isWarm;
+  const T_BORDER = isPaper ? '#DED2C2' : BORDER_COLOR;
+  const T_SUGGESTION_BG = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : SUGGESTION_BG;
+  const T_TEXT_MAIN = isPaper ? '#2F2A26' : TEXT_MAIN;
+  const T_TEXT_DIM = isPaper ? '#6A625B' : TEXT_DIM;
   return (
     // Wrapper handles positioning and external style (radius, border, etc)
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, width: '100%', overflow: 'hidden', ...style }}>
       {/* Title (Small Label) */}
       <div style={{
-        color: TEXT_DIM, fontWeight: 760, fontSize: 'clamp(14px, 1.45vh, 18px)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '4px',
+        color: T_TEXT_DIM, fontWeight: 760, fontSize: 'clamp(14px, 1.45vh, 18px)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '4px',
         fontFamily: UI_FONT,
       }}>{title}</div>
 
@@ -96,13 +103,13 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
           gap: '1px', // The separator
           height: '100%', // Fill wrapper height (controlled by prop)
           minHeight: height,
-          backgroundColor: BORDER_COLOR,
+          backgroundColor: T_BORDER,
           border: 'none',
           borderRadius: '0', // Controlled by wrapper
         }}
       >
         {words.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', backgroundColor: SUGGESTION_BG, color: TEXT_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(23px, 2.55vh, 32px)', fontWeight: 650, fontFamily: UI_FONT }}>
+          <div style={{ gridColumn: '1 / -1', backgroundColor: T_SUGGESTION_BG, color: T_TEXT_DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(23px, 2.55vh, 32px)', fontWeight: 650, fontFamily: UI_FONT }}>
             {emptyLabel}
           </div>
         ) : (
@@ -116,9 +123,9 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
               onClick={() => onPick(entry.word)}
               style={{
                 width: '100%', height: '100%',
-                backgroundColor: SUGGESTION_BG,
+                backgroundColor: T_SUGGESTION_BG,
                 border: 'none',
-                color: TEXT_MAIN,
+                color: T_TEXT_MAIN,
                 fontWeight: 720,
                 fontSize: fontSize,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -150,6 +157,7 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
 }) => {
   const displayRef = useRef<HTMLDivElement>(null);
   const { isGazeEnabled, toggleGaze, lastEnabledTimestamp } = useGazeControl();
+  const { isLight, isWarm } = useTheme();
 
   const [text, setText] = useState(initialText);
   const [wordLengthHint, setWordLengthHint] = useState<number | null>(null);
@@ -310,10 +318,19 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
   };
 
   // --- RENDER ---
+  // Theme-aware shell tokens. Light is dimmed to AAC-comfort range (~91% L*),
+  // Warm uses its own warm-paper palette, Dark/Mix use original navy/charcoal.
+  const isPaper = isLight || isWarm;
+  const T_SHELL_BG = isLight ? '#F2EDE0' : isWarm ? '#F5EEDF' : KEYBOARD_THEME.shellBg;
+  const T_BORDER = isPaper ? '#DED2C2' : BORDER_COLOR;
+  const T_DISPLAY_BG = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : DISPLAY_BG;
+  const T_TEXT_MAIN = isPaper ? '#2F2A26' : TEXT_MAIN;
+  const T_TEXT_SUB = isPaper ? '#6A625B' : TEXT_SUB;
+  const T_CARET = isPaper ? '#3F6968' : CARET_COLOR;
   return (
-    <div style={{
+    <div className={`spatial-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
-      backgroundColor: KEYBOARD_THEME.shellBg,
+      backgroundColor: T_SHELL_BG,
       padding: '4px', // Minimal padding
       gap: '0px', // NO GAP
       boxSizing: 'border-box', overflow: 'hidden'
@@ -339,9 +356,9 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
       <div style={{
         display: 'flex', flexDirection: 'row',
         width: '100%', height: '114px',
-        backgroundColor: DISPLAY_BG,
+        backgroundColor: T_DISPLAY_BG,
         borderRadius: '0', // Connected look
-        border: `2px solid ${BORDER_COLOR}`,
+        border: `2px solid ${T_BORDER}`,
         borderTop: 'none', // Merge with top
         borderBottom: 'none', // Merge with bottom
         overflow: 'hidden',
@@ -360,13 +377,13 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
           }}
         >
           <span style={{
-            color: TEXT_MAIN,
+            color: T_TEXT_MAIN,
             fontSize: 'clamp(41px, 4.95vh, 58px)', fontWeight: 700, lineHeight: '1.16',
             textAlign: 'left', wordBreak: 'break-word', whiteSpace: 'pre-wrap', width: '100%',
             fontFamily: UI_FONT,
           }}>
             {text}
-            <span style={{ display: 'inline-block', width: '4px', height: '1em', backgroundColor: CARET_COLOR, marginLeft: '6px', animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }} />
+            <span style={{ display: 'inline-block', width: '4px', height: '1em', backgroundColor: T_CARET, marginLeft: '6px', animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }} />
           </span>
         </div>
 
@@ -380,9 +397,9 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
           style={{
             width: '98px', height: '100%', borderRadius: 0,
             backgroundColor: 'transparent',
-            border: 'none', borderLeft: `2px solid ${BORDER_COLOR}`,
+            border: 'none', borderLeft: `2px solid ${T_BORDER}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: TEXT_SUB,
+            color: T_TEXT_SUB,
           }}
         >
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

@@ -83,7 +83,7 @@ export const GazeCursor: React.FC = () => {
     lastNavigationTimestampRef.current = gazeControl.lastNavigationTimestamp;
   }, [gazeControl.lastNavigationTimestamp]);
   const CURSOR_SIZE = CURSOR_SIZES[settings.gazeCursorSize] || DEFAULT_CURSOR_SIZE;
-  const { isLight } = useTheme();
+  const { isLight, isWarm } = useTheme();
   const isMouseMode = gazeControl.isMouseMode;
 
   const [x, setX] = useState(window.innerWidth / 2);

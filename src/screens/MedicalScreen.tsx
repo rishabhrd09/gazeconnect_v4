@@ -6,7 +6,7 @@
  * 2. Select from full-width phrase/action cards.
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { darkColors, lightColors, screenThemes } from '../utils/design';
+import { darkColors, lightColors, screenThemes, warmScreenTokens } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -200,10 +200,17 @@ const DAILY_ASSISTANCE_ICON_COLORS = {
     daily: '#8F6F36',
     symptoms: '#5F8278',
   },
+  warm: {
+    airway: '#7A312E',   // deeper warm maroon — urgency
+    urgent: '#7A312E',
+    bed: '#4F7388',      // deeper dusty sky blue — position/comfort
+    daily: '#5F7C58',    // deeper sage — routine calm
+    symptoms: '#A56D55', // deeper warm coral — body symptoms
+  },
 } as const;
 
-const getLandingSectionColor = (id: string, isMix: boolean, isWarmMode: boolean) => {
-  const mode = isMix ? 'mix' : isWarmMode ? 'dark' : 'light';
+const getLandingSectionColor = (id: string, isMix: boolean, isWarmMode: boolean, isWarm: boolean = false) => {
+  const mode = isMix ? 'mix' : isWarm ? 'warm' : isWarmMode ? 'dark' : 'light';
   return DAILY_ASSISTANCE_ICON_COLORS[mode][id as keyof typeof DAILY_ASSISTANCE_ICON_COLORS.dark] || DAILY_ASSISTANCE_ICON_COLORS[mode].daily;
 };
 
@@ -298,29 +305,31 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   const [lastSpoken, setLastSpoken] = useState('');
   const lastSpokenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const { medicalSections } = useCustomization();
 
   const isWarmMode = isDarkMode && !isLight;
-  const pageBg = isMix ? '#120E0B' : isWarmMode ? '#131412' : colors.background.primary;
-  const titleText = isMix ? '#FFF0D2' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardBg = isMix ? '#B6A17A' : isWarmMode ? screenThemes.medical.cardBg : colors.background.elevated;
-  const cardBorder = isMix ? '1.5px solid rgba(70,52,32,0.56)' : isWarmMode ? screenThemes.medical.cardBorder : `1.5px solid ${colors.border.light}`;
-  const cardText = isMix ? '#180F08' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardShadow = isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const pageBg = isMix ? '#120E0B' : isWarm ? warmScreenTokens.medical.pageBg : isWarmMode ? '#131412' : colors.background.primary;
+  const titleText = isMix ? '#FFF0D2' : isWarm ? warmScreenTokens.medical.cardText : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardBg = isMix ? '#B6A17A' : isWarm ? warmScreenTokens.medical.cardBg : isWarmMode ? screenThemes.medical.cardBg : colors.background.elevated;
+  const cardBorder = isMix ? '1.5px solid rgba(70,52,32,0.56)' : isWarm ? warmScreenTokens.medical.cardBorder : isWarmMode ? screenThemes.medical.cardBorder : `1.5px solid ${colors.border.light}`;
+  const cardText = isMix ? '#180F08' : isWarm ? warmScreenTokens.medical.cardText : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardShadow = isWarm ? warmScreenTokens.medical.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
   // v4 light-mode fix: #EFE7DA had near-equal RGB (239,231,218) → reads as
   // dusty-rose on most monitors. Replaced with #E8D4B0 — confident warm sand
   // with strong yellow lead, never reads pink. The back-card pastel sage
   // (#DCE2C8) replaced with deeper #D2DCBC — Sarvam/Tobii-tier muted sage.
-  const sectionCardBg = isMix ? '#B6A17A' : isWarmMode ? 'rgba(27, 31, 27, 0.92)' : '#E8D4B0';
-  const sectionBackCardBg = isMix ? '#28321F' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#D2DCBC';
+  const sectionCardBg = isMix ? '#B6A17A' : isWarm ? warmScreenTokens.medical.sectionCardBg : isWarmMode ? 'rgba(27, 31, 27, 0.92)' : '#E8D4B0';
+  const sectionBackCardBg = isMix ? '#28321F' : isWarm ? warmScreenTokens.medical.sectionBackCardBg : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#D2DCBC';
   const sectionCardBorder = '1.5px solid transparent';
-  const sectionCardShadow = isWarmMode
-    ? 'inset 0 1px 0 rgba(255,255,255,0.025), 0 9px 22px rgba(0,0,0,0.20)'
-    : '0 6px 16px rgba(95, 76, 52, 0.10), 0 1px 2px rgba(95, 76, 52, 0.06)';
-  const dividerColor = isMix ? 'rgba(91,74,51,0.34)' : isWarmMode ? screenThemes.medical.headerDivider : colors.border.light;
-  const hindiColor = isMix ? '#493B2E' : isWarmMode ? screenThemes.phrases.hindiText : colors.text.secondary;
-  const backIconColor = isMix ? '#9BA76D' : isWarmMode ? '#879464' : '#5C6B47';
+  const sectionCardShadow = isWarm
+    ? warmScreenTokens.medical.sectionShadow
+    : isWarmMode
+      ? 'inset 0 1px 0 rgba(255,255,255,0.025), 0 9px 22px rgba(0,0,0,0.20)'
+      : '0 6px 16px rgba(95, 76, 52, 0.10), 0 1px 2px rgba(95, 76, 52, 0.06)';
+  const dividerColor = isMix ? 'rgba(91,74,51,0.34)' : isWarm ? warmScreenTokens.medical.dividerColor : isWarmMode ? screenThemes.medical.headerDivider : colors.border.light;
+  const hindiColor = isMix ? '#493B2E' : isWarm ? warmScreenTokens.medical.hindiColor : isWarmMode ? screenThemes.phrases.hindiText : colors.text.secondary;
+  const backIconColor = isMix ? '#9BA76D' : isWarm ? warmScreenTokens.medical.backIconColor : isWarmMode ? '#879464' : '#5C6B47';
 
   const activeSection = activeSectionIndex === null ? null : medicalSections[activeSectionIndex];
 
@@ -336,7 +345,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   }, [onSpeak]);
 
   return (
-    <div className={`medical-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
+    <div className={`medical-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
@@ -364,7 +373,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
             backgroundColor: isMix ? '#2B251B' : isWarmMode ? 'rgba(32,34,30,0.98)' : lightColors.background.elevated,
             border: isMix ? '2px solid rgba(180,147,98,0.48)' : isWarmMode ? '2px solid rgba(143,174,114,0.42)' : `2px solid ${lightColors.border.main}`,
             borderRadius: '28px',
-            color: isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : lightColors.text.primary,
+            color: isMix ? '#FFFCF1' : isWarmMode ? '#ECEDE3' : lightColors.text.primary,
             fontSize: 'clamp(42px, 6vh, 72px)',
             fontWeight: 820,
             lineHeight: 1.12,
@@ -394,7 +403,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               gap: '14px',
               marginBottom: 'clamp(18px, 2.4vh, 28px)',
             }}>
-              <BellIcon size={42} color={getLandingSectionColor('daily', isMix, isWarmMode)} strokeWidth={2.1} />
+              <BellIcon size={42} color={getLandingSectionColor('daily', isMix, isWarmMode, isWarm)} strokeWidth={2.1} />
               <h2 style={{
                 margin: 0,
                 color: titleText,
@@ -416,7 +425,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               gap: 'clamp(22px, 3vh, 34px)',
             }}>
               {medicalSections.map((sec, idx) => {
-                const color = getLandingSectionColor(sec.id, isMix, isWarmMode);
+                const color = getLandingSectionColor(sec.id, isMix, isWarmMode, isWarm);
                 const landingIconSrc = LANDING_SECTION_ICON_ASSETS[sec.id] || dailyCareIcon;
                 const landingIconSize = getLandingIconSize(sec.id);
                 const landingIconMaxSize = getLandingIconMaxSize(sec.id);

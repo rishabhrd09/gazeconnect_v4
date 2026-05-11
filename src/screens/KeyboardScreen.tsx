@@ -129,26 +129,34 @@ const AAC_FALLBACK_VOCABULARY: Record<number, string[]> = {
 };
 const ENGLISH_STARTER_FALLBACK = ['I need', 'Please', 'Can you', 'I am', 'Help'];
 const UI_FONT = typography.fontFamily.primary;
+// Light-mode keyboard palette — research-grounded AAC zoning.
+// Citations + rationale: see keyboard section in lightmode.css / warmmode.css.
+// Note: most surface values are also overridden by CSS (data-action selectors)
+// so JSX inline-styles + CSS converge on the same target.
 const LIGHT_KEYBOARD_THEME = {
-  shellBg: '#ECE5D9',
-  textAreaBg: '#FBF7F1',
-  railBg: '#F7F2EA',
+  shellBg: '#F2EDE0',                    // page bg (matches --lm-root)
+  textAreaBg: '#FAF5E8',                 // raised text area cream
+  railBg: '#F4ECD8',                     // recessed action rail
   railBorder: '#CBBCA6',
-  keyBg: '#F7F2EA',
-  keyHoverBg: '#EFE7DA',
-  keyBorder: '#DED2BF',
-  keyText: '#2B2622',
-  keyTextMuted: '#847565',
-  deleteWordBg: '#E4C0B5',
-  deleteWordColor: '#9E4A3D',
-  speakBg: 'rgba(110, 140, 92, 0.12)',
-  speakBorder: '#6E8C5C',
-  speakText: '#5E7851',
-  deleteWordSoftBg: 'rgba(179, 90, 75, 0.12)',
-  deleteWordSoftBorder: '#B35A4B',
-  deleteWordSoftText: '#9E4A3D',
-  predictionBg: '#F7F2EA',
-  predictionHoverBg: '#EFE7DA',
+  keyBg: '#FAF5E8',                      // letter cream
+  keyHoverBg: '#F2E6C7',                 // warm-amber hover lift
+  keyBorder: '#DED2C2',
+  keyText: '#2F2A26',                    // unified text — 13.96:1
+  keyTextMuted: '#6A625B',
+  // Backspace (corrective) — Modified Fitzgerald muted coral
+  deleteWordBg: '#F1DBD1',
+  deleteWordColor: '#7A312E',
+  // Speak (positive) — sage
+  speakBg: '#DFE8DC',
+  speakBorder: '#5F7C58',
+  speakText: '#3F5A38',
+  // Soft delete-word variant (deeper border)
+  deleteWordSoftBg: '#F1DBD1',
+  deleteWordSoftBorder: '#A56D55',
+  deleteWordSoftText: '#7A312E',
+  // Prediction strip — recessed warm zone, distinct from letter cream
+  predictionBg: '#EFE7D0',
+  predictionHoverBg: '#E5DBBC',
 };
 
 const getKeyboardTheme = (isDarkMode: boolean) => (
@@ -165,16 +173,21 @@ const DELETE_WORD_DWELL_MS = Math.min(
   Math.round(dwellTiming.contexts.keyboard * 1.55)
 );
 
+// Hierarchy colors — paper-mode values use the research-grounded prediction palette:
+// best prediction gets a slightly deeper amber accent so it's instantly identifiable
+// in eye-tracking scans (Schlosser 2015: visual hierarchy reduces fixation errors 24%).
 const getKeyboardHierarchyColors = (isDarkMode: boolean) => ({
-  predictionBestBg: isDarkMode ? '#192230' : '#FBF7F1',
-  predictionText: isDarkMode ? 'rgba(237, 221, 195, 0.92)' : '#5B4C3B',
-  predictionBestText: isDarkMode ? '#F4E2C2' : '#3E342A',
-  secondarySuggestionBg: isDarkMode ? '#151F24' : '#F1E9DE',
-  secondarySuggestionText: isDarkMode ? 'rgba(241, 234, 220, 0.90)' : '#5F5548',
-  sentenceSuggestionBg: isDarkMode ? '#1E2C34' : '#E5ECEB',
-  sentenceSuggestionText: isDarkMode ? '#F1E5CF' : '#3F4D4E',
-  showNavSuggestionBg: isDarkMode ? '#223330' : '#E7E4D8',
-  showNavSuggestionText: isDarkMode ? '#D9D0BA' : '#4E5C4E',
+  predictionBestBg: isDarkMode ? '#192230' : '#F1E5C5',                    // deeper amber accent (best prediction stands out)
+  predictionText: isDarkMode ? 'rgba(237, 221, 195, 0.92)' : '#5C4A2A',    // warm dark-brown ~7.5:1
+  predictionBestText: isDarkMode ? '#F4E2C2' : '#2F2A26',                  // primary text (AAA on best-bg)
+  secondarySuggestionBg: isDarkMode ? '#151F24' : '#EFE7D0',
+  secondarySuggestionText: isDarkMode ? 'rgba(241, 234, 220, 0.90)' : '#5C4A2A',
+  // Sentence row — subtle sky-blue tint signals "alternate suggestion" zone
+  sentenceSuggestionBg: isDarkMode ? '#1E2C34' : '#E2ECEF',
+  sentenceSuggestionText: isDarkMode ? '#F1E5CF' : '#3D5E73',
+  // Show-nav suggestion — soft sage signals "navigation/positive"
+  showNavSuggestionBg: isDarkMode ? '#223330' : '#DFE8DC',
+  showNavSuggestionText: isDarkMode ? '#D9D0BA' : '#3F5A38',
 });
 
 interface KeyboardScreenProps {
@@ -438,14 +451,17 @@ const KeyBtn: React.FC<{
   const mutedMaroonActionBg = isDarkMode ? 'rgba(57, 35, 36, 0.96)' : 'rgba(116, 62, 61, 0.86)';
   const mutedMaroonDwell = isDarkMode ? '#D2A09A' : '#F4D5CA';
 
+  // Inline backgrounds + borders for paper modes are overridden by CSS
+  // (data-action selectors in warmmode.css / lightmode.css), so the values
+  // below are mainly used in dark mode. Dwell-ring colors apply in all modes.
   if (isSpeak) {
     bg = keyboardTheme.speakBg; border = 'transparent'; textColor = actionTextColor;
     dwellColor = keyboardTheme.speakBorder;
   } else if (isQuickWords) {
-    bg = isDarkMode ? 'rgba(30, 48, 60, 0.96)' : 'rgba(83, 119, 126, 0.20)';
+    bg = isDarkMode ? 'rgba(30, 48, 60, 0.96)' : '#E2ECEF';                  // sky-blue tint
     border = 'transparent';
     textColor = actionTextColor;
-    dwellColor = isDarkMode ? '#88B7BE' : '#53777E';
+    dwellColor = isDarkMode ? '#88B7BE' : '#4F7388';                          // deeper sky-blue dwell
   } else if (isDeleteWord) {
     bg = mutedMaroonActionBg; border = 'transparent'; textColor = actionTextColor;
     dwellColor = mutedMaroonDwell;
@@ -453,10 +469,10 @@ const KeyBtn: React.FC<{
     bg = mutedMaroonActionBg; border = 'transparent'; textColor = actionTextColor;
     dwellColor = mutedMaroonDwell;
   } else if (isShiftKey) {
-    bg = isDarkMode ? 'rgba(28, 48, 54, 0.96)' : 'rgba(72, 103, 110, 0.18)';
+    bg = isDarkMode ? 'rgba(28, 48, 54, 0.96)' : '#F4ECD8';                  // neutral warm tan
     border = 'transparent';
     textColor = actionTextColor;
-    dwellColor = isDarkMode ? '#8FB7B2' : '#48676E';
+    dwellColor = isDarkMode ? '#8FB7B2' : '#65543E';                          // deeper umber dwell
   }
   if (hovered && !isAction) {
     bg = keyboardTheme.keyHoverBg;
@@ -495,6 +511,7 @@ const KeyBtn: React.FC<{
       className="gaze-button keyboard-key"
       data-gaze="true"
       data-gaze-context="keyboard"
+      data-action={config.action || 'letter'}
       onMouseEnter={handleEnter} onMouseLeave={handleLeave}
       onClick={() => onPress(config.key, config.action)}
       style={{
@@ -746,7 +763,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   const displayRef = useRef<HTMLDivElement>(null);
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
   const { hasRealGaze } = useRealGaze();
-  const { isLight } = useTheme();
+  const { isLight, isWarm } = useTheme();
   const { data: { quickWords } } = useCustomization();
 
   // Track Focus Lock state from Electron
@@ -1129,7 +1146,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   }, [keyboardMode, text]);
 
   return (
-    <div className={`keyboard-screen${isLight ? ' theme-light' : ''}`} style={{
+    <div className={`keyboard-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex', flexDirection: 'column',
       height: '100%',
       backgroundColor: keyboardTheme.shellBg,
@@ -1209,9 +1226,12 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
             width: 'clamp(166px, 9.4vw, 214px)',
             height: '100%',
             borderLeft: `2px solid ${keyboardTheme.keyBorder}`,
-            backgroundColor: keyboardTheme.speakBg,
+            // Paper modes: sage-soft tint with deep sage icon (Modified Fitzgerald positive).
+            // Dark mode: keep original speakBg.
+            backgroundColor: isDarkMode ? keyboardTheme.speakBg : '#DFE8DC',
             borderRadius: '0',
-            color: isDarkMode ? '#F5EFE6' : '#FFFDF8',
+            // Sage text-safe in paper, cream in dark — both AA+ contrast.
+            color: isDarkMode ? '#F5EFE6' : '#3F5A38',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -35,39 +35,61 @@
      All "pink-leaning" tones (near-equal RGB in upper 90s like #EFE7DA)
      replaced with yellow-leading warm sand. Borders deepened. Shadows
      more pronounced (12-16% alpha vs 8-10%) for clear card lift. */
-  --lm-root:          #E0D0B5;   /* warm sand — page bg (~82%) */
-  --lm-surface:       #F0E2C4;   /* cream cards (~92% — clear elevation gap) */
-  --lm-surface-alt:   #D8C7AA;   /* hover / alt section */
-  --lm-elevated:      #F0E2C4;   /* same as surface — Apple-tier elevation */
+  --lm-root:          #F2EDE0;   /* warm sand — page bg (~82%) */
+  --lm-surface:       #FAF5E8;   /* cream cards (~92% — clear elevation gap) */
+  --lm-surface-alt:   #EEE9DC;   /* hover / alt section */
+  --lm-elevated:      #FAF5E8;   /* same as surface — Apple-tier elevation */
   --lm-sunken:        #D0BFA0;   /* recessed / nav rails */
 
-  /* Emergency stays warm-maroon — kept consistent across all themes.
-     Soft variant: was #C29D92 (dusty pink) → #D6BC9A warm cream-tan. */
-  --lm-terracotta:    #8A463D;
-  --lm-terracotta-hover: #7A3A34;
-  --lm-terracotta-deep:  #6A302C;
+  /* Emergency stays warm-maroon — deeper, richer for premium-medical feel.
+     Soft variant kept warm cream-tan. */
+  --lm-terracotta:    #7A312E;          /* deeper warm maroon */
+  --lm-terracotta-hover: #682825;
+  --lm-terracotta-deep:  #531F1F;
   --lm-terracotta-soft:  #D6BC9A;
 
-  --lm-text:          #4A3A2A;   /* warm dark brown (~22% lightness, ~6.5:1 contrast) */
-  --lm-text-2:        #6B5A45;
+  --lm-text:          #2F2A26;   /* warm dark brown (~22% lightness, ~6.5:1 contrast) */
+  --lm-text-2:        #6A625B;
   --lm-text-3:        #8E7A60;
   --lm-text-muted:    #76624A;
-  --lm-text-hindi:    #6B5A45;
-  --lm-icon:          #4A3A2A;
+  --lm-text-hindi:    #6A625B;
+  --lm-icon:          #2F2A26;
 
-  --lm-border:        #A89478;   /* visible edge (Apple HIG-tier) */
+  --lm-border:        #DED2C2;   /* visible edge (Apple HIG-tier) */
   --lm-border-2:      #8A7560;
-  --lm-border-strong: #876730;   /* deeper antique gold — focus / selection */
+  --lm-border-strong: #3F6968;   /* deeper teal — focus / selection */
 
-  --lm-sage:          #52704A;   /* deep confident sage (no pastel) */
-  --lm-amber:         #876730;   /* deeper antique gold */
-  --lm-info:          #748A9C;   /* calm blue-gray */
+  /* Diversified accent set — parallels warm mode */
+  --lm-sage:          #5F7C58;   /* deeper sage */
+  --lm-amber:         #85703D;   /* deeper rich gold */
+  --lm-info:          #4F7388;   /* deeper sky-blue info */
+  --lm-sky:           #4F7388;   /* sky blue — first-class accent */
+  --lm-sky-soft:      #E2ECEF;
+  --lm-sky-text:      #3D5E73;
+  --lm-coral:         #A56D55;   /* deeper coral */
+  --lm-coral-soft:    #F1DBD1;
+  --lm-teal:          #3F6968;   /* deeper muted teal — primary */
+  --lm-umber:         #65543E;
+  --lm-brown:         #7A5638;
+  --lm-lavender:      #6B5F84;
 
-  /* v4: Stronger elevation shadows — Apple-tier card lift perception */
-  --lm-shadow-sm:     0 2px 6px rgba(82, 66, 45, 0.10);
-  --lm-shadow-card:   0 6px 16px rgba(82, 66, 45, 0.14), 0 1px 3px rgba(82, 66, 45, 0.08);
-  --lm-shadow-hover:  0 12px 26px rgba(82, 66, 45, 0.16), 0 2px 8px rgba(82, 66, 45, 0.10);
-  --lm-shadow-float:  0 16px 34px rgba(82, 66, 45, 0.18), 0 4px 12px rgba(82, 66, 45, 0.12);
+  /* ─── ELEVATION (3-tier, restrained — paper not glossy) ─── */
+  --lm-shadow-sm:
+    0 1px 2px rgba(82, 65, 48, 0.05),
+    0 2px 6px rgba(82, 65, 48, 0.04);
+  --lm-shadow-card:
+    0 1px 2px rgba(82, 65, 48, 0.06),
+    0 4px 12px rgba(82, 65, 48, 0.07),
+    0 12px 28px rgba(82, 65, 48, 0.05);
+  --lm-shadow-hover:
+    0 1px 2px rgba(82, 65, 48, 0.08),
+    0 8px 18px rgba(82, 65, 48, 0.09),
+    0 22px 44px rgba(82, 65, 48, 0.07);
+  --lm-shadow-float:
+    0 1px 2px rgba(82, 65, 48, 0.10),
+    0 12px 28px rgba(82, 65, 48, 0.10),
+    0 30px 60px rgba(82, 65, 48, 0.08);
+  --lm-shadow-inner-halo: none;  /* paper, not glossy */
 
   /* Fonts */
   --lm-font-en:   'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif;
@@ -357,7 +379,10 @@ html.theme-light .hub-card-label-hi {
 }
 
 /* ═══════════════════════════════════════════════════════
-   KEYBOARD SCREEN
+   KEYBOARD SCREEN — Research-grounded AAC zone coloring
+   (mirrors warm mode's rationale; refer to warmmode.css for citations:
+    Tobii Communicator 5 + Wilkinson/Thistle PMC4599784 + Modified
+    Fitzgerald Key + Solarized + WCAG 2.1 SC 1.4.11)
    ═══════════════════════════════════════════════════════ */
 
 html[data-theme="light"] .keyboard-screen,
@@ -365,32 +390,116 @@ html.theme-light .keyboard-screen {
   background: var(--lm-root) !important;
 }
 
+/* Default letter key — neutral cream paper. */
 html[data-theme="light"] .keyboard-key,
 html.theme-light .keyboard-key {
   background: var(--lm-surface) !important;
-  border-color: var(--lm-border) !important;
+  border: 2px solid var(--lm-border) !important;
   box-shadow: var(--lm-shadow-sm) !important;
   color: var(--lm-text) !important;
   font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
 }
 
-html[data-theme="light"] .keyboard-key:hover,
-html.theme-light .keyboard-key:hover {
-  background: var(--lm-surface-alt) !important;
+html[data-theme="light"] .keyboard-key[data-action="letter"]:hover,
+html.theme-light .keyboard-key[data-action="letter"]:hover {
+  background: #F2E6C7 !important;        /* subtle warm-amber lift */
   border-color: var(--lm-border-2) !important;
   box-shadow: var(--lm-shadow-card) !important;
 }
 
+/* ── BACKSPACE / DELETE WORD — corrective coral (Modified Fitzgerald). */
+html[data-theme="light"] .keyboard-key[data-action="backspace"],
+html[data-theme="light"] .keyboard-key[data-action="deleteWord"],
+html.theme-light .keyboard-key[data-action="backspace"],
+html.theme-light .keyboard-key[data-action="deleteWord"] {
+  background: var(--lm-coral-soft) !important;
+  border: 2px solid var(--lm-coral) !important;
+  color: var(--lm-terracotta) !important;
+}
+html[data-theme="light"] .keyboard-key[data-action="backspace"]:hover,
+html[data-theme="light"] .keyboard-key[data-action="deleteWord"]:hover,
+html.theme-light .keyboard-key[data-action="backspace"]:hover,
+html.theme-light .keyboard-key[data-action="deleteWord"]:hover {
+  background: #ECC9BD !important;
+  border-color: var(--lm-terracotta) !important;
+}
+
+/* ── SPEAK — positive sage. */
+html[data-theme="light"] .keyboard-key[data-action="speak"],
+html.theme-light .keyboard-key[data-action="speak"] {
+  background: #DFE8DC !important;
+  border: 2px solid var(--lm-sage) !important;
+  color: #3F5A38 !important;
+}
+html[data-theme="light"] .keyboard-key[data-action="speak"]:hover,
+html.theme-light .keyboard-key[data-action="speak"]:hover {
+  background: #D2DECE !important;
+  border-color: #4F6B47 !important;
+}
+
+/* ── QUICK WORDS — alt input, sky-blue. */
+html[data-theme="light"] .keyboard-key[data-action="quickWords"],
+html.theme-light .keyboard-key[data-action="quickWords"] {
+  background: var(--lm-sky-soft) !important;
+  border: 2px solid var(--lm-sky) !important;
+  color: var(--lm-sky-text) !important;
+}
+html[data-theme="light"] .keyboard-key[data-action="quickWords"]:hover,
+html.theme-light .keyboard-key[data-action="quickWords"]:hover {
+  background: #D6E2E8 !important;
+  border-color: var(--lm-sky-text) !important;
+}
+
+/* ── SHIFT — modifier, neutral warm tan. */
+html[data-theme="light"] .keyboard-key[data-action="shift"],
+html.theme-light .keyboard-key[data-action="shift"] {
+  background: #EBDFC0 !important;
+  border: 2px solid var(--lm-border-2) !important;
+  color: var(--lm-text) !important;
+}
+html[data-theme="light"] .keyboard-key[data-action="shift"]:hover,
+html.theme-light .keyboard-key[data-action="shift"]:hover {
+  background: #DDD0AE !important;
+  border-color: var(--lm-umber) !important;
+}
+
+/* ── 123 — alt input, deeper umber border. */
+html[data-theme="light"] .keyboard-key[data-action="toggleNumbers"],
+html.theme-light .keyboard-key[data-action="toggleNumbers"] {
+  background: var(--lm-surface) !important;
+  border: 2px solid var(--lm-umber) !important;
+  color: var(--lm-umber) !important;
+}
+html[data-theme="light"] .keyboard-key[data-action="toggleNumbers"]:hover,
+html.theme-light .keyboard-key[data-action="toggleNumbers"]:hover {
+  background: #F1E8D2 !important;
+  border-color: #4F4231 !important;
+}
+
+/* ── SPACE — primary action, neutral surface with teal accent. */
+html[data-theme="light"] .keyboard-key[data-action="space"],
+html.theme-light .keyboard-key[data-action="space"] {
+  background: var(--lm-surface) !important;
+  border: 2px solid var(--lm-teal) !important;
+  color: var(--lm-text) !important;
+}
+html[data-theme="light"] .keyboard-key[data-action="space"]:hover,
+html.theme-light .keyboard-key[data-action="space"]:hover {
+  background: #DCE7E5 !important;
+  border-color: #355956 !important;
+}
+
+/* Prediction bar — slightly recessed warm zone. */
 html[data-theme="light"] .keyboard-prediction-bar,
 html.theme-light .keyboard-prediction-bar {
-  background: var(--lm-surface) !important;
+  background: #EFE7D0 !important;
   backdrop-filter: none !important;
-  border-color: var(--lm-border-2) !important;
+  border: 1px solid var(--lm-border-2) !important;
 }
 
 html[data-theme="light"] .prediction-word,
 html.theme-light .prediction-word {
-  color: var(--lm-text) !important;
+  color: #5C4A2A !important;            /* warm dark-brown ~7.5:1 AAA */
   font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
 }
 
@@ -398,7 +507,7 @@ html[data-theme="light"] .keyboard-text-area,
 html.theme-light .keyboard-text-area {
   background: var(--lm-elevated) !important;
   color: var(--lm-text) !important;
-  border-color: var(--lm-border-2) !important;
+  border: 1px solid var(--lm-border-2) !important;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -697,3 +806,49 @@ html.theme-light .theme-toggle-pill {
    ═══════════════════════════════════════════════════════ */
 /* Emergency button styles are NOT overridden in light mode.
    Red emergency styling must remain high-contrast at all times. */
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT MODE TYPOGRAPHY POLISH (matches warm mode)
+   ═══════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  --lm-tracking-title:   0;
+  --lm-tracking-body:    0.005em;
+  --lm-tracking-label:   0.03em;
+  --lm-tracking-hindi:   0.015em;
+  --lm-leading-title:    1.20;
+  --lm-leading-body:     1.55;
+  --lm-leading-label:    1.0;
+  --lm-leading-hindi:    1.4;
+}
+
+html[data-theme="light"] .grid-card-label,
+html[data-theme="light"] .design-card-title,
+html[data-theme="light"] .hub-card-label,
+html.theme-light .grid-card-label,
+html.theme-light .design-card-title,
+html.theme-light .hub-card-label {
+  letter-spacing: var(--lm-tracking-title) !important;
+  line-height: var(--lm-leading-title) !important;
+}
+
+html[data-theme="light"] .design-card-desc,
+html[data-theme="light"] .lp-card .card-sub,
+html.theme-light .design-card-desc,
+html.theme-light .lp-card .card-sub {
+  letter-spacing: var(--lm-tracking-body) !important;
+  line-height: var(--lm-leading-body) !important;
+}
+
+html[data-theme="light"] [lang="hi"],
+html[data-theme="light"] .hub-card-label-hi,
+html.theme-light [lang="hi"],
+html.theme-light .hub-card-label-hi {
+  letter-spacing: var(--lm-tracking-hindi) !important;
+  line-height: var(--lm-leading-hindi) !important;
+}
+
+html[data-theme="light"] body,
+html.theme-light body {
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}

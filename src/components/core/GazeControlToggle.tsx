@@ -379,7 +379,7 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
             backgroundColor: colors.success.subtle,
             border: `3px solid ${isHovered ? colors.success.main : '#34C759'}`,
             borderRadius: '16px',
-            color: colors.success.main,
+            color: colors.accentText.sage,
             fontSize: '20px',
             fontWeight: 700,
             cursor: 'pointer',

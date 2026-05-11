@@ -3,7 +3,7 @@
  * Responsive: 13"-27" screens via clamp()/min() - identical on 23" (1920x1080)
  */
 import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { lightColors, mixColors, screenThemes } from '../utils/design';
+import { lightColors, mixColors, screenThemes, warmColors, warmScreenTokens } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useCustomization } from '../contexts/CustomizationContext';
@@ -15,6 +15,9 @@ import {
   FamilyIcon, SettingsIcon,
   GridIcon, TVIcon, GlobalIcon,
 } from '../components/icons/Icons';
+// Emergency-card glyphs intentionally NOT used here — the card labels are
+// user-customisable, so a static icon mapping would be misleading for any
+// non-default label. Cards stay text-only on the red Fitzgerald tile.
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
@@ -40,14 +43,19 @@ type HomeTile = {
   cardClass: string;
 };
 
+// HomePhrasesIcon v2 — refined speech bubble with horizontal text lines.
+// Replaces the earlier waveform-bar design (vertical bars read as "audio EQ"
+// rather than "phrases"). Three horizontal lines of decreasing length is the
+// universally-recognized "message/text/phrases" glyph (used by iOS Messages,
+// WhatsApp, Material Symbols `chat`). Cleaner, more legible at distance.
 const HomePhrasesIcon: React.FC<{
   size?: number;
   color?: string;
   strokeWidth?: number;
   style?: React.CSSProperties;
 }> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => {
-  const bubbleStrokeWidth = Math.max(1.55, strokeWidth * 0.86);
-  const waveformStrokeWidth = Math.max(1.1, strokeWidth * 0.42);
+  const bubbleStrokeWidth = Math.max(1.65, strokeWidth * 0.92);
+  const lineStrokeWidth = Math.max(1.3, strokeWidth * 0.62);
 
   return (
     <svg
@@ -61,15 +69,19 @@ const HomePhrasesIcon: React.FC<{
       style={style}
       aria-hidden="true"
     >
+      {/* Speech bubble — rounded rectangle with downward tail.
+          Slightly larger bubble than v1 (anchored 4 → 20.5) for cleaner
+          proportions; tail is shorter + more centered. */}
       <path
         strokeWidth={bubbleStrokeWidth}
-        d="M5.25 4.8h13.5a3.35 3.35 0 0 1 3.35 3.35v4.75a3.35 3.35 0 0 1-3.35 3.35h-6.85l-4.35 3.35v-3.35h-2.3a3.35 3.35 0 0 1-3.35-3.35V8.15A3.35 3.35 0 0 1 5.25 4.8Z"
+        d="M5 4h14a3.2 3.2 0 0 1 3.2 3.2v7.1a3.2 3.2 0 0 1-3.2 3.2h-6.4L8 21v-3.5H5a3.2 3.2 0 0 1-3.2-3.2V7.2A3.2 3.2 0 0 1 5 4Z"
       />
-      <g strokeWidth={waveformStrokeWidth}>
-        <line x1="8.3" y1="10.25" x2="8.3" y2="12.9" />
-        <line x1="10.75" y1="9.55" x2="10.75" y2="13.6" />
-        <line x1="13.25" y1="9.95" x2="13.25" y2="13.2" />
-        <line x1="15.7" y1="10.45" x2="15.7" y2="12.7" />
+      {/* Three text lines of decreasing length — the canonical
+          "message body" pattern. Centered vertically inside the bubble. */}
+      <g strokeWidth={lineStrokeWidth}>
+        <line x1="6.5" y1="8.7"  x2="17.5" y2="8.7" />
+        <line x1="6.5" y1="11.2" x2="15.5" y2="11.2" />
+        <line x1="6.5" y1="13.7" x2="13"   y2="13.7" />
       </g>
     </svg>
   );
@@ -102,36 +114,42 @@ type HomeThemePalette = {
 };
 
 const HOME_BADGE_FILLS_DARK: Record<string, string> = {
-  kb: '#7CAFA8',
-  ph: '#B8A987',
-  ac: '#B8A987',
-  pp: '#789A92',
-  med: '#5A7D75',
-  st: '#BFAF9A',
-  web: '#6E9692',
-  fp: '#66724A',
+  kb:  '#7CAFA8',  // muted teal — primary action (anchor hue)
+  ph:  '#A5B5BD',  // warm muted dusty sky-blue — soft pastel blue with a grey-warm
+                   // undertone. Lighter + softer than Web Browsing sky `#88A3B5`;
+                   // distinct from Keyboard teal `#7CAFA8` (greener). Reads as
+                   // "calm communication / subtle warmth" on dark bg.
+  ac:  '#C4A864',  // cleaner muted rich gold — leisure/activities
+  pp:  '#8FAA86',  // muted sage — family/calm (was teal-grey #789A92)
+  med: '#5A7D75',  // Daily Assistance — locked (user preference)
+  st:  '#BFAF9A',  // Settings — locked
+  web: '#88A3B5',  // muted dusty sky-blue — explore/info (was teal-grey #6E9692)
+  fp:  '#66724A',  // Design Home — muted sage-olive — locked
 };
 
 const HOME_BADGE_FILLS_LIGHT: Record<string, string> = {
-  kb: '#35534F',
-  ph: '#6F4D18',
-  ac: '#73511B',
-  pp: '#3F5D59',
-  med: '#50746B',
-  st: '#514432',
-  web: '#486B67',
-  fp: '#35534F',
+  kb:  '#3F6968',  // deeper muted teal
+  ph:  '#A56D55',  // deeper warm coral
+  ac:  '#85703D',  // deeper rich gold
+  pp:  '#5F7C58',  // deeper sage
+  med: '#7A312E',  // deeper warm maroon
+  st:  '#65543E',  // deeper warm umber
+  web: '#4F7388',  // deeper dusty sky blue
+  // Design Home — warm antique gold (architectural / home-design feel).
+  // Uniform color across all 4 GridIcon squares. Distinct from Activities
+  // gold `#85703D` (Activities is deeper/browner; this is lighter/cleaner amber).
+  fp:  '#B0884E',
 };
 
 const HOME_BADGE_FILLS_MIX: Record<string, string> = {
-  kb: '#2F5C57',
-  ph: '#6F4D18',
-  ac: '#73511B',
-  pp: '#3B625C',
-  med: '#496D64',
-  st: '#4A3A28',
-  web: '#3D6B65',
-  fp: '#66724A',
+  kb:  '#2F5C57',  // deep teal — primary action (anchor hue)
+  ph:  '#7A3E2C',  // deep warm coral — communication (was brown #6F4D18)
+  ac:  '#73511B',  // deep rich gold — leisure/activities
+  pp:  '#3D5A35',  // deep sage — family/calm (was teal #3B625C)
+  med: '#496D64',  // Daily Assistance — locked (user preference)
+  st:  '#4A3A28',  // Settings — locked
+  web: '#3A5670',  // deep dusty sky-blue — explore/info (was teal #3D6B65)
+  fp:  '#5C6740',  // Design Home — sage-olive on tan card — locked
 };
 
 const HOME_BADGE_ICON = '#201A15';
@@ -224,7 +242,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { enableAlertMode } = useAlertMode();
   const { homeQuickActions, data: { quickWords, homeEmergencyCards, settings } } = useCustomization();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
 
   const [activatedText, setActivatedText] = useState<string | null>(null);
   const [activatedBtnId, setActivatedBtnId] = useState<string | null>(null);
@@ -252,46 +270,72 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current); };
   }, []);
 
-  const THEME: HomeThemePalette = isLight ? {
-    bg: '#E6D7BA',
-    cardBg: '#C4B392',
-    cardBorder: '1.5px solid rgba(122, 99, 71, 0.32)',
-    cardShadow: '0 10px 20px rgba(122, 99, 71, 0.12), 0 2px 5px rgba(122, 99, 71, 0.08)',
+  const WARM_THEME: HomeThemePalette = {
+    bg: warmScreenTokens.home.bg,
+    cardBg: warmScreenTokens.home.cardBg,
+    cardBorder: warmScreenTokens.home.cardBorder,
+    cardShadow: warmScreenTokens.home.cardShadow,
+    tileSurfaces: { ...warmScreenTokens.home.tileSurfaces },
+    icon: '#2F2A26',
+    badgeIcon: '#2F2A26',
+    text: warmScreenTokens.home.text,
+    subtleText: warmScreenTokens.home.subtleText,
+    mutedText: warmScreenTokens.home.mutedText,
+    brand: warmScreenTokens.home.brand,
+    dockSeparator: warmScreenTokens.home.dockSeparator,
+    quickPhrasesBg: warmScreenTokens.home.quickPhrasesBg,
+    quickPhrasesBorder: warmScreenTokens.home.quickPhrasesBorder,
+    quickPhrasesText: warmScreenTokens.home.quickPhrasesText,
+    quickPhrasesShadow: warmScreenTokens.home.quickPhrasesShadow,
+    emergencyBg: warmScreenTokens.home.emergencyBg,
+    emergencyHover: warmScreenTokens.home.emergencyHover,
+    emergencyText: warmScreenTokens.home.emergencyText,
+    emergencySoft: warmScreenTokens.home.emergencySoft,
+    placeholderBg: warmScreenTokens.home.placeholderBg,
+    placeholderBorder: warmScreenTokens.home.placeholderBorder,
+    dividerBackground: warmScreenTokens.home.dividerBackground,
+  };
+
+  const THEME: HomeThemePalette = isWarm ? WARM_THEME : isLight ? {
+    bg: '#F2EDE0',
+    cardBg: '#FAF5E8',
+    cardBorder: '1.5px solid rgba(122, 99, 71, 0.22)',
+    cardShadow: '0 10px 20px rgba(122, 99, 71, 0.10), 0 2px 5px rgba(122, 99, 71, 0.06)',
     tileSurfaces: {
-      kb: '#B5AA91',
-      ph: '#B7AE8D',
-      ac: '#C0AC83',
-      pp: '#BEA58F',
-      med: '#B3A999',
-      st: '#B9AC90',
-      web: '#B8AA98',
-      fp: '#B5AA91',
+      kb: '#FAF5E8',
+      ph: '#FAF5E8',
+      ac: '#FAF5E8',
+      pp: '#FAF5E8',
+      med: '#FAF5E8',
+      st: '#FAF5E8',
+      web: '#FAF5E8',
+      fp: '#FAF5E8',
     },
-    icon: '#3B2D20',
-    badgeIcon: '#3B2D20',
-    text: '#3B2D20',
-    subtleText: '#6E5A42',
-    mutedText: '#7A6347',
-    brand: 'rgba(90, 69, 48, 0.70)',
-    dockSeparator: 'rgba(122, 99, 71, 0.28)',
-    quickPhrasesBg: 'rgba(122, 99, 71, 0.10)',
-    quickPhrasesBorder: 'rgba(122, 99, 71, 0.32)',
-    quickPhrasesText: '#5A4530',
-    quickPhrasesShadow: '0 8px 16px rgba(122, 99, 71, 0.10), 0 1px 2px rgba(122, 99, 71, 0.08)',
-    emergencyBg: '#7A363A',
-    emergencyHover: '#6D3034',
-    emergencyText: '#FBE9DE',
-    emergencySoft: '#FBE9DE',
-    placeholderBg: 'rgba(122, 99, 71, 0.08)',
-    placeholderBorder: 'rgba(122, 99, 71, 0.18)',
-    dividerBackground: 'linear-gradient(180deg, transparent 0%, rgba(122,99,71,0.28) 50%, transparent 100%)',
+    icon: '#497775',
+    badgeIcon: '#497775',
+    text: '#2F2A26',
+    subtleText: '#6A625B',
+    mutedText: '#8A7C6B',
+    brand: 'rgba(47, 42, 38, 0.74)',
+    dockSeparator: 'rgba(122, 99, 71, 0.22)',
+    quickPhrasesBg: '#F3E8D1',
+    quickPhrasesBorder: 'rgba(122, 99, 71, 0.24)',
+    quickPhrasesText: '#4B3525',
+    quickPhrasesShadow: '0 8px 16px rgba(122, 99, 71, 0.10), 0 1px 2px rgba(122, 99, 71, 0.06)',
+    emergencyBg: '#8A3B38',
+    emergencyHover: '#763431',
+    emergencyText: '#FFF7EF',
+    emergencySoft: '#F4E3E0',
+    placeholderBg: 'rgba(122, 99, 71, 0.07)',
+    placeholderBorder: 'rgba(122, 99, 71, 0.16)',
+    dividerBackground: 'linear-gradient(180deg, transparent 0%, rgba(122, 99, 71, 0.20) 50%, transparent 100%)',
   } : isMix ? {
     bg: mixColors.home.root,
     cardBg: mixColors.home.tileSurfaces.kb,
     cardBorder: `1.5px solid ${mixColors.home.cardBorder}`,
     cardShadow: mixColors.home.cardShadow,
     tileSurfaces: mixColors.home.tileSurfaces,
-    icon: '#3B2D20',
+    icon: '#2F2A26',
     badgeIcon: MIX_HOME_BADGE_ICON,
     text: mixColors.home.text,
     subtleText: mixColors.home.subtleText,
@@ -346,8 +390,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       : 'linear-gradient(180deg, transparent 0%, rgba(168,181,196,0.04) 12%, rgba(168,181,196,0.12) 50%, rgba(168,181,196,0.04) 88%, transparent 100%)',
   };
   const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
-  const themeClass = isLight ? ' theme-light' : isMix ? ' theme-mix' : '';
-  const dividerStyle = (isLight || isMix) ? {
+  const themeClass = isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : '';
+  const dividerStyle = (isLight || isMix || isWarm) ? {
     ...vDividerStyle,
     background: THEME.dividerBackground,
   } : vDividerStyle;
@@ -418,23 +462,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     marginBottom: 'clamp(8px, 1.35vh, 13px)',
   };
 
-  const homeTileIconSize = (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 64 : 52;
-  const homeTileIconColors = isLight
-    ? HOME_BADGE_FILLS_LIGHT
-    : isMix
-      ? HOME_BADGE_FILLS_MIX
-      : HOME_BADGE_FILLS_DARK;
+  // Icon size — bumped from 64 → 72px to hit the AAC sweet-spot (40-50% of tile
+  // height per Material 3 / Tobii Snap Core First conventions). Larger icons read
+  // faster at eye-tracking distance and reduce fixation errors (Schlosser 2015).
+  const homeTileIconSize = (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 72 : 58;
+  const homeTileIconColors = isWarm
+    ? warmScreenTokens.home.badgeFills
+    : isLight
+      ? HOME_BADGE_FILLS_LIGHT
+      : isMix
+        ? HOME_BADGE_FILLS_MIX
+        : HOME_BADGE_FILLS_DARK;
 
   const labelStyle = {
     display: 'block',
-    fontSize: (isLight || isMix) ? 'clamp(24px, 3.15vh, 34px)' : 'clamp(21px, 2.95vh, 30px)',
-    fontWeight: (isLight || isMix) ? 700 : 700,
+    fontSize: (isLight || isMix || isWarm) ? 'clamp(24px, 3.15vh, 34px)' : 'clamp(21px, 2.95vh, 30px)',
+    fontWeight: (isLight || isMix || isWarm) ? 700 : 700,
     color: THEME.text,
-    letterSpacing: (isLight || isMix) ? '0.01em' : 'clamp(0.5px, 0.1vw, 1px)',
+    letterSpacing: (isLight || isMix || isWarm) ? '0.01em' : 'clamp(0.5px, 0.1vw, 1px)',
     textTransform: 'none' as const,
     fontFamily: ENGLISH_UI_FONT,
     whiteSpace: 'pre-wrap' as const,
-    lineHeight: (isLight || isMix) ? '1.16' : '1.2',
+    lineHeight: (isLight || isMix || isWarm) ? '1.16' : '1.2',
     textAlign: 'center' as const,
   };
 
@@ -467,14 +516,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const selectedHighColor = quickWords?.highColor ?? 'muted_maroon';
   const selectedMediumColor = quickWords?.mediumColor ?? 'warm_teal';
   const getEmergencyPriorityColor = useCallback((priority?: 'high' | 'medium') => {
+    if (isWarm) {
+      const isHigh = (priority ?? 'high') === 'high';
+      return isHigh
+        ? { bg: '#8A3B38', shadow: '#5A1F1D' }   // warm maroon
+        : { bg: '#C9A96B', shadow: '#A88B4F' };  // warm gold
+    }
     if (isLight) {
-      return { bg: '#7A363A', shadow: '#5A2528' };
+      const isHigh = (priority ?? 'high') === 'high';
+      return isHigh
+        ? { bg: '#8A3B38', shadow: '#5A2528' }   // warm maroon
+        : { bg: '#C9A96B', shadow: '#A88B4F' };  // warm gold
     }
     if (priority === 'medium') {
       return MEDIUM_PRIORITY_HOME_COLORS[selectedMediumColor] ?? MEDIUM_PRIORITY_HOME_COLORS.warm_teal;
     }
     return HIGH_PRIORITY_HOME_COLORS[selectedHighColor] ?? HIGH_PRIORITY_HOME_COLORS.muted_maroon;
-  }, [isLight, selectedHighColor, selectedMediumColor]);
+  }, [isLight, isWarm, selectedHighColor, selectedMediumColor]);
 
   return (
     <div className={`home-screen${themeClass}`} style={{
@@ -482,8 +540,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       flexDirection: 'column',
       height: '100vh',
       background: isLight
-        ? 'radial-gradient(circle at 50% 8%, #F0E4CB 0%, #E6D7BA 46%, #DDC9A6 100%)'
-        : THEME.bg,
+        ? 'radial-gradient(circle at 50% 8%, #FAF5E8 0%, #F2EDE0 52%, #E7E0D0 100%)'
+        : isWarm
+          ? warmScreenTokens.home.bgGradient
+          : THEME.bg,
       overflow: 'hidden',
       position: 'relative',
     }}>
@@ -646,10 +706,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           ? `1px solid ${THEME.quickPhrasesBorder}`
                           : (isLight
                             ? '1.5px solid rgba(74, 28, 32, 0.45)'
-                            : ((isLight || isMix) ? THEME.cardBorder : 'none')),
+                            : ((isLight || isMix || isWarm) ? THEME.cardBorder : 'none')),
                         boxShadow: isActivated
-                          ? isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 0 0 1px rgba(56, 189, 248, 0.12), 0 6px 16px rgba(0, 0, 0, 0.2)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 18px rgba(90, 37, 40, 0.18)' : ((isLight || isMix) ? THEME.cardShadow : `0 6px 16px rgba(0,0,0,0.16), 0 0 0 1px ${bgShadow}28`))
-                          : isNav ? ((isLight || isMix) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 16px rgba(90, 37, 40, 0.14)' : ((isLight || isMix) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)')),
+                          ? isNav ? ((isLight || isMix || isWarm) ? THEME.quickPhrasesShadow : '0 0 0 1px rgba(56, 189, 248, 0.12), 0 6px 16px rgba(0, 0, 0, 0.2)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 18px rgba(90, 37, 40, 0.18)' : ((isLight || isMix || isWarm) ? THEME.cardShadow : `0 6px 16px rgba(0,0,0,0.16), 0 0 0 1px ${bgShadow}28`))
+                          : isNav ? ((isLight || isMix || isWarm) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 16px rgba(90, 37, 40, 0.14)' : ((isLight || isMix || isWarm) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)')),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -665,13 +725,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
                           <span style={{
                             fontSize: !isNav ? 'clamp(24px, 3vh, 32px)' : 'clamp(22px, 2.8vh, 32px)',
-                            fontWeight: !isNav ? ((isLight || isMix) ? 600 : 900) : ((isLight || isMix) ? 600 : 700),
+                            fontWeight: !isNav ? ((isLight || isMix || isWarm) ? 600 : 900) : ((isLight || isMix || isWarm) ? 600 : 700),
                             color: isNav ? THEME.quickPhrasesText : THEME.emergencyText,
                             lineHeight: 1.1,
                             textAlign: 'center',
                             fontFamily: ENGLISH_UI_FONT,
                             whiteSpace: 'pre-wrap',
-                            letterSpacing: (isLight || isMix) ? '0.01em' : (!isNav ? '0.6px' : '0.2px'),
+                            letterSpacing: (isLight || isMix || isWarm) ? '0.01em' : (!isNav ? '0.6px' : '0.2px'),
                             textTransform: 'none',
                             textShadow: 'none',
                           }}>
@@ -704,7 +764,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                             fontWeight: isLight ? 500 : isMix ? 650 : 300,
                             color: isActivated
                               ? (isLight ? THEME.subtleText : isMix ? THEME.subtleText : screenThemes.home.teal)
-                              : (isLight ? THEME.mutedText : isMix ? '#F0E2C4' : THEME.mutedText),
+                              : (isLight ? THEME.mutedText : isMix ? '#FFFCF1' : THEME.mutedText),
                             opacity: isMix ? 0.9 : 1,
                             lineHeight: 1,
                             textShadow: 'none',
@@ -754,9 +814,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     background: (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 'transparent' : (homeTileIconColors[tile.id] ?? tile.color),
                   }}>
                       <tile.icon
-                        size={tile.id === 'ph' ? homeTileIconSize + 14 : homeTileIconSize}
+                        size={tile.id === 'ph' ? homeTileIconSize + 10 : homeTileIconSize}
                         color={(isMix || !USE_FILLED_HOME_ICON_BADGES) ? (homeTileIconColors[tile.id] ?? tile.color) : THEME.badgeIcon}
-                        strokeWidth={tile.id === 'ph' ? ((isLight || isMix) ? 2.7 : 2.45) : ((isLight || isMix) ? 3.1 : 2.65)}
+                        // Unified stroke width across all 8 tiles for visual cohesion
+                        // (was per-tile 2.45-3.1 → now a single value per theme).
+                        // Paper modes use slightly thicker stroke (3.0) for higher
+                        // legibility on cream; dark mode 2.7 to avoid heaviness.
+                        strokeWidth={(isLight || isMix || isWarm) ? 3.0 : 2.7}
                         style={tile.id === 'ph' ? { transform: 'translateY(1px)' } : undefined}
                       />
                   </div>
@@ -834,9 +898,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     background: (isMix || !USE_FILLED_HOME_ICON_BADGES) ? 'transparent' : (homeTileIconColors[tile.id] ?? tile.color),
                   }}>
                         <tile.icon
-                          size={tile.id === 'ph' ? homeTileIconSize + 12 : homeTileIconSize}
+                          size={tile.id === 'ph' ? homeTileIconSize + 10 : homeTileIconSize}
                           color={(isMix || !USE_FILLED_HOME_ICON_BADGES) ? (homeTileIconColors[tile.id] ?? tile.color) : THEME.badgeIcon}
-                          strokeWidth={tile.id === 'ph' ? ((isLight || isMix) ? 2.9 : 2.6) : ((isLight || isMix) ? 3.1 : 2.65)}
+                          // Unified stroke width (same logic as left panel above).
+                          strokeWidth={(isLight || isMix || isWarm) ? 3.0 : 2.7}
                           style={tile.id === 'ph' ? { transform: 'translateY(1px)' } : undefined}
                         />
                   </div>
@@ -897,10 +962,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           }}>
             <span style={{
               fontSize: 'clamp(48px, 8vh, 96px)',
-              fontWeight: (isLight || isMix) ? 600 : 800,
+              fontWeight: (isLight || isMix || isWarm) ? 600 : 800,
               color: isLight ? lightColors.text.primary : isMix ? (activatedColor || THEME.text) : activatedColor,
               fontFamily: ENGLISH_UI_FONT,
-              letterSpacing: (isLight || isMix) ? '0.02em' : '3px',
+              letterSpacing: (isLight || isMix || isWarm) ? '0.02em' : '3px',
               textAlign: 'center',
               textTransform: 'none',
             }}>

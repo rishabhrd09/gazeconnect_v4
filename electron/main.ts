@@ -43,6 +43,11 @@ let isQuitting = false;
 let isMouseOnlyMode = false;
 let isFocusModeActive = false;
 let isAlertModeActive = false;
+// When isAlertModeLocked is true, the AlertModeScreen's Home button is
+// disabled so the patient can't navigate away. Only the caregiver can
+// unlock (or disable Alert Mode entirely) via right-click. The lock is
+// automatically cleared whenever Alert Mode is disabled.
+let isAlertModeLocked = false;
 let isRefinementMapEnabled = true;
 
 // Dynamic App State for Features
@@ -370,8 +375,23 @@ function setAlertModeActive(enabled: boolean): void {
     isFocusModeActive = false;
     mainWindow?.webContents.send('focus-mode-changed', false);
   }
+  // Auto-clear the lock whenever Alert Mode is disabled — the lock has no
+  // meaning outside Alert Mode and we don't want a stale lock applied to a
+  // future Alert Mode session.
+  if (!isAlertModeActive && isAlertModeLocked) {
+    isAlertModeLocked = false;
+    mainWindow?.webContents.send('alert-mode-lock-changed', false);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('alert-mode-changed', isAlertModeActive);
+  }
+}
+
+function setAlertModeLocked(enabled: boolean): void {
+  // Only allow lock to be enabled when Alert Mode itself is active.
+  isAlertModeLocked = enabled && isAlertModeActive;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('alert-mode-lock-changed', isAlertModeLocked);
   }
 }
 
@@ -749,6 +769,19 @@ function createWindow(): void {
         checked: isAlertModeActive,
         click: (menuItem) => {
           setAlertModeActive(menuItem.checked);
+        },
+      },
+      // Lock Alert Mode — only meaningful when Alert Mode is already active.
+      // When ON, the AlertModeScreen's Home button is disabled so the patient
+      // can't exit; only the caregiver can unlock (or fully disable Alert
+      // Mode) via this same right-click menu.
+      {
+        label: isAlertModeLocked ? '🔐 Unlock Alert Mode' : '🔒 Lock Alert Mode',
+        type: 'checkbox',
+        checked: isAlertModeLocked,
+        enabled: isAlertModeActive,
+        click: (menuItem) => {
+          setAlertModeLocked(menuItem.checked);
         },
       },
       {
@@ -1774,6 +1807,13 @@ function setupIpcHandlers(): void {
   ipcMain.handle('alert-mode:set', (_event: any, enabled: boolean) => {
     setAlertModeActive(Boolean(enabled));
     return isAlertModeActive;
+  });
+  // Lock state — renderer can query + set. Setting only takes effect when
+  // Alert Mode is active (gated by setAlertModeLocked).
+  ipcMain.handle('alert-mode-lock:get', () => isAlertModeLocked);
+  ipcMain.handle('alert-mode-lock:set', (_event: any, enabled: boolean) => {
+    setAlertModeLocked(Boolean(enabled));
+    return isAlertModeLocked;
   });
 
   // Chat history — auto-save keyboard display text to chat_history/chat_YYYY-MM-DD.txt

@@ -22,7 +22,7 @@ const FeelingBtn: React.FC<{ item: Item; isDarkMode: boolean; showHindi: boolean
     const sRef = useRef(0);
     const dwellMs = dwellTiming.contexts.phrases;
     const colors = isDarkMode ? darkColors : lightColors;
-    const { isMix } = useTheme();
+    const { isMix, isWarm } = useTheme();
 
     const clear = () => { if (tRef.current) cancelAnimationFrame(tRef.current); if (dRef.current) clearTimeout(dRef.current); };
     const tick = useCallback(() => {
@@ -45,16 +45,16 @@ const FeelingBtn: React.FC<{ item: Item; isDarkMode: boolean; showHindi: boolean
         style={{
           position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           padding: 'clamp(10px, 1.5vh, 16px) 10px',
-          backgroundColor: isMix ? mixColors.home.tileSurfaces.ph : colors.background.secondary,
-          border: isMix ? `1.5px solid ${hovered ? '#8B6F49' : mixColors.home.cardBorder}` : `2px solid ${hovered ? colors.accent.main : colors.border.main}`,
+          backgroundColor: isMix ? mixColors.home.tileSurfaces.ph : isWarm ? '#FBF5E5' : colors.background.secondary,
+          border: isMix ? `1.5px solid ${hovered ? '#8B6F49' : mixColors.home.cardBorder}` : isWarm ? `1.5px solid ${hovered ? '#497775' : '#DED2C2'}` : `2px solid ${hovered ? colors.accent.main : colors.border.main}`,
           borderRadius: '12px',
           cursor: 'pointer', transform: flash ? 'scale(0.94)' : hovered ? 'scale(1.03)' : 'scale(1)',
           transition: 'all 80ms', overflow: 'hidden',
-          boxShadow: isMix ? mixColors.home.cardShadow : undefined,
+          boxShadow: isMix ? mixColors.home.cardShadow : isWarm ? '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)' : undefined,
         }}>
-        {hovered && <div style={{ position: 'absolute', bottom: 0, left: 0, height: 3, width: `${progress * 100}%`, backgroundColor: isMix ? '#8B6F49' : colors.accent.main }} />}
-        <span style={{ fontSize: 'clamp(13px, 1.8vh, 19px)', fontWeight: 600, color: isMix ? mixColors.home.text : colors.text.primary, textAlign: 'center', lineHeight: 1.3 }}>{item.en}</span>
-        {showHindi && <span style={{ fontSize: 'clamp(20px, 2.4vh, 30px)', fontWeight: 600, color: isMix ? mixColors.home.subtleText : colors.text.secondary, textAlign: 'center', marginTop: '8px', fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif", lineHeight: 1.3 }}>{item.hi}</span>}
+        {hovered && <div style={{ position: 'absolute', bottom: 0, left: 0, height: 3, width: `${progress * 100}%`, backgroundColor: isMix ? '#8B6F49' : isWarm ? '#3F6968' : colors.accent.main }} />}
+        <span style={{ fontSize: 'clamp(13px, 1.8vh, 19px)', fontWeight: 600, color: isMix ? mixColors.home.text : isWarm ? '#2F2A26' : colors.text.primary, textAlign: 'center', lineHeight: 1.3 }}>{item.en}</span>
+        {showHindi && <span style={{ fontSize: 'clamp(20px, 2.4vh, 30px)', fontWeight: 600, color: isMix ? mixColors.home.subtleText : isWarm ? '#5C4F44' : colors.text.secondary, textAlign: 'center', marginTop: '8px', fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif", lineHeight: 1.3 }}>{item.hi}</span>}
       </button>
     );
   };
@@ -62,10 +62,10 @@ const FeelingBtn: React.FC<{ item: Item; isDarkMode: boolean; showHindi: boolean
 const FeelingScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true, showHindi = false }) => {
   const colors = isDarkMode ? darkColors : lightColors;
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const { feelings: FEELINGS } = useCustomization();
   return (
-    <div className={`feelings-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: isMix ? mixColors.home.root : colors.background.primary, padding: '8px', gap: '8px' }}>
+    <div className={`feelings-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: isMix ? mixColors.home.root : isWarm ? '#F5EEDF' : colors.background.primary, padding: '8px', gap: '8px' }}>
       {/* GlobalNavBar - Home, Keyboard, Medical, Emergency */}
       <GlobalNavBar
         currentPage="feelings"

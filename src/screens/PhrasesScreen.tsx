@@ -8,7 +8,7 @@
  * - Enhanced aesthetic styling
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { darkColors, lightColors, mixColors, screenThemes } from '../utils/design';
+import { darkColors, lightColors, mixColors, screenThemes, warmScreenTokens } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -169,21 +169,21 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   const colors = isDarkMode ? darkColors : lightColors;
   const { phraseCategories } = useCustomization();
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const isWarmMode = isDarkMode && !isLight;
   const primaryPhraseCategories = phraseCategories.filter(isPrimaryPhraseCategory);
-  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
-  const sidebarBg = isMix ? '#2A241C' : isWarmMode ? SIDEBAR_BG : lightColors.background.secondary;
-  const sidebarBorder = isMix ? 'rgba(139, 111, 73, 0.42)' : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
-  const sidebarShadow = isWarmMode ? '0 8px 22px rgba(0,0,0,0.24)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
-  const selectedBg = isMix ? 'rgba(196, 178, 142, 0.22)' : isWarmMode ? screenThemes.phrases.selectedBg : lightColors.background.tertiary;
-  const inactiveIcon = isMix || isWarmMode ? PAGE_ICON_COLOR : lightColors.text.tertiary;
-  const sidebarText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const titleText = isMix ? '#F0E2C4' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const phraseCardBg = isMix ? mixColors.home.tileSurfaces.ph : isWarmMode ? screenThemes.phrases.cardBg : colors.background.secondary;
-  const phraseCardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? screenThemes.phrases.cardBorder : `1.5px solid ${colors.border.light}`;
-  const phraseText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const phraseShadow = isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const pageBg = isMix ? '#17130F' : isWarm ? warmScreenTokens.phrases.pageBg : isWarmMode ? '#131412' : colors.background.primary;
+  const sidebarBg = isMix ? '#2A241C' : isWarm ? warmScreenTokens.phrases.sidebarBg : isWarmMode ? SIDEBAR_BG : lightColors.background.secondary;
+  const sidebarBorder = isMix ? 'rgba(139, 111, 73, 0.42)' : isWarm ? warmScreenTokens.phrases.sidebarBorder : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
+  const sidebarShadow = isWarm ? '0 2px 8px rgba(122, 99, 71, 0.10)' : isWarmMode ? '0 8px 22px rgba(0,0,0,0.24)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const selectedBg = isMix ? 'rgba(196, 178, 142, 0.22)' : isWarm ? warmScreenTokens.phrases.selectedBg : isWarmMode ? screenThemes.phrases.selectedBg : lightColors.background.tertiary;
+  const inactiveIcon = isMix || isWarmMode ? PAGE_ICON_COLOR : isWarm ? warmScreenTokens.phrases.cardText : lightColors.text.tertiary;
+  const sidebarText = isMix ? '#FFFCF1' : isWarm ? warmScreenTokens.phrases.cardText : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const titleText = isMix ? '#FFFCF1' : isWarm ? warmScreenTokens.phrases.cardText : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseCardBg = isMix ? mixColors.home.tileSurfaces.ph : isWarm ? warmScreenTokens.phrases.cardBg : isWarmMode ? screenThemes.phrases.cardBg : colors.background.secondary;
+  const phraseCardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarm ? warmScreenTokens.phrases.cardBorder : isWarmMode ? screenThemes.phrases.cardBorder : `1.5px solid ${colors.border.light}`;
+  const phraseText = isMix ? mixColors.home.text : isWarm ? warmScreenTokens.phrases.cardText : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseShadow = isMix ? mixColors.home.cardShadow : isWarm ? warmScreenTokens.phrases.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
   const [activatedIdx, setActivatedIdx] = useState<number | null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -223,7 +223,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   }, [onSpeak]);
 
   return (
-    <div className={`phrases-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
+    <div className={`phrases-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
@@ -458,9 +458,9 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   minHeight: 0,
                   padding: 'clamp(18px, 2.2vh, 26px) clamp(18px, 2vw, 28px)',
                   background: phraseCardBg,
-                  border: activatedIdx === index ? `2px solid ${isMix ? '#8B6F49' : isWarmMode ? '#D6C98E' : colors.accent.main}` : phraseCardBorder,
+                  border: activatedIdx === index ? `2px solid ${isMix ? '#8B6F49' : isWarm ? warmScreenTokens.phrases.activatedBorder : isWarmMode ? '#D6C98E' : colors.accent.main}` : phraseCardBorder,
                   borderRadius: '22px',
-                  boxShadow: activatedIdx === index ? (isMix ? mixColors.home.cardShadow : isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)') : phraseShadow,
+                  boxShadow: activatedIdx === index ? (isMix ? mixColors.home.cardShadow : isWarm ? warmScreenTokens.phrases.cardShadowActivated : isWarmMode ? '0 0 0 1px rgba(213,216,188,0.20), 0 8px 18px rgba(0,0,0,0.20)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)') : phraseShadow,
                   transition: 'border 0.15s ease, box-shadow 0.15s ease',
                   transform: activatedIdx === index ? 'scale(1.02)' : 'scale(1)',
                 }}
@@ -488,11 +488,11 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   {/* Hindi text - Beautiful, clear Devanagari font */}
                   {showHindi && phrase.hi && (
                     <>
-                      <div style={{ width: '36px', height: '1.5px', background: isMix ? 'rgba(122,99,71,0.30)' : 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
+                      <div style={{ width: '36px', height: '1.5px', background: isMix ? 'rgba(122,99,71,0.30)' : isWarm ? 'rgba(73,119,117,0.30)' : 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
                       <span style={{
                         fontSize: 'clamp(22px, 2.6vh, 34px)',
                         fontWeight: 700,
-                        color: isMix ? mixColors.home.subtleText : 'rgba(255, 210, 140, 0.95)',
+                        color: isMix ? mixColors.home.subtleText : isWarm ? warmScreenTokens.phrases.hindiText : 'rgba(255, 210, 140, 0.95)',
                         lineHeight: 1.5,
                         fontFamily: "'Noto Sans Devanagari', sans-serif",
                         letterSpacing: '0.02em',

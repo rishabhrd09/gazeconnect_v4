@@ -17,7 +17,7 @@ const PersonBtn: React.FC<{
   person: Person; isSelected: boolean; isDarkMode: boolean;
   onSelect: () => void; gazeEnabled: boolean; lastEnabledTimestamp: number;
 }> = ({ person, isSelected, isDarkMode, onSelect, gazeEnabled, lastEnabledTimestamp }) => {
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const [hovered, setHovered] = useState(false);
   const [progress, setProgress] = useState(0);
   const tRef = useRef<number | null>(null);
@@ -96,16 +96,16 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
   const colors = isDarkMode ? darkColors : lightColors;
   const [selected, setSelected] = useState<string | null>(null);
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const { people: PEOPLE } = useCustomization();
   const fallbackPerson: Person = { name: 'Rishabh', nameHi: 'Rishabh', role: '', phrases: [] };
   const isWarmMode = isDarkMode && !isLight;
-  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
-  const phraseBg = isMix ? mixColors.home.tileSurfaces.pp : isWarmMode ? '#20221E' : colors.background.secondary;
-  const phraseBorder = isMix ? mixColors.home.cardBorder : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
-  const phraseText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const phraseHindi = isMix ? '#493B2E' : isWarmMode ? '#C8C5B8' : colors.text.secondary;
-  const phraseHover = isMix ? '#628780' : isWarmMode ? '#7FA39B' : '#4F6E68';
+  const pageBg = isMix ? '#17130F' : isWarm ? '#F5EEDF' : isWarmMode ? '#131412' : colors.background.primary;
+  const phraseBg = isMix ? mixColors.home.tileSurfaces.pp : isWarm ? '#FBF5E5' : isWarmMode ? '#20221E' : colors.background.secondary;
+  const phraseBorder = isMix ? mixColors.home.cardBorder : isWarm ? '#DED2C2' : isWarmMode ? 'rgba(213,216,188,0.14)' : colors.border.main;
+  const phraseText = isMix ? mixColors.home.text : isWarm ? '#2F2A26' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const phraseHindi = isMix ? '#493B2E' : isWarm ? '#5C4F44' : isWarmMode ? '#C8C5B8' : colors.text.secondary;
+  const phraseHover = isMix ? '#628780' : isWarm ? '#3F6968' : isWarmMode ? '#7FA39B' : '#4F6E68';
   const selectedPerson = PEOPLE.find(p => p.name === selected) ?? PEOPLE[0] ?? fallbackPerson;
 
   useEffect(() => {
@@ -115,7 +115,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
   }, [PEOPLE, selected]);
 
   return (
-    <div className={`people-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: pageBg, padding: '8px', gap: 'clamp(8px, 1vh, 14px)', overflow: 'hidden' }}>
+    <div className={`people-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: pageBg, padding: '8px', gap: 'clamp(8px, 1vh, 14px)', overflow: 'hidden' }}>
       {/* GlobalNavBar - Home, Keyboard, Medical, Emergency */}
       <GlobalNavBar
         currentPage="people"

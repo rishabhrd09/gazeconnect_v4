@@ -249,7 +249,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
 
     const { isGazeEnabled } = useGazeControl();
-    const { isLight } = useTheme();
+    const { isLight, isWarm } = useTheme();
 
     // Theme-aware text + accent tokens. THEME.* is dark-only (light text, dark
     // bg). When isLight=true, override text colors to dark warm-brown so they
@@ -528,11 +528,11 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     // ════════════════════════════════════════════════════════════
 
     return (
-        <div className={`survey-screen${isLight ? ' theme-light' : ''}`} style={{
+        <div className={`survey-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
-            backgroundColor: isLight ? lightColors.background.primary : THEME.bg,
+            backgroundColor: isLight ? lightColors.background.primary : isWarm ? '#F5EEDF' : THEME.bg,
             color: T_textMain,
             overflow: 'hidden',
             fontFamily: UI_FONT,

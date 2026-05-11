@@ -15,6 +15,7 @@
   <script>
     try {
       var t = localStorage.getItem('gc-theme') || 'dark';
+      if (t !== 'dark' && t !== 'light' && t !== 'mix' && t !== 'warm') t = 'dark';
       document.documentElement.setAttribute('data-theme', t);
       document.documentElement.classList.add('theme-' + t);
     } catch (e) {}

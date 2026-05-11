@@ -441,15 +441,24 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                   ? `Light mode${settings.showHindi ? ' \u00B7 \u0932\u093E\u0907\u091F \u092E\u094B\u0921' : ''}`
                   : theme === 'mix'
                     ? `Mix mode${settings.showHindi ? ' \u00B7 \u092E\u093F\u0915\u094D\u0938 \u092E\u094B\u0921' : ''}`
-                    : `Dark mode${settings.showHindi ? ' \u00B7 \u0921\u093E\u0930\u094D\u0915 \u092E\u094B\u0921' : ''}`}
+                    : theme === 'warm'
+                      ? `Warm mode${settings.showHindi ? ' \u00B7 \u0917\u0930\u094D\u092E \u092E\u094B\u0921' : ''}`
+                      : `Dark mode${settings.showHindi ? ' \u00B7 \u0921\u093E\u0930\u094D\u0915 \u092E\u094B\u0921' : ''}`}
               </div>
             </div>
 
+            {(() => {
+              // Theme-aware pill colors. In warm + light modes the pill sits on cream
+              // paper, so the unselected button text must be a dark warm color (not white).
+              const isPaper = theme === 'warm' || theme === 'light';
+              const pillTrackBg = isPaper ? 'rgba(122, 99, 71, 0.07)' : 'rgba(255,255,255,0.06)';
+              const idleText = isPaper ? 'rgba(47, 42, 38, 0.55)' : 'rgba(255,255,255,0.40)';
+              return (
             <div className="theme-toggle-pill" style={{
               display: 'flex',
               flexWrap: 'wrap',
               gap: 8,
-              background: 'rgba(255,255,255,0.06)',
+              background: pillTrackBg,
               borderRadius: 100,
               padding: '6px',
               border: `1px solid ${colors.border.main}`,
@@ -459,13 +468,13 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                 style={{
                   borderRadius: 100,
                   padding: '10px 20px',
-                  minWidth: 96,
+                  minWidth: 86,
                   minHeight: 44,
                   background: theme === 'dark'
                     ? 'rgba(255,255,255,0.18)'
                     : 'transparent',
                   border: 'none',
-                  color: theme === 'dark' ? '#fff' : 'rgba(255,255,255,0.40)',
+                  color: theme === 'dark' ? '#fff' : idleText,
                   fontWeight: 700,
                   fontSize: 15,
                   cursor: 'pointer',
@@ -482,13 +491,13 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                 style={{
                   borderRadius: 100,
                   padding: '10px 20px',
-                  minWidth: 96,
+                  minWidth: 86,
                   minHeight: 44,
                   background: theme === 'mix'
                     ? 'rgba(138, 74, 61, 0.38)'
                     : 'transparent',
                   border: 'none',
-                  color: theme === 'mix' ? '#F5EAD3' : 'rgba(255,255,255,0.40)',
+                  color: theme === 'mix' ? '#F5EAD3' : idleText,
                   fontWeight: 700,
                   fontSize: 15,
                   cursor: 'pointer',
@@ -501,17 +510,40 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
               </button>
 
               <button
+                onClick={() => { setTheme('warm'); updateSetting('isDarkMode', false); }}
+                style={{
+                  borderRadius: 100,
+                  padding: '10px 20px',
+                  minWidth: 86,
+                  minHeight: 44,
+                  background: theme === 'warm'
+                    ? 'linear-gradient(135deg, #C9A96B, #D39C5C)'
+                    : 'transparent',
+                  border: 'none',
+                  color: theme === 'warm' ? '#2F2A26' : idleText,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 8,
+                  transition: 'background 200ms, color 200ms',
+                }}
+              >
+                Warm
+              </button>
+
+              <button
                 onClick={() => { setTheme('light'); updateSetting('isDarkMode', false); }}
                 style={{
                   borderRadius: 100,
                   padding: '10px 20px',
-                  minWidth: 96,
+                  minWidth: 86,
                   minHeight: 44,
                   background: theme === 'light'
-                    ? 'linear-gradient(135deg, #F97316, #F59E0B)'
+                    ? 'linear-gradient(135deg, #C19A4D, #3F6864)'  // gold→teal — matches new identity
                     : 'transparent',
                   border: 'none',
-                  color: theme === 'light' ? '#fff' : 'rgba(255,255,255,0.40)',
+                  color: theme === 'light' ? '#fff' : idleText,
                   fontWeight: 700,
                   fontSize: 15,
                   cursor: 'pointer',
@@ -523,6 +555,8 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                 Light
               </button>
             </div>
+              );
+            })()}
           </div>
 
           <ToggleSetting

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
-import { screenThemes, typography } from '../utils/design';
+import { screenThemes, typography, warmScreenTokens } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { useGazeBrowser } from '../hooks/useGazeBrowser';
@@ -939,6 +939,17 @@ const QUICK_TOPICS: QuickTopic[] = [
     { id: 'stock_market', label: 'Stock Market', url: 'https://www.google.com/search?q=Sensex+Nifty+today', mode: 'web' },
 ];
 
+// Subtitle captions — small descriptive caption below each topic label
+// (mirrors the YouTube category-card subtitle grammar).
+const QUICK_TOPIC_SUBTITLES: Record<string, string> = {
+    india_news:     "Today's headlines",
+    local_weather:  'Forecast nearby',
+    global_news:    'Top stories worldwide',
+    als_research:   'Latest ALS news',
+    cricket_score:  'Live match scores',
+    stock_market:   'Sensex · Nifty today',
+};
+
 type ViewState = 'grid' | 'news' | 'youtube' | 'knowledge' | 'search' | 'whatsapp' | 'social';
 
 // ── NEWS PANEL ──
@@ -999,25 +1010,26 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
     isNavHidden?: boolean;
 }) => {
     const ws = useWS();
-    const { isLight, isMix } = useTheme();
+    const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. Content cards stay dark in all modes.
-    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
-    const T_chromePillSelected = isLight ? 'rgba(31, 107, 126, 0.16)' : isMix ? 'rgba(180, 147, 98, 0.22)' : 'rgba(198, 154, 69, 0.16)';
-    const T_chromePillSelectedBorder = isLight ? 'rgba(31, 107, 126, 0.34)' : isMix ? 'rgba(180, 147, 98, 0.40)' : 'rgba(198, 154, 69, 0.34)';
-    const T_chromePillSelectedText = isLight ? '#1F6B7E' : isMix ? '#E3C28E' : '#F1E2C2';
-    const T_chromeAccentLine = isLight ? '#1F6B7E' : isMix ? '#B49362' : '#C69A45';
+    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_chromePillSelected = isLight ? 'rgba(31, 107, 126, 0.16)' : isWarm ? warmScreenTokens.web.chromePillSelected : isMix ? 'rgba(180, 147, 98, 0.22)' : 'rgba(198, 154, 69, 0.16)';
+    const T_chromePillSelectedBorder = isLight ? 'rgba(31, 107, 126, 0.34)' : isWarm ? warmScreenTokens.web.chromePillSelectedBorder : isMix ? 'rgba(180, 147, 98, 0.40)' : 'rgba(198, 154, 69, 0.34)';
+    const T_chromePillSelectedText = isLight ? '#1F6B7E' : isWarm ? warmScreenTokens.web.chromePillSelectedText : isMix ? '#E3C28E' : '#F1E2C2';
+    const T_chromeAccentLine = isLight ? '#1F6B7E' : isWarm ? warmScreenTokens.web.accentLine : isMix ? '#B49362' : '#C69A45';
     const [cat, setCat] = useState('positive_india');
     const [sel, setSel] = useState<NewsItem | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [readerUrl, setReaderUrl] = useState('');
     const [readerLoading, setReaderLoading] = useState(false);
     const [readerData, setReaderData] = useState<any | null>(null);
-    const [readerLiveMode, setReaderLiveMode] = useState(false);
+    // Embedded BrowserView ("live mode") removed from news flow — it crashed
+    // on open. News reader now exclusively uses the parsed-text Reader View.
     const [autoReadOn, setAutoReadOn] = useState(false);
     const [autoReadPaused, setAutoReadPaused] = useState(false);
     const [autoReadIndex, setAutoReadIndex] = useState(0);
@@ -1025,7 +1037,6 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
         typeof window !== 'undefined' ? (window.innerWidth < 1500 || window.innerHeight < 900) : false,
     );
     const scrollRef = useRef<HTMLDivElement>(null);
-    const readerWebRef = useRef<HTMLDivElement>(null);
     const autoReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const cats = ws.newsCategories.length ? ws.newsCategories : [
@@ -1046,7 +1057,6 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
         setReaderUrl('');
         setReaderData(null);
         setReaderLoading(false);
-        setReaderLiveMode(false);
         setAutoReadOn(false);
         setAutoReadPaused(false);
         setAutoReadIndex(0);
@@ -1065,36 +1075,13 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
         }
     }, [ws.articleData, readerUrl]);
 
-    useEffect(() => {
-        if (!readerLiveMode || !readerUrl) return;
-        let cancelled = false;
-        const raf = requestAnimationFrame(() => {
-            if (cancelled || !readerWebRef.current) return;
-            const r = readerWebRef.current.getBoundingClientRect();
-            if (r.width > 50 && r.height > 50) {
-                browser.openPage(readerUrl, {
-                    x: Math.round(r.left),
-                    y: Math.round(r.top),
-                    width: Math.round(r.width),
-                    height: Math.round(r.height),
-                });
-            }
-        });
-        return () => {
-            cancelled = true;
-            cancelAnimationFrame(raf);
-        };
-    }, [readerLiveMode, readerUrl, browser, isNavHidden]);
-
-    useEffect(() => {
-        if (!readerLiveMode) {
-            browser.closePage();
-        }
-    }, [readerLiveMode, browser]);
-
+    // Embedded BrowserView effects removed — news flow no longer opens
+    // in-app browser. Reader View (parsed text) is the only article render.
+    // Defensive cleanup: if any browser session lingers from a sibling panel
+    // (YouTube / Quick Search) we close it on news-component unmount.
     useEffect(() => {
         return () => {
-            browser.closePage();
+            try { browser.closePage(); } catch { /* ignore */ }
         };
     }, [browser]);
 
@@ -1171,97 +1158,99 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
         setReaderUrl(sel.link);
         setReaderLoading(true);
         setReaderData(null);
-        setReaderLiveMode(false);
         ws.fetchArticle(sel.link);
         disableGaze();
     }, [sel, ws.fetchArticle, disableGaze]);
-
-    const openReaderFallbackWeb = useCallback(() => {
-        if (!sel?.link) return;
-        setReaderUrl(sel.link);
-        setReaderLiveMode(true);
-        disableGaze();
-    }, [sel, disableGaze]);
 
     const cardCount = isCompactGrid ? 4 : 6;
     const visibleItems = ws.newsItems.slice(0, cardCount) as NewsItem[];
     const activeAutoReadIndex = ws.newsItems.length ? autoReadIndex % ws.newsItems.length : -1;
     const sidebarVisibleCount = 5;
     const sidebarItems = ws.newsItems.slice(0, sidebarVisibleCount) as NewsItem[];
-    const sidebarSlots = Array.from({ length: sidebarVisibleCount }, (_, idx) => sidebarItems[idx] || null);
+    // Note: sidebarVisibleCount caps how many items we pull from ws.newsItems;
+    // we render only the items that actually exist so the available vertical
+    // space is split across real headlines (no empty placeholder slots).
     const categoryIndex = Math.max(0, cats.findIndex((c: any) => c.id === cat));
     const currentCategory = cats[categoryIndex] || cats[0];
     const readerBodyRaw = readerData?.text || sel?.content || sel?.description || sel?.summary || '';
     const readableParagraphs = formatNewsAsReadableParagraphs(readerBodyRaw);
 
     if (sel) {
+        // Simplified toolbar — embedded BrowserView removed (it crashed on open).
+        // 5 essential actions: Close · Read · Read Full Story · Stop · Scroll.
+        // All buttons sit in one connected container with internal dividers;
+        // semantic roles: emergency=destructive, primary=open/scroll, secondary=TTS.
+        const totalBtns = 5;
+        const positionAt = (idx: number): 'first' | 'middle' | 'last' =>
+            idx === 0 ? 'first' : idx === totalBtns - 1 ? 'last' : 'middle';
+        let bi = 0;
+        const nextPos = () => positionAt(bi++);
         return (
             <div style={{
                 flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                marginTop: 'clamp(95px, 12.5vh, 125px)', padding: 'clamp(16px, 2vh, 24px) clamp(20px, 3vw, 40px)',
-                paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+                marginTop: 'clamp(8px, 1vh, 14px)',
+                padding: 'clamp(12px, 1.5vh, 18px) clamp(20px, 3vw, 40px)',
+                paddingBottom: 'clamp(16px, 2vh, 28px)',
                 background: T_pageBg,
             }}>
-                <div style={{ display: 'flex', gap: 'clamp(16px,2.5vw,28px)', flexShrink: 0, flexWrap: 'wrap', marginBottom: 'clamp(12px,2vh,20px)' }}>
-                    <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); setReaderLiveMode(false); browser.closePage(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER), minWidth: 'clamp(130px,13vw,170px)' }}>
-                        <XIcon size={26} color="currentColor" strokeWidth={2.4} />
-                        <span>Close</span>
-                    </GazeButton>
-                    <GazeButton id="n-read" onClick={() => onSpeak(`${sel.title}. ${sel.summary || sel.description || ''}`)} gazeEnabled={ige}
-                        gazeEnabledTimestamp={ts} isDarkMode style={{ ...actionButton(TL, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER), minWidth: 'clamp(130px,13vw,170px)' }}>
-                        <SpeakIcon size={26} color="currentColor" strokeWidth={2.3} />
-                        <span>Read</span>
-                    </GazeButton>
-                    <GazeButton id="n-reader" onClick={openReaderView} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: INFO, borderColor: INFO_BORDER, minWidth: 'clamp(160px,16vw,220px)' }}>
-                        <BookIcon size={26} color="currentColor" strokeWidth={2.2} />
-                        <span>Read Full Story</span>
-                    </GazeButton>
-                    <GazeButton id="n-reader-web" onClick={openReaderFallbackWeb} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cb, color: SUCCESS, borderColor: SUCCESS_BORDER, minWidth: 'clamp(150px,15vw,220px)' }}>
-                        <ExternalIcon size={26} color="currentColor" strokeWidth={2.3} />
-                        <span>Open in Browser</span>
-                    </GazeButton>
-                    {readerLiveMode && (
-                        <>
-                        <GazeButton id="n-bv-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...actionButton(WEB_ACCENTS.tealText, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER), minWidth: 'clamp(130px,13vw,170px)' }}>
-                            <PointerIcon size={28} color="currentColor" strokeWidth={2.2} />
-                            <span>Click Here</span>
+                {/* Connected toolbar — single rounded container, internal dividers,
+                    semantic role colors. Matches YouTube reader chrome. */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'clamp(10px, 1.1vw, 16px)',
+                    flexShrink: 0,
+                    marginBottom: 'clamp(14px,2vh,22px)',
+                }}>
+                    <div style={{ ...connectedToolbarStyle, flex: 1 }}>
+                        <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                            style={{ ...toolbarBtnConnected('emergency', false, nextPos()), fontWeight: 800, letterSpacing: '0.08em' }}>
+                            <XIcon size={26} color="currentColor" strokeWidth={2.4} />
+                            <span>Close</span>
                         </GazeButton>
-                        <GazeButton id="n-bv-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...actionButton(WEB_ACCENTS.blueText), minWidth: 'clamp(100px,10vw,140px)' }}>
-                            <ArrowUpIcon size={26} color="currentColor" strokeWidth={2.3} />
-                            <span>Up</span>
+                        <GazeButton id="n-read" onClick={() => onSpeak(`${sel.title}. ${sel.summary || sel.description || ''}`)} gazeEnabled={ige}
+                            gazeEnabledTimestamp={ts} isDarkMode style={toolbarBtnConnected('secondary', false, nextPos())}>
+                            <SpeakIcon size={26} color="currentColor" strokeWidth={2.3} />
+                            <span>Read</span>
                         </GazeButton>
-                        <GazeButton id="n-bv-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...actionButton(WEB_ACCENTS.blueText), minWidth: 'clamp(100px,10vw,140px)' }}>
-                            <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
-                            <span>Down</span>
-                        </GazeButton>
-                        <GazeButton id="n-reader-text" onClick={() => { setReaderLiveMode(false); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                            style={{ ...cb, color: SOFT_INFO, borderColor: SOFT_INFO_BORDER, minWidth: 'clamp(150px,15vw,220px)' }}>
+                        <GazeButton id="n-reader" onClick={openReaderView} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                            style={toolbarBtnConnected('primary', false, nextPos())}>
                             <BookIcon size={26} color="currentColor" strokeWidth={2.2} />
-                            <span>Reader View</span>
+                            <span>Read Full Story</span>
                         </GazeButton>
-                        </>
-                    )}
-                    <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER), minWidth: 'clamp(110px,11vw,150px)' }}>Stop</GazeButton>
-                    <GazeButton id="n-scroll" onClick={() => scrollRef.current?.scrollBy({ top: 280, behavior: 'smooth' })} gazeEnabled={ige}
-                        gazeEnabledTimestamp={ts} isDarkMode style={{ ...actionButton(WEB_ACCENTS.blueText), minWidth: 'clamp(130px,13vw,170px)' }}>
-                        <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
-                        <span>Scroll</span>
-                    </GazeButton>
+                        <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                            style={toolbarBtnConnected('emergency', false, nextPos())}>
+                            <span>Stop</span>
+                        </GazeButton>
+                        <GazeButton id="n-scroll" onClick={() => scrollRef.current?.scrollBy({ top: 280, behavior: 'smooth' })} gazeEnabled={ige}
+                            gazeEnabledTimestamp={ts} isDarkMode style={toolbarBtnConnected('primary', false, nextPos())}>
+                            <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
+                            <span>Scroll</span>
+                        </GazeButton>
+                    </div>
+                    {/* Cached chip — small status pill, sits outside the action toolbar
+                        so it doesn't compete with the active buttons. */}
                     {ws.newsCached && (
                         <div style={{
-                            ...cb,
-                            minHeight: 'clamp(54px,7vh,80px)',
-                            color: STATUS,
-                            borderColor: STATUS_BORDER,
-                            background: 'rgba(16, 67, 93, 0.22)',
-                    }}>Cached</div>
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            minHeight: 'clamp(56px, 7vh, 80px)',
+                            padding: '0 clamp(16px, 1.6vw, 24px)',
+                            background: isLight ? 'rgba(31, 107, 126, 0.10)'
+                                : isWarm ? 'rgba(79, 115, 136, 0.12)'
+                                : isMix ? 'rgba(94, 156, 168, 0.20)'
+                                : 'rgba(28, 47, 45, 0.55)',
+                            border: `1.5px solid ${isLight ? 'rgba(31, 107, 126, 0.32)'
+                                : isWarm ? 'rgba(79, 115, 136, 0.36)'
+                                : isMix ? 'rgba(94, 156, 168, 0.42)'
+                                : 'rgba(120, 157, 145, 0.36)'}`,
+                            borderRadius: '14px',
+                            color: isLight ? '#1F6B7E' : isWarm ? '#3D5E73' : isMix ? '#B6D7D1' : '#A9CAC7',
+                            fontSize: 'clamp(14px, 1.7vh, 18px)',
+                            fontWeight: 800,
+                            letterSpacing: '0.08em',
+                            fontFamily: FONT_PRIMARY,
+                            flexShrink: 0,
+                        }}>Cached</div>
                     )}
                 </div>
 
@@ -1274,141 +1263,218 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             alignItems: 'stretch',
                             justifyContent: 'center',
                             padding: 'clamp(12px,1.4vh,16px)',
-                            background: T.cardBg,
+                            background: isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : T.cardBg,
+                            border: isLight ? '1.5px solid rgba(168, 120, 56, 0.30)'
+                                : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
+                                : undefined,
+                            boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+                                : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+                                : undefined,
                         }}>
-                            <div style={{ fontSize: 'clamp(12px,1.35vh,14px)', color: 'rgba(173,194,214,0.75)', marginBottom: '6px', letterSpacing: '0.02em' }}>
+                            <div style={{ fontSize: 'clamp(12px,1.35vh,14px)', color: isLight ? '#76624A' : isWarm ? '#6A625B' : 'rgba(173,194,214,0.75)', marginBottom: '6px', letterSpacing: '0.02em' }}>
                                 CURRENT CATEGORY
                             </div>
-                            <div style={{ fontSize: 'clamp(18px,2vh,22px)', fontWeight: 700, color: T.textMain }}>
+                            <div style={{ fontSize: 'clamp(18px,2vh,22px)', fontWeight: 700, color: isLight ? '#2E2A24' : isWarm ? '#2F2A26' : T.textMain }}>
                                 {stripLeadingEmoji(currentCategory?.label || 'Top Stories')}
                             </div>
                         </div>
 
+                        {/* Sidebar list — only renders actual items (no dashed empty
+                            placeholders). Items distribute across the available
+                            vertical space via 1fr rows, so 3 items fill the panel
+                            cleanly instead of stacking at the top with empty slots. */}
                         <div style={{
                             flex: 1,
                             display: 'grid',
-                            gridTemplateRows: `repeat(${sidebarVisibleCount}, minmax(0, 1fr))`,
-                            gap: 'clamp(10px, 1.2vh, 14px)',
+                            gridTemplateRows: `repeat(${Math.max(1, sidebarItems.length)}, minmax(clamp(110px, 12vh, 150px), 1fr))`,
+                            gap: 'clamp(12px, 1.4vh, 16px)',
                             overflow: 'hidden',
                             minHeight: 0,
+                            alignContent: 'stretch',
                         }}>
-                            {sidebarSlots.map((it, i) => (
-                                it ? (
-                                    <GazeButton
-                                        key={`${it.title}-${i}`}
-                                        id={`ni-side-${i}`}
-                                        onClick={() => selectItem(it)}
-                                        gazeEnabled={ige}
-                                        gazeEnabledTimestamp={ts}
-                                        isDarkMode
-                                        style={{
-                                            ...cs,
-                                            alignItems: 'flex-start',
-                                            justifyContent: 'space-between',
-                                            padding: 'clamp(14px,1.7vh,18px)',
-                                            minHeight: 'clamp(96px, 10.5vh, 122px)',
-                                            background: sel.title === it.title ? 'rgba(56, 189, 248, 0.10)' : T.cardBg,
-                                            border: sel.title === it.title ? `2px solid ${AC}90` : CB,
-                                        }}
-                                    >
-                                        <div style={{
-                                            fontSize: 'clamp(15px,1.65vh,19px)',
-                                            fontWeight: 600,
-                                            color: T.textMain,
-                                            lineHeight: 1.35,
-                                            display: '-webkit-box',
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: 'vertical' as const,
-                                            overflow: 'hidden',
-                                            textAlign: 'left',
-                                            width: '100%',
-                                        }}>
-                                            {it.title}
-                                        </div>
-                                        <div style={{ fontSize: 'clamp(11px,1.1vh,13px)', color: 'rgba(153,175,198,0.78)', marginTop: '8px' }}>
-                                            {it.source || 'News'} • {it.relative_time || 'Recent'}
-                                        </div>
-                                    </GazeButton>
-                                ) : (
-                                    <div key={`ni-empty-${i}`} style={{
-                                        minHeight: 'clamp(96px, 10.5vh, 122px)',
-                                        borderRadius: '18px',
-                                        border: '1px solid rgba(90,110,130,0.12)',
-                                        background: 'rgba(20,30,44,0.22)',
-                                    }} />
-                                )
+                            {sidebarItems.map((it, i) => (
+                                <GazeButton
+                                    key={`${it.title}-${i}`}
+                                    id={`ni-side-${i}`}
+                                    onClick={() => selectItem(it)}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    style={{
+                                        ...cs,
+                                        alignItems: 'flex-start',
+                                        justifyContent: 'space-between',
+                                        padding: 'clamp(16px,1.9vh,22px) clamp(16px, 1.6vw, 22px)',
+                                        minHeight: 'clamp(110px, 12vh, 150px)',
+                                        background: sel.title === it.title
+                                          ? (isLight ? 'rgba(31, 107, 126, 0.12)'
+                                            : isWarm ? 'rgba(63, 105, 104, 0.14)'
+                                            : 'rgba(56, 189, 248, 0.10)')
+                                          : (isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : T.cardBg),
+                                        border: sel.title === it.title
+                                          ? (isLight ? '2px solid #1F6B7E'
+                                            : isWarm ? '2px solid #3F6968'
+                                            : `2px solid ${AC}90`)
+                                          : (isLight ? '1.5px solid rgba(168, 120, 56, 0.22)'
+                                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
+                                            : CB),
+                                        boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+                                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+                                            : undefined,
+                                    }}
+                                >
+                                    <div style={{
+                                        fontSize: 'clamp(16px,1.8vh,21px)',
+                                        fontWeight: 700,
+                                        color: isLight ? '#2E2A24' : isWarm ? '#2F2A26' : T.textMain,
+                                        lineHeight: 1.32,
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: 'vertical' as const,
+                                        overflow: 'hidden',
+                                        textAlign: 'left',
+                                        width: '100%',
+                                    }}>
+                                        {it.title}
+                                    </div>
+                                    <div style={{ fontSize: 'clamp(12px,1.25vh,15px)', color: isLight ? '#76624A' : isWarm ? '#8A7C6B' : 'rgba(153,175,198,0.78)', marginTop: 'clamp(8px, 1vh, 12px)', fontWeight: 600 }}>
+                                        {it.source || 'News'} • {it.relative_time || 'Recent'}
+                                    </div>
+                                </GazeButton>
                             ))}
+                            {sidebarItems.length === 0 && (
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    borderRadius: '18px',
+                                    border: isLight || isWarm
+                                        ? '1px dashed rgba(122, 99, 71, 0.20)'
+                                        : '1px solid rgba(90,110,130,0.12)',
+                                    background: isLight ? 'rgba(168, 120, 56, 0.06)'
+                                        : isWarm ? 'rgba(122, 99, 71, 0.05)'
+                                        : 'rgba(20,30,44,0.22)',
+                                    color: isLight ? '#76624A' : isWarm ? '#8A7C6B' : 'rgba(153,175,198,0.78)',
+                                    fontSize: 'clamp(13px, 1.5vh, 17px)',
+                                    fontWeight: 600,
+                                    fontFamily: FONT_PRIMARY,
+                                    fontStyle: 'italic',
+                                }}>
+                                    No related articles
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {readerLiveMode ? (
-                        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                            {browser.edgeScrollDirection === 'up' && (
-                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to bottom, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `${CR} ${CR} 0 0` }} />
-                            )}
-                            {browser.edgeScrollDirection === 'down' && (
-                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to top, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `0 0 ${CR} ${CR}` }} />
-                            )}
-                            <div ref={readerWebRef} style={{
-                                width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden', background: '#fff',
-                                border: WEB_SURFACE.borderSoft, boxShadow: WEB_SURFACE.panelShadow,
-                            }}>
-                                <div style={{
-                                    width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: '#999', fontSize: '16px',
-                                }}>
-                                    {browser.loading ? 'Loading article website...' : 'Live article opened in BrowserView'}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
+                    {(() => {
+                        // Theme tokens for the reader card — fully light/warm/mix aware.
+                        const T_readerBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241F18' : T.cardBg;
+                        const T_readerBorder = isLight ? '1.5px solid rgba(168, 120, 56, 0.22)'
+                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
+                            : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)'
+                            : '1.5px solid rgba(213, 216, 188, 0.14)';
+                        const T_readerShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+                            : isMix ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
+                            : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
+                        const T_titleColor = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : T.textMain;
+                        const T_metaColor = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : 'rgba(173,194,214,0.85)';
+                        const T_bodyColorPrimary = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : '#F3F8FF';
+                        const T_bodyColorSecondary = isLight ? '#3F3933' : isWarm ? '#3F3933' : isMix ? 'rgba(255,252,241,0.92)' : 'rgba(230,237,243,0.93)';
+                        // Source-badge styling (matches news grid card source badges)
+                        const T_badgeAccent = isLight ? '#1F6B7E' : isWarm ? '#4F7388' : isMix ? '#B49362' : '#789D91';
+                        const T_badgeBg = (isLight || isWarm) ? `${T_badgeAccent}15` : isMix ? 'rgba(180, 147, 98, 0.18)' : 'rgba(120, 157, 145, 0.18)';
+                        const T_badgeBorder = (isLight || isWarm) ? `${T_badgeAccent}33` : isMix ? 'rgba(180, 147, 98, 0.32)' : 'rgba(120, 157, 145, 0.32)';
+                        // Lede callout — first paragraph gets accent-tinted bg/border
+                        const T_ledeBg = isLight ? 'rgba(31, 107, 126, 0.07)'
+                            : isWarm ? 'rgba(79, 115, 136, 0.08)'
+                            : isMix ? 'rgba(180, 147, 98, 0.10)'
+                            : 'rgba(88,166,255,0.08)';
+                        const T_ledeBorder = isLight ? '1px solid rgba(31, 107, 126, 0.22)'
+                            : isWarm ? '1px solid rgba(79, 115, 136, 0.24)'
+                            : isMix ? '1px solid rgba(180, 147, 98, 0.28)'
+                            : '1px solid rgba(88,166,255,0.22)';
+                        const T_dividerLine = isLight ? 'rgba(168, 120, 56, 0.28)'
+                            : isWarm ? 'rgba(122, 99, 71, 0.24)'
+                            : isMix ? 'rgba(180, 147, 98, 0.30)'
+                            : 'rgba(56, 189, 248, 0.20)';
+                        return (
                         <div ref={scrollRef} style={{
-                            ...cs, flex: 1, alignItems: 'stretch', justifyContent: 'flex-start',
-                            padding: 'clamp(28px, 3.8vh, 48px)', overflow: 'auto', minHeight: 0,
-                            background: T.cardBg,
+                            flex: 1, display: 'flex', flexDirection: 'column',
+                            alignItems: 'stretch', justifyContent: 'flex-start',
+                            padding: 'clamp(32px, 4.2vh, 56px) clamp(28px, 3.6vw, 56px)',
+                            overflow: 'auto', minHeight: 0,
+                            background: T_readerBg,
+                            border: T_readerBorder,
+                            borderRadius: '26px',
+                            boxShadow: T_readerShadow,
                         }}>
                             <div style={{ width: '100%', maxWidth: 'min(980px, 100%)', margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
+                                {/* Source badge — small accent pill above the headline,
+                                    mirrors YouTube channel-badge grammar. */}
+                                <div style={{
+                                    display: 'inline-flex', alignItems: 'center',
+                                    alignSelf: 'flex-start',
+                                    gap: '8px',
+                                    background: T_badgeBg,
+                                    color: T_badgeAccent,
+                                    border: `1px solid ${T_badgeBorder}`,
+                                    padding: 'clamp(5px, 0.7vh, 8px) clamp(12px, 1.2vw, 16px)',
+                                    borderRadius: '999px',
+                                    fontSize: 'clamp(13px, 1.4vh, 16px)',
+                                    fontWeight: 800,
+                                    letterSpacing: '0.06em',
+                                    textTransform: 'uppercase' as const,
+                                    marginBottom: 'clamp(14px, 1.8vh, 22px)',
+                                    fontFamily: FONT_PRIMARY,
+                                }}>
+                                    <NewsIcon size={16} color="currentColor" strokeWidth={2.4} />
+                                    <span>{sel.source || 'News'}</span>
+                                </div>
                                 <h2 style={{
-                                    fontSize: 'clamp(30px, 4vh, 46px)',
-                                    fontWeight: 700,
-                                    color: T.textMain,
+                                    fontSize: 'clamp(32px, 4.4vh, 52px)',
+                                    fontWeight: 760,
+                                    color: T_titleColor,
                                     margin: 0,
                                     fontFamily: FONT_PRIMARY,
-                                    lineHeight: 1.25,
-                                    letterSpacing: '-0.015em',
+                                    lineHeight: 1.22,
+                                    letterSpacing: '-0.012em',
                                 }}>
                                     {readerData?.title || sel.title}
                                 </h2>
-
                                 <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 'clamp(10px, 1vw, 14px)',
                                     flexWrap: 'wrap',
-                                    marginTop: '14px',
-                                    color: 'rgba(173,194,214,0.8)',
-                                    fontSize: 'clamp(13px,1.35vh,16px)',
+                                    marginTop: 'clamp(12px, 1.4vh, 18px)',
+                                    color: T_metaColor,
+                                    fontSize: 'clamp(14px, 1.5vh, 18px)',
+                                    fontWeight: 600,
+                                    fontFamily: FONT_PRIMARY,
                                 }}>
-                                    <span>{sel.source || 'News'}</span>
-                                    <span>•</span>
                                     <span>{sel.relative_time || 'Recent'}</span>
-                                    {readerData?.cached && <span style={{ color: STATUS }}>Reader Cache</span>}
-                                    {readerData?.fallback && <span style={{ color: '#FFCC80' }}>Fallback mode</span>}
+                                    {readerData?.cached && <>
+                                        <span style={{ opacity: 0.5 }}>·</span>
+                                        <span style={{ color: T_badgeAccent }}>Reader Cache</span>
+                                    </>}
+                                    {readerData?.fallback && <>
+                                        <span style={{ opacity: 0.5 }}>·</span>
+                                        <span style={{ color: isLight || isWarm ? '#85703D' : '#FFCC80' }}>Fallback mode</span>
+                                    </>}
                                 </div>
-
-                                <div style={{ height: 1, background: 'rgba(56, 189, 248, 0.18)', margin: 'clamp(16px,2vh,22px) 0 clamp(20px,2.4vh,30px)' }} />
-
+                                <div style={{
+                                    height: 1, background: T_dividerLine,
+                                    margin: 'clamp(20px, 2.4vh, 28px) 0 clamp(22px, 2.8vh, 32px)',
+                                }} />
                                 {readerLoading && (
-                                    <div style={{ fontSize: 'clamp(20px,2.3vh,26px)', color: 'rgba(255,255,255,0.76)', lineHeight: 1.8 }}>
+                                    <div style={{ fontSize: 'clamp(20px, 2.3vh, 26px)', color: T_metaColor, lineHeight: 1.8 }}>
                                         Loading AAC Reader View...
                                     </div>
                                 )}
-
                                 {!readerLoading && (
                                     <div style={{
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: 'clamp(16px, 2.1vh, 24px)',
+                                        gap: 'clamp(18px, 2.3vh, 28px)',
                                         fontFamily: "'Merriweather', 'Georgia', serif",
                                     }}>
                                         {(readableParagraphs.length ? readableParagraphs : ['No article content available right now. Use Open in Browser.']).map((para, idx) => (
@@ -1416,11 +1482,12 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                                 margin: 0,
                                                 fontSize: 'clamp(20px, 2.45vh, 30px)',
                                                 lineHeight: 1.82,
-                                                color: idx === 0 ? '#F3F8FF' : 'rgba(230,237,243,0.93)',
-                                                background: idx === 0 ? 'rgba(88,166,255,0.08)' : 'transparent',
-                                                border: idx === 0 ? '1px solid rgba(88,166,255,0.2)' : 'none',
-                                                borderRadius: idx === 0 ? '14px' : 0,
-                                                padding: idx === 0 ? 'clamp(16px,2vh,22px)' : 0,
+                                                color: idx === 0 ? T_bodyColorPrimary : T_bodyColorSecondary,
+                                                background: idx === 0 ? T_ledeBg : 'transparent',
+                                                border: idx === 0 ? T_ledeBorder : 'none',
+                                                borderRadius: idx === 0 ? '16px' : 0,
+                                                padding: idx === 0 ? 'clamp(18px, 2.2vh, 26px) clamp(20px, 2.2vw, 28px)' : '0 clamp(2px, 0.4vw, 6px)',
+                                                fontWeight: idx === 0 ? 520 : 480,
                                             }}>
                                                 {para}
                                             </p>
@@ -1429,7 +1496,8 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                 )}
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
             </div>
         );
@@ -1445,21 +1513,67 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
             overflow: 'hidden',
             background: T_pageBg,
         }}>
-            {/* SIDEBAR — 7 news categories */}
+            {/* SIDEBAR — news categories. Mirrors YouTube sidebar grammar:
+                wider chrome panel, larger icons (48px) inside dedicated icon
+                zones, larger title fonts, accent line on selection, neutral
+                hairline border at all times. Each category gets a small
+                diversified accent in paper modes (visual variety like YT). */}
             <div style={{
-                width: 'clamp(260px, 22vw, 320px)', flexShrink: 0,
+                width: 'clamp(340px, 30vw, 440px)', flexShrink: 0,
                 display: 'grid',
-                gridAutoRows: 'minmax(clamp(94px, 10.5vh, 126px), 1fr)',
-                gap: 'clamp(8px, 1vh, 12px)',
+                gridAutoRows: 'minmax(clamp(110px, 12.5vh, 150px), 1fr)',
+                gap: 'clamp(10px, 1.2vh, 16px)',
                 background: T_chromeBg,
                 border: `1.5px solid ${T_chromeBorder}`,
-                borderRadius: '20px',
-                padding: 'clamp(12px, 1.4vh, 18px)',
+                borderRadius: '22px',
+                padding: 'clamp(14px, 1.5vh, 20px)',
                 overflow: 'hidden',
                 boxShadow: T_chromeShadow,
             }}>
-                {cats.map((c: any) => {
+                {cats.map((c: any, ci: number) => {
                     const isSelected = cat === c.id;
+                    // Rotating diversified accent — matches news-card palette pattern.
+                    // 9 colors so even longer category lists stay visually distinct.
+                    const PAPER_CAT_ACCENTS = [
+                        '#7A312E', // maroon
+                        '#4F7388', // sky blue
+                        '#85703D', // gold
+                        '#5F7C58', // sage
+                        '#A56D55', // coral
+                        '#3F6968', // teal
+                        '#7A5638', // brown
+                        '#65543E', // umber
+                        '#6B5F84', // lavender
+                    ];
+                    const catAccent = (isLight || isWarm)
+                        ? PAPER_CAT_ACCENTS[ci % PAPER_CAT_ACCENTS.length]
+                        : '#789D91';
+                    // Each sidebar item now has a full card surface (mirrors news-card
+                    // grammar): cream card bg, tinted icon zone, accent border + lift
+                    // on selection. Gives every item its own clickable identity.
+                    const itemBg = isSelected
+                        ? (isLight ? `${catAccent}14`
+                            : isWarm ? `${catAccent}18`
+                            : isMix ? `${catAccent}26`
+                            : `${catAccent}1F`)
+                        : (isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? 'rgba(60, 48, 32, 0.40)' : 'rgba(213, 216, 188, 0.025)');
+                    const itemBorder = isSelected
+                        ? `2px solid ${catAccent}`
+                        : (isLight ? '1.5px solid rgba(168, 120, 56, 0.22)'
+                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
+                            : isMix ? '1.5px solid rgba(180, 147, 98, 0.18)'
+                            : '1.5px solid rgba(213, 216, 188, 0.08)');
+                    const itemShadow = isSelected
+                        ? (isLight || isWarm
+                            ? `0 0 0 1px ${catAccent}22, 0 4px 14px rgba(82, 65, 48, 0.12)`
+                            : `0 0 0 1px ${catAccent}44, inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 20px rgba(0, 0, 0, 0.30)`)
+                        : (isLight ? '0 1px 3px rgba(82, 66, 45, 0.06)'
+                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.04)'
+                            : 'none');
+                    const iconColor = catAccent;                // Always show category-distinct color (not muted on selected)
+                    const iconZoneBg = (isLight || isWarm)
+                        ? (isSelected ? `${catAccent}26` : `${catAccent}14`)
+                        : (isSelected ? `${catAccent}33` : `${catAccent}1A`);
                     return (
                         <GazeButton key={c.id} id={`nc-${c.id}`} onClick={() => { setCat(c.id); disableGaze(); }}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
@@ -1467,28 +1581,71 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             style={{
                                 width: '100%', height: '100%', minHeight: 0,
                                 position: 'relative', overflow: 'hidden',
-                                borderRadius: '14px',
-                                background: isSelected ? T_chromePillSelected : 'transparent',
-                                border: isSelected ? `1.5px solid ${T_chromePillSelectedBorder}` : '1.5px solid transparent',
-                                display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
-                                gap: 'clamp(10px, 1vw, 14px)',
-                                padding: 'clamp(10px, 1.2vh, 16px) clamp(14px, 1.4vw, 20px)',
+                                borderRadius: '18px',
+                                background: itemBg,
+                                border: itemBorder,
+                                boxShadow: itemShadow,
+                                display: 'flex', alignItems: 'stretch', justifyContent: 'flex-start',
+                                gap: 0,
+                                padding: 0,
                                 fontFamily: FONT_PRIMARY,
                                 textAlign: 'left',
+                                transition: 'background 150ms ease, box-shadow 150ms ease',
                             }}>
-                            {isSelected && <div style={{
-                                position: 'absolute', left: 'clamp(8px, 0.8vw, 12px)',
-                                top: 'clamp(12px, 1.3vh, 18px)', bottom: 'clamp(12px, 1.3vh, 18px)',
-                                width: '3px', borderRadius: '999px', background: T_chromeAccentLine,
-                            }} />}
-                            <NewsIcon size={28} color={isSelected ? T_chromeAccentLine : (isLight ? '#76624A' : '#789D91')} strokeWidth={2.2} />
-                            <span style={{
-                                fontSize: 'clamp(17px, 2vh, 24px)', fontWeight: isSelected ? 800 : 700,
-                                color: isSelected ? T_chromePillSelectedText : T_chromeText, lineHeight: 1.15,
-                                fontStyle: isSelected ? 'italic' : 'normal',
+                            {/* Icon zone — 30% width, tinted backdrop matches the
+                                news-card pattern. Stronger tint when selected. */}
+                            <div style={{
+                                flex: '0 0 30%',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: iconZoneBg,
+                                borderRight: `1px solid ${catAccent}22`,
+                                color: iconColor,
                             }}>
-                                {stripLeadingEmoji(c.label)}
-                            </span>
+                                <NewsIcon size={isSelected ? 46 : 42} color="currentColor" strokeWidth={2.3} />
+                            </div>
+                            {/* Text zone — title + per-state subtitle (active dot when selected) */}
+                            <div style={{
+                                flex: '1 1 0', minWidth: 0,
+                                display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                                padding: 'clamp(8px, 1vh, 14px) clamp(14px, 1.4vw, 20px) clamp(8px, 1vh, 14px) clamp(14px, 1.4vw, 20px)',
+                                gap: 'clamp(4px, 0.6vh, 8px)',
+                            }}>
+                                <span style={{
+                                    fontSize: 'clamp(20px, 2.4vh, 28px)',
+                                    fontWeight: isSelected ? 820 : 720,
+                                    color: isSelected ? catAccent : T_chromeText,
+                                    lineHeight: 1.15,
+                                    letterSpacing: '0.005em',
+                                }}>
+                                    {stripLeadingEmoji(c.label)}
+                                </span>
+                                {/* Subtitle / status line — accent-colored "Active" pip
+                                    when selected, muted "Browse" hint otherwise. Gives
+                                    each row a 2-line hierarchy (matches YouTube cards). */}
+                                <span style={{
+                                    fontSize: 'clamp(13px, 1.45vh, 17px)',
+                                    fontWeight: isSelected ? 700 : 600,
+                                    color: isSelected ? catAccent : (isLight ? '#76624A' : isWarm ? '#8A7C6B' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(153, 175, 198, 0.65)'),
+                                    fontFamily: FONT_PRIMARY,
+                                    letterSpacing: '0.04em',
+                                    textTransform: 'uppercase' as const,
+                                    opacity: isSelected ? 1 : 0.75,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                }}>
+                                    {isSelected && (
+                                        <span style={{
+                                            display: 'inline-block',
+                                            width: '7px', height: '7px',
+                                            borderRadius: '50%',
+                                            background: catAccent,
+                                            boxShadow: `0 0 6px ${catAccent}88`,
+                                        }} />
+                                    )}
+                                    {isSelected ? 'Active' : 'Browse'}
+                                </span>
+                            </div>
                         </GazeButton>
                     );
                 })}
@@ -1511,9 +1668,9 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             minHeight: 'clamp(72px, 8.5vh, 96px)',
                             padding: '0 clamp(18px, 1.8vw, 26px)',
                             display: 'flex', alignItems: 'center',
-                            color: isLight ? '#1F6B7E' : isMix ? '#B6D7D1' : '#A9CAC7',
-                            border: `1px solid ${isLight ? 'rgba(31, 107, 126, 0.28)' : 'rgba(169, 202, 199, 0.28)'}`,
-                            background: isLight ? 'rgba(31, 107, 126, 0.10)' : isMix ? 'rgba(28, 47, 45, 0.55)' : 'rgba(28, 47, 45, 0.42)',
+                            color: isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#B6D7D1' : '#A9CAC7',
+                            border: `1px solid ${isLight ? 'rgba(31, 107, 126, 0.28)' : isWarm ? 'rgba(73, 119, 117, 0.28)' : 'rgba(169, 202, 199, 0.28)'}`,
+                            background: isLight ? 'rgba(31, 107, 126, 0.10)' : isWarm ? 'rgba(73, 119, 117, 0.10)' : isMix ? 'rgba(28, 47, 45, 0.55)' : 'rgba(28, 47, 45, 0.42)',
                             borderRadius: '20px',
                             fontSize: 'clamp(15px, 1.8vh, 19px)',
                             fontFamily: FONT_PRIMARY,
@@ -1523,7 +1680,10 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     )}
                 </div>
 
-                {/* Article grid (3 columns × 2 rows = 6 cards, or 2×2 compact) */}
+                {/* Article grid — restructured to mirror YouTube category card layout:
+                    icon zone (28%) + text zone (72%) so news + YouTube share visual
+                    grammar across the Web Browsing experience. Each card has a
+                    diversified warm-muted accent in paper modes (per Home tile pattern). */}
                 <div style={{
                     flex: 1,
                     display: 'grid',
@@ -1532,46 +1692,107 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     gap: 'clamp(14px, 1.6vh, 22px)',
                     overflow: 'hidden', minHeight: 0,
                 }}>
-                    {(visibleItems.length ? visibleItems : Array(cardCount).fill(null)).map((it: NewsItem | null, i: number) => (
-                        <GazeButton key={it?.title || `ph-${i}`} id={`ni-${i}`} onClick={() => { if (it) selectItem(it); }}
-                            gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            contentFill
-                            style={{
-                                width: '100%', height: '100%', minHeight: 0,
-                                background: '#20221E',
-                                border: autoReadOn && i === activeAutoReadIndex ? `2px solid #789D91` : '1.5px solid rgba(213, 216, 188, 0.14)',
-                                borderRadius: '26px',
-                                boxShadow: autoReadOn && i === activeAutoReadIndex
-                                    ? '0 0 0 2px rgba(120, 157, 145, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)'
-                                    : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)',
-                                display: 'flex', flexDirection: 'column',
-                                alignItems: 'flex-start', justifyContent: 'space-between',
-                                padding: 'clamp(20px, 2.4vh, 30px) clamp(22px, 2vw, 32px)',
-                                opacity: it ? 1 : 0.35,
-                                textAlign: 'left',
-                            }}>
-                            <div style={{
-                                fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 760, color: T.textMain,
-                                fontFamily: FONT_PRIMARY, lineHeight: 1.28,
-                                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
-                                overflow: 'hidden', width: '100%',
-                            }}>{it?.title || (isLoading ? 'Loading...' : 'No news available right now')}</div>
-                            {it && (
-                                <div style={{
-                                    display: 'flex', justifyContent: 'space-between', width: '100%',
-                                    fontSize: 'clamp(13px, 1.5vh, 17px)', color: T.textSub, marginTop: '14px',
-                                    fontFamily: FONT_PRIMARY,
+                    {(visibleItems.length ? visibleItems : Array(cardCount).fill(null)).map((it: NewsItem | null, i: number) => {
+                        // Rotating diversified accent palette for paper modes (matches Quick Search pattern)
+                        const PAPER_NEWS_ACCENTS = [
+                            '#7A312E', // deeper maroon
+                            '#4F7388', // deeper sky blue
+                            '#85703D', // deeper rich gold
+                            '#5F7C58', // deeper sage
+                            '#A56D55', // deeper coral
+                            '#3F6968', // deeper teal
+                            '#7A5638', // deeper warm brown
+                            '#65543E', // deeper umber
+                            '#6B5F84', // deeper lavender
+                        ];
+                        const cardBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241F18' : '#20221E';
+                        const cardBorder = autoReadOn && i === activeAutoReadIndex
+                            ? `2px solid ${isLight || isWarm ? '#5F7C58' : '#789D91'}`
+                            : isLight ? '1.5px solid rgba(168, 120, 56, 0.30)'
+                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
+                            : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)'
+                            : '1.5px solid rgba(213, 216, 188, 0.14)';
+                        const cardShadow = autoReadOn && i === activeAutoReadIndex
+                            ? (isLight || isWarm
+                                ? '0 0 0 2px rgba(95, 124, 88, 0.20), 0 4px 12px rgba(82, 65, 48, 0.10)'
+                                : '0 0 0 2px rgba(120, 157, 145, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)')
+                            : isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+                            : isMix ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
+                            : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
+                        const accentColor = (isLight || isWarm)
+                            ? PAPER_NEWS_ACCENTS[i % PAPER_NEWS_ACCENTS.length]
+                            : '#789D91';
+                        const titleColor = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : T.textMain;
+                        const subtitleColor = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : T.textSub;
+                        const sourceBadgeBg = (isLight || isWarm) ? `${accentColor}1A` : 'rgba(213, 216, 188, 0.08)';
+                        const sourceBadgeText = (isLight || isWarm) ? accentColor : titleColor;
+                        const dividerColor = (isLight || isWarm) ? 'rgba(122, 99, 71, 0.16)' : 'rgba(213, 216, 188, 0.10)';
+                        return (
+                            <GazeButton key={it?.title || `ph-${i}`} id={`ni-${i}`} onClick={() => { if (it) selectItem(it); }}
+                                gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
+                                contentFill
+                                style={{
+                                    width: '100%', height: '100%', minHeight: 0,
+                                    background: cardBg,
+                                    border: cardBorder,
+                                    borderRadius: '26px',
+                                    boxShadow: cardShadow,
+                                    display: 'flex', flexDirection: 'row',
+                                    alignItems: 'stretch',
+                                    padding: 0,
+                                    overflow: 'hidden',
+                                    opacity: it ? 1 : 0.35,
+                                    textAlign: 'left',
                                 }}>
-                                    <span style={{
-                                        background: 'rgba(213, 216, 188, 0.08)',
-                                        padding: '4px 12px', borderRadius: '10px',
-                                        fontWeight: 700,
-                                    }}>{it.source}</span>
-                                    <span>{it.relative_time}</span>
+                                {/* Icon zone — fixed 28% width, accent-colored news icon
+                                    on a tinted backdrop. Mirrors YouTube category-card pattern. */}
+                                <div style={{
+                                    flex: '0 0 28%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: (isLight || isWarm) ? `${accentColor}12` : 'rgba(15, 18, 16, 0.42)',
+                                    borderRight: `1px solid ${dividerColor}`,
+                                    color: accentColor,
+                                }}>
+                                    <NewsIcon size={56} color="currentColor" strokeWidth={2.2} />
                                 </div>
-                            )}
-                        </GazeButton>
-                    ))}
+                                {/* Content zone — title (3-line clamp) + source badge + relative time */}
+                                <div style={{
+                                    flex: '1 1 0', minWidth: 0,
+                                    display: 'flex', flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    padding: 'clamp(18px, 2.2vh, 26px) clamp(20px, 1.8vw, 28px)',
+                                    gap: 'clamp(10px, 1.2vh, 14px)',
+                                }}>
+                                    <div style={{
+                                        fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 760,
+                                        color: titleColor,
+                                        fontFamily: FONT_PRIMARY, lineHeight: 1.28,
+                                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
+                                        overflow: 'hidden', width: '100%',
+                                    }}>{it?.title || (isLoading ? 'Loading...' : 'No news available right now')}</div>
+                                    {it && (
+                                        <div style={{
+                                            display: 'flex', justifyContent: 'space-between',
+                                            alignItems: 'center', width: '100%',
+                                            fontSize: 'clamp(13px, 1.5vh, 17px)',
+                                            color: subtitleColor,
+                                            fontFamily: FONT_PRIMARY,
+                                        }}>
+                                            <span style={{
+                                                background: sourceBadgeBg,
+                                                color: sourceBadgeText,
+                                                padding: '4px 12px', borderRadius: '10px',
+                                                fontWeight: 700,
+                                                border: (isLight || isWarm) ? `1px solid ${accentColor}33` : 'none',
+                                            }}>{it.source}</span>
+                                            <span>{it.relative_time}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </GazeButton>
+                        );
+                    })}
                 </div>
 
                 {/* Reader-controls strip — Auto-Read / Pause / Stop */}
@@ -1612,20 +1833,20 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     onNavHiddenToggle?: (hidden: boolean) => void;
     onEmergency: () => void;
 }) => {
-    const { isLight, isMix } = useTheme();
+    const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. The YouTube video card stays dark in all modes.
-    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.22)';
+    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.22)';
     // Watch / Control mode toggle: dark teal/maroon work fine on dark, but on
     // cream/walnut chrome they're too heavy — use tinted-but-transparent variants.
-    const T_watchModeBg = isLight ? 'rgba(122, 54, 58, 0.14)' : isMix ? 'rgba(122, 54, 58, 0.30)' : WATCH_MODE_BG;
-    const T_watchModeText = isLight ? '#7A363A' : isMix ? '#E9B9AE' : WATCH_MODE_TEXT;
-    const T_controlModeBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isMix ? 'rgba(31, 107, 126, 0.30)' : CONTROL_MODE_BG;
-    const T_controlModeText = isLight ? '#1F6B7E' : isMix ? '#A9CAC7' : CONTROL_MODE_TEXT;
+    const T_watchModeBg = isLight ? 'rgba(122, 54, 58, 0.14)' : isWarm ? warmScreenTokens.web.watchModeBg : isMix ? 'rgba(122, 54, 58, 0.30)' : WATCH_MODE_BG;
+    const T_watchModeText = isLight ? '#8A3B38' : isWarm ? warmScreenTokens.web.watchModeText : isMix ? '#E9B9AE' : WATCH_MODE_TEXT;
+    const T_controlModeBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isWarm ? warmScreenTokens.web.controlModeBg : isMix ? 'rgba(31, 107, 126, 0.30)' : CONTROL_MODE_BG;
+    const T_controlModeText = isLight ? '#1F6B7E' : isWarm ? warmScreenTokens.web.controlModeText : isMix ? '#A9CAC7' : CONTROL_MODE_TEXT;
     void T_chromeText; void T_chromeTextMuted; void T_watchModeBg; void T_watchModeText; void T_controlModeBg; void T_controlModeText;
     const [catId, setCatId] = useState('old_songs');
     const [playing, setPlaying] = useState<any>(null);
@@ -1977,12 +2198,12 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                     )}
                     <div ref={viewRef} style={{
                         width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden',
-                        background: T.bg,
+                        background: isWarm ? '#F5EEDF' : T.bg,
                         border: WEB_SURFACE.borderSoft, boxShadow: WEB_SURFACE.panelShadow
                     }}>
                         <div style={{
                             width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: T.textSub, fontSize: '18px'
+                            color: isWarm ? '#6A625B' : T.textSub, fontSize: '18px'
                         }}>
                             {browser.loading ? 'Loading video...' : ''}
                         </div>
@@ -2037,19 +2258,20 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                     const isSelected = catId === c.id;
                     // Muted, darker antique-gold palette — less neon than #C69A45.
                     const SELECTED_ACCENT_DARK = '#9B7A38';           // Accent line + icon tint (deep antique gold) — dark mode
-                    const SELECTED_ACCENT = isLight ? '#1F6B7E' : isMix ? '#B49362' : SELECTED_ACCENT_DARK;
+                    const SELECTED_ACCENT = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#B49362' : SELECTED_ACCENT_DARK;
                     const SELECTED_BG = isLight ? 'rgba(31, 107, 126, 0.14)'
+                        : isWarm ? 'rgba(73, 119, 117, 0.14)'
                         : isMix ? 'rgba(180, 147, 98, 0.20)'
                         : 'rgba(155, 122, 56, 0.13)';
-                    const SELECTED_TITLE = isLight ? '#1F6B7E' : isMix ? '#E3C28E' : '#E0CDA6';
-                    const UNSELECTED_BG = isLight ? 'rgba(255, 248, 228, 0.55)' : isMix ? 'rgba(60, 48, 32, 0.40)' : 'rgba(213, 216, 188, 0.025)';
-                    const UNSELECTED_BORDER = isLight ? '1.5px solid rgba(168, 120, 56, 0.20)' : isMix ? '1.5px solid rgba(180, 147, 98, 0.18)' : '1.5px solid rgba(213, 216, 188, 0.08)';
-                    const UNSELECTED_ICON = isLight ? '#76624A' : isMix ? '#C4B697' : WEB_ACCENTS.tealText;
-                    const UNSELECTED_TITLE = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-                    const UNSELECTED_SUBTITLE = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+                    const SELECTED_TITLE = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#E3C28E' : '#E0CDA6';
+                    const UNSELECTED_BG = isLight ? 'rgba(255, 248, 228, 0.55)' : isWarm ? '#FBF5E5' : isMix ? 'rgba(60, 48, 32, 0.40)' : 'rgba(213, 216, 188, 0.025)';
+                    const UNSELECTED_BORDER = isLight ? '1.5px solid rgba(168, 120, 56, 0.20)' : isWarm ? '1px solid rgba(122, 99, 71, 0.16)' : isMix ? '1.5px solid rgba(180, 147, 98, 0.18)' : '1.5px solid rgba(213, 216, 188, 0.08)';
+                    const UNSELECTED_ICON = isLight ? '#76624A' : isWarm ? '#7A5638' : isMix ? '#C4B697' : WEB_ACCENTS.tealText;
+                    const UNSELECTED_TITLE = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : T.textMain;
+                    const UNSELECTED_SUBTITLE = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : T.textSub;
                     const iconColor = isSelected ? SELECTED_ACCENT : UNSELECTED_ICON;
                     const titleColor = isSelected ? SELECTED_TITLE : UNSELECTED_TITLE;
-                    const subtitleColor = isSelected ? (isLight ? 'rgba(31, 107, 126, 0.72)' : isMix ? 'rgba(227, 194, 142, 0.65)' : 'rgba(224, 205, 166, 0.58)') : UNSELECTED_SUBTITLE;
+                    const subtitleColor = isSelected ? (isLight ? 'rgba(31, 107, 126, 0.72)' : isWarm ? 'rgba(73, 119, 117, 0.72)' : isMix ? 'rgba(227, 194, 142, 0.65)' : 'rgba(224, 205, 166, 0.58)') : UNSELECTED_SUBTITLE;
                     const meta = YT_CATEGORY_META[c.id] || { subtitle: '', renderIcon: () => <YoutubeIcon size={48} color={iconColor} strokeWidth={2.2} /> };
                     return (
                         <GazeButton key={c.id} id={`yc-${c.id}`} onClick={() => { setCatId(c.id); disableGaze(); }}
@@ -2125,10 +2347,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                             contentFill
                             style={{
                                 width: '100%', height: '100%', minHeight: 0,
-                                background: '#20221E',
-                                border: '1.5px solid rgba(213, 216, 188, 0.14)',
+                                background: isWarm ? '#FBF5E5' : '#20221E',
+                                border: isWarm ? '1px solid rgba(122, 99, 71, 0.16)' : '1.5px solid rgba(213, 216, 188, 0.14)',
                                 borderRadius: '26px',
-                                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)',
+                                boxShadow: isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)',
                                 overflow: 'hidden',
                                 display: 'flex', flexDirection: 'column',
                                 padding: 0,
@@ -2137,9 +2359,9 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                             <div style={{
                                 position: 'relative',
                                 width: '100%', flex: '0 0 65%',
-                                background: '#0F100E',
+                                background: isWarm ? '#EFE7D8' : '#0F100E',
                                 overflow: 'hidden',
-                                borderBottom: '1px solid rgba(213, 216, 188, 0.10)',
+                                borderBottom: isWarm ? '1px solid rgba(122, 99, 71, 0.12)' : '1px solid rgba(213, 216, 188, 0.10)',
                             }}>
                                 {thumbUrl ? (
                                     <img
@@ -2198,13 +2420,13 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                 textAlign: 'left',
                             }}>
                                 <div style={{
-                                    fontSize: 'clamp(20px, 2.4vh, 28px)', fontWeight: 760, color: T.textMain,
+                                    fontSize: 'clamp(20px, 2.4vh, 28px)', fontWeight: 760, color: isWarm ? '#2F2A26' : T.textMain,
                                     fontFamily: FONT_PRIMARY, lineHeight: 1.18,
                                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
                                     overflow: 'hidden',
                                 }}>{v.title}</div>
                                 <div style={{
-                                    fontSize: 'clamp(15px, 1.7vh, 19px)', color: T.textSub,
+                                    fontSize: 'clamp(15px, 1.7vh, 19px)', color: isWarm ? '#6A625B' : T.textSub,
                                     fontFamily: FONT_PRIMARY, fontWeight: 600,
                                 }}>{v.ch}</div>
                             </div>
@@ -2219,14 +2441,14 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
 // ── KNOWLEDGE PANEL ──
 const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: number; onSpeak: (t: string) => void; isNavHidden?: boolean; }) => {
     const ws = useWS();
-    const { isLight, isMix } = useTheme();
+    const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. The knowledge article card stays dark in all modes.
-    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
     void T_chromeTextMuted;
     const [selCat, setSelCat] = useState<string | null>(null);
     const [selArt, setSelArt] = useState<any>(null);
@@ -2266,7 +2488,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                 ...cs, flex: 1, width: '100%', height: 'auto', alignItems: 'flex-start', justifyContent: 'flex-start',
                 padding: 'clamp(24px,3.5vh,40px)', overflow: 'auto', minHeight: 0
             }}>
-                <h2 style={{ fontSize: 'clamp(22px,3vh,32px)', fontWeight: 700, color: T.textMain, margin: '0 0 10px 0', fontFamily: FONT_PRIMARY }}>{selArt.title}</h2>
+                <h2 style={{ fontSize: 'clamp(22px,3vh,32px)', fontWeight: 700, color: isWarm ? '#2F2A26' : T.textMain, margin: '0 0 10px 0', fontFamily: FONT_PRIMARY }}>{selArt.title}</h2>
                 <div style={{ fontSize: 'clamp(16px,2.2vh,22px)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.75, whiteSpace: 'pre-line' as const }}>{selArt.content}</div>
             </div>
         </div>
@@ -2286,8 +2508,8 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                     const isSel = selCat === c.id;
                     const accent = c.color || AC;
                     const selectedTextColor = isLight ? '#1F6B7E' : accent;
-                    const selectedBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isMix ? `${accent}30` : `${accent}20`;
-                    const selectedAccentLine = isLight ? '#1F6B7E' : accent;
+                    const selectedBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isWarm ? 'rgba(73, 119, 117, 0.14)' : isMix ? `${accent}30` : `${accent}20`;
+                    const selectedAccentLine = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : accent;
                     return (
                         <GazeButton key={c.id} id={`kc-${c.id}`} onClick={() => { setSelCat(c.id); setSelArt(null); }}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -2298,10 +2520,10 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                                 borderRadius: '0 14px 14px 0', border: 'none', minHeight: 'clamp(60px,7.5vh,78px)',
                                 display: 'flex', alignItems: 'center', gap: '10px'
                             }}>
-                            <BookIcon size={28} color={isSel ? selectedAccentLine : (isLight ? '#76624A' : WEB_ACCENTS.oliveText)} strokeWidth={2} />
+                            <BookIcon size={28} color={isSel ? selectedAccentLine : (isLight ? '#76624A' : isWarm ? '#7A5638' : WEB_ACCENTS.oliveText)} strokeWidth={2} />
                             <div>
                                 <div style={{ fontSize: 'clamp(15px,1.8vh,19px)', fontWeight: 600, color: isSel ? selectedTextColor : T_chromeText }}>{c.title}</div>
-                                <div style={{ fontSize: '12px', color: isLight ? 'rgba(74, 58, 42, 0.55)' : isMix ? 'rgba(196, 182, 151, 0.55)' : 'rgba(255,255,255,0.3)' }}>{c.article_count} articles</div>
+                                <div style={{ fontSize: '12px', color: isLight ? 'rgba(74, 58, 42, 0.55)' : isWarm ? '#8A7C6B' : isMix ? 'rgba(196, 182, 151, 0.55)' : 'rgba(255,255,255,0.3)' }}>{c.article_count} articles</div>
                             </div>
                         </GazeButton>
                     );
@@ -2311,10 +2533,18 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                 {selCat && ws.knowledgeArticles.length ? ws.knowledgeArticles.slice(0, 6).map((a: any, i: number) => (
                     <GazeButton key={a.id} id={`ka-${i}`} onClick={() => { setSelArt({ ...a, content: a.summary || 'Loading...' }); ws.getKnowledgeArticle(a.id); }}
                         gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        style={{ ...cs, justifyContent: 'space-between', alignItems: 'flex-start', padding: 'clamp(16px,2.2vh,26px)' }}>
-                        <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 600, color: T.textMain, lineHeight: 1.35, flex: 1, textAlign: 'left' }}>{a.title}</div>
+                        style={{
+                            ...cs,
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            padding: 'clamp(16px,2.2vh,26px)',
+                            background: isWarm ? '#FBF5E5' : undefined,
+                            border: isWarm ? '1px solid rgba(122, 99, 71, 0.16)' : undefined,
+                            boxShadow: isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)' : undefined,
+                        }}>
+                        <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 600, color: isWarm ? '#2F2A26' : T.textMain, lineHeight: 1.35, flex: 1, textAlign: 'left' }}>{a.title}</div>
                         <div style={{
-                            fontSize: 'clamp(13px,1.5vh,16px)', color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: '8px', textAlign: 'left',
+                            fontSize: 'clamp(13px,1.5vh,16px)', color: isWarm ? '#6A625B' : 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: '8px', textAlign: 'left',
                             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden'
                         }}>{a.summary}</div>
                     </GazeButton>
@@ -2345,14 +2575,14 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     onEmergency: () => void;
 }) => {
     const ws = useWS();
-    const { isLight, isMix } = useTheme();
+    const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. Search-result / card-mode card stay dark.
-    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
+    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
     void T_chromeShadow;
     const [topic, setTopic] = useState<QuickTopic | null>(null);
     const [showLinksSidebar, setShowLinksSidebar] = useState(false);
@@ -2684,7 +2914,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     overflow: 'auto',
                     whiteSpace: 'pre-line' as const,
                 }}>
-                    <div style={{ fontSize: 'clamp(30px,4.2vh,46px)', fontWeight: 700, color: T.textMain, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ fontSize: 'clamp(30px,4.2vh,46px)', fontWeight: 700, color: isWarm ? '#2F2A26' : T.textMain, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                         {renderQuickTopicIcon(topic.id, 52, WEB_ACCENTS.tealText)}
                         <span>{stripLeadingEmoji(topic.label)}</span>
                     </div>
@@ -2711,31 +2941,56 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
             background: T_pageBg,
         }}>
             <div style={{
-                color: T_chromeText, fontSize: 'clamp(24px,3vh,32px)', fontWeight: 820,
-                flexShrink: 0, fontFamily: FONT_PRIMARY, letterSpacing: '0.04em',
-                display: 'flex', alignItems: 'center', gap: '14px',
+                color: T_chromeText, fontSize: 'clamp(30px, 3.8vh, 42px)', fontWeight: 820,
+                flexShrink: 0, fontFamily: FONT_PRIMARY, letterSpacing: '0.02em',
+                display: 'flex', alignItems: 'center', gap: 'clamp(14px, 1.4vw, 20px)',
+                paddingBottom: 'clamp(6px, 0.8vh, 12px)',
             }}>
-                <SearchIcon size={34} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.4} />
+                <SearchIcon size={44} color={isLight ? '#4F7388' : isWarm ? '#4F7388' : '#789D91'} strokeWidth={2.4} />
                 <span>Quick Search</span>
             </div>
             <div style={{
                 flex: 1,
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gridAutoRows: 'minmax(clamp(110px, 14vh, 160px), 1fr)',
-                gap: 'clamp(16px, 2vh, 24px) clamp(20px, 2.4vw, 36px)',
+                gridAutoRows: 'minmax(clamp(140px, 17vh, 200px), 1fr)',
+                gap: 'clamp(18px, 2.2vh, 28px) clamp(22px, 2.6vw, 40px)',
                 overflow: 'hidden', minHeight: 0,
             }}>
-                {QUICK_TOPICS.map((t) => {
-                    const tileBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : '#20221E';
-                    const tileBorder = isLight ? '1.5px solid rgba(168, 120, 56, 0.30)' : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)' : '1.5px solid rgba(213, 216, 188, 0.14)';
+                {QUICK_TOPICS.map((t, ti) => {
+                    const tileBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241F18' : '#20221E';
+                    const tileBorder = isLight
+                        ? '1.5px solid rgba(168, 120, 56, 0.30)'
+                        : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
+                        : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)'
+                        : '1.5px solid rgba(213, 216, 188, 0.14)';
                     const tileShadow = isLight
                         ? '0 4px 12px rgba(82, 66, 45, 0.10)'
-                        : isMix
-                            ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
-                            : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
-                    const iconColor = isLight ? '#76624A' : '#789D91';
-                    const labelColor = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : '#ECEDE3';
+                        : isWarm
+                            ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+                            : isMix
+                                ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
+                                : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
+                    // Each Quick Search topic gets a distinct warm-muted accent — diversifies
+                    // colors across the grid for visual variety (matches Home tile pattern).
+                    const PAPER_TOPIC_ACCENTS = [
+                        '#7A312E', // deeper maroon
+                        '#4F7388', // deeper sky blue
+                        '#85703D', // deeper rich gold
+                        '#5F7C58', // deeper sage
+                        '#A56D55', // deeper coral
+                        '#3F6968', // deeper teal
+                        '#7A5638', // deeper warm brown
+                        '#65543E', // deeper umber
+                    ];
+                    const iconColor = (isLight || isWarm)
+                        ? PAPER_TOPIC_ACCENTS[ti % PAPER_TOPIC_ACCENTS.length]
+                        : '#789D91';
+                    const labelColor = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : '#ECEDE3';
+                    // Icon zone gets a subtle tinted backdrop in paper modes so the
+                    // colorful icon reads as a "category badge" (YouTube card grammar).
+                    const iconZoneBg = (isLight || isWarm) ? `${iconColor}12` : 'transparent';
+                    const iconZoneDivider = (isLight || isWarm) ? `1px solid ${iconColor}22` : 'none';
                     return (
                         <GazeButton key={t.id} id={`qs-${t.id}`} onClick={() => openTopic(t)}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
@@ -2744,29 +2999,43 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                 width: '100%', height: '100%', minHeight: 0,
                                 background: tileBg,
                                 border: tileBorder,
-                                borderRadius: '26px',
+                                borderRadius: '28px',
                                 boxShadow: tileShadow,
-                                display: 'flex', flexDirection: 'row', alignItems: 'center',
+                                display: 'flex', flexDirection: 'row', alignItems: 'stretch',
                                 position: 'relative',
                                 padding: 0, overflow: 'hidden',
                             }}>
+                            {/* Icon zone — 28% width, tinted backdrop in paper modes,
+                                large 88px icon for clear scanning at distance
+                                (YouTube category-card grammar). */}
                             <div style={{
-                                flex: '0 0 22%',
+                                flex: '0 0 28%',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                paddingLeft: 'clamp(28px, 2.6vw, 44px)',
+                                background: iconZoneBg,
+                                borderRight: iconZoneDivider,
                                 color: iconColor,
                             }}>
-                                {renderQuickTopicIcon(t.id, 64, iconColor)}
+                                {renderQuickTopicIcon(t.id, 88, iconColor)}
                             </div>
                             <div style={{
                                 flex: '1 1 0', minWidth: 0,
                                 display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start',
-                                padding: 'clamp(14px,1.8vh,22px) clamp(20px,2.4vw,32px) clamp(14px,1.8vh,22px) clamp(14px,1.4vw,22px)',
+                                padding: 'clamp(18px,2.2vh,28px) clamp(24px,2.8vw,42px) clamp(18px,2.2vh,28px) clamp(20px,2vw,30px)',
+                                gap: 'clamp(4px, 0.6vh, 8px)',
                             }}>
                                 <span style={{
-                                    fontSize: 'clamp(22px, 2.7vh, 32px)', fontWeight: 820, color: labelColor,
-                                    fontFamily: FONT_PRIMARY, lineHeight: 1.1, letterSpacing: 0,
+                                    fontSize: 'clamp(28px, 3.4vh, 40px)', fontWeight: 820, color: labelColor,
+                                    fontFamily: FONT_PRIMARY, lineHeight: 1.08, letterSpacing: '0.005em',
                                 }}>{stripLeadingEmoji(t.label)}</span>
+                                {/* Subtitle — per-topic caption (mirrors YT card subtitle). */}
+                                <span style={{
+                                    fontSize: 'clamp(15px, 1.75vh, 20px)',
+                                    fontWeight: 600,
+                                    color: (isLight || isWarm) ? iconColor : (isMix ? '#C4B697' : '#789D91'),
+                                    fontFamily: FONT_PRIMARY,
+                                    letterSpacing: '0.02em',
+                                    opacity: 0.9,
+                                }}>{QUICK_TOPIC_SUBTITLES[t.id] || ''}</span>
                             </div>
                         </GazeButton>
                     );
@@ -2782,11 +3051,11 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
     goBack: () => void;
     isNavHidden?: boolean;
 }) => {
-    const { isLight, isMix } = useTheme();
+    const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. The chat / message-list card stays dark.
-    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
-    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isMix ? '#C4B697' : T.textSub;
+    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
+    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
+    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
     void T_chromeText; void T_chromeTextMuted;
     const [connected, setConnected] = useState(false);
     const viewRef = useRef<HTMLDivElement>(null);
@@ -2899,8 +3168,8 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
         }}>
             <div style={{ ...cs, width: 'clamp(420px,42vw,620px)', height: 'auto', padding: 'clamp(40px,5.5vh,65px)', gap: 'clamp(20px,3.2vh,36px)', border: WEB_SURFACE.borderSoft }}>
                 <div style={{ color: WEB_ACCENTS.oliveText, display: 'flex', filter: 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' }}><WhatsAppIcon size={88} /></div>
-                <h2 style={{ fontSize: 'clamp(24px,3.2vh,34px)', fontWeight: 700, color: T.textMain, margin: 0, fontFamily: FONT_PRIMARY }}>WhatsApp Web</h2>
-                <p style={{ fontSize: 'clamp(15px,2vh,19px)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, margin: 0, textAlign: 'center', maxWidth: '420px' }}>
+                <h2 style={{ fontSize: 'clamp(24px,3.2vh,34px)', fontWeight: 700, color: isWarm ? '#2F2A26' : T.textMain, margin: 0, fontFamily: FONT_PRIMARY }}>WhatsApp Web</h2>
+                <p style={{ fontSize: 'clamp(15px,2vh,19px)', color: isWarm ? '#6A625B' : 'rgba(255,255,255,0.5)', lineHeight: 1.6, margin: 0, textAlign: 'center', maxWidth: '420px' }}>
                     Connect WhatsApp to send messages using eye gaze. Scan a QR code with your phone.
                 </p>
                 <GazeButton id="wa-connect" onClick={() => setConnected(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
@@ -2919,12 +3188,12 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
 const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden, setView }: {
     ige: boolean, ts: number, browser: any, gpRef: React.MutableRefObject<{ x: number; y: number }>, goBack: () => void, disableGaze: () => void, isNavHidden: boolean, setView?: (view: any) => void
 }) => {
-    const { isLight, isMix } = useTheme();
+    const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. The browser-view content card stays dark.
-    const T_pageBg = isLight ? '#E0D0B5' : isMix ? '#1A1611' : T.bg;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
+    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
+    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
+    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
+    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
     const [topic, setTopic] = useState<{ id: string, url: string, label: string } | null>(null);
     const viewRef = useRef<HTMLDivElement>(null);
 
@@ -3048,7 +3317,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
             if (id === 'linkedin') return 'rgba(31, 107, 126, 0.10)';
             if (id === 'gmail') return 'rgba(165, 106, 96, 0.12)';
             if (id === 'whatsapp') return 'rgba(143, 161, 123, 0.14)';
-            return '#F0E2C4';
+            return '#FFFCF1';
         }
         if (isMix) {
             if (id === 'linkedin') return 'rgba(31, 50, 60, 0.85)';
@@ -3059,7 +3328,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
         return darkBg;
     };
     const tileBorder = isLight ? `1.5px solid ${T_chromeBorder}` : isMix ? '1.5px solid rgba(180, 147, 98, 0.20)' : WEB_SURFACE.borderSoft;
-    const tileLabelColor = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : T.textMain;
+    const tileLabelColor = isLight ? '#2E2A24' : isMix ? '#FFFCF1' : T.textMain;
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T_pageBg, padding: 'clamp(20px, 4vh, 60px)' }}>
             <h2 style={{ fontSize: 'clamp(32px, 4.5vh, 48px)', color: T_chromeText, marginBottom: 'clamp(40px, 6vh, 80px)', fontFamily: FONT_PRIMARY, fontWeight: 800 }}>
@@ -3104,10 +3373,13 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
 };
 
 // ── MAIN COMPONENT ──
+// Hub layout: 4 cards arranged as a balanced 2×2 grid.
+// 'knowledge' (ALS Knowledge) intentionally removed — that path is now
+// covered by ALS Research inside Quick Search. The KnowledgePanel
+// component + 'knowledge' ViewState are kept for any deep-link routing.
 const HUB_CARDS = [
     { id: 'news', label: 'News Feed', labelHindi: 'समाचार', accent: WEB_ACCENTS.maroon, bg: 'rgba(45, 27, 24, 0.94)' },
     { id: 'youtube', label: 'YouTube', labelHindi: 'यूट्यूब', accent: WEB_ACCENTS.gold, bg: 'rgba(42, 33, 19, 0.94)' },
-    { id: 'knowledge', label: 'ALS Knowledge', labelHindi: 'जानकारी', accent: WEB_ACCENTS.olive, bg: 'rgba(31, 38, 27, 0.94)' },
     { id: 'search', label: 'Quick Search', labelHindi: 'खोज', accent: WEB_ACCENTS.teal, bg: 'rgba(22, 40, 38, 0.94)' },
     { id: 'social', label: 'Social & Connect', labelHindi: 'संपर्क', accent: WEB_ACCENTS.blue, bg: 'rgba(25, 35, 42, 0.94)' },
 ];
@@ -3174,7 +3446,7 @@ const HUB_CARD_VISUALS: Record<string, HubCardVisual> = {
 const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t: string) => void; isDarkMode: boolean; showHindi?: boolean }> = ({
     onNavigate, onSpeak, isDarkMode, showHindi = false,
 }) => {
-    const { isLight } = useTheme();
+    const { isLight, isWarm, isMix } = useTheme();
     const { data: { settings } } = useCustomization();
     const [view, setView] = useState<ViewState>('grid');
     const { isGazeEnabled: ige, lastEnabledTimestamp: ts, disableGaze, enableGaze } = useGazeControl();
@@ -3395,7 +3667,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     }, [browser]);
 
     if (view !== 'grid') return (
-        <div className={`web-hub-screen${isLight ? ' theme-light' : ''}`} data-gaze-context="webbrowse" style={{ position: 'absolute', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} data-gaze-context="webbrowse" style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Nav visibility — driven SOLELY by isNavHidden (the single source of truth).
                 Previous code gated this on isEmbeddedBrowserActive, which flapped on
                 child-state resync (websocket reconnects, focus events) and caused the
@@ -3434,6 +3706,33 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             iconOpacity: 0.76,
             dividerOpacity: 0.42,
         };
+        // Light/Warm: cream paper cards. Mix: tan paper-on-dark-desk cards (matches
+        // home tile surfaces). Default dark mode: dark navy with cream text.
+        const isPaperMode = isLight || isWarm;
+        const isMixMode = isMix;
+        const cardBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMixMode ? '#B6A17A' : visual.bg;
+        const cardBorder = isPaperMode
+          ? '1px solid rgba(122, 99, 71, 0.16)'
+          : isMixMode ? '1.5px solid rgba(70, 52, 32, 0.56)' : HUB_UNIFIED_CARD_BORDER;
+        const cardShadow = isPaperMode
+          ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+          : isMixMode ? 'inset 0 1px 0 rgba(255,255,255,0.07), 0 7px 16px rgba(0,0,0,0.22)' : HUB_UNIFIED_CARD_SHADOW;
+        // Paper-mode hub icons use the diversified warm-muted palette so each
+        // card has its own visual identity (matches Home tile colors).
+        // Mix-mode keeps unified teal for tan-card cohesion.
+        const PAPER_HUB_ACCENTS: Record<string, string> = {
+            news:       '#7A312E', // deeper maroon
+            youtube:    '#A56D55', // deeper coral
+            knowledge:  '#5F7C58', // deeper sage
+            search:     '#4F7388', // deeper sky blue
+            social:     '#85703D', // deeper rich gold
+        };
+        const iconAccent = isPaperMode
+            ? (PAPER_HUB_ACCENTS[card.id] ?? '#3F6968')
+            : isMixMode ? '#3F6968' : visual.accent;
+        const labelColor = isPaperMode ? '#2F2A26' : isMixMode ? '#180F08' : '#ECEDE3';
+        const labelTextShadow = isPaperMode || isMixMode ? 'none' : '0 1px 1px rgba(0,0,0,0.10)';
+        const hindiColor = isPaperMode ? '#5C4F44' : isMixMode ? '#4E3D29' : '#B0BFB6';
 
         return (
             <GazeButton key={card.id} id={`hub-${card.id}`} onClick={() => setView(card.id as ViewState)}
@@ -3443,19 +3742,23 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                     width: '100%', height: '100%',
                     minHeight: 0,
                     borderRadius: '26px', overflow: 'hidden', cursor: 'pointer',
-                    border: HUB_UNIFIED_CARD_BORDER,
-                    background: visual.bg,
-                    boxShadow: HUB_UNIFIED_CARD_SHADOW,
-                    transition: 'transform 150ms ease, background 150ms ease, filter 150ms ease',
+                    border: cardBorder,
+                    background: cardBg,
+                    boxShadow: cardShadow,
+                    transition: 'background 150ms ease, filter 150ms ease',
                     padding: 0
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.filter = 'brightness(1.025)';
+                    if (!isPaperMode && !isMixMode) {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.filter = 'brightness(1.025)';
+                    }
                 }}
                 onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.filter = 'brightness(1)';
+                    if (!isPaperMode && !isMixMode) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.filter = 'brightness(1)';
+                    }
                 }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'row', width: '100%', height: '100%', alignItems: 'center', position: 'relative' }}>
                     <div style={{
@@ -3464,10 +3767,10 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                         alignItems: 'center',
                         justifyContent: 'center',
                         paddingLeft: 'clamp(34px, 3.6vw, 60px)',
-                        color: visual.accent,
+                        color: iconAccent,
                         opacity: visual.iconOpacity,
                     }}>
-                        {renderHubIcon(card.id, visual.iconSize, visual.accent)}
+                        {renderHubIcon(card.id, visual.iconSize, iconAccent)}
                     </div>
                     <div style={{
                         flex: '1 1 0',
@@ -3482,16 +3785,16 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                     }}>
                         <span style={{
                             fontFamily: FONT_PRIMARY, fontWeight: 820,
-                            fontSize: 'clamp(30px, 3.4vh, 43px)', color: '#ECEDE3',
+                            fontSize: 'clamp(30px, 3.4vh, 43px)', color: labelColor,
                             textAlign: 'left', lineHeight: 1.08, letterSpacing: 0,
-                            textShadow: '0 1px 1px rgba(0,0,0,0.10)',
+                            textShadow: labelTextShadow,
                         }}>
                             {card.label}
                         </span>
                         {showHindi && (
                             <span style={{
                                 fontFamily: "'Noto Sans Devanagari', sans-serif", fontWeight: 700,
-                                fontSize: 'clamp(20px, 2.4vh, 28px)', color: '#B0BFB6',
+                                fontSize: 'clamp(20px, 2.4vh, 28px)', color: hindiColor,
                                 textAlign: 'left', lineHeight: 1.25,
                             }}>
                                 {card.labelHindi}
@@ -3503,16 +3806,19 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         );
     };
 
+    // Balanced 2×2 grid for 4 hub cards. Each card is slightly larger than
+    // the prior 3-column layout to use the extra space — gives the hub a
+    // more confident, premium feel while keeping eye-gaze targets generous.
     const HUB_GRID_ROW: React.CSSProperties = {
         display: 'grid',
-        gridAutoRows: 'minmax(clamp(220px, 26vh, 300px), 1fr)',
-        gap: 'clamp(22px, 2.8vw, 40px)',
+        gridAutoRows: 'minmax(clamp(240px, 28vh, 320px), 1fr)',
+        gap: 'clamp(26px, 3.2vw, 48px)',
         justifyContent: 'center',
         width: '100%',
     };
 
     return (
-        <div className={`web-hub-screen${isLight ? ' theme-light' : ''}`} style={{ position: 'absolute', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
+        <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
             <div style={{ zIndex: 10 }}>
                 <GlobalNavBar currentPage="web" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
             </div>
@@ -3525,25 +3831,23 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 justifyContent: 'center',
                 width: '100%',
                 marginTop: 'clamp(-32px, -4vh, -16px)',
-                gap: 'clamp(22px, 3vh, 36px)',
-                padding: '0 clamp(28px, 3.5vw, 60px)',
+                gap: 'clamp(26px, 3.4vh, 44px)',
+                padding: '0 clamp(40px, 4.5vw, 80px)',
                 boxSizing: 'border-box',
             }}>
-                {/* Both rows use the same 3-column template so the second row's
-                    two cards align with the first row's first two cards (column 1
-                    and column 2). The third column on row 2 is empty by design — no
-                    orphan cell, just structured negative space. */}
+                {/* Row 1: News Feed + YouTube */}
                 <div style={{
                     ...HUB_GRID_ROW,
-                    gridTemplateColumns: 'repeat(3, minmax(0, clamp(330px, 28vw, 500px)))',
+                    gridTemplateColumns: 'repeat(2, minmax(0, clamp(420px, 36vw, 620px)))',
                 }}>
-                    {HUB_CARDS.slice(0, 3).map(renderHubCard)}
+                    {HUB_CARDS.slice(0, 2).map(renderHubCard)}
                 </div>
+                {/* Row 2: Quick Search + Social & Connect */}
                 <div style={{
                     ...HUB_GRID_ROW,
-                    gridTemplateColumns: 'repeat(3, minmax(0, clamp(330px, 28vw, 500px)))',
+                    gridTemplateColumns: 'repeat(2, minmax(0, clamp(420px, 36vw, 620px)))',
                 }}>
-                    {HUB_CARDS.slice(3).map(renderHubCard)}
+                    {HUB_CARDS.slice(2).map(renderHubCard)}
                 </div>
             </div>
         </div>

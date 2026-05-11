@@ -150,20 +150,20 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colors = isDarkMode ? darkColors : lightColors;
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const isWarmMode = isDarkMode && !isLight;
-  const pageBg = isMix ? '#17130F' : isWarmMode ? '#131412' : colors.background.primary;
-  const titleText = isMix ? '#FFF0D2' : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardBg = isMix ? mixColors.home.tileSurfaces.ac : isWarmMode ? screenThemes.activities.cardBg : colors.background.secondary;
-  const cardText = isMix ? mixColors.home.text : isWarmMode ? '#ECEDE3' : colors.text.primary;
-  const cardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarmMode ? screenThemes.activities.cardBorder : `1.5px solid ${colors.border.light}`;
+  const pageBg = isMix ? '#17130F' : isWarm ? '#F5EEDF' : isWarmMode ? '#131412' : colors.background.primary;
+  const titleText = isMix ? '#FFF0D2' : isWarm ? '#2F2A26' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardBg = isMix ? mixColors.home.tileSurfaces.ac : isWarm ? '#FBF5E5' : isWarmMode ? screenThemes.activities.cardBg : colors.background.secondary;
+  const cardText = isMix ? mixColors.home.text : isWarm ? '#2F2A26' : isWarmMode ? '#ECEDE3' : colors.text.primary;
+  const cardBorder = isMix ? `1.5px solid ${mixColors.home.cardBorder}` : isWarm ? '1.5px solid #DED2C2' : isWarmMode ? screenThemes.activities.cardBorder : `1.5px solid ${colors.border.light}`;
   const categoryCardBg = cardBg;
   const categoryBorder = cardBorder;
-  const categoryAccent = isMix ? '#6A4D34' : isWarmMode ? SELECTED_COLOR : lightColors.warning.main;
+  const categoryAccent = isMix ? '#6A4D34' : isWarm ? '#3F6968' : isWarmMode ? SELECTED_COLOR : lightColors.warning.main;
   const categoryText = cardText;
-  const cardShadow = isMix ? mixColors.home.cardShadow : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
-  const backCardBg = isMix ? '#28321F' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#DCE2C8';
-  const backIconColor = isMix ? '#9DB384' : isWarmMode ? '#9CAF7E' : '#61714A';
+  const cardShadow = isMix ? mixColors.home.cardShadow : isWarm ? '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)' : isWarmMode ? '0 8px 18px rgba(0,0,0,0.22)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)';
+  const backCardBg = isMix ? '#28321F' : isWarm ? '#EFE7D8' : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#DCE2C8';
+  const backIconColor = isMix ? '#9DB384' : isWarm ? '#5F7C58' : isWarmMode ? '#9CAF7E' : '#61714A';
 
   const activeCategory = selectedCategory
     ? (activityCategories.find(c => c.id === selectedCategory) || null)
@@ -203,7 +203,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
   );
 
   return (
-    <div className={`activities-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : ''}`} style={{
+    <div className={`activities-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',

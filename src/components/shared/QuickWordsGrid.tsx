@@ -58,7 +58,7 @@ const OVERLAY_DARK: Record<string, OverlayPalette> = {
     headerBg: '#351715',
     headerText: '#CFA094',
     cardBg: '#4B211E',
-    cardBorder: '#8A463D',
+    cardBorder: '#8B3A36',
     cardText: '#F5F0EE',
     hindiText: 'rgba(255, 210, 140, 0.95)',
     activeBorder: 'rgba(255,255,255,0.85)',
@@ -287,41 +287,50 @@ export interface QuickWordsGridProps {
   presentation?: 'overlay' | 'standalone';
 }
 
-const getStandaloneTone = (categoryId: string, isMix: boolean, isDarkMode: boolean): StandaloneTone => {
+const getStandaloneTone = (categoryId: string, isMix: boolean, isDarkMode: boolean, isWarm: boolean = false): StandaloneTone => {
   const colorCategoryId = getStandaloneColorCategoryId(categoryId);
+  // TODO(warm-mode): unique warm palette tables — for v1, route warm to LIGHT
+  if (isWarm) return STANDALONE_LIGHT[colorCategoryId] ?? STANDALONE_LIGHT.daily;
   if (isMix) return STANDALONE_MIX[colorCategoryId] ?? STANDALONE_MIX.daily;
   if (isDarkMode) return STANDALONE_DARK[colorCategoryId] ?? STANDALONE_DARK.daily;
   return STANDALONE_LIGHT[colorCategoryId] ?? STANDALONE_LIGHT.daily;
 };
 
-const getOverlayPalette = (categoryId: string, isMix: boolean, isDarkMode: boolean): OverlayPalette => {
+const getOverlayPalette = (categoryId: string, isMix: boolean, isDarkMode: boolean, isWarm: boolean = false): OverlayPalette => {
+  // TODO(warm-mode): unique warm palette tables — for v1, route warm to LIGHT
+  if (isWarm) return OVERLAY_LIGHT[categoryId] ?? OVERLAY_LIGHT.daily;
   if (isMix) return OVERLAY_MIX[categoryId] ?? OVERLAY_MIX.daily;
   if (isDarkMode) return OVERLAY_DARK[categoryId] ?? OVERLAY_DARK.daily;
   return OVERLAY_LIGHT[categoryId] ?? OVERLAY_LIGHT.daily;
 };
 
+// Font sizes bumped ~15-18% over prior values for better AAC readability at
+// eye-tracking distance (~60 cm). Standalone (full Quick Words screen)
+// receives a slightly larger boost than overlay (where space is more
+// constrained). All clamps respect viewport-height scaling so the layout
+// stays no-scroll at 13" → 27".
 const getWordFontSize = (text: string, presentation: 'overlay' | 'standalone') => {
   const length = text.length;
   const hasCompoundLabel = text.includes('/') || text.includes('&');
 
   if (presentation === 'overlay') {
-    if (length >= 28) return 'clamp(19px, 2.35vh, 27px)';
-    if (length >= 18 || hasCompoundLabel) return 'clamp(21px, 2.55vh, 30px)';
-    return 'clamp(24px, 2.95vh, 34px)';
+    if (length >= 28) return 'clamp(22px, 2.7vh, 30px)';
+    if (length >= 18 || hasCompoundLabel) return 'clamp(24px, 2.9vh, 33px)';
+    return 'clamp(27px, 3.3vh, 38px)';
   }
-  if (length >= 30) return 'clamp(22px, 2.45vh, 28px)';
-  if (length >= 20 || hasCompoundLabel) return 'clamp(24px, 2.75vh, 31px)';
-  if (length >= 12 || text.includes(' ')) return 'clamp(26px, 3vh, 35px)';
-  return 'clamp(30px, 3.4vh, 40px)';
+  if (length >= 30) return 'clamp(26px, 2.85vh, 32px)';
+  if (length >= 20 || hasCompoundLabel) return 'clamp(28px, 3.15vh, 36px)';
+  if (length >= 12 || text.includes(' ')) return 'clamp(30px, 3.45vh, 40px)';
+  return 'clamp(34px, 3.85vh, 46px)';
 };
 
 const getHindiFontSize = (text: string, presentation: 'overlay' | 'standalone') => {
   if (presentation === 'overlay') {
-    if (text.length >= 18) return 'clamp(24px, 3vh, 32px)';
-    return 'clamp(26px, 3.2vh, 36px)';
+    if (text.length >= 18) return 'clamp(27px, 3.35vh, 36px)';
+    return 'clamp(30px, 3.6vh, 40px)';
   }
-  if (text.length >= 18) return 'clamp(19px, 2.2vh, 26px)';
-  return 'clamp(21px, 2.45vh, 30px)';
+  if (text.length >= 18) return 'clamp(22px, 2.5vh, 30px)';
+  return 'clamp(24px, 2.8vh, 34px)';
 };
 
 const getStandaloneHeading = (category: QuickWordCategory) => {
@@ -347,8 +356,9 @@ const STANDALONE_ICON_COLORS = {
   },
 } as const;
 
-const getStandaloneIconColor = (categoryId: string, isMix: boolean, isDarkMode: boolean) => {
-  const mode = isMix ? 'mix' : isDarkMode ? 'dark' : 'light';
+const getStandaloneIconColor = (categoryId: string, isMix: boolean, isDarkMode: boolean, isWarm: boolean = false) => {
+  // TODO(warm-mode): unique warm palette tables — for v1, route warm to LIGHT
+  const mode = isMix ? 'mix' : isWarm ? 'light' : isDarkMode ? 'dark' : 'light';
   const palette = STANDALONE_ICON_COLORS[mode];
   const colorCategoryId = getStandaloneColorCategoryId(categoryId);
   return palette[colorCategoryId as keyof typeof palette] ?? palette.daily;
@@ -364,7 +374,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
   idPrefix = 'qwg',
   presentation = 'overlay',
 }) => {
-  const { isMix } = useTheme();
+  const { isMix, isWarm } = useTheme();
   const [activatedKey, setActivatedKey] = useState<string | null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -396,8 +406,8 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
     }}>
       {orderedCategories.map((category) => {
         const words = category.words.filter((word) => word.enabled).slice(0, MAX_WORDS);
-        const overlayPalette = getOverlayPalette(category.id, isMix, isDarkMode);
-        const standaloneTone = getStandaloneTone(category.id, isMix, isDarkMode);
+        const overlayPalette = getOverlayPalette(category.id, isMix, isDarkMode, isWarm);
+        const standaloneTone = getStandaloneTone(category.id, isMix, isDarkMode, isWarm);
         const categoryName = category.heading || category.id.charAt(0).toUpperCase() + category.id.slice(1);
         const categoryIconSrc = CATEGORY_ICON_ASSETS[category.id];
 
@@ -513,7 +523,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                         opacity: 0.9,
                         pointerEvents: 'none',
                         userSelect: 'none',
-                        backgroundColor: getStandaloneIconColor(category.id, isMix, isDarkMode),
+                        backgroundColor: getStandaloneIconColor(category.id, isMix, isDarkMode, isWarm),
                         WebkitMaskImage: `url(${categoryIconSrc})`,
                         maskImage: `url(${categoryIconSrc})`,
                         WebkitMaskRepeat: 'no-repeat',

@@ -39,6 +39,8 @@ export function LiveClock({ currentScreen, suppressed = false }: LiveClockProps)
 
   const dayColor = isHomeWarmLight
     ? 'rgba(122, 99, 71, 0.55)'
+    : theme === 'warm'
+      ? '#6A625B'
     : theme === 'light'
     ? '#5A4A3B'
     : theme === 'mix'
@@ -47,6 +49,8 @@ export function LiveClock({ currentScreen, suppressed = false }: LiveClockProps)
 
   const timeColor = isHomeWarmLight
     ? 'rgba(59, 45, 32, 0.55)'
+    : theme === 'warm'
+      ? '#2F2A26'
     : theme === 'light'
     ? '#1B140E'
     : theme === 'mix'
@@ -55,25 +59,33 @@ export function LiveClock({ currentScreen, suppressed = false }: LiveClockProps)
 
   const ampmColor = isHomeWarmLight
     ? 'rgba(59, 45, 32, 0.55)'
+    : theme === 'warm'
+      ? '#6A625B'
     : theme === 'light'
     ? '#6D5945'
     : theme === 'mix'
       ? '#B49362'
       : '#9FB19A';
 
-  const dayColorSoft = theme === 'light'
+  const dayColorSoft = theme === 'warm'
+    ? 'rgba(106, 98, 91, 0.85)'
+    : theme === 'light'
     ? 'rgba(90, 74, 59, 0.78)'
     : theme === 'mix'
       ? 'rgba(120, 100, 72, 0.76)'
       : 'rgba(196, 198, 187, 0.64)';
 
-  const timeColorSoft = theme === 'light'
+  const timeColorSoft = theme === 'warm'
+    ? 'rgba(47, 42, 38, 0.92)'
+    : theme === 'light'
     ? 'rgba(27, 20, 14, 0.92)'
     : theme === 'mix'
       ? 'rgba(238, 223, 196, 0.82)'
       : 'rgba(230, 233, 221, 0.76)';
 
-  const ampmColorSoft = theme === 'light'
+  const ampmColorSoft = theme === 'warm'
+    ? 'rgba(106, 98, 91, 0.85)'
+    : theme === 'light'
     ? 'rgba(109, 89, 69, 0.82)'
     : theme === 'mix'
       ? '#9E7B4B'

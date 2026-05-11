@@ -856,39 +856,39 @@ interface CompassMapScreenProps {
 
 function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMapScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const ws = useWS();
   const { settings: dwellSettings } = useDwellTime();
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
-  const T_pageBg = isLight ? '#EBE0CC' : isMix ? '#1A1611' : THEME.bg;
-  const T_panelBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : THEME.panelBg;
-  const T_cardBg = isLight ? '#F5EDDB' : isMix ? '#2A2419' : THEME.cardBg;
-  const T_panelBorder = isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border;
-  const T_panelBorderSoft = isLight ? '#A89478' : isMix ? 'rgba(180, 147, 98, 0.28)' : THEME.border;
-  const T_textMain = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : THEME.text;
-  const T_textSub = isLight ? '#76624A' : isMix ? '#C4B697' : THEME.textSub;
-  const T_textDim = isLight ? '#7B6346' : isMix ? '#A89476' : THEME.textDim;
-  const T_textInverse = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : '#FFFFFF';
+  const T_pageBg = isLight ? '#EBE0CC' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : THEME.bg;
+  const T_panelBg = isLight ? '#FAF5E8' : isWarm ? '#F8F1DF' : isMix ? '#241F18' : THEME.panelBg;
+  const T_cardBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#2A2419' : THEME.cardBg;
+  const T_panelBorder = isLight ? '#3F6864' : isWarm ? '#CBBCA9' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border;
+  const T_panelBorderSoft = isLight ? '#D6CAB7' : isWarm ? '#DED2C2' : isMix ? 'rgba(180, 147, 98, 0.28)' : THEME.border;
+  const T_textMain = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : THEME.text;
+  const T_textSub = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : THEME.textSub;
+  const T_textDim = isLight ? '#7B6346' : isWarm ? '#8A7C6B' : isMix ? '#A89476' : THEME.textDim;
+  const T_textInverse = isLight ? '#FBE9DE' : isWarm ? '#FBF5E5' : isMix ? '#FFFCF1' : '#FFFFFF';
   // Action accent colors
-  const T_accent = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.accent;
-  const T_accentSubtle = isLight ? 'rgba(31, 107, 126, 0.14)' : isMix ? 'rgba(94, 156, 168, 0.18)' : THEME.accentSubtle;
-  const T_success = isLight ? '#3D7853' : isMix ? '#5A7548' : THEME.success;
-  const T_successSubtle = isLight ? 'rgba(61, 120, 83, 0.16)' : isMix ? 'rgba(90, 117, 72, 0.20)' : THEME.successSubtle;
-  const T_danger = isLight ? '#7A363A' : isMix ? '#9C5A53' : THEME.danger;
-  const T_info = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.info;
+  const T_accent = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : THEME.accent;
+  const T_accentSubtle = isLight ? 'rgba(31, 107, 126, 0.14)' : isWarm ? '#E7EEEA' : isMix ? 'rgba(94, 156, 168, 0.18)' : THEME.accentSubtle;
+  const T_success = isLight ? '#3D7853' : isWarm ? '#5F7C58' : isMix ? '#5A7548' : THEME.success;
+  const T_successSubtle = isLight ? 'rgba(61, 120, 83, 0.16)' : isWarm ? '#E9EFE6' : isMix ? 'rgba(90, 117, 72, 0.20)' : THEME.successSubtle;
+  const T_danger = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#9C5A53' : THEME.danger;
+  const T_info = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : THEME.info;
   // Refine / Edit / Generate
-  const T_refineModeAccent = isLight ? '#7A363A' : isMix ? '#B49362' : '#2DD4BF';
+  const T_refineModeAccent = isLight ? '#8A3B38' : isMix ? '#B49362' : '#2DD4BF';
   const T_editAccent = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : '#2DD4BF';
-  const T_generatePlanBg = isLight ? '#1F6B7E' : isMix ? '#3A6770' : 'rgba(16,185,129,0.15)';
-  const T_generatePlanBorder = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : '#10B981';
-  const T_generatePlanText = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : '#10B981';
-  const T_refineMapBg = isLight ? '#5B4B98' : isMix ? '#5A4878' : 'rgba(139,92,246,0.08)';
-  const T_refineMapBorder = isLight ? '#5B4B98' : isMix ? '#8B7AB8' : 'rgba(139,92,246,0.3)';
-  const T_refineMapText = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : '#8B5CF6';
+  const T_generatePlanBg = isLight ? '#497775' : isWarm ? '#3F6968' : isMix ? '#3A6770' : 'rgba(16,185,129,0.15)';
+  const T_generatePlanBorder = isLight ? '#497775' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : '#497775';
+  const T_generatePlanText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : '#497775';
+  const T_refineMapBg = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#5A4878' : 'rgba(139,92,246,0.08)';
+  const T_refineMapBorder = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#8B7AB8' : 'rgba(139,92,246,0.3)';
+  const T_refineMapText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : '#8B5CF6';
   // Hide/show nav (currently solid black/dark) — adapt to theme
-  const T_navBtnBg = isLight ? '#F5EDDB' : isMix ? '#2A2419' : THEME.panelBg;
-  const T_navBtnBorder = isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border;
+  const T_navBtnBg = isLight ? '#FAF5E8' : isMix ? '#2A2419' : THEME.panelBg;
+  const T_navBtnBorder = isLight ? '#3F6864' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border;
   const T_overlayDim = isLight ? 'rgba(74, 58, 42, 0.55)' : isMix ? 'rgba(0,0,0,0.78)' : 'rgba(0,0,0,0.84)';
   const T_overlayDeep = isLight ? 'rgba(74, 58, 42, 0.62)' : isMix ? 'rgba(0,0,0,0.86)' : 'rgba(0,0,0,0.92)';
   const T_subSurface = isLight ? 'rgba(168, 148, 120, 0.18)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(255,255,255,0.05)';
@@ -2017,7 +2017,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const controlsUnlocked = !!currentRoom && state.phase === 'placement' && state.armed && !state.pendingExpansion;
     const canUndo = state.history.length > 0 || (state.phase === 'placement' && !!currentRoom);
 
-    // Common style for strip buttons
+    // Common style for strip buttons — taller in nav-visible mode so each
+    // button feels properly hit-target sized for eye-gaze even when the
+    // strip's vertical column is shorter (compressed by HIDE NAV + bottom gap).
     const stripBtnStyle = (active: boolean, specialColor?: string) => ({
       flex: 1, width: '100%', borderRadius: 0, margin: 0,
       border: 'none',
@@ -2027,24 +2029,26 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900,
       letterSpacing: '0.4px',
       display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-      gap: 'clamp(6px, 0.9vh, 10px)',
-      padding: 'clamp(10px, 1.4vh, 16px) clamp(8px, 1vw, 14px)',
+      gap: 'clamp(8px, 1.2vh, 14px)',
+      // Chunkier vertical padding — gives every button extra height
+      // independent of the strip's flex distribution.
+      padding: 'clamp(14px, 2.1vh, 26px) clamp(8px, 1vw, 14px)',
       transition: 'all 0.2s ease',
+      minHeight: 'clamp(96px, 11vh, 130px)',
     });
 
     return (
       <div style={{
         position: 'absolute',
         right: '24px',
-        // Dynamic top: when nav is hidden, SHOW NAV sits at top:12 (ends ~132),
-        // so the strip can start much higher and claim the full vertical column.
-        // When nav is visible, HIDE NAV sits at top:175 (ends ~295), so the strip
-        // drops down to clear it.
-        top: navHidden ? '152px' : '316px',
-        // Bottom gutter of ~32px so the last button (REFINE MAP) is fully visible
-        // and not pushed past the bottom edge.
+        // Dynamic top — tighter when nav is visible. HIDE NAV ends at ~295;
+        // strip now starts at 304 (only ~9px below HIDE NAV instead of ~21px),
+        // reclaiming vertical space so each button can be taller.
+        top: navHidden ? '152px' : '304px',
+        // Reduced bottom gutter (was 32px → now 20px) — gives the strip
+        // more vertical room which flex-distributes into each button.
         width: '296px',
-        height: navHidden ? 'calc(100% - 184px)' : 'calc(100% - 348px)',
+        height: navHidden ? 'calc(100% - 184px)' : 'calc(100% - 324px)',
         background: T_panelBg,
         border: `1px solid ${T_panelBorderSoft}`,
         borderRadius: '24px', overflow: 'hidden',
@@ -2082,7 +2086,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               style={{
                 ...stripBtnStyle(state.placements.length >= 1, T_generatePlanBg),
                 color: state.placements.length >= 1
-                  ? (isLight ? T_textInverse : isMix ? T_textInverse : '#10B981')
+                  ? (isLight ? T_textInverse : isMix ? T_textInverse : '#497775')
                   : T_textDim,
                 minHeight: '132px',
               }}>
@@ -2166,7 +2170,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 ...stripBtnStyle(controlsUnlocked && state.placements.length >= 2, T_generatePlanBg),
                 borderBottom: 'none',
                 color: (controlsUnlocked && state.placements.length >= 2)
-                  ? (isLight ? T_textInverse : isMix ? T_textInverse : '#10B981')
+                  ? (isLight ? T_textInverse : isMix ? T_textInverse : '#497775')
                   : T_textDim,
               }}>
               <div style={{ fontSize: 'clamp(24px, 2.8vh, 30px)' }}>{'📝'}</div>
@@ -2283,7 +2287,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           <CompassRose
             facing={facing}
             bg={T_panelBg}
-            border={isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : T_panelBorderSoft}
+            border={isLight ? '#3F6864' : isMix ? 'rgba(180, 147, 98, 0.42)' : T_panelBorderSoft}
             textColor={T_textSub}
             northColor={isLight ? '#8C3F3F' : isMix ? '#C9695C' : '#EF5350'}
             size={72}
@@ -2301,7 +2305,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3,
             padding: '4px 16px', borderRadius: '0 0 10px 10px',
             background: isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328',
-            color: isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3',
+            color: isLight ? '#FAF5E8' : isMix ? '#FFFCF1' : '#ECEDE3',
             fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
             fontVariantNumeric: 'tabular-nums',
             boxShadow: '0 2px 6px rgba(0,0,0,0.14)',
@@ -2310,7 +2314,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', zIndex: 3,
             padding: '16px 4px', borderRadius: '0 10px 10px 0',
             background: isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328',
-            color: isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3',
+            color: isLight ? '#FAF5E8' : isMix ? '#FFFCF1' : '#ECEDE3',
             fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
             fontVariantNumeric: 'tabular-nums',
             writingMode: 'vertical-rl' as const,
@@ -2321,7 +2325,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             position: 'absolute', top: '50%', right: 0, transform: 'translateY(-50%)', zIndex: 3,
             padding: '16px 4px', borderRadius: '10px 0 0 10px',
             background: isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328',
-            color: isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3',
+            color: isLight ? '#FAF5E8' : isMix ? '#FFFCF1' : '#ECEDE3',
             fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
             fontVariantNumeric: 'tabular-nums',
             writingMode: 'vertical-rl' as const,
@@ -2513,7 +2517,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                       })()}
                       {/* Wall edge indicator — colored bar on specified edge */}
                       {refinements.customEdges.filter(e => e.cells[0] === cellKey).map(edge => {
-                        const edgeColor = edge.type === 'full_wall' ? '#2DD4BF' : edge.type === 'half_wall_glass' ? '#10B981' : edge.type === 'open_archway' ? '#FBBF24' : '#EF5350';
+                        const edgeColor = edge.type === 'full_wall' ? '#2DD4BF' : edge.type === 'half_wall_glass' ? '#497775' : edge.type === 'open_archway' ? '#C9A96B' : '#EF5350';
                         const side = edge.boundary[1] || 'right';
                         const posStyle = side === 'top' ? { top: 0, left: 0, right: 0, height: '3px' }
                           : side === 'bottom' ? { bottom: 0, left: 0, right: 0, height: '3px' }
@@ -2528,7 +2532,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                           background: 'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(251,191,36,0.2) 6px, rgba(251,191,36,0.2) 12px)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
-                          <span style={{ fontSize: '10px', fontWeight: 900, color: '#FBBF24', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '3px' }}>VOID</span>
+                          <span style={{ fontSize: '10px', fontWeight: 900, color: '#C9A96B', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '3px' }}>VOID</span>
                         </div>
                       )}
                       {/* Rotation indicator */}
@@ -2580,7 +2584,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           borderTop: 'none', borderRadius: '0 0 16px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative',
-          color: isLight ? T_textMain : isMix ? '#F0E2C4' : THEME.road, fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 26px)', letterSpacing: '0.6px',
+          color: isLight ? T_textMain : isMix ? '#FFFCF1' : THEME.road, fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 26px)', letterSpacing: '0.6px',
           boxShadow: isLight ? '0 -4px 14px rgba(82, 66, 45, 0.08)' : isMix ? '0 -4px 16px rgba(0,0,0,0.22)' : 'none',
         }}>
           {/* Gate diagram — spans exactly one cell width (25% of grid frontage).
@@ -2595,7 +2599,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             const centerPct = gp === 'Left' ? 12.5 : gp === 'Right' ? 87.5 : 50;
             const stone = isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328';
             const stoneShade = isLight ? '#5C4A30' : isMix ? '#3D3328' : '#26221C';
-            const cream = isLight ? '#F5EDDB' : isMix ? '#F0E2C4' : '#ECEDE3';
+            const cream = isLight ? '#FAF5E8' : isMix ? '#FFFCF1' : '#ECEDE3';
             return (
               <div style={{
                 position: 'absolute',
@@ -2741,7 +2745,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     <span style={{
                       fontSize: 'clamp(18px, 2.3vh, 26px)', fontWeight: 800,
-                      color: isLight ? T_textMain : isMix ? '#F0E2C4' : '#F8FAFC',
+                      color: isLight ? T_textMain : isMix ? '#FFFCF1' : '#F8FAFC',
                       letterSpacing: '0.6px', lineHeight: 1.15,
                     }}>
                       {currentRoom.roomLabel.toUpperCase()}
@@ -3174,7 +3178,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const renderRightActionRail = () => null;
 
   return (
-    <div className={`compass-screen${isLight ? ' theme-light' : ''}${isMix ? ' theme-mix' : ''}`} style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: T_pageBg, display: 'flex', flexDirection: 'column', fontFamily: UI_FONT }}>
+    <div className={`compass-screen${isLight ? ' theme-light' : ''}${isMix ? ' theme-mix' : ''}${isWarm ? ' theme-warm' : ''}`} style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: T_pageBg, display: 'flex', flexDirection: 'column', fontFamily: UI_FONT }}>
       {!menuOpen && !navHidden && (
         <div style={{ pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto' }}>
           <GlobalNavBar
@@ -3322,10 +3326,28 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
         const effectiveGazeEnabled = isGazeEnabled && refinementArmed && !readingCooldown;
 
+        // Theme-aware room picker card. Paper modes (warm + light) use dark
+        // brown text on cream card bg so room names are readable (was light
+        // `#E2E8F0` slate on a tan tile — invisible). Dark/mix keep light text.
+        const rcBg = isLight ? '#FAF5E8'
+            : isWarm ? '#FBF5E5'
+            : isMix ? 'rgba(60, 48, 32, 0.55)'
+            : 'rgba(139,92,246,0.08)';
+        const rcBorder = isLight ? '2px solid rgba(168, 120, 56, 0.30)'
+            : isWarm ? '2px solid rgba(122, 99, 71, 0.22)'
+            : isMix ? '2px solid rgba(180, 147, 98, 0.32)'
+            : '3px solid rgba(139,92,246,0.3)';
+        const rcText = isLight ? '#2E2A24'
+            : isWarm ? '#2F2A26'
+            : isMix ? '#FFFCF1'
+            : '#E2E8F0';
+        const rcShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+            : 'none';
         const roomCard = (id: string, rid: string, onClick: () => void, dwell = 1500) => (
           <GazeButton key={id} id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={dwell}
             onClick={() => { onClick(); setRoomPage(0); }}
-            style={{ flex: '1 1 200px', minWidth: '200px', maxWidth: '240px', minHeight: '140px', borderRadius: '16px', border: '3px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.08)', color: '#E2E8F0', fontSize: '24px', fontWeight: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px' }}>
+            style={{ flex: '1 1 200px', minWidth: '200px', maxWidth: '240px', minHeight: '140px', borderRadius: '16px', border: rcBorder, background: rcBg, color: rcText, fontSize: '24px', fontWeight: 800, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', boxShadow: rcShadow }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: ROOM_LIBRARY[rid]?.color || '#555' }} />
             <div style={{ textAlign: 'center', lineHeight: 1.2 }}>{ROOM_LIBRARY[rid]?.shortLabel || rid}</div>
           </GazeButton>
@@ -3470,7 +3492,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     return (
                       <div key={ck} style={{
                         borderRadius: 6,
-                        background: gLib ? `${gLib.color}${isRoomSelected ? 'AA' : '44'}` : (isLight ? '#F5EDDB' : isMix ? '#241E16' : 'rgba(255,255,255,0.02)'),
+                        background: gLib ? `${gLib.color}${isRoomSelected ? 'AA' : '44'}` : (isLight ? '#FAF5E8' : isMix ? '#241E16' : 'rgba(255,255,255,0.02)'),
                         border: isCellTargeted ? `3px solid ${T_textMain}` : isRoomSelected ? `2px solid ${T_accent}` : `1px solid ${T_panelBorderSoft}`,
                         boxShadow: isRoomSelected ? `0 0 16px ${T_accent}66` : 'none',
                         opacity: isRoomSelected ? 1 : 0.6,
@@ -3510,7 +3532,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                       {bigBtn('ce-prev-split', '✂ SPLIT', '#C4B5FD', 'rgba(139,92,246,0.08)', 'rgba(139,92,246,0.3)', () => { }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
                       {bigBtn('ce-prev-walls', '▐ WALLS', '#6EE7B7', 'rgba(45,212,191,0.08)', 'rgba(45,212,191,0.3)', () => { }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
                       {bigBtn('ce-prev-rotate', '↻ ROTATE', '#F59E0B', 'rgba(245,158,11,0.08)', 'rgba(245,158,11,0.3)', () => { }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
-                      {bigBtn('ce-prev-expand', '⇔ EXPAND', '#10B981', 'rgba(16,185,129,0.08)', 'rgba(16,185,129,0.3)', () => { }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
+                      {bigBtn('ce-prev-expand', '⇔ EXPAND', '#497775', 'rgba(16,185,129,0.08)', 'rgba(16,185,129,0.3)', () => { }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
                       {hasCellRefinement && bigBtn('ce-prev-reset', '✕ RESET', '#EF5350', 'rgba(239,83,80,0.06)', 'rgba(239,83,80,0.3)', () => { }, 1500, { width: '220px', height: '140px', fontSize: '22px' })}
                     </div>
 
@@ -3593,7 +3615,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                         () => { openRotateOverlay(); triggerReadingCooldown(); }, 1500,
                         { width: '100%', height: 'clamp(160px, 22vh, 220px)', fontSize: 'clamp(26px, 3.2vh, 34px)' })}
                       {bigBtn('ce-expand', '⇔ EXPAND',
-                        isLight ? '#3D7853' : isMix ? '#8FB99D' : '#10B981',
+                        isLight ? '#3D7853' : isMix ? '#8FB99D' : '#497775',
                         isLight ? 'rgba(61, 120, 83, 0.10)' : isMix ? 'rgba(143, 185, 157, 0.12)' : 'rgba(16,185,129,0.08)',
                         isLight ? 'rgba(61, 120, 83, 0.42)' : isMix ? 'rgba(143, 185, 157, 0.42)' : 'rgba(16,185,129,0.3)',
                         () => { openExpandOverlay(); triggerReadingCooldown(); }, 1500,
@@ -3631,7 +3653,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'roomA' && (
                       <>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>Room for {splitDirection === 'vertical' ? 'LEFT' : 'TOP'} half</div>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>Room for {splitDirection === 'vertical' ? 'LEFT' : 'TOP'} half</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20, justifyContent: 'center', alignContent: 'start', maxWidth: '1200px', width: '100%', flex: 1, overflowY: 'auto', padding: '10px' }}>
                           {pagedRoomIds.map(rid => roomCard(`ce-sA-${rid}`, rid, () => { setSubRoomA(rid); setSplitStep('pctA'); triggerReadingCooldown(); onSpeak(`${ROOM_LIBRARY[rid]?.shortLabel || rid}. Choose percentage.`); }, 2000))}
                         </div>
@@ -3640,7 +3662,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'pctA' && subRoomA && (
                       <>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>
                           Space for <span style={{ color: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', fontWeight: 900 }}>{ROOM_LIBRARY[subRoomA]?.shortLabel || subRoomA}</span>
                         </div>
 
@@ -3649,7 +3671,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 20 }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} ({subRoomAPct || 50}%)
                           </div>
-                          <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', border: '2px dashed #64748B', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontWeight: 800 }}>
+                          <div style={{
+                            flex: 1,
+                            background: isLight || isWarm ? 'rgba(122, 99, 71, 0.06)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(255,255,255,0.05)',
+                            borderRadius: 8, display: 'flex',
+                            border: `2px dashed ${isLight || isWarm ? 'rgba(122, 99, 71, 0.32)' : isMix ? 'rgba(180, 147, 98, 0.38)' : '#64748B'}`,
+                            alignItems: 'center', justifyContent: 'center',
+                            color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8',
+                            fontWeight: 800,
+                          }}>
                             {100 - (subRoomAPct || 50)}% (Empty)
                           </div>
                         </div>
@@ -3663,14 +3693,23 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'roomB' && subRoomA && (
                       <>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>Room for {splitDirection === 'vertical' ? 'RIGHT' : 'BOTTOM'} half ({100 - (subRoomAPct || 50)}%)</div>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>Room for {splitDirection === 'vertical' ? 'RIGHT' : 'BOTTOM'} half ({100 - (subRoomAPct || 50)}%)</div>
 
                         {/* LIVE PREVIEW BOX - B */}
                         <div style={{ width: '400px', height: '140px', background: T_panelBg, border: `4px solid ${T_panelBorder}`, borderRadius: '16px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0 }}>
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 16 }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} ({subRoomAPct || 50}%)
                           </div>
-                          <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', border: '2px dashed #93C5FD', alignItems: 'center', justifyContent: 'center', color: '#93C5FD', fontWeight: 800, animation: 'pulse 1.5s infinite' }}>
+                          <div style={{
+                            flex: 1,
+                            background: isLight || isWarm ? 'rgba(79, 115, 136, 0.10)' : isMix ? 'rgba(94, 156, 168, 0.14)' : 'rgba(255,255,255,0.1)',
+                            borderRadius: 8, display: 'flex',
+                            border: `2px dashed ${isLight ? '#1F6B7E' : isWarm ? '#4F7388' : isMix ? '#5E9CA8' : '#93C5FD'}`,
+                            alignItems: 'center', justifyContent: 'center',
+                            color: isLight ? '#1F6B7E' : isWarm ? '#3D5E73' : isMix ? '#5E9CA8' : '#93C5FD',
+                            fontWeight: 800,
+                            animation: 'pulse 1.5s infinite',
+                          }}>
                             ? Select Below
                           </div>
                         </div>
@@ -3682,7 +3721,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'confirm' && subRoomA && subRoomB && (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30, animation: 'fadeIn 0.3s ease-out' }}>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>Review & Confirm Your Split</div>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>Review &amp; Confirm Your Split</div>
 
                         {/* FINAL PREVIEW BOX */}
                         <div style={{ width: '500px', height: '300px', background: T_panelBg, border: `5px solid ${T_panelBorder}`, borderRadius: '24px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0, boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>
@@ -3770,7 +3809,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
 
                     <div style={{ display: 'flex', gap: 20 }}>
-                      {bigBtn('ce-rot-apply', '✓ APPLY', '#10B981', 'rgba(16,185,129,0.12)', 'rgba(16,185,129,0.4)', confirmRotation, 1000, { width: '180px', height: '70px' })}
+                      {bigBtn('ce-rot-apply', '✓ APPLY', '#497775', 'rgba(16,185,129,0.12)', 'rgba(16,185,129,0.4)', confirmRotation, 1000, { width: '180px', height: '70px' })}
                     </div>
                   </>
                 )}
@@ -3778,17 +3817,17 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 {/* ── EXPAND TOOL ── */}
                 {refinementArmed && cellEditorTool === 'expand' && (
                   <>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#10B981' }}>⇔ EXPAND — {roomLabel}</div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#497775' }}>⇔ EXPAND — {roomLabel}</div>
                     <div style={{ fontSize: 14, color: '#94A3B8' }}>Expand into an empty neighbor</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 140px)', gridTemplateRows: 'repeat(3, 90px)', gap: 12 }}>
                       <div />
-                      {bigBtn('ce-exp-up', '↑ UP', canExpandDir('up') ? '#10B981' : '#334155', canExpandDir('up') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('up') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('up') && confirmExpand('up'), 1200, { width: '140px', height: '90px' })}
+                      {bigBtn('ce-exp-up', '↑ UP', canExpandDir('up') ? '#497775' : '#334155', canExpandDir('up') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('up') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('up') && confirmExpand('up'), 1200, { width: '140px', height: '90px' })}
                       <div />
-                      {bigBtn('ce-exp-left', '← LEFT', canExpandDir('left') ? '#10B981' : '#334155', canExpandDir('left') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('left') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('left') && confirmExpand('left'), 1200, { width: '140px', height: '90px' })}
+                      {bigBtn('ce-exp-left', '← LEFT', canExpandDir('left') ? '#497775' : '#334155', canExpandDir('left') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('left') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('left') && confirmExpand('left'), 1200, { width: '140px', height: '90px' })}
                       <div style={{ width: '140px', height: '90px', borderRadius: '16px', border: `2px solid ${roomColor}`, background: `${roomColor}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 900, color: roomColor }}>{roomLabel}</div>
-                      {bigBtn('ce-exp-right', 'RIGHT →', canExpandDir('right') ? '#10B981' : '#334155', canExpandDir('right') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('right') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('right') && confirmExpand('right'), 1200, { width: '140px', height: '90px' })}
+                      {bigBtn('ce-exp-right', 'RIGHT →', canExpandDir('right') ? '#497775' : '#334155', canExpandDir('right') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('right') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('right') && confirmExpand('right'), 1200, { width: '140px', height: '90px' })}
                       <div />
-                      {bigBtn('ce-exp-down', '↓ DOWN', canExpandDir('down') ? '#10B981' : '#334155', canExpandDir('down') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('down') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('down') && confirmExpand('down'), 1200, { width: '140px', height: '90px' })}
+                      {bigBtn('ce-exp-down', '↓ DOWN', canExpandDir('down') ? '#497775' : '#334155', canExpandDir('down') ? 'rgba(16,185,129,0.1)' : 'rgba(30,41,59,0.5)', canExpandDir('down') ? 'rgba(16,185,129,0.4)' : 'rgba(100,116,139,0.15)', () => canExpandDir('down') && confirmExpand('down'), 1200, { width: '140px', height: '90px' })}
                       <div />
                     </div>
                   </>
@@ -3802,7 +3841,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 {refinementArmed && toolSideBtn('ts-split', '✂', 'SPLIT', 'split', '#C4B5FD', () => { openSplitOverlay(); triggerReadingCooldown(); })}
                 {refinementArmed && toolSideBtn('ts-walls', '▐', 'WALLS', 'walls', '#6EE7B7')}
                 {refinementArmed && toolSideBtn('ts-rotate', '↻', 'ROTATE', 'rotate', '#F59E0B', () => { openRotateOverlay(); triggerReadingCooldown(); })}
-                {refinementArmed && toolSideBtn('ts-expand', '⇔', 'EXPAND', 'expand', '#10B981', () => { openExpandOverlay(); triggerReadingCooldown(); })}
+                {refinementArmed && toolSideBtn('ts-expand', '⇔', 'EXPAND', 'expand', '#497775', () => { openExpandOverlay(); triggerReadingCooldown(); })}
                 <div style={{ flex: 1 }} />
                 {refinementArmed && hasCellRefinement && (
                   <GazeButton id="ts-reset" gazeEnabled={isGazeEnabled && !readingCooldown} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1500}
@@ -3900,7 +3939,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       {
         saveToast && (
           <div style={{ position: 'fixed', top: '100px', left: '50%', transform: 'translateX(-50%)', zIndex: 10000, background: '#0F2A1F', border: '2px solid #10B981', borderRadius: '16px', padding: '16px 32px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#FFF', fontSize: '16px', fontWeight: 700 }}>✓</span></div>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#497775', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#FFF', fontSize: '16px', fontWeight: 700 }}>✓</span></div>
             <span style={{ color: T_textMain, fontSize: '18px', fontWeight: 800 }}>Compass Map Saved!</span>
             <GazeButton id="toast-ok" gazeEnabled={isGazeEnabled} alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600} onClick={() => setSaveToast(false)}
               style={{ marginLeft: '16px', minWidth: '120px', height: '80px', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, borderRadius: '14px', color: T_textMain, fontSize: '18px', fontWeight: 700 }}>

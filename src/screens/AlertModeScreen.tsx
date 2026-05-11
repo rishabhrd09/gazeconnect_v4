@@ -8,6 +8,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import GazeButton from '../components/core/GazeButton';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useGazeControl } from '../components/core/GazeControlToggle';
+import { useAlertMode } from '../contexts/AlertModeContext';
 
 interface AlertModeScreenProps {
   onSpeak: (text: string) => void;
@@ -118,6 +119,7 @@ const HomeIcon: React.FC<{ size?: number; color?: string }> = ({ size = 34, colo
 const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) => {
   const { data } = useCustomization();
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
+  const { isAlertModeLocked } = useAlertMode();
   const [confirming, setConfirming] = useState<{ label: string; idx: number } | null>(null);
 
   const handlePress = useCallback((label: string, idx: number) => {
@@ -178,11 +180,15 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6E7A53', opacity: 0.85 }} />
         </div>
 
+        {/* HOME button — disabled when caregiver has locked Alert Mode.
+            When locked, gaze is disabled, click is a no-op, the card dims
+            and shows a small lock icon + "Locked" label so the patient
+            knows the path is intentionally unavailable. */}
         <GazeButton
           id="alert-mode-home"
-          onClick={onHome}
+          onClick={isAlertModeLocked ? () => {} : onHome}
           isDarkMode
-          gazeEnabled={isGazeEnabled}
+          gazeEnabled={isAlertModeLocked ? false : isGazeEnabled}
           gazeEnabledTimestamp={lastEnabledTimestamp}
           dwellCategory="homeScreenTile"
           style={{
@@ -193,28 +199,51 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
             width: 'clamp(156px, 12vw, 214px)',
             height: 'clamp(156px, 19vh, 214px)',
             borderRadius: 28,
-            background: '#171A18',
-            border: 'none',
-            color: '#D9CEC1',
-            boxShadow: '0 10px 24px rgba(0,0,0,0.22)',
+            background: isAlertModeLocked ? '#10120F' : '#171A18',
+            border: isAlertModeLocked ? '1.5px dashed rgba(217, 206, 193, 0.18)' : 'none',
+            color: isAlertModeLocked ? 'rgba(217, 206, 193, 0.36)' : '#D9CEC1',
+            boxShadow: isAlertModeLocked ? 'none' : '0 10px 24px rgba(0,0,0,0.22)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 12,
-            cursor: 'pointer',
+            cursor: isAlertModeLocked ? 'not-allowed' : 'pointer',
             fontFamily: UI_FONT,
+            pointerEvents: isAlertModeLocked ? 'none' : 'auto',
+            transition: 'background 200ms ease, color 200ms ease',
           }}
         >
-          <HomeIcon size={50} color="#D9CEC1" />
-          <span style={{
-            fontSize: 'clamp(19px, 2.1vh, 24px)',
-            fontWeight: 700,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}>
-            Home
-          </span>
+          {isAlertModeLocked ? (
+            <>
+              {/* Small lock glyph + "Locked" label replace the Home icon
+                  when the caregiver has locked the screen. */}
+              <svg width={44} height={44} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="5" y="11" width="14" height="9" rx="2" stroke="rgba(217, 206, 193, 0.46)" strokeWidth="2.2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="rgba(217, 206, 193, 0.46)" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+              <span style={{
+                fontSize: 'clamp(15px, 1.7vh, 19px)',
+                fontWeight: 700,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+              }}>
+                Locked
+              </span>
+            </>
+          ) : (
+            <>
+              <HomeIcon size={50} color="#D9CEC1" />
+              <span style={{
+                fontSize: 'clamp(19px, 2.1vh, 24px)',
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}>
+                Home
+              </span>
+            </>
+          )}
         </GazeButton>
 
         <div style={{ marginBottom: 'clamp(18px, 2.6vh, 34px)', textAlign: 'center' }}>
@@ -306,7 +335,9 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           color: 'rgba(150,130,110,0.28)',
           letterSpacing: '0.02em',
         }}>
-          Right-click to disable Alert Mode
+          {isAlertModeLocked
+            ? 'Right-click to unlock or disable Alert Mode'
+            : 'Right-click to disable Alert Mode'}
         </div>
       </div>
 

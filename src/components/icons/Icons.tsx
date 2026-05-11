@@ -13,6 +13,11 @@ interface IconProps {
   strokeWidth?: number;
   className?: string;
   style?: React.CSSProperties;
+  // Optional accent — used by GridIcon to render one of its 4 squares in
+  // a complementary hue (architectural-elegant 2-color pattern). Other icons
+  // ignore this prop. Pattern is inspired by Pantone 2024-25 plum + amber
+  // home palettes and split-complementary color harmony.
+  accentColor?: string;
 }
 
 const defaultProps: IconProps = {
@@ -25,14 +30,20 @@ const defaultProps: IconProps = {
 // NEW AESTHETIC ICONS (v8.5)
 // ============================================
 
-export const GridIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7" rx="1" />
-    <rect x="14" y="3" width="7" height="7" rx="1" />
-    <rect x="14" y="14" width="7" height="7" rx="1" />
-    <rect x="3" y="14" width="7" height="7" rx="1" />
-  </svg>
-);
+export const GridIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2, accentColor }) => {
+  // When accentColor is provided, the top-right square renders in the accent
+  // hue (split-complementary visual pattern). Otherwise all 4 squares share
+  // the primary stroke color.
+  const accent = accentColor || color;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" stroke={color} />
+      <rect x="14" y="3" width="7" height="7" rx="1" stroke={accent} />
+      <rect x="14" y="14" width="7" height="7" rx="1" stroke={color} />
+      <rect x="3" y="14" width="7" height="7" rx="1" stroke={color} />
+    </svg>
+  );
+};
 
 export const PuzzleIcon: React.FC<IconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">

@@ -287,7 +287,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
           }}>
             Manage words shown on the Quick Words screen across all categories
             {isDirty && (
-              <span style={{ color: colors.warning.main, marginLeft: 12, fontWeight: 600 }}>
+              <span style={{ color: colors.accentText.gold, marginLeft: 12, fontWeight: 600 }}>
                 Unsaved changes
               </span>
             )}

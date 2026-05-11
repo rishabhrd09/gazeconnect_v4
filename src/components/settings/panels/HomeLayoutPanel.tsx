@@ -721,7 +721,7 @@ const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
           }}>
             Manage the four large emergency cards shown on the Home Screen
             {isDirty && (
-              <span style={{ color: colors.warning.main, marginLeft: 12, fontWeight: 600 }}>
+              <span style={{ color: colors.accentText.gold, marginLeft: 12, fontWeight: 600 }}>
                 Unsaved changes
               </span>
             )}

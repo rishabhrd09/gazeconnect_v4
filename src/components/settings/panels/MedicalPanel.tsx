@@ -386,7 +386,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
           }}>
             {editSections.length} of {MAX_SECTIONS} sections
             {isDirty && (
-              <span style={{ color: colors.warning.main, marginLeft: 12, fontWeight: 600 }}>
+              <span style={{ color: colors.accentText.gold, marginLeft: 12, fontWeight: 600 }}>
                 Unsaved changes
               </span>
             )}

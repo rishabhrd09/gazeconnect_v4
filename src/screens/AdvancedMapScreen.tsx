@@ -54,7 +54,7 @@ const THEME = {
   text: '#F0F4F8',
   sub: '#6B8FAF',
   dim: '#2E4A62',
-  success: '#10B981',
+  success: '#497775',
   road: '#38BDF8',
 };
 
@@ -206,21 +206,21 @@ interface AdvancedMapScreenProps {
 
 function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
-  const { isLight, isMix } = useTheme();
+  const { isLight, isMix, isWarm } = useTheme();
   const ws = useWS();
   const { settings: dwellSettings } = useDwellTime();
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
-  const T_pageBg = isLight ? '#EBE0CC' : isMix ? '#1A1611' : THEME.bg;
-  const T_panelBg = isLight ? '#F0E2C4' : isMix ? '#241F18' : THEME.panel;
-  const T_panelBorder = isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
-  const T_panelBorderSoft = isLight ? '#A89478' : isMix ? 'rgba(180, 147, 98, 0.28)' : THEME.border;
-  const T_textMain = isLight ? '#4A3A2A' : isMix ? '#F0E2C4' : THEME.text;
-  const T_textSub = isLight ? '#76624A' : isMix ? '#C4B697' : THEME.sub;
-  const T_textDim = isLight ? '#9A8568' : isMix ? '#8E7E62' : THEME.dim;
-  const T_textInverse = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : '#FFFFFF';
-  const T_cellEmpty = isLight ? '#F5EDDB' : isMix ? '#241E16' : THEME.bg;
-  const T_cellBorder = isLight ? '#A89478' : isMix ? 'rgba(180, 147, 98, 0.32)' : THEME.border2;
+  const T_pageBg = isLight ? '#EBE0CC' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : THEME.bg;
+  const T_panelBg = isLight ? '#FAF5E8' : isWarm ? '#F8F1DF' : isMix ? '#241F18' : THEME.panel;
+  const T_panelBorder = isLight ? '#3F6864' : isWarm ? '#CBBCA9' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
+  const T_panelBorderSoft = isLight ? '#D6CAB7' : isWarm ? '#DED2C2' : isMix ? 'rgba(180, 147, 98, 0.28)' : THEME.border;
+  const T_textMain = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : THEME.text;
+  const T_textSub = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : THEME.sub;
+  const T_textDim = isLight ? '#9A8568' : isWarm ? '#8A7C6B' : isMix ? '#8E7E62' : THEME.dim;
+  const T_textInverse = isLight ? '#FBE9DE' : isWarm ? '#FBF5E5' : isMix ? '#FFFCF1' : '#FFFFFF';
+  const T_cellEmpty = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241E16' : THEME.bg;
+  const T_cellBorder = isLight ? '#D6CAB7' : isWarm ? '#DED2C2' : isMix ? 'rgba(180, 147, 98, 0.32)' : THEME.border2;
   const T_subSurface = isLight
     ? 'rgba(168, 148, 120, 0.18)'
     : isMix
@@ -242,12 +242,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const T_rotateFill = isLight ? '#8C5A1E' : isMix ? '#6E4520' : THEME.amber;
   const T_expandFill = isLight ? '#3D7853' : isMix ? '#324F3D' : THEME.success;
   // Generate plan / refine accents
-  const T_generatePlanBg = isLight ? '#1F6B7E' : isMix ? '#3A6770' : `${THEME.teal}15`;
-  const T_generatePlanBorder = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.teal;
-  const T_generatePlanText = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : THEME.teal;
-  const T_refineMapBg = isLight ? '#5B4B98' : isMix ? '#5A4878' : 'rgba(139,92,246,0.08)';
-  const T_refineMapBorder = isLight ? '#5B4B98' : isMix ? '#8B7AB8' : 'rgba(139,92,246,0.4)';
-  const T_refineMapText = isLight ? '#FBE9DE' : isMix ? '#F0E2C4' : THEME.violet;
+  const T_generatePlanBg = isLight ? '#497775' : isWarm ? '#3F6968' : isMix ? '#3A6770' : `${THEME.teal}15`;
+  const T_generatePlanBorder = isLight ? '#497775' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : THEME.teal;
+  const T_generatePlanText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : THEME.teal;
+  const T_refineMapBg = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#5A4878' : 'rgba(139,92,246,0.08)';
+  const T_refineMapBorder = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#8B7AB8' : 'rgba(139,92,246,0.4)';
+  const T_refineMapText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : THEME.violet;
   // Right plot canvas bg (slightly cooler than panel)
   const T_canvasBg = isLight ? '#E5DAC2' : isMix ? '#15110C' : '#08131F';
 
@@ -661,7 +661,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
     const navRestoreBorder = isLight ? '#1F6B7E' : isMix ? 'rgba(180, 147, 98, 0.5)' : 'rgba(45,212,191,0.4)';
     const navRestoreColor = isLight ? '#1F6B7E' : isMix ? '#5E9CA8' : THEME.teal;
     const navPanelBg = isLight ? 'rgba(240, 226, 196, 0.95)' : isMix ? 'rgba(36, 31, 24, 0.94)' : 'rgba(13,27,46,0.92)';
-    const navPanelBorder = isLight ? '#876730' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
+    const navPanelBorder = isLight ? '#3F6864' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
     const navBtnBg = isLight ? 'rgba(168, 148, 120, 0.18)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(255,255,255,0.05)';
     const navBtnBorder = isLight ? 'rgba(168, 148, 120, 0.50)' : isMix ? 'rgba(180, 147, 98, 0.32)' : THEME.border2;
     const navBackText = isLight ? '#76624A' : isMix ? '#C4B697' : THEME.sub;
@@ -1632,7 +1632,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  ROOT
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   return (
-    <div className={`advanced-map-screen${isLight ? ' theme-light' : ''}${isMix ? ' theme-mix' : ''}`} style={{
+    <div className={`advanced-map-screen${isLight ? ' theme-light' : ''}${isMix ? ' theme-mix' : ''}${isWarm ? ' theme-warm' : ''}`} style={{
       width: '100vw', height: '100vh',
       display: 'flex', flexDirection: 'row',
       overflow: 'hidden',
