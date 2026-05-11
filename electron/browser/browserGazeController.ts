@@ -42,8 +42,15 @@ export function buildBrowserCursorInjectionScript(): string {
         stabilityRadiusPx: 50,
         postClickCooldownMs: 900,
         targetRegionSlackPx: 24,
-        youtubeCardHitZonePx: 120,
-        youtubeSkipSnapPx: 130,
+        // Asymmetric snap/unsnap (Tobii US10,890,967): snap-in narrow,
+        // unsnap wide. Once a target is locked the dwell tolerates a
+        // larger gaze drift before reset, preventing boundary flicker
+        // and giving ALS users a wider hold zone.
+        youtubeCardHitZonePx: 120,           // snap-in for cards
+        youtubeCardUnsnapPx: 180,            // unsnap (hold) for cards
+        youtubeSkipSnapPx: 130,              // snap-in for skip ad
+        youtubeSkipUnsnapPx: 200,            // unsnap (hold) for skip ad
+        // Legacy alias kept for back-compat with main.ts setGazeConfig
         youtubeCardStabilityRadiusPx: 110
       }, window.gcConfig || {});
 
@@ -282,8 +289,34 @@ export function buildBrowserCursorInjectionScript(): string {
         return null;
       };
 
+      // Snap-in vs. unsnap (hold) radii. Audit #6 / Tobii US10,890,967:
+      // a locked target uses a wider hold radius than the initial snap
+      // distance so small gaze drift doesn't break the lock — but a
+      // FRESH gaze must still be close to qualify.
+      const cardSnapInRadius = () => Number(window.gcConfig?.youtubeCardHitZonePx || 120);
+      const cardUnsnapRadius = () => Math.max(
+        cardSnapInRadius(),
+        Number(window.gcConfig?.youtubeCardUnsnapPx || 180)
+      );
+      const skipSnapInRadius = () => Number(window.gcConfig?.youtubeSkipSnapPx || 130);
+      const skipUnsnapRadius = () => Math.max(
+        skipSnapInRadius(),
+        Number(window.gcConfig?.youtubeSkipUnsnapPx || 200)
+      );
+
+      const isLockedYoutubeCard = (anchor) => {
+        if (!anchor || !state.targetKey) return false;
+        const rect = safeRect(anchor);
+        if (!rect) return false;
+        const candidateKey = stableKeyFor(anchor, 'youtube_nearest_card', anchor.href || '', labelOf(anchor).slice(0, 80), rect);
+        const altKey = stableKeyFor(anchor, 'youtube_card', anchor.href || '', labelOf(anchor).slice(0, 80), rect);
+        const altKey2 = stableKeyFor(anchor, 'youtube_anchor', anchor.href || '', labelOf(anchor).slice(0, 80), rect);
+        return candidateKey === state.targetKey || altKey === state.targetKey || altKey2 === state.targetKey;
+      };
+
       const nearestYoutubeCard = (x, y) => {
-        const maxDistance = Number(window.gcConfig?.youtubeCardHitZonePx || 120);
+        const snapIn = cardSnapInRadius();
+        const unsnap = cardUnsnapRadius();
         let best = null;
         let bestDistance = Infinity;
         const cards = Array.from(document.querySelectorAll(videoCardSelector)).slice(0, 80);
@@ -293,7 +326,10 @@ export function buildBrowserCursorInjectionScript(): string {
           if (!anchor || !isVisible(anchor)) continue;
           const rect = safeRect(card);
           const distance = distanceToRect(x, y, rect);
-          if (distance <= maxDistance && distance < bestDistance) {
+          // If this card is the currently locked dwell target, allow a
+          // wider hold zone (unsnap > snap-in). Otherwise use snap-in.
+          const limit = isLockedYoutubeCard(anchor) ? unsnap : snapIn;
+          if (distance <= limit && distance < bestDistance) {
             bestDistance = distance;
             best = anchor;
           }
@@ -304,20 +340,29 @@ export function buildBrowserCursorInjectionScript(): string {
       const isYoutubeVideoSurface = (el) =>
         !!el?.closest?.('#movie_player, .html5-video-player, video.video-stream, .ytp-player-content');
 
+      const isSkipButtonLocked = (skipButton) => {
+        if (!skipButton || !state.targetKey) return false;
+        const rect = safeRect(skipButton);
+        if (!rect) return false;
+        const key = stableKeyFor(skipButton, 'youtube_skip_ad', skipButton.href || '', labelOf(skipButton).slice(0, 80), rect);
+        return key === state.targetKey;
+      };
+
       const resolveClickRequest = (x, y) => {
         const el = document.elementFromPoint(x, y);
 
-        // Skip-ad button gets priority. If the gaze is anywhere within
-        // skipSnapPx of the visible skip button, snap to it. This both
-        // makes the skip button easier to dwell on AND prevents the
-        // alternative — clicking the video underneath, which YouTube
-        // interprets as play/pause.
+        // Skip-ad button gets priority. Asymmetric hysteresis: snap in
+        // at skipSnapInRadius, hold at the wider skipUnsnapRadius once
+        // the dwell has locked. Both prevents flicker at the boundary
+        // and prevents a click from landing on the video underneath.
         const skipButton = findYoutubeSkipButton();
         if (skipButton) {
-          const skipSnapPx = Number(window.gcConfig?.youtubeSkipSnapPx || 130);
+          const snapIn = skipSnapInRadius();
+          const unsnap = skipUnsnapRadius();
+          const limit = isSkipButtonLocked(skipButton) ? unsnap : snapIn;
           const skipRect = safeRect(skipButton);
           const directSkipHit = !!(el && (el === skipButton || skipButton.contains?.(el) || el.closest?.(skipButtonSelector) === skipButton));
-          if (directSkipHit || distanceToRect(x, y, skipRect) <= skipSnapPx) {
+          if (directSkipHit || distanceToRect(x, y, skipRect) <= limit) {
             return clickRequestFor(skipButton, x, y, 'youtube_skip_ad', true);
           }
           // Don't fall through to a video-surface click when an ad with
@@ -409,7 +454,9 @@ export function buildBrowserCursorInjectionScript(): string {
         const cfg = window.gcConfig || {};
         const baseStability = Number(cfg.stabilityRadiusPx || 50);
         const cardStability = Number(cfg.youtubeCardStabilityRadiusPx || 110);
+        const cardUnsnapPx = Number(cfg.youtubeCardUnsnapPx || 180);
         const skipSnapPx = Number(cfg.youtubeSkipSnapPx || 130);
+        const skipUnsnapPx = Number(cfg.youtubeSkipUnsnapPx || 200);
         const dwellMs = Number(cfg.dwellMs || 1200);
         const onsetMs = Number(cfg.onsetMs || 300);
         const postClickCooldownMs = Number(cfg.postClickCooldownMs || 900);
@@ -423,19 +470,18 @@ export function buildBrowserCursorInjectionScript(): string {
         const clickReq = resolveClickRequest(x, y);
         const dist = Math.hypot(x - state.x, y - state.y);
 
-        // Target-aware stability: when the same click target is still
-        // resolved at the new gaze position AND that gaze is inside the
-        // target region (rect + slack OR snap zone), allow the dwell to
-        // continue even if the gaze drifted outside the strict 50px
-        // anchor circle. This is the key fix for "hard to dwell on
-        // YouTube videos" — large cards and the skip button get a
-        // dwell tolerance that matches their visible size.
+        // Asymmetric hysteresis (audit #6 / Tobii US10,890,967): once a
+        // target is locked the dwell tolerates drift to the unsnap
+        // radius; before lock we only get the narrower stability
+        // radius. This prevents both unintended dwell-onset (strict
+        // entry) and boundary flicker (loose exit).
         let stabilityRadius = baseStability;
+        const hasLock = !!state.targetKey && !!clickReq && clickReq.key === state.targetKey;
         if (clickReq) {
           if (clickReq.kind === 'youtube_skip_ad') {
-            stabilityRadius = Math.max(baseStability, skipSnapPx);
+            stabilityRadius = Math.max(baseStability, hasLock ? skipUnsnapPx : skipSnapPx);
           } else if (clickReq.kind === 'youtube_anchor' || clickReq.kind === 'youtube_card' || clickReq.kind === 'youtube_nearest_card') {
-            stabilityRadius = Math.max(baseStability, cardStability);
+            stabilityRadius = Math.max(baseStability, hasLock ? cardUnsnapPx : cardStability);
           }
         }
 

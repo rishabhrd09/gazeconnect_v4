@@ -44,7 +44,9 @@ type BrowserGazeConfig = {
     postClickCooldownMs?: number;
     targetRegionSlackPx?: number;
     youtubeCardHitZonePx?: number;
+    youtubeCardUnsnapPx?: number;
     youtubeSkipSnapPx?: number;
+    youtubeSkipUnsnapPx?: number;
     youtubeCardStabilityRadiusPx?: number;
     edgeScrollEnabled?: boolean;
     edgeHoldMs?: number;

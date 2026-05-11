@@ -74,7 +74,9 @@ type BrowserGazeConfig = {
   postClickCooldownMs: number;
   targetRegionSlackPx: number;
   youtubeCardHitZonePx: number;
+  youtubeCardUnsnapPx: number;
   youtubeSkipSnapPx: number;
+  youtubeSkipUnsnapPx: number;
   youtubeCardStabilityRadiusPx: number;
   edgeScrollEnabled: boolean;
   edgeHoldMs: number;
@@ -92,8 +94,13 @@ let browserGazeConfig: BrowserGazeConfig = {
   stabilityRadiusPx: 50,
   postClickCooldownMs: 900,
   targetRegionSlackPx: 24,
+  // Asymmetric hysteresis (Tobii US10,890,967, audit #6): snap-in narrow,
+  // unsnap wide. Once a YouTube target is locked the dwell tolerates a
+  // larger gaze drift before reset, preventing boundary flicker.
   youtubeCardHitZonePx: 120,
+  youtubeCardUnsnapPx: 180,
   youtubeSkipSnapPx: 130,
+  youtubeSkipUnsnapPx: 200,
   youtubeCardStabilityRadiusPx: 110,
   edgeScrollEnabled: false,
   edgeHoldMs: 650,
@@ -1219,7 +1226,9 @@ function setupIpcHandlers(): void {
           postClickCooldownMs: browserGazeConfig.postClickCooldownMs,
           targetRegionSlackPx: browserGazeConfig.targetRegionSlackPx,
           youtubeCardHitZonePx: browserGazeConfig.youtubeCardHitZonePx,
+          youtubeCardUnsnapPx: browserGazeConfig.youtubeCardUnsnapPx,
           youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
+          youtubeSkipUnsnapPx: browserGazeConfig.youtubeSkipUnsnapPx,
           youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
         });
         view.webContents.executeJavaScript(
@@ -1627,7 +1636,9 @@ function setupIpcHandlers(): void {
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),
       targetRegionSlackPx: clampNumber(config?.targetRegionSlackPx, browserGazeConfig.targetRegionSlackPx, 8, 60),
       youtubeCardHitZonePx: clampNumber(config?.youtubeCardHitZonePx, browserGazeConfig.youtubeCardHitZonePx, 60, 200),
+      youtubeCardUnsnapPx: clampNumber(config?.youtubeCardUnsnapPx, browserGazeConfig.youtubeCardUnsnapPx, 80, 280),
       youtubeSkipSnapPx: clampNumber(config?.youtubeSkipSnapPx, browserGazeConfig.youtubeSkipSnapPx, 60, 200),
+      youtubeSkipUnsnapPx: clampNumber(config?.youtubeSkipUnsnapPx, browserGazeConfig.youtubeSkipUnsnapPx, 80, 280),
       youtubeCardStabilityRadiusPx: clampNumber(config?.youtubeCardStabilityRadiusPx, browserGazeConfig.youtubeCardStabilityRadiusPx, 50, 180),
       edgeScrollEnabled: typeof config?.edgeScrollEnabled === 'boolean' ? config.edgeScrollEnabled : browserGazeConfig.edgeScrollEnabled,
       edgeHoldMs: clampNumber(config?.edgeHoldMs, browserGazeConfig.edgeHoldMs, 300, 1600),
@@ -1647,7 +1658,9 @@ function setupIpcHandlers(): void {
         postClickCooldownMs: browserGazeConfig.postClickCooldownMs,
         targetRegionSlackPx: browserGazeConfig.targetRegionSlackPx,
         youtubeCardHitZonePx: browserGazeConfig.youtubeCardHitZonePx,
+        youtubeCardUnsnapPx: browserGazeConfig.youtubeCardUnsnapPx,
         youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
+        youtubeSkipUnsnapPx: browserGazeConfig.youtubeSkipUnsnapPx,
         youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
       });
       try {
