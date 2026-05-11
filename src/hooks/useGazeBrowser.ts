@@ -24,6 +24,7 @@ type YoutubeCommandResult = {
     status?: 'done' | 'waiting_for_skip' | 'no_ad' | 'no_next' | 'buffering' | 'stalled' | 'failed' | string;
     detail?: string;
     youtubeState?: string;
+    blockDwellMs?: number;
 };
 type BrowserDiagnostics = {
     url: string;
@@ -41,6 +42,12 @@ type BrowserGazeConfig = {
     onsetMs?: number;
     stabilityRadiusPx?: number;
     postClickCooldownMs?: number;
+    targetRegionSlackPx?: number;
+    youtubeCardHitZonePx?: number;
+    youtubeCardUnsnapPx?: number;
+    youtubeSkipSnapPx?: number;
+    youtubeSkipUnsnapPx?: number;
+    youtubeCardStabilityRadiusPx?: number;
     edgeScrollEnabled?: boolean;
     edgeHoldMs?: number;
     edgeZonePct?: number;
