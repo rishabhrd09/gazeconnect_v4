@@ -33,25 +33,59 @@ export function buildBrowserCursorInjectionScript(): string {
         lastClickKey: '',
         blockedUntil: 0,
         targetKey: '',
-        targetRect: null
+        targetRect: null,
+        // R8: Bayesian target posterior over YouTube cards. Keyed by a
+        // stable href+grid-cell hash so small layout shifts don't lose
+        // the belief.
+        cardPosteriors: {},
+        // R1: per-click telemetry ring buffer (browser-side).
+        telemetry: [],
+        // v17.6 Option A: visual continuity for the in-page dwell ring.
+        // When stability is lost mid-dwell, dwellingExpiryAt is set to
+        // (now + grace) so the .dwelling CSS class is NOT removed
+        // immediately — the patient sees the ring stay lit through
+        // brief gaze excursions instead of flickering off and back.
+        dwellingExpiryAt: 0
       };
 
       window.gcConfig = Object.assign({
-        dwellMs: 1200,
-        onsetMs: 300,
-        stabilityRadiusPx: 50,
+        dwellMs: 1100,                       // v17: 1200 → 1100, slightly faster select
+        onsetMs: 280,                        // v17: 300 → 280
+        stabilityRadiusPx: 60,               // v17: 50 → 60 — base tolerates more ALS noise
         postClickCooldownMs: 900,
-        targetRegionSlackPx: 24,
+        targetRegionSlackPx: 32,             // v17: 24 → 32 — wider rect+slack hold zone
         // Asymmetric snap/unsnap (Tobii US10,890,967): snap-in narrow,
         // unsnap wide. Once a target is locked the dwell tolerates a
         // larger gaze drift before reset, preventing boundary flicker
-        // and giving ALS users a wider hold zone.
-        youtubeCardHitZonePx: 120,           // snap-in for cards
-        youtubeCardUnsnapPx: 180,            // unsnap (hold) for cards
-        youtubeSkipSnapPx: 130,              // snap-in for skip ad
-        youtubeSkipUnsnapPx: 200,            // unsnap (hold) for skip ad
+        // and giving ALS users a wider hold zone. v17 widens the
+        // unsnap radii further — patient reported it was "very very
+        // difficult" to stop on a video card to select it.
+        youtubeCardHitZonePx: 130,           // snap-in for cards (was 120)
+        youtubeCardUnsnapPx: 230,            // unsnap (hold) for cards (was 180)
+        youtubeSkipSnapPx: 140,              // snap-in for skip ad (was 130)
+        youtubeSkipUnsnapPx: 250,            // unsnap (hold) for skip ad (was 200)
         // Legacy alias kept for back-compat with main.ts setGazeConfig
-        youtubeCardStabilityRadiusPx: 110
+        youtubeCardStabilityRadiusPx: 130,   // v17: 110 → 130
+        // R8: Bayesian posterior over YouTube cards.
+        //   bayesianCardsEnabled: master switch. Default ON for YouTube.
+        //   bayesianSigmaPx: σ of the Gaussian likelihood (gaze → card
+        //     center distance). Tuned to a default rough ET5 noise
+        //     floor; R1 telemetry will let us refine this per session.
+        //   bayesianAlpha: per-frame weight of the new likelihood
+        //     against the existing posterior. Higher = more responsive,
+        //     lower = smoother. 0.30 ≈ 7-frame settling at 30 Hz.
+        //   bayesianCommitThreshold: minimum posterior probability for
+        //     a card to win the resolveClickRequest race.
+        //   bayesianExpandedZoneMult: expand the candidate-pool zone
+        //     beyond the regular hit zone so cards just outside snap
+        //     range still get evaluated (and posterior smoothly hands
+        //     off if you fixate longer).
+        bayesianCardsEnabled: true,
+        bayesianSigmaPx: 46,                 // v17.5: 50 → 46, slightly tighter
+        bayesianAlpha: 0.32,                 // v17.5: 0.40 → 0.32, restore smoother transitions
+        bayesianCommitThreshold: 0.45,       // keep at 0.45 — easier commits help dwell
+        bayesianOutOfZoneDecay: 0.35,        // keep aggressive — clears stale beliefs
+        bayesianExpandedZoneMult: 1.55       // 1.6 → 1.55, slight trim
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -337,6 +371,124 @@ export function buildBrowserCursorInjectionScript(): string {
         return best ? clickRequestFor(best, x, y, 'youtube_nearest_card', true) : null;
       };
 
+      // === R8: BAYESIAN TARGET POSTERIOR over YouTube cards ============
+      // Each frame:
+      //   1. Collect all visible cards within an expanded zone (1.5×
+      //      the regular hit radius) — even cards slightly outside the
+      //      snap zone are considered so that as gaze approaches a
+      //      card, evidence accumulates before it qualifies as "nearest".
+      //   2. Compute a Gaussian likelihood for each candidate from its
+      //      distance to gaze. Cards with gaze inside their rect get
+      //      d=0 → likelihood=1; far cards get exponentially small.
+      //   3. Normalise across candidates so likelihoods sum to 1.
+      //   4. Temporally smooth: P_new = α·L + (1-α)·P_old (per-card),
+      //      then renormalise across all active posteriors.
+      //   5. Decay belief for cards no longer in the candidate set
+      //      (so a card you stopped looking at fades to zero).
+      //   6. The winning card is the argmax posterior — but only commit
+      //      as the resolved target if its posterior ≥ commitThreshold.
+      // This replaces nearest-distance card resolution with a
+      // probabilistic one that's robust to gaze noise flipping between
+      // adjacent cards every frame. Reference: BayesGaze (Xu et al.
+      // Graphics Interface 2021); audit report R8.
+      const cardPosteriorKey = (anchor, rect) => {
+        const href = (anchor.href || anchor.getAttribute?.('href') || '').toString();
+        // Round to a 24-px grid so layout micro-shifts don't break the
+        // posterior continuity.
+        const gx = rect ? Math.round(rect.left / 24) * 24 : 0;
+        const gy = rect ? Math.round(rect.top / 24) * 24 : 0;
+        return href + '|' + gx + '|' + gy;
+      };
+
+      const bayesianYoutubeCard = (x, y) => {
+        if (!window.gcConfig?.bayesianCardsEnabled) return null;
+        const snapIn = cardSnapInRadius();
+        const expandedZone = snapIn * Number(window.gcConfig?.bayesianExpandedZoneMult || 1.5);
+        const sigma = Number(window.gcConfig?.bayesianSigmaPx || 42);
+        const sigma2 = sigma * sigma;
+        const alpha = Number(window.gcConfig?.bayesianAlpha || 0.30);
+        const commitThreshold = Number(window.gcConfig?.bayesianCommitThreshold || 0.55);
+
+        const cards = Array.from(document.querySelectorAll(videoCardSelector)).slice(0, 80);
+        const candidates = [];
+        for (const card of cards) {
+          if (!isVisible(card)) continue;
+          const anchor = card.querySelector(videoAnchorSelector);
+          if (!anchor || !isVisible(anchor)) continue;
+          const rect = safeRect(card);
+          if (!rect) continue;
+          const dist = distanceToRect(x, y, rect);
+          if (dist > expandedZone) continue;
+          const key = cardPosteriorKey(anchor, rect);
+          candidates.push({ anchor, rect, dist, key });
+        }
+
+        // v17.4: AGGRESSIVE decay for cards no longer in the candidate
+        // set. Previously we faded slowly via (1-alpha), which meant a
+        // previously-fixated card kept a stale ~0.85 posterior for many
+        // frames AFTER gaze had moved on — preventing the NEW card
+        // from ever crossing the commit threshold. Now we multiply by
+        // bayesianOutOfZoneDecay (default 0.35 = 65% loss per frame),
+        // so a stale belief drops below the 0.45 commit threshold
+        // within 1–2 frames of looking away.
+        const outOfZoneDecay = Number(window.gcConfig?.bayesianOutOfZoneDecay || 0.35);
+        const candidateKeySet = new Set(candidates.map((c) => c.key));
+        const posteriors = state.cardPosteriors;
+        for (const k in posteriors) {
+          if (!candidateKeySet.has(k)) {
+            posteriors[k] *= outOfZoneDecay;
+            if (posteriors[k] < 0.02) delete posteriors[k];
+          }
+        }
+
+        if (candidates.length === 0) return null;
+
+        // Likelihoods.
+        let likelihoodSum = 0;
+        const likelihoods = candidates.map((c) => {
+          const l = Math.exp(-(c.dist * c.dist) / (2 * sigma2));
+          likelihoodSum += l;
+          return l;
+        });
+        if (likelihoodSum > 0) {
+          for (let i = 0; i < likelihoods.length; i++) likelihoods[i] /= likelihoodSum;
+        }
+
+        // Posterior update.
+        for (let i = 0; i < candidates.length; i++) {
+          const c = candidates[i];
+          const prev = posteriors[c.key] || 0;
+          posteriors[c.key] = alpha * likelihoods[i] + (1 - alpha) * prev;
+        }
+
+        // Renormalise (sum across all live posteriors = 1).
+        let totalP = 0;
+        for (const k in posteriors) totalP += posteriors[k];
+        if (totalP > 0) {
+          for (const k in posteriors) posteriors[k] /= totalP;
+        }
+
+        // Pick max posterior among current candidates.
+        let bestCandidate = null;
+        let bestP = 0;
+        for (const c of candidates) {
+          const p = posteriors[c.key] || 0;
+          if (p > bestP) {
+            bestP = p;
+            bestCandidate = c;
+          }
+        }
+
+        if (!bestCandidate) return null;
+        // Always allow a locked card to keep winning even below the
+        // commit threshold — once committed, we stay until the dwell
+        // logic above breaks lock (gaze leaves the unsnap radius).
+        const lockedWin = isLockedYoutubeCard(bestCandidate.anchor);
+        if (!lockedWin && bestP < commitThreshold) return null;
+
+        return clickRequestFor(bestCandidate.anchor, x, y, 'youtube_nearest_card', true);
+      };
+
       const isYoutubeVideoSurface = (el) =>
         !!el?.closest?.('#movie_player, .html5-video-player, video.video-stream, .ytp-player-content');
 
@@ -374,6 +526,12 @@ export function buildBrowserCursorInjectionScript(): string {
         const ytAtPoint = youtubeTargetFromElement(el, x, y);
         if (ytAtPoint) return ytAtPoint;
 
+        // R8: Bayesian posterior wins if it has converged on a card.
+        // Falls through to nearest-distance otherwise so behaviour
+        // degrades gracefully if the posterior hasn't built up yet.
+        const ytBayesian = bayesianYoutubeCard(x, y);
+        if (ytBayesian) return ytBayesian;
+
         const ytNearby = nearestYoutubeCard(x, y);
         if (ytNearby) return ytNearby;
 
@@ -405,6 +563,7 @@ export function buildBrowserCursorInjectionScript(): string {
         state.blockedUntil = 0;
         state.targetKey = '';
         state.targetRect = null;
+        state.dwellingExpiryAt = 0;
       };
 
       // Reset dwell WITHOUT clearing blockedUntil — used after a click
@@ -415,6 +574,7 @@ export function buildBrowserCursorInjectionScript(): string {
         state.lastClickKey = '';
         state.targetKey = '';
         state.targetRect = null;
+        state.dwellingExpiryAt = 0;
         cursor.classList.remove('dwelling');
         cursor.classList.remove('clicking');
       };
@@ -464,11 +624,50 @@ export function buildBrowserCursorInjectionScript(): string {
 
         if (now < state.blockedUntil) {
           cursor.classList.remove('dwelling');
+          state.dwellingExpiryAt = 0;
           return null;
         }
 
-        const clickReq = resolveClickRequest(x, y);
+        // v17.6 Option A: hard-clear the preserved dwelling ring if the
+        // grace period has passed without gaze returning.
+        if (state.dwellingExpiryAt > 0 && now > state.dwellingExpiryAt) {
+          state.dwellingExpiryAt = 0;
+          cursor.classList.remove('dwelling');
+        }
+
+        let clickReq = resolveClickRequest(x, y);
         const dist = Math.hypot(x - state.x, y - state.y);
+
+        // === v17.4: STICKY DWELL TARGET (BrowserView equivalent) =======
+        // If resolveClickRequest returned null on this frame (Bayesian
+        // posterior didn't commit AND nearest-card found nothing) but we
+        // already have a tracked dwell target and gaze is still close to
+        // its rect, synthesize a "ghost" clickReq pointing at the same
+        // target so the dwell circle doesn't visibly restart. Same root
+        // cause as the main-app sticky target — gaze excursion on a
+        // YouTube card briefly leaves the snap zone, dwell resets, then
+        // gaze returns. Without this, the dwell loop is stuck at the
+        // restart point.
+        if (!clickReq && state.targetKey && state.targetRect) {
+          const sRect = state.targetRect;
+          const STICKY_TOLERANCE_BROWSER = 80; // px beyond rect
+          if (
+            x >= sRect.left - STICKY_TOLERANCE_BROWSER
+            && x <= sRect.right + STICKY_TOLERANCE_BROWSER
+            && y >= sRect.top - STICKY_TOLERANCE_BROWSER
+            && y <= sRect.bottom + STICKY_TOLERANCE_BROWSER
+          ) {
+            clickReq = {
+              x: Math.round((sRect.left + sRect.right) / 2),
+              y: Math.round((sRect.top + sRect.bottom) / 2),
+              kind: 'sticky_resume',
+              key: state.targetKey,
+              href: '',
+              label: '',
+              rect: sRect,
+            };
+          }
+        }
 
         // Asymmetric hysteresis (audit #6 / Tobii US10,890,967): once a
         // target is locked the dwell tolerates drift to the unsnap
@@ -498,16 +697,34 @@ export function buildBrowserCursorInjectionScript(): string {
         const stabilityHeld = dist < stabilityRadius || (sameTarget && insideTargetRegion);
 
         if (state.start <= 0 || !stabilityHeld) {
+          // === v17.6 OPTION A: VISUAL CONTINUITY IN BROWSERVIEW ========
+          // If we'd already passed onset and were showing the dwelling
+          // ring, KEEP the ring lit for a 600 ms grace period instead
+          // of removing the class immediately. Mirrors the main-app
+          // savedDwellRef visual continuity — patient sees a stable
+          // ring through brief gaze excursions on YouTube cards
+          // instead of an on/off/on flicker.
+          const wasDwelling = state.targetKey && state.start > 0 && (now - state.start) > onsetMs * 0.6;
+          if (wasDwelling) {
+            state.dwellingExpiryAt = now + 600;
+            // Don't remove the dwelling class — let it persist visually.
+          } else {
+            cursor.classList.remove('dwelling');
+          }
           state.x = x;
           state.y = y;
           state.start = now;
           state.clicked = false;
           state.targetKey = clickReq?.key || '';
           state.targetRect = clickReq?.rect || null;
-          cursor.classList.remove('dwelling');
           cursor.classList.remove('clicking');
           return null;
         }
+
+        // v17.6 Option A: dwell stability restored — cancel any pending
+        // visual-continuity expiry. From here the live dwell drives
+        // the ring class as normal.
+        state.dwellingExpiryAt = 0;
 
         if (sameTarget && clickReq?.rect) {
           // Refresh the rect — page content can shift while the user
@@ -519,6 +736,35 @@ export function buildBrowserCursorInjectionScript(): string {
 
         const elapsed = now - state.start;
         if (elapsed > onsetMs && !state.clicked) cursor.classList.add('dwelling');
+
+        // === v17.3 R2: TWO-PHASE VISUAL ANCHOR IN BROWSERVIEW ==========
+        // Mirror of the main-app two-phase anchor:
+        //   Phase A (elapsed > onsetMs): hard snap cursor to target
+        //     center for the rest of the dwell.
+        //   Phase B (40 ms < elapsed ≤ onsetMs): gradual pull toward
+        //     center so the cursor visibly homes in on a YouTube card
+        //     while the dwell is committing, instead of jittering on
+        //     the edge while the patient panics it'll exit the card.
+        // Only fires when sameTarget — if gaze flips to a neighbour,
+        // anchor releases immediately.
+        if (sameTarget && state.targetRect) {
+          const rect = state.targetRect;
+          const anchorX = (rect.left + rect.right) / 2;
+          const anchorY = (rect.top + rect.bottom) / 2;
+          if (elapsed > onsetMs) {
+            // Phase A — hard snap
+            cursor.style.left = anchorX + 'px';
+            cursor.style.top = anchorY + 'px';
+          } else if (elapsed > 40) {
+            // Phase B — proportional pull (ramps 0 → 1 over 40 → onsetMs)
+            const t = Math.min(1, (elapsed - 40) / Math.max(1, onsetMs - 40));
+            const pullStrength = 0.35 * t;
+            const cx = x + (anchorX - x) * pullStrength;
+            const cy = y + (anchorY - y) * pullStrength;
+            cursor.style.left = cx + 'px';
+            cursor.style.top = cy + 'px';
+          }
+        }
 
         if (elapsed > dwellMs && !state.clicked && clickReq) {
           // Per-target cooldown — if the same target was just clicked,
@@ -533,6 +779,42 @@ export function buildBrowserCursorInjectionScript(): string {
           clickReq.id = state.clickSeq;
           cursor.classList.remove('dwelling');
           cursor.classList.add('clicking');
+
+          // === R1: BROWSERVIEW TELEMETRY ============================
+          // Record gaze residual vs target center at click time. Pure
+          // measurement. Inspect via window.__gcTelemetry.snapshot()
+          // in the BrowserView's DevTools.
+          try {
+            const tRect = state.targetRect || (clickReq.rect || null);
+            if (tRect) {
+              const cx = (tRect.left + tRect.right) / 2;
+              const cy = (tRect.top + tRect.bottom) / 2;
+              const dx = x - cx;
+              const dy = y - cy;
+              state.telemetry.push({
+                seq: state.clickSeq,
+                ts: now,
+                kind: clickReq.kind || '',
+                label: (clickReq.label || '').slice(0, 80),
+                rect: {
+                  left: Math.round(tRect.left),
+                  top: Math.round(tRect.top),
+                  width: Math.round((tRect.right || 0) - (tRect.left || 0)),
+                  height: Math.round((tRect.bottom || 0) - (tRect.top || 0))
+                },
+                center: { x: Math.round(cx), y: Math.round(cy) },
+                gaze: { x: Math.round(x), y: Math.round(y) },
+                residual: {
+                  dx: Math.round(dx),
+                  dy: Math.round(dy),
+                  mag: Math.round(Math.sqrt(dx * dx + dy * dy))
+                },
+                dwellToClickMs: now - state.start
+              });
+              if (state.telemetry.length > 200) state.telemetry.shift();
+            }
+          } catch (_) { /* never block click on telemetry */ }
+
           setTimeout(() => {
             cursor.classList.remove('clicking');
             state.clicked = false;
@@ -544,6 +826,52 @@ export function buildBrowserCursorInjectionScript(): string {
         }
 
         return null;
+      };
+
+      // R1: expose BrowserView telemetry for live inspection.
+      // From the BrowserView DevTools console:
+      //   __gcTelemetry.snapshot()  → aggregates
+      //   __gcTelemetry.events()    → raw event ring
+      //   __gcTelemetry.clear()     → wipe buffer
+      window.__gcTelemetry = {
+        events: function () { return state.telemetry.slice(); },
+        clear: function () { state.telemetry.length = 0; state.clickSeq = 0; },
+        snapshot: function () {
+          var t = state.telemetry;
+          if (!t || t.length === 0) return null;
+          var mags = t.map(function (e) { return e.residual.mag; }).slice().sort(function (a, b) { return a - b; });
+          var median = mags[Math.floor(mags.length / 2)];
+          var devs = mags.map(function (v) { return Math.abs(v - median); }).slice().sort(function (a, b) { return a - b; });
+          var mad = devs[Math.floor(devs.length / 2)];
+          var sumDx = 0; var sumDy = 0; var sumDw = 0;
+          for (var i = 0; i < t.length; i++) {
+            sumDx += t[i].residual.dx;
+            sumDy += t[i].residual.dy;
+            sumDw += t[i].dwellToClickMs;
+          }
+          var meanDx = sumDx / t.length;
+          var meanDy = sumDy / t.length;
+          var perKind = {};
+          for (var j = 0; j < t.length; j++) {
+            var k = t[j].kind || 'unknown';
+            perKind[k] = (perKind[k] || 0) + 1;
+          }
+          return {
+            count: t.length,
+            medianResidualPx: median,
+            madPx: mad,
+            driftVector: { dx: Math.round(meanDx), dy: Math.round(meanDy), mag: Math.round(Math.sqrt(meanDx * meanDx + meanDy * meanDy)) },
+            meanDwellToClickMs: Math.round(sumDw / t.length),
+            perKindCount: perKind
+          };
+        },
+        // R8 posterior inspection — see what the Bayesian model
+        // currently believes about cards on screen.
+        posteriors: function () {
+          var snap = {};
+          for (var k in state.cardPosteriors) snap[k] = state.cardPosteriors[k];
+          return snap;
+        }
       };
 
       return 'injected';

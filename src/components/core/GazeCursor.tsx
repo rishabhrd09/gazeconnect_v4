@@ -23,6 +23,7 @@ import { computeEdgeExpansion, isPointInExpandedRect } from '../../utils/edgeHit
 import { computeScreenProfile } from '../../utils/screenProfile';
 import { useTheme } from '../../contexts/ThemeContext';
 import { collectKeyboardKeys, findBestKeyboardKey, type KeyRect } from '../../utils/hitZoneExpansion';
+import { recordDwellEvent } from '../../utils/gazeTelemetry';
 
 // === TUNING PARAMETERS ===
 const CURSOR_SIZES: Record<string, number> = { small: 50, medium: 70, large: 90 };
@@ -50,7 +51,10 @@ const FIXATION_TTL_MIN_PROGRESS = 0.05;  // Minimum progress to save (below this
 
 // === KEYBOARD HIT ZONE EXPANSION ===
 // v15: Increased from 15 to 35 — now primary selection mechanism (not fallback)
-const KEYBOARD_SNAP_MARGIN = 35;    // px beyond visual bounds for keyboard keys
+// v17.8: 35 → 55 px to fix loop on left/right edge keys (A, Z, P, ?) where
+// raw-gaze noise routinely exceeds 35 px outside the rect. Still safely
+// under the ~100 px inter-key spacing so adjacent keys win disambiguation.
+const KEYBOARD_SNAP_MARGIN = 55;    // px beyond visual bounds for keyboard keys
 
 // Velocity-adaptive smoothing — tuned for calm, stable movement
 // v14: All alphas reduced for smoother, less overshooting cursor
@@ -67,8 +71,14 @@ const ALPHA_SLOW = 0.35;         // moderate convergence during fixation
 const ALPHA_NORMAL = 0.55;       // medium transition response
 const ALPHA_FAST = 0.85;         // near-raw for saccades
 
-// Anti-jitter stabilization zone
-const STABLE_ZONE = 4;           // stronger anti-jitter freeze zone
+// Anti-jitter stabilization zone.
+// v17: Widened 4 → 8 px. Tobii ET5 noise floor on ALS gaze is routinely
+// 10–20 px even at the center of the track box; a 4 px freeze zone
+// almost never engages once the user is dwelling, so the cursor stays
+// "alive" and visibly trembles around the button center. 8 px is still
+// well inside a 60+ px card / key and lets the cursor settle visibly
+// once dwell starts.
+const STABLE_ZONE = 8;           // stronger anti-jitter freeze zone
 
 export const GazeCursor: React.FC = () => {
   const ws = useWS();
@@ -145,6 +155,10 @@ export const GazeCursor: React.FC = () => {
     progress: number;
     timestamp: number;
   } | null>(null);
+  // v17.6 Option A: visual continuity expiry. When savedDwellRef is set,
+  // the dwell circle + highlight stay visible (don't reset to 0) until
+  // either gaze returns (resume) OR this timestamp passes (hard clear).
+  const savedDwellExpiryRef = useRef<number>(0);
 
   // === v17: REPEAT DWELL TRACKING ===
   // Track last selected element to enable faster repeat key presses (OptiKey-style)
@@ -454,20 +468,52 @@ export const GazeCursor: React.FC = () => {
     const effectiveCooldown = s.cooldownAfterActivation + 1000; // base 1000ms + configurable
     const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
 
-    // v18: Use RAW gaze position (pre-EMA) for keyboard key detection.
-    // EMA smoothing introduces directional lag — when the eye scans left→right,
-    // the smoothed cursor trails behind, causing the wrong key to be selected.
-    // Using the raw position ensures the CORRECT key is identified for dwell.
-    // The cursor visual still shows the smoothed position for stability.
-    const rawPt = lastRawPointRef.current;
-    const cx = isLockedRef.current ? lockPosRef.current.x
-      : (isKeyboardScreenRef.current ? rawPt.x : posRef.current.x);
-    const cy = isLockedRef.current ? lockPosRef.current.y
-      : (isKeyboardScreenRef.current ? rawPt.y : posRef.current.y);
+    // === v17.9: UNIFIED HIT-TEST POSITION (cursor render == hit test) ====
+    // CRITICAL FIX for the persistent corner-button loop the patient
+    // reported even after v17.5–v17.8. Logs revealed Tobii ET5 frame
+    // gaps of 100–500 ms (occasionally multi-second), and the real bug
+    // was that the cursor RENDER position (posRef = post-snap, post-EMA,
+    // post-R2-anchor) and the HIT-TEST position diverged on keyboard
+    // screens: the v18 code used `rawPt` (post-3-tap MA, pre-snap)
+    // because of an old concern that EMA lag would cause wrong-key
+    // selection during fast scanning.
+    //
+    // The cost of that divergence was exactly the patient's symptom:
+    //   • User sees the cursor sitting on key K (rendered via posRef)
+    //   • Raw gaze drifts 30–60 px off K's rect (Tobii ET5 noise)
+    //   • Hit test runs on raw gaze → misses K → clickable = null
+    //   • Onset target reset → dwell loop forever
+    //
+    // Unifying on posRef:
+    //   • Cursor and hit test are now the SAME point. What you see is
+    //     what you select. No more "cursor on K but test off K".
+    //   • Pre-onset: posRef ≈ EMA-smoothed gaze with snap applied —
+    //     stable representation of where the user is looking.
+    //   • Post-onset: posRef ≈ R2 anchor at target center (Option B).
+    //   • Frame gaps from the tracker: posRef just stays where it was
+    //     until the next gaze sample arrives, so dwell continues
+    //     uninterrupted through brief tracking drops.
+    //
+    // The v18 concern (EMA lag during scanning) is mitigated by the
+    // classifier-driven alpha — during saccades alpha jumps to 0.90,
+    // so the EMA actually catches up within ~1 frame of a saccade.
+    // For ALS users, scanning is slow enough that this works fine.
+    const cx = isLockedRef.current ? lockPosRef.current.x : posRef.current.x;
+    const cy = isLockedRef.current ? lockPosRef.current.y : posRef.current.y;
 
     // Multi-point hit test: check center + 4 nearby points
     // v11: Larger offset for always-active elements (gaze toggle buttons are hard to reach)
-    const HIT_OFFSET = dwellTargetRef.current ? 35 : 20;
+    // v17.5: Widened the "actively-dwelling" radius from 35 → 70 px. This
+    // is the structural fix for the dwell-circle restart loop at corner
+    // buttons (Word / Quick Words / Show Nav / 123 / "what") — those
+    // sit where the backend GravityWell switches to EDGE_MODE and stops
+    // smoothing, so raw gaze can be 30–80 px off the button rect for
+    // several frames. A wider hit test catches those excursions without
+    // a separate sticky-tolerance layer that holds the WRONG target
+    // during real transitions (the regression in v17.4). Hit test still
+    // returns the FIRST element found, so adjacent buttons that the
+    // user is genuinely moving to still win the race.
+    const HIT_OFFSET = dwellTargetRef.current ? 70 : 20;
     const TOGGLE_HIT_OFFSET = 64; // Extra-large for gaze toggles — they must be easy to hit
     const useToggleHit = !dwellTargetRef.current; // Only expand when not already dwelling
     const hitPoints = [
@@ -524,7 +570,15 @@ export const GazeCursor: React.FC = () => {
         isToggle = false;
         isAlwaysActive = false;
       }
-    } else if (snapTargetsRef.current.length > 0) {
+    }
+    // v17.8: Run snap-targets-nearest-center as a fallback even on keyboard
+    // screen, so non-keyboard buttons like "Word", "Quick Words",
+    // "Show Nav", "123", and the prediction strip get the same generous
+    // nearest-center treatment as keys do. Previously these fell straight
+    // through to the multi-point hit test with HIT_OFFSET=20 (tight),
+    // causing onset to reset on every gaze excursion >20 px — exactly the
+    // corner-button loop the patient described.
+    if (!clickable && snapTargetsRef.current.length > 0) {
       // v16: Nearest-center for non-keyboard screens using snap targets.
       // Find the snap target whose center is closest to the cursor position.
       //
@@ -585,6 +639,63 @@ export const GazeCursor: React.FC = () => {
       }
     }
 
+    // === v17.8: UNIFIED STICKY TARGET (onset + dwell phases, edge-aware) ===
+    // Extended from v17.5 to also cover the ONSET phase, which is where
+    // the patient's "continuous loop on corner buttons" actually lives.
+    // Mechanism:
+    //   • In dwell phase (dwellTargetRef.current set): tolerance 35 px,
+    //     90 px if button is near a viewport edge (Tobii ET5 noise at
+    //     screen corners can exceed 50 px even with EDGE_MODE off).
+    //   • In onset phase (only onsetTargetRef.current set): tolerance
+    //     60 px, 100 px near edges. Wider because there's no R2 anchor
+    //     yet — the onset candidate needs more tolerance to survive
+    //     gaze noise until onset completes and Option B kicks in.
+    //   • When clickable is already set (hit test found something
+    //     valid), sticky doesn't fire — real transitions still win
+    //     instantly.
+    //   • Adjacent-button risk: keyboard inter-key spacing is ~100 px,
+    //     so a 90 px tolerance never reaches another key's center. A
+    //     neighbouring key always wins disambiguation via its own
+    //     hit test, not sticky.
+    if (!clickable) {
+      const stickyTarget = dwellTargetRef.current || onsetTargetRef.current;
+      if (stickyTarget && stickyTarget.isConnected) {
+        const sRect = stickyTarget.getBoundingClientRect();
+        if (sRect.width > 0 && sRect.height > 0) {
+          const inDwellPhase = !!dwellTargetRef.current;
+          // Edge detection — within 80 px of any viewport edge counts as
+          // an edge button, where Tobii ET5 noise is empirically worst.
+          const EDGE_THRESHOLD_PX = 80;
+          const nearEdge = (
+            sRect.left < EDGE_THRESHOLD_PX
+            || sRect.top < EDGE_THRESHOLD_PX
+            || sRect.right > window.innerWidth - EDGE_THRESHOLD_PX
+            || sRect.bottom > window.innerHeight - EDGE_THRESHOLD_PX
+          );
+          // v17.9: tolerances widened slightly to absorb Tobii ET5
+          // frame drops (logs show 100–500 ms gaps routinely, with
+          // occasional multi-second gaps). During a gap, posRef may
+          // be slightly off the rect when the next frame arrives.
+          let STICKY_TOLERANCE: number;
+          if (inDwellPhase) {
+            STICKY_TOLERANCE = nearEdge ? 110 : 50;
+          } else {
+            STICKY_TOLERANCE = nearEdge ? 130 : 80;
+          }
+          if (
+            cx >= sRect.left - STICKY_TOLERANCE
+            && cx <= sRect.right + STICKY_TOLERANCE
+            && cy >= sRect.top - STICKY_TOLERANCE
+            && cy <= sRect.bottom + STICKY_TOLERANCE
+          ) {
+            clickable = stickyTarget;
+            isToggle = stickyTarget.getAttribute('data-gaze-toggle') === 'true';
+            isAlwaysActive = isToggle || stickyTarget.getAttribute('data-gaze-always') === 'true';
+          }
+        }
+      }
+    }
+
     // v10: Toggle lockout — if target is toggle and within lockout or user hasn't looked away, ignore it
     const toggleCandidate = Boolean(clickable && isToggle);
     if (!toggleCandidate && !toggleLookedAwayRef.current) {
@@ -604,6 +715,19 @@ export const GazeCursor: React.FC = () => {
     const inNavCooldown = lastNavigationTimestamp > 0
       && Date.now() - lastNavigationTimestamp < POST_NAVIGATION_COOLDOWN_MS;
 
+    // === v17.6 OPTION A: VISUAL CONTINUITY EXPIRY ========================
+    // If we previously saved a dwell to savedDwellRef but gaze hasn't
+    // returned within FIXATION_TTL_MS, clear the preserved visuals now.
+    // Without this, the dwell circle could linger indefinitely at its
+    // saved progress level after the user has clearly moved on.
+    if (savedDwellRef.current && savedDwellExpiryRef.current > 0 && now > savedDwellExpiryRef.current) {
+      savedDwellRef.current = null;
+      savedDwellExpiryRef.current = 0;
+      setDwellProgress(0);
+      setTargetName('');
+      setHighlightRect(null);
+    }
+
     // Only dwell if:
     // - Element is clickable AND
     // - (Gaze is enabled OR element is always-active) AND
@@ -611,6 +735,7 @@ export const GazeCursor: React.FC = () => {
     if (!clickable || (!enabled && !isAlwaysActive) || (inClickCooldown && !isToggle) || (inNavCooldown && !isAlwaysActive)) {
       // === INCOMPLETE FIXATION TTL ===
       // Save progress when gaze leaves so it can be resumed if user looks back
+      let didCaptureSave = false;
       if (dwellTargetRef.current && dwellStartTimeRef.current > 0 && onsetCompletedRef.current) {
         const elapsed = now - dwellStartTimeRef.current;
         const targetContext = (getTargetAttr(dwellTargetRef.current, 'data-gaze-context') || '').trim();
@@ -623,6 +748,8 @@ export const GazeCursor: React.FC = () => {
             progress: currentProgress,
             timestamp: now,
           };
+          savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
+          didCaptureSave = true;
         }
       }
 
@@ -631,11 +758,27 @@ export const GazeCursor: React.FC = () => {
       onsetTargetRef.current = null;
       onsetStartTimeRef.current = 0;
       onsetCompletedRef.current = false;
-      setDwellProgress(0);
-      setTargetName('');
       setIsLocked(false);
       isLockedRef.current = false;
-      setHighlightRect(null);
+
+      // === v17.6 OPTION A: VISUAL CONTINUITY LAYER =======================
+      // If we just captured a save (didCaptureSave) OR a save is already
+      // active and hasn't expired yet, KEEP the dwell circle + highlight
+      // at their current values. The patient sees a stable progress ring
+      // through brief gaze excursions instead of the 25% → 0% → 25%
+      // restart loop they reported on corner buttons / at greater
+      // viewing distance. The visuals will either:
+      //   • resume seamlessly when gaze returns to the same element
+      //     (savedDwellRef resume path below), OR
+      //   • be cleared by the expiry check at top of next frame, OR
+      //   • be replaced when onset starts on a different element.
+      const hasActiveSave = didCaptureSave
+        || (savedDwellRef.current && now <= savedDwellExpiryRef.current);
+      if (!hasActiveSave) {
+        setDwellProgress(0);
+        setTargetName('');
+        setHighlightRect(null);
+      }
 
       frameRef.current = requestAnimationFrame(dwellFrame);
       return;
@@ -658,6 +801,10 @@ export const GazeCursor: React.FC = () => {
         onsetCompletedRef.current = true;
         const savedProgress = savedDwellRef.current.progress;
         savedDwellRef.current = null;
+        // v17.6 Option A: live dwell is taking over; clear the visual
+        // continuity expiry so the next save-and-resume cycle starts
+        // from a clean slate.
+        savedDwellExpiryRef.current = 0;
 
         dwellTargetRef.current = clickable;
         const effectiveDwell = _getEffectiveDwell(clickable,
@@ -669,6 +816,15 @@ export const GazeCursor: React.FC = () => {
         setTargetName(name);
       } else {
         // Fresh onset — clear any saved dwell for different elements
+        // v17.6 Option A: also clear the visual-continuity expiry —
+        // a different element is now the focus, so the saved visuals
+        // should be reset before the new dwell starts drawing.
+        if (savedDwellRef.current) {
+          savedDwellExpiryRef.current = 0;
+          // The line below already clears savedDwellRef in the next
+          // statement; calling setDwellProgress(0)/highlight null in
+          // the inner `if` block below covers the visual reset.
+        }
         savedDwellRef.current = null;
         // Reset dwell state during onset
         if (dwellTargetRef.current !== clickable) {
@@ -770,6 +926,34 @@ export const GazeCursor: React.FC = () => {
       }
       repeatLastIdRef.current = elId;
       repeatLastTimeRef.current = now;
+
+      // === R1: TELEMETRY ===========================================
+      // Record this click's residual (raw gaze vs target center),
+      // acquisition time and context. No behaviour change — pure
+      // measurement. Inspect with `window.__gazeTelemetry.snapshot()`.
+      try {
+        const target = dwellTargetRef.current;
+        const rect = target.getBoundingClientRect();
+        const center = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+        const gaze = lastRawPointRef.current;
+        const contextAttr = (getTargetAttr(target, 'data-gaze-context') || '').trim();
+        const targetLabel = target.id
+          || (target.textContent || '').trim().slice(0, 40)
+          || target.tagName.toLowerCase();
+        recordDwellEvent({
+          targetId: targetLabel,
+          context: contextAttr,
+          screen: ws.currentScreen || 'unknown',
+          rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          center,
+          gaze: { x: gaze.x, y: gaze.y },
+          onsetToClickMs: onsetStartTimeRef.current > 0 ? now - onsetStartTimeRef.current : 0,
+          dwellToClickMs: dwellStartTimeRef.current > 0 ? now - dwellStartTimeRef.current : 0,
+        });
+      } catch { /* never let telemetry block the click */ }
 
       dwellTargetRef.current.click();
       dwellTargetRef.current = null;
@@ -898,10 +1082,57 @@ export const GazeCursor: React.FC = () => {
     rawX = snap.x;
     rawY = snap.y;
 
-    // === LOCK CHECK ===
+    // === LOCK CHECK (v17.10: gated by actual target rect) =================
+    // Behavioural-analysis discovery: the dwell ring was filling to ~90 %
+    // on the "L" key and on prediction-strip targets, then aborting
+    // without firing the click. The single code path that aborts at
+    // high dwell progress is THIS one. The previous logic:
+    //
+    //   if (distFromLock > 80) → abort dwell
+    //
+    // ...uses RAW gaze distance from lock position. lockPos == target
+    // centre (because R2 anchor put posRef there at lock time). For ALS
+    // users with Tobii ET5 noise of 50–80 px at edges, routine fixation
+    // generates raw-gaze excursions ≥80 px from target centre. The
+    // lock breaks on noise even though the user is still genuinely
+    // fixating on the button.
+    //
+    // The fix: lock-break now requires BOTH conditions:
+    //   (a) raw gaze > LOCK_BREAK_DISTANCE from lockPos, AND
+    //   (b) raw gaze actually outside the dwell target's rect (with
+    //       generous tolerance to absorb noise that still indicates
+    //       the user is on the button)
+    //
+    // This means lock holds when the user is genuinely looking at the
+    // button (even with noisy raw samples) and breaks only when the
+    // user has clearly moved their gaze elsewhere. The 90 % abort
+    // bug — which the video analysis isolated to a single frame
+    // around timestamp v1 0:23.6 — disappears.
     if (isLockedRef.current) {
       const distFromLock = Math.hypot(rawX - lockPosRef.current.x, rawY - lockPosRef.current.y);
-      if (distFromLock > LOCK_BREAK_DISTANCE) {
+      let shouldBreakLock = distFromLock > LOCK_BREAK_DISTANCE;
+
+      if (shouldBreakLock && dwellTargetRef.current && dwellTargetRef.current.isConnected) {
+        const tRect = dwellTargetRef.current.getBoundingClientRect();
+        if (tRect.width > 0 && tRect.height > 0) {
+          // Generous tolerance — should catch all gaze noise that
+          // still corresponds to the user fixating on this button.
+          // Set to roughly half the LOCK_BREAK_DISTANCE so the OR-zone
+          // (rect + this) is meaningfully larger than the lockPos circle.
+          const LOCK_RECT_TOLERANCE = 45;
+          const insideTargetRect = (
+            rawX >= tRect.left - LOCK_RECT_TOLERANCE
+            && rawX <= tRect.right + LOCK_RECT_TOLERANCE
+            && rawY >= tRect.top - LOCK_RECT_TOLERANCE
+            && rawY <= tRect.bottom + LOCK_RECT_TOLERANCE
+          );
+          if (insideTargetRect) {
+            shouldBreakLock = false;
+          }
+        }
+      }
+
+      if (shouldBreakLock) {
         isLockedRef.current = false;
         setIsLocked(false);
         dwellTargetRef.current = null;
@@ -934,11 +1165,14 @@ export const GazeCursor: React.FC = () => {
       // Post-saccade settling: moderate convergence
       alpha = 0.65;
     } else if (state === 'fixation') {
-      // v16: Heavier cursor on ALL screens (was 0.55 for non-keyboard — too drifty).
-      // Keyboard gets heaviest (0.38) for precise key targeting.
-      // Other screens get moderate (0.45) — stable enough to dwell without drift.
-      const fixAlpha = isKeyboardScreenRef.current ? 0.38 : 0.45;
-      alpha = distance < NOISE_THRESHOLD ? 0.18 : fixAlpha;
+      // v17: Heavier cursor during fixation for both keyboard and other
+      // screens. Previously 0.45 for non-keyboard let raw gaze noise of
+      // 15–25 px (typical Tobii ET5 baseline for ALS users with mild
+      // ocular tremor) drift the cursor toward the card corners. 0.36
+      // lets the snap layer (semantic + backend magnet) catch and hold
+      // center without phase lag becoming noticeable at 1.2 s dwell.
+      const fixAlpha = isKeyboardScreenRef.current ? 0.38 : 0.36;
+      alpha = distance < NOISE_THRESHOLD ? 0.16 : fixAlpha;
     } else {
       // No state info from backend: use velocity-adaptive fallback
       if (distance < NOISE_THRESHOLD) {
@@ -1008,6 +1242,63 @@ export const GazeCursor: React.FC = () => {
     // Clamp final position — allow slight overshoot for edge button visibility
     posRef.current.x = Math.max(-30, Math.min(window.innerWidth + 30, posRef.current.x));
     posRef.current.y = Math.max(-30, Math.min(window.innerHeight + 30, posRef.current.y));
+
+    // === v17.3 R2: TWO-PHASE VISUAL ANCHOR =============================
+    // Decouples perceived center accuracy from selection accuracy on
+    // hardware whose true residual is ≥12–20 px at this viewing distance.
+    //
+    // Phase A — DWELL ANCHOR (hard snap):
+    //   Once onset confirms a dwell target, every frame snaps posRef to
+    //   the target's bounding-rect center. This stays in effect through
+    //   the rest of the dwell so the cursor visibly "sits" at center
+    //   even when the backend lock has clamped at a gaze-corner position.
+    //   v17.3: REMOVED the previous !backendLocked guard — when the
+    //   backend GravityWell locked at a gaze sample that happened to be
+    //   off-center (e.g. corner of a card), the guard caused the cursor
+    //   to freeze at that off-center spot. The anchor should override
+    //   the backend's visual position regardless.
+    //
+    // Phase B — ONSET PREVIEW ANCHOR (smooth pull):
+    //   During the 250 ms onset phase (before dwell commits), gently
+    //   interpolate posRef toward the candidate target's center. The
+    //   pull ramps from 0 → ~0.30 between 100 ms and 250 ms of stable
+    //   gaze on the candidate. This kills the "drift to corner before
+    //   lock-in" panic the patient reported — the cursor visibly
+    //   homes in on the key center *during* onset instead of jittering
+    //   on the edge.
+    //
+    // Selection logic remains unaffected throughout: rawX/rawY drive
+    // lock-break and the dwellFrame loop's candidate search.
+    if (dwellTargetRef.current) {
+      const target = dwellTargetRef.current;
+      const rect = target.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const anchorX = rect.left + rect.width / 2;
+        const anchorY = rect.top + rect.height / 2;
+        posRef.current.x = anchorX;
+        posRef.current.y = anchorY;
+        // Keep the highlight rect synced — covers layout shift mid-dwell.
+        setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+      }
+    } else if (onsetTargetRef.current && onsetStartTimeRef.current > 0) {
+      // Onset preview: gradually pull cursor toward candidate center.
+      // Ramp starts at 100 ms of stable onset, reaches full strength
+      // at the standard 250 ms onset completion point.
+      const onsetElapsed = now - onsetStartTimeRef.current;
+      if (onsetElapsed > 100) {
+        const target = onsetTargetRef.current;
+        const rect = target.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const anchorX = rect.left + rect.width / 2;
+          const anchorY = rect.top + rect.height / 2;
+          // Ramp from 0 → 1 over 100 → 250 ms onset progress.
+          const t = Math.min(1, (onsetElapsed - 100) / 150);
+          const pullStrength = 0.30 * t;
+          posRef.current.x += (anchorX - posRef.current.x) * pullStrength;
+          posRef.current.y += (anchorY - posRef.current.y) * pullStrength;
+        }
+      }
+    }
 
     setX(posRef.current.x);
     setY(posRef.current.y);

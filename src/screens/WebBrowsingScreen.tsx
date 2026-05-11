@@ -2089,9 +2089,19 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         onBrowserInteractionModeChange('control');
     }, [browser.resetBrowserSession, onBrowserInteractionModeChange, onNavHiddenToggle]);
 
+    // v17: Back button now navigates the BrowserView's history first.
+    // If the patient watched videos A → B → C, "Back" walks back to B,
+    // then A, then finally closes the YouTube panel when there's no
+    // earlier page left. Previously this button immediately closed the
+    // whole YouTube view, dropping the patient at YouTube's landing
+    // screen on every press — confusing during a session.
     const handleYouTubeBack = useCallback(() => {
-        stop();
-    }, [stop]);
+        if (browser.canGoBack) {
+            void browser.goBack();
+        } else {
+            stop();
+        }
+    }, [browser.canGoBack, browser.goBack, stop]);
 
     if (playing) return (
         <div style={{
@@ -3523,11 +3533,18 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         }
     }, [isEmbeddedBrowserActive, view]);
 
+    // Force-enable gaze whenever the embedded browser is active. Previously
+    // this only fired when nav was hidden, which left YouTube's toolbar
+    // buttons (play/pause/skip-ad) dead if the patient had left the gaze
+    // toggle OFF on a prior screen. Now any embedded-browser view (YouTube,
+    // search, knowledge article) guarantees the cursor can drive its
+    // toolbar buttons via dwell. Mouse-only mode still wins — enableGaze()
+    // itself no-ops when isMouseMode is true (see GazeControlToggle.tsx).
     useEffect(() => {
-        if (isEmbeddedBrowserActive && isNavHidden && !ige) {
+        if (isEmbeddedBrowserActive && !ige) {
             enableGaze();
         }
-    }, [enableGaze, ige, isEmbeddedBrowserActive, isNavHidden]);
+    }, [enableGaze, ige, isEmbeddedBrowserActive]);
 
     // ── POLL WINDOW BOUNDS for coordinate mapping (same as GazeCursor.tsx) ──
     useEffect(() => {

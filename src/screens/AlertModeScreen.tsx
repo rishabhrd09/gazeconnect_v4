@@ -118,9 +118,20 @@ const HomeIcon: React.FC<{ size?: number; color?: string }> = ({ size = 34, colo
 
 const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) => {
   const { data } = useCustomization();
-  const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
+  const { isGazeEnabled, lastEnabledTimestamp, enableGaze, isMouseMode } = useGazeControl();
   const { isAlertModeLocked } = useAlertMode();
   const [confirming, setConfirming] = useState<{ label: string; idx: number } | null>(null);
+
+  // Force-enable gaze whenever Alert Mode is shown. The patient is on
+  // this screen specifically to trigger an emergency / care action —
+  // they must NEVER get stuck because the toggle was left off elsewhere.
+  // Skipped in Mouse Only Mode (caregiver explicit override). The
+  // enableGaze callback itself is no-op when isMouseMode is true, but
+  // we also gate at call site so the effect doesn't re-run unnecessarily.
+  useEffect(() => {
+    if (isMouseMode) return;
+    if (!isGazeEnabled) enableGaze();
+  }, [isGazeEnabled, isMouseMode, enableGaze]);
 
   const handlePress = useCallback((label: string, idx: number) => {
     const spokenLabel = idx === 0 ? 'Emergency please come immediately' : label;

@@ -10,7 +10,14 @@
 // between keys and the area just outside the keyboard bounds.
 // This is now the PRIMARY selection mechanism (not a fallback), so it must
 // capture any gaze point near the keyboard grid.
-export const DEFAULT_SNAP_MARGIN = 35;
+// v17.8: 35 → 55 px. The patient reported the corner-key loop happens
+// reliably on edge keys (A, Z, P, ?) — those are where raw gaze noise
+// routinely exceeds 35 px outside the rect, causing findBestKeyboardKey
+// to return null and onset to reset every frame. 55 px is below typical
+// inter-key spacing (≈100 px on this layout) so adjacent keys still win
+// disambiguation; only the empty space just outside the keyboard grid is
+// re-attributed to the nearest key.
+export const DEFAULT_SNAP_MARGIN = 55;
 
 // Minimum element size to consider for snapping (avoid tiny elements)
 const MIN_ELEMENT_SIZE = 30;

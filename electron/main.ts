@@ -94,19 +94,23 @@ type BrowserGazeConfig = {
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
-  dwellMs: 1200,
-  onsetMs: 300,
-  stabilityRadiusPx: 50,
+  // v17: Patient reported in-browser cursor was "very very difficult" to
+  // stop on a video card; widening these defaults gives a larger lock
+  // zone once a target is acquired without making fresh acquisition
+  // looser. Mirror gcConfig defaults in browserGazeController.ts.
+  dwellMs: 1100,
+  onsetMs: 280,
+  stabilityRadiusPx: 60,
   postClickCooldownMs: 900,
-  targetRegionSlackPx: 24,
+  targetRegionSlackPx: 32,
   // Asymmetric hysteresis (Tobii US10,890,967, audit #6): snap-in narrow,
   // unsnap wide. Once a YouTube target is locked the dwell tolerates a
   // larger gaze drift before reset, preventing boundary flicker.
-  youtubeCardHitZonePx: 120,
-  youtubeCardUnsnapPx: 180,
-  youtubeSkipSnapPx: 130,
-  youtubeSkipUnsnapPx: 200,
-  youtubeCardStabilityRadiusPx: 110,
+  youtubeCardHitZonePx: 130,
+  youtubeCardUnsnapPx: 230,
+  youtubeSkipSnapPx: 140,
+  youtubeSkipUnsnapPx: 250,
+  youtubeCardStabilityRadiusPx: 130,
   edgeScrollEnabled: false,
   edgeHoldMs: 650,
   edgeZonePct: 0.20,
