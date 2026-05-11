@@ -3326,10 +3326,28 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
         const effectiveGazeEnabled = isGazeEnabled && refinementArmed && !readingCooldown;
 
+        // Theme-aware room picker card. Paper modes (warm + light) use dark
+        // brown text on cream card bg so room names are readable (was light
+        // `#E2E8F0` slate on a tan tile — invisible). Dark/mix keep light text.
+        const rcBg = isLight ? '#FAF5E8'
+            : isWarm ? '#FBF5E5'
+            : isMix ? 'rgba(60, 48, 32, 0.55)'
+            : 'rgba(139,92,246,0.08)';
+        const rcBorder = isLight ? '2px solid rgba(168, 120, 56, 0.30)'
+            : isWarm ? '2px solid rgba(122, 99, 71, 0.22)'
+            : isMix ? '2px solid rgba(180, 147, 98, 0.32)'
+            : '3px solid rgba(139,92,246,0.3)';
+        const rcText = isLight ? '#2E2A24'
+            : isWarm ? '#2F2A26'
+            : isMix ? '#FFFCF1'
+            : '#E2E8F0';
+        const rcShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
+            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
+            : 'none';
         const roomCard = (id: string, rid: string, onClick: () => void, dwell = 1500) => (
           <GazeButton key={id} id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={dwell}
             onClick={() => { onClick(); setRoomPage(0); }}
-            style={{ flex: '1 1 200px', minWidth: '200px', maxWidth: '240px', minHeight: '140px', borderRadius: '16px', border: '3px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.08)', color: '#E2E8F0', fontSize: '24px', fontWeight: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px' }}>
+            style={{ flex: '1 1 200px', minWidth: '200px', maxWidth: '240px', minHeight: '140px', borderRadius: '16px', border: rcBorder, background: rcBg, color: rcText, fontSize: '24px', fontWeight: 800, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', boxShadow: rcShadow }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: ROOM_LIBRARY[rid]?.color || '#555' }} />
             <div style={{ textAlign: 'center', lineHeight: 1.2 }}>{ROOM_LIBRARY[rid]?.shortLabel || rid}</div>
           </GazeButton>
@@ -3635,7 +3653,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'roomA' && (
                       <>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>Room for {splitDirection === 'vertical' ? 'LEFT' : 'TOP'} half</div>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>Room for {splitDirection === 'vertical' ? 'LEFT' : 'TOP'} half</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20, justifyContent: 'center', alignContent: 'start', maxWidth: '1200px', width: '100%', flex: 1, overflowY: 'auto', padding: '10px' }}>
                           {pagedRoomIds.map(rid => roomCard(`ce-sA-${rid}`, rid, () => { setSubRoomA(rid); setSplitStep('pctA'); triggerReadingCooldown(); onSpeak(`${ROOM_LIBRARY[rid]?.shortLabel || rid}. Choose percentage.`); }, 2000))}
                         </div>
@@ -3644,7 +3662,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'pctA' && subRoomA && (
                       <>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>
                           Space for <span style={{ color: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', fontWeight: 900 }}>{ROOM_LIBRARY[subRoomA]?.shortLabel || subRoomA}</span>
                         </div>
 
@@ -3653,7 +3671,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 20 }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} ({subRoomAPct || 50}%)
                           </div>
-                          <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', border: '2px dashed #64748B', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontWeight: 800 }}>
+                          <div style={{
+                            flex: 1,
+                            background: isLight || isWarm ? 'rgba(122, 99, 71, 0.06)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(255,255,255,0.05)',
+                            borderRadius: 8, display: 'flex',
+                            border: `2px dashed ${isLight || isWarm ? 'rgba(122, 99, 71, 0.32)' : isMix ? 'rgba(180, 147, 98, 0.38)' : '#64748B'}`,
+                            alignItems: 'center', justifyContent: 'center',
+                            color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8',
+                            fontWeight: 800,
+                          }}>
                             {100 - (subRoomAPct || 50)}% (Empty)
                           </div>
                         </div>
@@ -3667,14 +3693,23 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'roomB' && subRoomA && (
                       <>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>Room for {splitDirection === 'vertical' ? 'RIGHT' : 'BOTTOM'} half ({100 - (subRoomAPct || 50)}%)</div>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>Room for {splitDirection === 'vertical' ? 'RIGHT' : 'BOTTOM'} half ({100 - (subRoomAPct || 50)}%)</div>
 
                         {/* LIVE PREVIEW BOX - B */}
                         <div style={{ width: '400px', height: '140px', background: T_panelBg, border: `4px solid ${T_panelBorder}`, borderRadius: '16px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0 }}>
                           <div style={{ flex: splitDirection === 'horizontal' ? `0 0 ${subRoomAPct || 50}%` : `0 0 ${subRoomAPct || 50}%`, background: ROOM_LIBRARY[subRoomA]?.color || '#8B5CF6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 900, fontSize: 16 }}>
                             {ROOM_LIBRARY[subRoomA]?.shortLabel} ({subRoomAPct || 50}%)
                           </div>
-                          <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', border: '2px dashed #93C5FD', alignItems: 'center', justifyContent: 'center', color: '#93C5FD', fontWeight: 800, animation: 'pulse 1.5s infinite' }}>
+                          <div style={{
+                            flex: 1,
+                            background: isLight || isWarm ? 'rgba(79, 115, 136, 0.10)' : isMix ? 'rgba(94, 156, 168, 0.14)' : 'rgba(255,255,255,0.1)',
+                            borderRadius: 8, display: 'flex',
+                            border: `2px dashed ${isLight ? '#1F6B7E' : isWarm ? '#4F7388' : isMix ? '#5E9CA8' : '#93C5FD'}`,
+                            alignItems: 'center', justifyContent: 'center',
+                            color: isLight ? '#1F6B7E' : isWarm ? '#3D5E73' : isMix ? '#5E9CA8' : '#93C5FD',
+                            fontWeight: 800,
+                            animation: 'pulse 1.5s infinite',
+                          }}>
                             ? Select Below
                           </div>
                         </div>
@@ -3686,7 +3721,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     )}
                     {splitStep === 'confirm' && subRoomA && subRoomB && (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30, animation: 'fadeIn 0.3s ease-out' }}>
-                        <div style={{ fontSize: 16, color: '#94A3B8' }}>Review & Confirm Your Split</div>
+                        <div style={{ fontSize: 16, color: isLight || isWarm ? T_textSub : isMix ? T_textSub : '#94A3B8', fontWeight: 700 }}>Review &amp; Confirm Your Split</div>
 
                         {/* FINAL PREVIEW BOX */}
                         <div style={{ width: '500px', height: '300px', background: T_panelBg, border: `5px solid ${T_panelBorder}`, borderRadius: '24px', display: 'flex', flexDirection: splitDirection === 'horizontal' ? 'column' : 'row', overflow: 'hidden', padding: 8, gap: 4, flexShrink: 0, boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>

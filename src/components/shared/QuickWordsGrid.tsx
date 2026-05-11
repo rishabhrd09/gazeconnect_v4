@@ -304,28 +304,33 @@ const getOverlayPalette = (categoryId: string, isMix: boolean, isDarkMode: boole
   return OVERLAY_LIGHT[categoryId] ?? OVERLAY_LIGHT.daily;
 };
 
+// Font sizes bumped ~15-18% over prior values for better AAC readability at
+// eye-tracking distance (~60 cm). Standalone (full Quick Words screen)
+// receives a slightly larger boost than overlay (where space is more
+// constrained). All clamps respect viewport-height scaling so the layout
+// stays no-scroll at 13" → 27".
 const getWordFontSize = (text: string, presentation: 'overlay' | 'standalone') => {
   const length = text.length;
   const hasCompoundLabel = text.includes('/') || text.includes('&');
 
   if (presentation === 'overlay') {
-    if (length >= 28) return 'clamp(19px, 2.35vh, 27px)';
-    if (length >= 18 || hasCompoundLabel) return 'clamp(21px, 2.55vh, 30px)';
-    return 'clamp(24px, 2.95vh, 34px)';
+    if (length >= 28) return 'clamp(22px, 2.7vh, 30px)';
+    if (length >= 18 || hasCompoundLabel) return 'clamp(24px, 2.9vh, 33px)';
+    return 'clamp(27px, 3.3vh, 38px)';
   }
-  if (length >= 30) return 'clamp(22px, 2.45vh, 28px)';
-  if (length >= 20 || hasCompoundLabel) return 'clamp(24px, 2.75vh, 31px)';
-  if (length >= 12 || text.includes(' ')) return 'clamp(26px, 3vh, 35px)';
-  return 'clamp(30px, 3.4vh, 40px)';
+  if (length >= 30) return 'clamp(26px, 2.85vh, 32px)';
+  if (length >= 20 || hasCompoundLabel) return 'clamp(28px, 3.15vh, 36px)';
+  if (length >= 12 || text.includes(' ')) return 'clamp(30px, 3.45vh, 40px)';
+  return 'clamp(34px, 3.85vh, 46px)';
 };
 
 const getHindiFontSize = (text: string, presentation: 'overlay' | 'standalone') => {
   if (presentation === 'overlay') {
-    if (text.length >= 18) return 'clamp(24px, 3vh, 32px)';
-    return 'clamp(26px, 3.2vh, 36px)';
+    if (text.length >= 18) return 'clamp(27px, 3.35vh, 36px)';
+    return 'clamp(30px, 3.6vh, 40px)';
   }
-  if (text.length >= 18) return 'clamp(19px, 2.2vh, 26px)';
-  return 'clamp(21px, 2.45vh, 30px)';
+  if (text.length >= 18) return 'clamp(22px, 2.5vh, 30px)';
+  return 'clamp(24px, 2.8vh, 34px)';
 };
 
 const getStandaloneHeading = (category: QuickWordCategory) => {

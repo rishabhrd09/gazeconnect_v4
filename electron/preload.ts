@@ -13,6 +13,7 @@ const validEventChannels = [
   'mouse-only-mode-changed',
   'focus-mode-changed',
   'alert-mode-changed',
+  'alert-mode-lock-changed',
   'refinement-map-changed',
   'webview:navigation-state',
   'webview:links',
@@ -85,6 +86,15 @@ const api = {
 
   alertMode: {
     set: (enabled: boolean) => ipcRenderer.invoke('alert-mode:set', enabled),
+  },
+
+  // Alert Mode Lock — when ON, the Home button on AlertModeScreen is
+  // disabled so the patient can't exit. Only the caregiver can toggle via
+  // the right-click context menu. Lock auto-clears when Alert Mode is
+  // disabled (handled in main process).
+  alertModeLock: {
+    get: () => ipcRenderer.invoke('alert-mode-lock:get'),
+    set: (enabled: boolean) => ipcRenderer.invoke('alert-mode-lock:set', enabled),
   },
 
   // Gaze-controlled BrowserView for web browsing
