@@ -1,8 +1,10 @@
 # Eye Gaze Pipeline Learning Guide
 
-> Branch context: `feature/gaze_accuracy_word_prediction`
+> Branch context: `main` (build v4.8.0, gaze pipeline v17.10).
 >
 > This document is intended to stay in `docs/` as a normal tracked file. It is learning material, branch memory, and a technical handoff note for future commits.
+>
+> **For the comprehensive end-to-end technical reference covering the v17 pipeline** (architecture, every stage, every constant, dwell state machine, v17.x version history), see the companion HTML textbook: [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html).
 
 ## Why this document exists
 
@@ -496,3 +498,46 @@ eye-gaze accuracy is a system property, not a single filter setting
 
 If the pipeline honors coordinate truth, sample freshness, classifier basis, target intent, and lock-release balance together, the user experience improves sharply.
 If any one of those layers lies, the whole interaction feels inaccurate even when the tracker itself is good.
+
+---
+
+## Supplement — the v17.x sub-series (May 2026)
+
+After the initial v17 work this document describes, a deeper debugging campaign drove ten further refinements (v17.1 → v17.10), all in `main`. The deeper-than-expected problem turned out to be hardware-floor noise on the Tobii ET5 and a cursor-vs-hit-test position mismatch. The v17.x series each addresses one specific failure mode that emerged during clinical use with the patient.
+
+### What v17.x added on top of v17
+
+- **v17.3 — R2 visual anchor** (`GazeCursor.tsx`). The single biggest change. Once dwell onset commits, `posRef` is forced to the dwell target's bounding-rect centre every frame for the rest of the dwell. The cursor visibly "sits" at the target centre regardless of raw-gaze noise. Selection logic still reads raw gaze for lock-break and target-change detection, so this is purely a presentation/perception change — but on hardware with 12–20 px residual it transforms the felt accuracy.
+
+- **v17.3 — Onset preview anchor** (`GazeCursor.tsx`). During onset (100–250 ms before dwell commits), the cursor is gently pulled toward the candidate's centre with pull strength ramping 0 → 0.30. Kills the "cursor drifts to corner before lock" panic that was reported on Home cards.
+
+- **v17.6 — Visual continuity layer** (`GazeCursor.tsx` + `electron/browser/browserGazeController.ts`). The savedDwell mechanism preserves *logical* dwell progress when gaze briefly leaves a target — but the visual ring used to reset to 0, creating a perceived "loop". v17.6 decouples them: ring and highlight stay visible at their last value during the 1000 ms grace, only clearing if grace expires.
+
+- **v17.7 — Anchored hit test (Option B)** (`GazeCursor.tsx`). Once a dwell target is committed, the multi-point hit test runs against `posRef` (the R2-anchored cursor) instead of raw gaze. The cursor is already at target centre, so the hit test always finds the target — eliminating the "cursor on K but underlying selection off K" mismatch that caused infinite loops.
+
+- **v17.8 — Onset-phase sticky + keyboard margin 55** (`GazeCursor.tsx`, `hitZoneExpansion.ts`). Sticky tolerance now also covers the onset phase (60 px standard, 100 px edge-aware) so onset doesn't reset on a single noisy frame. `KEYBOARD_SNAP_MARGIN` raised 35 → 55 to absorb edge-key noise (A, Z, P, ?). Snap-targets-nearest-center now runs as a fallback even on keyboard screens, so non-keyboard buttons like "Word", "Quick Phrases", and prediction-strip phrases get the same generous nearest-center treatment.
+
+- **v17.9 — Unified hit test on posRef** (`GazeCursor.tsx`). Removed the v18 special case that used raw-gaze for keyboard hit testing. The cursor render position and the hit-test point are now literally the same. What you see is what you select.
+
+- **v17.10 — Lock-break gated by target rect** (`GazeCursor.tsx`). The most important late fix. Lock-break used to fire on raw-gaze noise (Tobii ET5 produces 50–80 px noise during legitimate fixation, especially at edges). The fix gates lock-break on a second condition: raw gaze must also be outside the dwell target's rect + 45 px tolerance. Verified by frame-by-frame video analysis to eliminate the "90% dwell abort" bug on letter keys and the 15-second loop on Assistance-screen cards.
+
+- **R1 (audit) — Telemetry** (`src/utils/gazeTelemetry.ts`). New module. Records every dwell-click with target id, rect, gaze residual, and timing. Exposed via `window.__gazeTelemetry.snapshot()`. Companion BrowserView telemetry via `window.__gcTelemetry`. Provides objective accuracy numbers for tuning future iterations without subjective guesswork.
+
+- **R8 (audit) — Bayesian YouTube card posterior** (`electron/browser/browserGazeController.ts`). Replaces nearest-distance card resolution in the BrowserView with a Gaussian-likelihood posterior over visible cards, temporally smoothed across frames. σ = 46 px, α = 0.32, commit threshold 0.45. A single noisy gaze sample cannot flip the winning card.
+
+- **Asymmetric snap/unsnap** (Tobii Dynavox US10,890,967 pattern) applied to BrowserView YouTube targets: card snap-in 130 / unsnap 230, skip-ad snap-in 140 / unsnap 250.
+
+- **Auto-enable gaze** on AlertModeScreen and embedded-browser views — the patient was getting stuck with gaze toggle off on these screens.
+
+### What's *un*changed (the principles still hold)
+
+- "Backend owns truth for stability; frontend renders and lightly assists" — unchanged.
+- The classifier thresholds (65 / 150 °/s) — unchanged. The audit recommends adaptive thresholding (R5) but it's deferred until R1 telemetry has been collected from a real session.
+- The 3-tap MA — still in place. Audit R3 (remove it) was deferred for the same reason.
+- All dwell timings (250 ms onset, 1000 ms dwell, 1300 ms cooldown) — unchanged.
+
+### What to read next
+
+1. **[`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html)** — the comprehensive technical reference covering the full v17.10 pipeline end to end, with Mermaid diagrams.
+2. **[`gaze-accuracy-and-word-prediction-guide.md`](./gaze-accuracy-and-word-prediction-guide.md)** — Part 4 "Recent Changes" was extended in parallel with this supplement.
+3. **The accuracy audit** — the research-grade audit document that drove R1, R2, R6, R8. (Conversation history; consider archiving to docs/.)

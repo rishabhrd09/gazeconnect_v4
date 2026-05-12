@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GazeConnect Pro — Eye Tracking Pipeline · Technical Reference</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* =====================================================================
+       GazeConnect Pro — Eye Tracking Pipeline Textbook
+       Stylesheet — academic / textbook aesthetic
+       ===================================================================== */
+    :root {
+      --bg: #faf8f3;
+      --bg-elev: #ffffff;
+      --bg-soft: #f0ece0;
+      --ink: #1c2434;
+      --ink-soft: #4a5568;
+      --ink-faint: #76808f;
+      --accent: #1f4d4d;     /* deep teal */
+      --accent-warm: #8a5a1a; /* amber */
+      --accent-cool: #2c4a7c; /* navy */
+      --border: #dfd6c1;
+      --border-strong: #c7bca0;
+      --code-bg: #f4efe2;
+      --code-border: #d9cfb2;
+      --callout-bg: #eaf0eb;
+      --callout-warn: #fbf3df;
+      --callout-warn-border: #d1b76b;
+      --shadow: 0 1px 3px rgba(28, 36, 52, 0.06), 0 4px 12px rgba(28, 36, 52, 0.04);
+      --serif: "Crimson Pro", "Crimson Text", "Georgia", "Times New Roman", serif;
+      --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --mono: "JetBrains Mono", "Fira Code", "Source Code Pro", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--serif);
+      font-size: 18px;
+      line-height: 1.65;
+      font-feature-settings: "kern", "liga", "onum";
+    }
+
+    /* ---------- TYPOGRAPHY ---------- */
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--sans);
+      color: var(--accent);
+      letter-spacing: -0.005em;
+      margin-top: 2.2em;
+      margin-bottom: 0.6em;
+      line-height: 1.25;
+    }
+    h1 { font-size: 2.4rem; font-weight: 700; }
+    h2 { font-size: 1.7rem; font-weight: 600; border-bottom: 2px solid var(--border); padding-bottom: 0.2em; }
+    h3 { font-size: 1.3rem; font-weight: 600; color: var(--accent-cool); }
+    h4 { font-size: 1.1rem; font-weight: 600; color: var(--accent-warm); }
+    h5 { font-size: 1.0rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+
+    p { margin: 0.7em 0; max-width: 70ch; }
+    em { font-style: italic; }
+    strong { font-weight: 600; color: var(--ink); }
+    .lead { font-size: 1.15em; color: var(--ink-soft); max-width: 64ch; }
+
+    a { color: var(--accent-cool); text-decoration: none; border-bottom: 1px dotted var(--accent-cool); }
+    a:hover { border-bottom-style: solid; }
+
+    /* ---------- LAYOUT ---------- */
+    .page-frame {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 4rem 2.5rem 6rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    @media (min-width: 1100px) {
+      .page-frame {
+        grid-template-columns: 240px 1fr;
+        gap: 3rem;
+      }
+    }
+
+    nav.toc {
+      position: sticky;
+      top: 1.5rem;
+      align-self: start;
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+      padding-right: 0.5rem;
+      border-right: 1px solid var(--border);
+      padding-bottom: 2rem;
+    }
+    nav.toc h5 {
+      margin: 0 0 0.6em;
+      font-size: 0.78rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3em;
+    }
+    nav.toc ol {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      counter-reset: chapter;
+    }
+    nav.toc > ol > li {
+      counter-increment: chapter;
+      margin: 0.35em 0;
+      padding-left: 1.6em;
+      position: relative;
+    }
+    nav.toc > ol > li::before {
+      content: counter(chapter, decimal);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1.3em;
+      color: var(--accent-warm);
+      font-weight: 500;
+    }
+    nav.toc a { color: var(--ink); border-bottom: none; }
+    nav.toc a:hover { color: var(--accent); }
+    nav.toc ol ol {
+      counter-reset: section;
+      padding-left: 0.6em;
+      margin: 0.2em 0 0.5em;
+    }
+    nav.toc ol ol li {
+      counter-increment: section;
+      padding-left: 1.5em;
+      position: relative;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      margin: 0.18em 0;
+    }
+    nav.toc ol ol li::before {
+      content: counter(chapter) "." counter(section);
+      position: absolute;
+      left: 0;
+      color: var(--ink-faint);
+    }
+
+    /* ---------- COVER ---------- */
+    header.cover {
+      grid-column: 1 / -1;
+      padding: 3rem 2.5rem 2.5rem;
+      margin: -4rem -2.5rem 3rem;
+      background: linear-gradient(135deg, #1f4d4d 0%, #2c4a7c 100%);
+      color: #f0eee2;
+      border-bottom: 6px double #c7bca0;
+    }
+    header.cover .pretitle {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #d4cfc0;
+      margin: 0 0 0.5em;
+    }
+    header.cover h1 {
+      color: #faf8f3;
+      font-size: 3rem;
+      margin: 0 0 0.3em;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    header.cover .subtitle {
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      font-style: italic;
+      color: #e4dfcf;
+      margin: 0;
+    }
+    header.cover .meta {
+      margin-top: 1.5em;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      color: #c7c2b0;
+    }
+    header.cover .meta span { margin-right: 1.5em; }
+
+    /* ---------- BOXES & CALLOUTS ---------- */
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--accent);
+      padding: 1em 1.4em;
+      margin: 1.6em 0;
+      border-radius: 0 4px 4px 0;
+      box-shadow: var(--shadow);
+    }
+    .callout h5 {
+      margin: 0 0 0.4em;
+      color: var(--accent);
+      font-size: 0.85rem;
+    }
+    .callout p:last-child { margin-bottom: 0; }
+    .callout p:first-child { margin-top: 0; }
+
+    .callout.warn {
+      background: var(--callout-warn);
+      border-left-color: var(--callout-warn-border);
+    }
+    .callout.warn h5 { color: var(--accent-warm); }
+
+    .callout.spec {
+      background: #eef1f7;
+      border-left-color: var(--accent-cool);
+    }
+    .callout.spec h5 { color: var(--accent-cool); }
+
+    /* ---------- CODE ---------- */
+    code {
+      font-family: var(--mono);
+      font-size: 0.87em;
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      border: 1px solid var(--code-border);
+      color: #44391d;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 6px;
+      padding: 1em 1.2em;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.55;
+      margin: 1.5em 0;
+      color: #2e2616;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    .filename {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+      background: var(--bg-soft);
+      padding: 0.2em 0.6em;
+      border-radius: 3px;
+      display: inline-block;
+      margin-bottom: 0.4em;
+      border: 1px solid var(--border);
+    }
+
+    /* ---------- DIAGRAMS ---------- */
+    .mermaid {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5em;
+      margin: 1.8em 0;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .diagram-caption {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      text-align: center;
+      margin: -1em 0 1.8em;
+      font-style: italic;
+    }
+
+    /* ---------- TABLES ---------- */
+    table {
+      border-collapse: collapse;
+      margin: 1.4em 0;
+      font-size: 0.92rem;
+      width: 100%;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    th {
+      background: var(--bg-soft);
+      font-family: var(--sans);
+      font-weight: 600;
+      text-align: left;
+      padding: 0.7em 1em;
+      border-bottom: 2px solid var(--border-strong);
+      color: var(--accent);
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+    }
+    td {
+      padding: 0.6em 1em;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: rgba(240, 236, 224, 0.3); }
+
+    /* ---------- LISTS ---------- */
+    ul, ol { padding-left: 1.5em; max-width: 70ch; }
+    li { margin: 0.35em 0; }
+
+    /* ---------- FIGURE NUMBERING ---------- */
+    .figure-num {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-warm);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 0.3em;
+      display: block;
+    }
+
+    /* ---------- CHAPTER MARKER ---------- */
+    .chapter-marker {
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent-warm);
+      margin-top: 4em;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    section { margin-bottom: 3em; }
+
+    /* ---------- DEFINITION ---------- */
+    dl {
+      margin: 1.2em 0;
+      padding: 0;
+    }
+    dt {
+      font-family: var(--sans);
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: 0.8em;
+    }
+    dd {
+      margin: 0.2em 0 0.8em;
+      padding-left: 1em;
+      color: var(--ink-soft);
+    }
+
+    /* ---------- KBD / SHORTCUT ---------- */
+    kbd {
+      font-family: var(--mono);
+      font-size: 0.78em;
+      background: #fff;
+      border: 1px solid var(--border-strong);
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      padding: 0.1em 0.45em;
+      color: var(--ink);
+    }
+
+    /* ---------- BLOCKQUOTE ---------- */
+    blockquote {
+      border-left: 3px solid var(--border-strong);
+      margin: 1.3em 0;
+      padding: 0.2em 1.4em;
+      font-style: italic;
+      color: var(--ink-soft);
+    }
+
+    /* ---------- HORIZONTAL RULE ---------- */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3em 0;
+    }
+
+    /* ---------- INDEX TAG ---------- */
+    .tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.75em;
+      padding: 0.15em 0.5em;
+      border-radius: 3px;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      color: var(--ink-soft);
+      margin-right: 0.3em;
+    }
+
+    .tag.new { background: #e1efe3; color: #2d5a3d; border-color: #b7d4bc; }
+    .tag.fix { background: #fceee2; color: #8a4515; border-color: #d6b08a; }
+
+    /* ---------- FOOTER ---------- */
+    footer.book-end {
+      grid-column: 1 / -1;
+      margin-top: 4em;
+      padding: 2em 0;
+      border-top: 4px double var(--border-strong);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      color: var(--ink-faint);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-frame">
+
+  <!-- ============ COVER ============ -->
+  <header class="cover">
+    <p class="pretitle">GazeConnect Pro · Technical Reference Series</p>
+    <h1>The Eye Tracking Pipeline</h1>
+    <p class="subtitle">A complete end-to-end exposition of how human gaze becomes a confirmed selection on screen — from infrared photons to a clicked button.</p>
+    <p class="meta">
+      <span><strong>Build:</strong> v17.10</span>
+      <span><strong>Scope:</strong> branch <code style="color:#e4dfcf;background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2)">main</code></span>
+      <span><strong>Audience:</strong> developers, clinicians, auditors</span>
+    </p>
+  </header>
+
+  <!-- ============ TOC ============ -->
+  <nav class="toc">
+    <h5>Contents</h5>
+    <ol>
+      <li><a href="#preface">Preface &amp; Scope</a>
+        <ol>
+          <li><a href="#what-this-book-covers">What this book covers</a></li>
+          <li><a href="#how-to-read">How to read it</a></li>
+        </ol>
+      </li>
+      <li><a href="#architecture">System Architecture</a>
+        <ol>
+          <li><a href="#five-layers">The five layers</a></li>
+          <li><a href="#latency-budget">Latency budget</a></li>
+        </ol>
+      </li>
+      <li><a href="#hardware">Hardware Layer</a>
+        <ol>
+          <li><a href="#et5-spec">Tobii ET5 specifications</a></li>
+          <li><a href="#et5-noise-model">Noise model</a></li>
+        </ol>
+      </li>
+      <li><a href="#native-bridge">Native Bridge (C#)</a>
+        <ol>
+          <li><a href="#tobii-helper">TobiiGazeHelper</a></li>
+          <li><a href="#tcp-protocol">TCP protocol</a></li>
+        </ol>
+      </li>
+      <li><a href="#python-pipeline">Python Backend Pipeline</a>
+        <ol>
+          <li><a href="#signal-conditioner">SignalConditioner</a></li>
+          <li><a href="#calibration">Calibration correction</a></li>
+          <li><a href="#one-euro">GazeFilter2D (One Euro)</a></li>
+          <li><a href="#optikey-kalman">OptiKey pipeline &amp; Kalman</a></li>
+          <li><a href="#classifier">GazeClassifier (I-VT)</a></li>
+          <li><a href="#gravity-well">GravityWell &amp; magnetism</a></li>
+        </ol>
+      </li>
+      <li><a href="#transport">WebSocket Transport</a>
+        <ol>
+          <li><a href="#ws-server">Server side</a></li>
+          <li><a href="#ws-client">Client side</a></li>
+        </ol>
+      </li>
+      <li><a href="#electron-main">Electron Main Process</a>
+        <ol>
+          <li><a href="#browserview">BrowserView injection</a></li>
+          <li><a href="#ipc-handlers">IPC handlers</a></li>
+        </ol>
+      </li>
+      <li><a href="#renderer">React Renderer Pipeline</a>
+        <ol>
+          <li><a href="#websocket-provider">WebSocketProvider</a></li>
+          <li><a href="#gaze-cursor">GazeCursor.tsx — anatomy</a></li>
+          <li><a href="#coord-transform">Coordinate transformation</a></li>
+          <li><a href="#three-tap-ma">Three-tap moving average</a></li>
+          <li><a href="#semantic-snap">Semantic snap</a></li>
+          <li><a href="#ema">EMA velocity-adaptive smoothing</a></li>
+          <li><a href="#r2-anchor">R2 visual anchor</a></li>
+          <li><a href="#hit-zone-expansion">Hit-zone expansion</a></li>
+        </ol>
+      </li>
+      <li><a href="#dwell-machine">The Dwell State Machine</a>
+        <ol>
+          <li><a href="#onset">Onset phase</a></li>
+          <li><a href="#onset-preview">Onset preview anchor</a></li>
+          <li><a href="#dwell-phase">Dwell phase</a></li>
+          <li><a href="#lock">Lock acquisition</a></li>
+          <li><a href="#lock-break">Lock-break gating (v17.10)</a></li>
+          <li><a href="#click-fire">Click firing</a></li>
+          <li><a href="#saved-dwell">SavedDwell &amp; visual continuity (v17.6)</a></li>
+          <li><a href="#anchored-hit-test">Anchored hit test (v17.7, v17.9)</a></li>
+          <li><a href="#sticky">Edge-aware sticky tolerance</a></li>
+        </ol>
+      </li>
+      <li><a href="#browser-pipeline">BrowserView Pipeline</a>
+        <ol>
+          <li><a href="#in-page-cursor">In-page cursor</a></li>
+          <li><a href="#youtube-commands">YouTube commands</a></li>
+          <li><a href="#bayesian">Bayesian card posterior</a></li>
+          <li><a href="#asymmetric-snap">Asymmetric snap/unsnap</a></li>
+        </ol>
+      </li>
+      <li><a href="#telemetry">Telemetry (R1)</a></li>
+      <li><a href="#config">Configuration Reference</a></li>
+      <li><a href="#frame-trace">End-to-End Frame Trace</a></li>
+      <li><a href="#version-history">Version History (v17.x)</a></li>
+      <li><a href="#file-map">File Architecture Map</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- ============ PREFACE ============ -->
+  <section id="preface">
+    <p class="chapter-marker">Chapter 1</p>
+    <h1>Preface &amp; Scope</h1>
+
+    <p class="lead">
+      GazeConnect Pro is a medical-grade Augmentative and Alternative Communication (AAC) application built for ALS patients whose primary remaining motor channel is eye gaze. This book documents the
+      end-to-end eye tracking pipeline as it exists in build <strong>v17.10</strong> — the build that landed after the screen-recording-verified resolution of the &ldquo;90% dwell abort&rdquo; bug.
+    </p>
+
+    <h2 id="what-this-book-covers">1.1 &nbsp;What this book covers</h2>
+    <p>
+      The book traces a single 30-millisecond infrared sample from the Tobii Eye Tracker 5 device, through six runtime boundaries, through twelve software stages, and into a confirmed
+      <code>HTMLElement.click()</code> call in the React renderer. Each transformation along the way is described both <em>conceptually</em> (what mathematical or perceptual problem it solves) and
+      <em>operationally</em> (which file, which function, which constants).
+    </p>
+
+    <p>The scope explicitly includes:</p>
+    <ul>
+      <li>The five-layer runtime architecture and the IPC boundaries between layers.</li>
+      <li>The Python <em>backend</em> pipeline: signal conditioning, the velocity-adaptive One Euro Filter, the OptiKey-style four-zone stabilizer, the Adaptive Kalman, the I-VT classifier, and the
+        backend GravityWell magnetism.</li>
+      <li>The React <em>frontend</em> pipeline: coordinate transformation, weighted moving average, semantic snap, EMA smoothing, the v17 R2 visual anchor, and hit-zone expansion.</li>
+      <li>The dwell selection state machine — the heart of the user-perceived behaviour — including all the v17 refinements that fixed the corner-button loop, the 90% abort, and the visual flicker.</li>
+      <li>The Electron BrowserView injection used for in-page gaze control on YouTube, including the Bayesian card posterior (audit recommendation R8).</li>
+      <li>The R1 telemetry layer added for objective accuracy measurement.</li>
+    </ul>
+
+    <p>Explicitly out of scope (covered in companion documents):</p>
+    <ul>
+      <li>Word prediction and language modelling — see <span class="filename">docs/word-prediction-system-complete-guide.md</span>.</li>
+      <li>Floor plan and home-design visualisation — see <span class="filename">docs/3D_FLOORPLAN_TECHNICAL_AUDIT.md</span>.</li>
+      <li>Color system and visual design tokens — see <span class="filename">docs/color-system-research.md</span>.</li>
+    </ul>
+
+    <h2 id="how-to-read">1.2 &nbsp;How to read this book</h2>
+    <p>
+      Chapters <strong>2&ndash;7</strong> are the &ldquo;forward path&rdquo; — they describe each stage in the order a gaze sample traverses them. Read them sequentially to build a mental model of the
+      pipeline. Chapter 8 (<a href="#dwell-machine">The Dwell State Machine</a>) is the most behaviourally important and references all earlier chapters; if you have ten minutes and want to understand only the
+      most subtle parts of the system, read Chapter 8 first.
+    </p>
+    <p>
+      Chapters <strong>9&ndash;13</strong> are reference material: the BrowserView pipeline, the telemetry layer, the configuration constants, and a worked example of a single frame's journey.
+      Chapter <strong>14</strong> is the historical version log explaining what each v17.x revision changed and why.
+    </p>
+
+    <div class="callout">
+      <h5>Convention</h5>
+      <p>Source-file references are written as <span class="filename">path/to/file.ext</span>. Inline code is set in monospace such as <code>posRef.current.x</code>. Numbers in
+      <em>italic</em> are tuned constants whose values are also collected in the <a href="#config">configuration reference</a> table.</p>
+    </div>
+  </section>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <section id="architecture">
+    <p class="chapter-marker">Chapter 2</p>
+    <h1>System Architecture</h1>
+
+    <p>The pipeline runs across <strong>five distinct processes</strong> on a single Windows machine, communicating over three protocol boundaries. Understanding the boundaries is essential because each
+    crossing introduces serialisation latency, opportunities for state desynchronisation, and unique data formats.</p>
+
+    <h2 id="five-layers">2.1 &nbsp;The five layers</h2>
+
+    <pre class="mermaid">
+flowchart TB
+  classDef hw fill:#eaf0eb,stroke:#1f4d4d,stroke-width:2px
+  classDef native fill:#fbf3df,stroke:#8a5a1a,stroke-width:2px
+  classDef python fill:#eef1f7,stroke:#2c4a7c,stroke-width:2px
+  classDef electron fill:#f4efe2,stroke:#4a5568,stroke-width:2px
+  classDef react fill:#e1efe3,stroke:#2d5a3d,stroke-width:2px
+
+  ET5["Tobii Eye Tracker 5<br/>(USB infrared sensor)"]:::hw
+  HELPER["TobiiGazeHelper<br/>.NET 6.0 C#<br/>Tobii Stream Engine SDK"]:::native
+  PY["Python 3.10 Backend<br/>asyncio + websockets<br/>Signal pipeline + ML + TTS"]:::python
+  MAIN["Electron Main Process<br/>BrowserWindow + BrowserView<br/>OS-level IPC, native click"]:::electron
+  RENDER["React 18 Renderer<br/>Vite + TypeScript<br/>UI + Dwell state machine"]:::react
+
+  ET5 -->|USB raw gaze 33 Hz| HELPER
+  HELPER -->|TCP socket 5555<br/>JSON lines| PY
+  PY -->|WebSocket 8765<br/>JSON frames at 33 Hz| RENDER
+  RENDER <-->|Chromium IPC<br/>contextBridge| MAIN
+  MAIN -->|sendInputEvent<br/>trusted mouse| RENDER
+    </pre>
+    <p class="diagram-caption"><span class="figure-num">Figure 2.1</span>The five-layer runtime architecture. Arrows show <em>data direction</em>; double arrows indicate request/response semantics.</p>
+
+    <p>Each layer has a singular responsibility:</p>
+
+    <dl>
+      <dt>1. Hardware Layer — Tobii Eye Tracker 5</dt>
+      <dd>USB-attached infrared illuminator + camera. Captures raw eye images, runs on-device pupil + glint detection, emits a 2-D normalised gaze coordinate (0.0&ndash;1.0 in both axes, relative to the
+        screen) at 33 Hz steady-state with momentary peaks to 133 Hz under good tracking conditions.</dd>
+
+      <dt>2. Native Bridge — TobiiGazeHelper (C# / .NET 6.0)</dt>
+      <dd>A small managed-code daemon that links against Tobii's Interaction Library / Stream Engine SDK (a closed-source DLL Tobii ships for accessibility integrators). It subscribes to the
+        <em>LightlyFiltered</em> gaze stream, normalises timestamps, and emits one JSON line per sample over a local TCP socket on port 5555.</dd>
+
+      <dt>3. Python Backend — main.py + services/</dt>
+      <dd>An asyncio process that consumes the TCP stream, runs the entire mathematical signal-processing pipeline (validity, calibration correction, classifier, filter, magnetism), and rebroadcasts
+        the result over a local WebSocket on port 8765. This process is also the home of word prediction, TTS, fatigue monitoring, and the calibration store.</dd>
+
+      <dt>4. Electron Main Process — electron/main.ts</dt>
+      <dd>Owns the operating-system surfaces: the main <code>BrowserWindow</code> hosting the React UI, and the embedded <code>BrowserView</code> used for in-page gaze control on YouTube and other web
+        content. Routes Chromium IPC, performs trusted <code>sendInputEvent</code> mouse synthesis when the user dwells on web content, and manages app-level state (Alert Mode, gaze toggle, screen
+        identifier).</dd>
+
+      <dt>5. Renderer — React 18 + TypeScript</dt>
+      <dd>Where the user-visible behaviour lives. Receives gaze samples from Python via the renderer-side WebSocket, applies the frontend pipeline (3-tap MA, snap, EMA, R2 anchor), runs the dwell state
+        machine in an animation-frame loop, and translates dwell-completion into <code>HTMLElement.click()</code> calls. Hosts the cursor, dwell ring, highlight rectangle, and all interactive widgets.</dd>
+    </dl>
+
+    <h2 id="latency-budget">2.2 &nbsp;The latency budget</h2>
+    <p>Total end-to-end latency from photons hitting the retina to a pixel-level cursor move on screen is the sum of:</p>
+
+    <table>
+      <thead>
+        <tr><th>Stage</th><th>Typical latency</th><th>Worst observed</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ET5 sensor + on-device processing</td><td>~30 ms</td><td>20 s+ (tracking loss)</td><td>Manufacturer spec; pipeline visible in <code>[QUALITY] Frame gap</code> logs.</td></tr>
+        <tr><td>TCP transport (C# &rarr; Python)</td><td>0.5&ndash;2 ms</td><td>10 ms</td><td>Localhost; negligible.</td></tr>
+        <tr><td>Python pipeline (per sample)</td><td>0.2&ndash;0.4 ms</td><td>1.5 ms</td><td>See <code>[LATENCY]</code> log: <code>conditioner=0.04 calib=0.05 classifier=0.08 kalman=0.02 filter=0.02 map=0.01 magnet=0.03 send=0.11 total=0.36 ms</code>.</td></tr>
+        <tr><td>WebSocket transport (Python &rarr; renderer)</td><td>1&ndash;3 ms</td><td>15 ms</td><td>JSON encoding + asyncio scheduling.</td></tr>
+        <tr><td>Frontend math (coord transform &rarr; EMA &rarr; render)</td><td>0.1&ndash;0.5 ms</td><td>3 ms</td><td>Single React render tick.</td></tr>
+        <tr><td>Browser compositor + display refresh</td><td>16&ndash;33 ms</td><td>50 ms</td><td>60 Hz monitor &rarr; one vsync.</td></tr>
+        <tr><td><strong>End-to-end tail (perceived)</strong></td><td><strong>~50&ndash;80 ms</strong></td><td><strong>varies</strong></td><td>Dominated by sensor period + compositor.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout spec">
+      <h5>Key observation</h5>
+      <p>The mathematical pipeline itself contributes <em>under one millisecond</em> per sample. Optimising the math is not the path to lower latency; the dominant cost is the 33 Hz sensor period (30 ms)
+      and the 16 ms compositor frame. This is why the audit's <a href="#version-history">recommendation R14</a> (Rust core migration) is justified by IPC reduction, not raw FLOPS.</p>
+    </div>
+  </section>
+
+  <!-- ============ HARDWARE ============ -->
+  <section id="hardware">
+    <p class="chapter-marker">Chapter 3</p>
+    <h1>The Hardware Layer</h1>
+
+    <p>The Tobii Eye Tracker 5 is a consumer-grade gaming/Windows-Hello peripheral that Tobii also positions for accessibility hobbyists. It is <em>not</em> the same product tier as Tobii Dynavox PCEye 5 or Tobii Pro Nano, both of which target ALS production deployments. Knowing this distinction is critical to interpreting the residual accuracy observed in clinical use.</p>
+
+    <h2 id="et5-spec">3.1 &nbsp;Tobii ET5 specifications</h2>
+
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Image sample rate (sensor)</td><td>133 Hz</td><td>Tobii marketing</td></tr>
+        <tr><td>Gaze data output rate</td><td><strong>33 Hz</strong> (non-interlaced)</td><td>Tobii Help Center, ET5 comparison page</td></tr>
+        <tr><td>Head tracking rate</td><td>33 Hz</td><td>Tobii Help Center</td></tr>
+        <tr><td>Operating distance</td><td>50&ndash;95 cm</td><td>Manufacturer spec</td></tr>
+        <tr><td>Average power</td><td>2.0 W</td><td>Manufacturer spec</td></tr>
+        <tr><td>Published accuracy map</td><td><em>None</em></td><td>Verified absence — Tobii does not publish a center/mid/corner accuracy figure for ET5.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="et5-noise-model">3.2 &nbsp;Empirical noise model on a 23&Prime; 1080p display at 60 cm</h2>
+
+    <p>At our reference deployment (23&Prime; display, 1920&times;1080, 60 cm viewing distance, ~0.265 mm pixel pitch), <strong>1° of visual angle equals 39.5 px</strong>. Tobii does not publish ET5 accuracy maps, but empirical observation during our v17 debugging session showed:</p>
+
+    <ul>
+      <li>Centre-of-screen fixation: ~10&ndash;20 px noise envelope (≈0.3°&ndash;0.5°)</li>
+      <li>Mid-screen fixation: ~15&ndash;30 px noise envelope</li>
+      <li>Corner / edge fixation: ~50&ndash;100 px noise envelope (extreme angles cause iris occlusion)</li>
+      <li>Frame gap distribution: 30 ms typical, with routine 100&ndash;500 ms drops, occasional multi-second tracking loss during blinks or look-aways.</li>
+    </ul>
+
+    <p>This noise floor is the dominant constraint on perceived accuracy. The entire frontend pipeline can be viewed as a <em>noise-floor adaptation strategy</em>: the more noise the tracker produces, the
+    more the snap, anchor, and stability mechanisms have to do.</p>
+
+    <div class="callout warn">
+      <h5>Implication for tuning</h5>
+      <p>Any constant in the pipeline whose units are pixels (snap radius, dwell stability radius, lock-break distance, hit zone expansion) must be at least as large as the worst-case noise envelope at
+      the screen region where it will be used. The v17 series adjusted nearly every such constant after observing edge-region noise of 50&ndash;100 px in clinical recordings.</p>
+    </div>
+  </section>
+
+  <!-- ============ NATIVE BRIDGE ============ -->
+  <section id="native-bridge">
+    <p class="chapter-marker">Chapter 4</p>
+    <h1>The Native Bridge (C# / .NET 6.0)</h1>
+
+    <p>Tobii's Interaction Library (the <code>Tobii.Interaction</code> NuGet package) is a managed-code wrapper over the Stream Engine native DLL. It is .NET-only, which is why this layer exists — Python
+    cannot directly subscribe to Tobii's gaze stream on Windows.</p>
+
+    <h2 id="tobii-helper">4.1 &nbsp;TobiiGazeHelper</h2>
+    <p class="filename">tobii-helper/TobiiGazeHelper/Program.cs</p>
+    <p>A small .NET 6 console application. On startup it:</p>
+    <ol>
+      <li>Calls <code>SetProcessDpiAwareness</code> so it reports pixels in device coordinates.</li>
+      <li>Initialises a Tobii <code>Host</code> instance (this loads the Stream Engine DLL).</li>
+      <li>Creates a <code>GazePointDataStream</code> with the <em>LightlyFiltered</em> profile. Lightly filtered is preferred because heavy in-SDK filtering would conflict with our One Euro + Kalman
+        pipeline downstream — we want the rawest reasonable stream.</li>
+      <li>Opens a TCP listening socket on <code>127.0.0.1:5555</code> and waits for the Python backend to connect.</li>
+      <li>On each gaze callback, computes screen-pixel coordinates, normalises to 0&ndash;1, attaches a high-resolution timestamp, and writes one JSON line: <code>{"x":0.483,"y":0.612,"t":1778523914.401,"valid":true}</code>.</li>
+    </ol>
+
+    <p>The helper also instruments <em>quality</em>: every 60 frames it emits a <code>[GAZE DEBUG]</code> log line with min/max gap metrics, and a <code>[QUALITY] Frame gap: Nms</code> warning whenever the
+    inter-frame interval exceeds 60 ms. These logs are the canonical source of truth for diagnosing &ldquo;cursor disappeared&rdquo; complaints.</p>
+
+    <h2 id="tcp-protocol">4.2 &nbsp;TCP protocol contract</h2>
+    <p>Newline-delimited JSON, one frame per line, ASCII encoding. Backpressure handling is naive: if the Python side is slow, the OS socket buffer fills and the C# side blocks briefly. This is
+    acceptable because the gaze stream is ~33 messages/second and each message is &lt;100 bytes.</p>
+
+    <p>Reconnection semantics: if Python disconnects (e.g., backend restart), the C# helper logs <code>[TCP] Disconnected</code> and re-enters the <code>accept()</code> loop. Python's
+    <code>tobii_connector.py</code> retries with exponential backoff. In practice the helper and the backend are launched together by <code>start-dev.bat</code> and stay paired for the lifetime of the
+    Electron process.</p>
+  </section>
+
+  <!-- ============ PYTHON PIPELINE ============ -->
+  <section id="python-pipeline">
+    <p class="chapter-marker">Chapter 5</p>
+    <h1>The Python Backend Pipeline</h1>
+
+    <p>Once a gaze sample arrives at Python, it traverses six software stages before being broadcast. Each stage has been audited against the published literature on eye-movement event detection. The
+    diagram below shows the call order; the sections that follow describe each stage.</p>
+
+    <pre class="mermaid">
+flowchart TB
+  classDef stage fill:#eef1f7,stroke:#2c4a7c,stroke-width:1.5px,color:#1c2434
+  classDef opt fill:#fbf3df,stroke:#8a5a1a,stroke-width:1.5px,color:#1c2434
+
+  IN([Raw sample from TCP<br/>x, y ∈ [0,1], timestamp])
+  COND[SignalConditioner<br/>validity + blink hold +<br/>tracking-loss + frozen]:::stage
+  CALIB[CalibrationCorrection<br/>9-point polynomial or<br/>thin-plate splines]:::stage
+  CLASS[GazeClassifier<br/>I-VT, 65 / 150 °/s thresholds<br/>2-of-N / 4-of-N hysteresis]:::stage
+  KAL["AdaptiveKalmanFilter<br/>(when OPTIKEY pipeline enabled)<br/>R-matrix per gaze state"]:::stage
+  FILT["OptiKey 4-Zone Filter<br/>or<br/>GazeFilter2D (One Euro)"]:::stage
+  MAGNET[backend _apply_magnetism<br/>per-context radius/pull/release<br/>sticky-target hysteresis]:::stage
+  MAP[Screen-mapping<br/>multi-display, scaling]:::stage
+  OUT([Broadcast to WebSocket<br/>renderer-bound payload])
+
+  IN --> COND
+  COND --> CALIB
+  CALIB --> CLASS
+  CLASS --> KAL
+  KAL --> FILT
+  FILT --> MAP
+  MAP --> MAGNET
+  MAGNET --> OUT
+    </pre>
+    <p class="diagram-caption"><span class="figure-num">Figure 5.1</span>Python backend pipeline. The split between <code>OptiKey 4-Zone</code> and <code>One Euro</code> is configuration-controlled — see <a href="#optikey-kalman">5.4</a>.</p>
+
+    <h2 id="signal-conditioner">5.1 &nbsp;SignalConditioner</h2>
+    <p class="filename">python/services/signal_conditioner.py</p>
+    <p>Purely defensive layer. Does not produce a smoothed signal — only labels samples and synthesises fallback values when the tracker mis-reports. Five jobs:</p>
+
+    <dl>
+      <dt>Validity</dt>
+      <dd>Drops samples flagged <code>valid: false</code> by the tracker, or with NaN coordinates.</dd>
+      <dt>Blink hold</dt>
+      <dd>If a stream of invalid samples lasts &le; <em>150 ms</em> (<code>BLINK_HOLD_MAX</code>), the last valid sample is replayed. This prevents a normal blink from being interpreted as a saccade.</dd>
+      <dt>Tracking loss</dt>
+      <dd>If the invalid stream exceeds <em>500 ms</em> (<code>TRACKING_LOSS_THRESHOLD</code>), the conditioner emits a <code>gaze_lost</code> event over the WebSocket. The renderer listens and uses
+        this to pause UI animations.</dd>
+      <dt>Bounds clamp</dt>
+      <dd>Samples are clamped to <code>[0, 1]</code> on both axes (Tobii occasionally emits 0.999 or 1.001 at exact screen edges due to floating-point rounding).</dd>
+      <dt>Frozen detection</dt>
+      <dd>If displacement &lt; <em>0.0001</em> for &gt; <em>200 frames</em> (≈6 s at 33 Hz), the sample is labelled <code>FROZEN</code>. This catches driver replays and SDK glitches. The threshold is
+        deliberately sub-pixel — real human gaze has natural microsaccade amplitude above this floor.</dd>
+    </dl>
+
+    <h2 id="calibration">5.2 &nbsp;Calibration correction</h2>
+    <p class="filename">python/services/calibration.py</p>
+    <p>If the user has run the in-app 9-point calibration wizard, a per-point residual map is stored to disk. The runtime correction applies either:</p>
+    <ul>
+      <li>A second-order polynomial fit across the 9 calibration points (default), or</li>
+      <li>A thin-plate spline interpolation (experimental, gated behind a feature flag).</li>
+    </ul>
+    <p>If no calibration is on file, this stage is a no-op pass-through. The renderer-side <code>setGazeOffset</code> in <span class="filename">src/utils/gazeSnapping.ts</span> is layered on top as a
+    user-tunable manual offset (the &ldquo;nudge&rdquo; setting in Settings &rarr; Gaze).</p>
+
+    <h2 id="one-euro">5.3 &nbsp;GazeFilter2D — the One Euro Filter</h2>
+    <p class="filename">python/services/one_euro_filter.py</p>
+    <p>Reference: Casiez, Roussel &amp; Vogel, CHI 2012, <em>1&euro; Filter</em>.</p>
+
+    <p>The One Euro filter is a velocity-adaptive low-pass — it cleans noise at low gaze velocities (when the user is fixating) and steps out of the way at high velocities (when the user is saccading).
+    Mathematically:</p>
+
+    <pre><code>cutoff = min_cutoff + beta * |velocity|
+alpha  = 1 / (1 + tau / dt)   where tau = 1 / (2π · cutoff)
+x_filt = x_filt_prev + alpha · (x_raw - x_filt_prev)</code></pre>
+
+    <p>Per-state cutoffs (set adaptively from the classifier output):</p>
+
+    <table>
+      <thead><tr><th>State</th><th>min_cutoff</th><th>beta</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td>fixation</td><td>0.4</td><td>0.007</td><td>Heavy smoothing — tiny tremor suppressed.</td></tr>
+        <tr><td>saccade</td><td>3.0</td><td>8.0</td><td>Near pass-through — cursor jumps with gaze.</td></tr>
+        <tr><td>glissade</td><td>0.8</td><td>0.3</td><td>Moderate — handles post-saccade settling.</td></tr>
+      </tbody>
+    </table>
+
+    <p>The <code>BALANCED</code> preset (<code>min_cutoff=1.0</code>, <code>beta=15.0</code>) is the global fallback when the classifier reports a state not in the above table. The accuracy audit calls
+    out <code>beta=15.0</code> as unusually high; see <a href="#version-history">version history</a> for the audit response.</p>
+
+    <h2 id="optikey-kalman">5.4 &nbsp;OptiKey pipeline &amp; Adaptive Kalman</h2>
+    <p class="filename">python/main.py</p>
+    <p>The flag <code>USE_OPTIKEY_PIPELINE = True</code> (line ~867) routes samples through a more elaborate stack:</p>
+
+    <pre class="mermaid">
+flowchart LR
+  classDef stage fill:#eef1f7,stroke:#2c4a7c,stroke-width:1.5px
+
+  C[GazeClassifier]:::stage --> K[AdaptiveKalmanFilter<br/>R-matrix per state]:::stage
+  K --> Z[OptiKeyGazeFilter<br/>4 zones: lock / fixation /<br/>edge / free]:::stage
+  Z --> M[_apply_magnetism]:::stage
+    </pre>
+
+    <p>The four-zone <code>OptiKeyGazeFilter</code> applies different damping multipliers depending on the cursor's recent displacement:</p>
+
+    <ul>
+      <li><strong>Lock zone</strong> (distance &lt; 0.008 normalised, ~8 px): multiplier 0 — cursor truly stationary.</li>
+      <li><strong>Fixation zone</strong> (8&ndash;40 px): power-law damping for smooth deceleration.</li>
+      <li><strong>Edge zone</strong> (within 6% of viewport edge): multiplier capped low so cursor can reach the edge but doesn't oscillate.</li>
+      <li><strong>Free zone</strong> (everything else): multiplier ~0.6&ndash;0.9 — fast tracking.</li>
+    </ul>
+
+    <p>The hysteresis between zones is asymmetric per the Tobii Dynavox patent US10,890,967 (snap-with-different-unsnap-threshold). Lock entry is at 8 px; unsnap at ~14 px.</p>
+
+    <h2 id="classifier">5.5 &nbsp;GazeClassifier — I-VT</h2>
+    <p class="filename">python/services/gaze_classifier.py</p>
+    <p>Reference: Salvucci &amp; Goldberg, ETRA 2000, <em>Identifying fixations and saccades in eye-tracking protocols</em>.</p>
+
+    <p>The classifier emits one of <code>fixation</code> / <code>saccade</code> / <code>glissade</code> per sample. The decision is purely velocity-based plus an N-of-M hysteresis:</p>
+
+    <pre><code>velocity = median over VELOCITY_WINDOW=5 samples of dθ/dt  (degrees per second)
+
+if velocity > SACCADE_THRESHOLD (150 °/s):
+    high_count++
+    if high_count >= SACCADE_ONSET_COUNT (2): state = SACCADE
+elif velocity < FIXATION_THRESHOLD (65 °/s):
+    low_count++
+    if low_count >= FIXATION_ONSET_COUNT (4): state = FIXATION
+else:
+    state = GLISSADE  (transitioning)</code></pre>
+
+    <p>The asymmetric hysteresis (2-of-N for saccades, 4-of-N for fixations) is intentional — the system commits faster to a saccade (so the cursor stays responsive) than to a fixation (so a noisy frame
+    doesn't falsely lock during a saccade).</p>
+
+    <div class="callout warn">
+      <h5>Audit caveat</h5>
+      <p>The accuracy audit recommends adaptive thresholding (Nyström &amp; Holmqvist BRM 2010 / REMoDNaV BRM 2021) rather than fixed thresholds. The current 65 / 150 °/s defaults are higher than Tobii's
+      own 30 °/s default to accommodate ALS ocular tremor. This is a defensible tuning but not a defensible architectural decision — adaptive thresholding is on the audit roadmap as R5.</p>
+    </div>
+
+    <h2 id="gravity-well">5.6 &nbsp;Backend magnetism — GravityWell</h2>
+    <p class="filename">python/services/one_euro_filter.py · python/main.py</p>
+    <p>The <code>GravityWell</code> class is a three-zone gravity model from MAGIC pointing (Zhai, Morimoto &amp; Ihde, CHI 1999). It is invoked as the <em>fallback</em> backend filter when
+    <code>USE_OPTIKEY_PIPELINE = False</code>. When the OptiKey pipeline is active, magnetism is applied by <code>_apply_magnetism</code> in <code>main.py</code> instead, which uses per-context parameter
+    sets:</p>
+
+    <table>
+      <thead><tr><th>Context</th><th>Radius (px)</th><th>Pull strength</th><th>Release radius (px)</th></tr></thead>
+      <tbody>
+        <tr><td>keyboard</td><td>72</td><td>0.32</td><td>88</td></tr>
+        <tr><td>prediction</td><td>112</td><td>0.48</td><td>100</td></tr>
+        <tr><td>navigation</td><td>44</td><td>0.16</td><td>64</td></tr>
+        <tr><td>gazetoggle</td><td>165</td><td>0.34</td><td>185</td></tr>
+        <tr><td>default</td><td>62</td><td>0.22</td><td>82</td></tr>
+      </tbody>
+    </table>
+
+    <p>The <strong>sticky-target</strong> mechanism prevents oscillation: once the cursor enters a target's radius, it is treated as captured until pre-magnetism gaze moves beyond <code>release_radius</code>
+    (typically 1.4&times;&ndash;1.6&times; the entry radius). This is the same asymmetric-snap pattern claimed in Tobii Dynavox US10,890,967.</p>
+  </section>
+
+  <!-- ============ TRANSPORT ============ -->
+  <section id="transport">
+    <p class="chapter-marker">Chapter 6</p>
+    <h1>The WebSocket Transport Layer</h1>
+
+    <p>Python broadcasts processed gaze frames over a local WebSocket on <code>ws://127.0.0.1:8765</code>. The renderer connects on startup and stays connected for the lifetime of the application.</p>
+
+    <h2 id="ws-server">6.1 &nbsp;Server side</h2>
+    <p class="filename">python/main.py</p>
+    <p>One asyncio task (<code>_broadcast_gaze_loop</code>) runs at the pipeline's natural rate (~33 Hz). It serialises one JSON frame per sample with this shape:</p>
+
+    <pre><code>{
+  "type": "gaze",
+  "x": 0.483,                  // normalised, post-pipeline
+  "y": 0.612,
+  "raw_x": 0.485,              // pre-pipeline reference
+  "raw_y": 0.611,
+  "kalman_x": 0.484,
+  "kalman_y": 0.612,
+  "conditioned_x": 0.485,
+  "conditioned_y": 0.611,
+  "coord_space": "window",     // "window" (renderer pixels) or "screen" (global)
+  "backend_zone": "lock",      // "lock" | "fixation" | "edge" | "free"
+  "is_valid": true,
+  "is_fixation": true,
+  "confidence": 0.93,
+  "gaze_state": "fixation",    // classifier state
+  "velocity": 12.4,            // °/s
+  "sample_rate_hz": 33.1,
+  "calibration_applied": true,
+  "backend_on_key": true,      // is backend magnet locked to a key?
+  "backend_magnet_px": 4.3     // px pulled by magnet this frame
+}</code></pre>
+
+    <h2 id="ws-client">6.2 &nbsp;Client side</h2>
+    <p class="filename">src/hooks/useWebSocket.tsx</p>
+    <p>The <code>WebSocketProvider</code> hook in the renderer is the entry point. Three implementation details matter:</p>
+
+    <ol>
+      <li>The <code>onmessage</code> handler dispatches to <em>listenersRef.current</em> — a Set of subscriber callbacks. <code>GazeCursor.tsx</code> registers one such callback. This avoids a re-render
+        on every gaze frame.</li>
+      <li>An auto-reconnect loop with exponential backoff handles transient WebSocket failures. The renderer never crashes from a backend restart.</li>
+      <li>The <code>set_screen_size</code> message is sent to the backend every two seconds with the current window's inner dimensions and screen position. This is how the backend knows how to convert
+        screen-normalised gaze to window-normalised gaze when the app is windowed (not fullscreen).</li>
+    </ol>
+  </section>
+
+  <!-- ============ ELECTRON MAIN ============ -->
+  <section id="electron-main">
+    <p class="chapter-marker">Chapter 7</p>
+    <h1>The Electron Main Process</h1>
+
+    <p>Electron's main process is responsible for OS-level surfaces. For the gaze pipeline specifically, two responsibilities matter:</p>
+
+    <h2 id="browserview">7.1 &nbsp;BrowserView injection for in-page gaze control</h2>
+    <p class="filename">electron/main.ts · electron/browser/browserGazeController.ts</p>
+
+    <p>When the user enters Web Browsing (and especially YouTube), a Chromium <code>BrowserView</code> is created and overlaid on the renderer. The renderer sends gaze coordinates to the main process via
+    IPC (<code>webview:updateGaze</code>); the main process injects them into the BrowserView's JavaScript context via
+    <code>executeJavaScript</code>, where an injected dwell-detection IIFE (see Chapter 10) renders an in-page cursor and detects dwell on web content.</p>
+
+    <p>When the in-page dwell completes, the IIFE returns a <code>trustedClick</code> coordinate. The main process then calls
+    <code>view.webContents.sendInputEvent({ type: 'mouseDown', ... })</code> followed by <code>mouseUp</code>. This is a <em>trusted</em> input event — Chromium treats it identically to a real OS-level click,
+    so user-gesture-gated APIs (autoplay, fullscreen, popups) succeed.</p>
+
+    <h2 id="ipc-handlers">7.2 &nbsp;IPC handler inventory</h2>
+    <p>The main process exposes a small set of webview-related IPC handlers. The renderer-side wrapper is <span class="filename">src/hooks/useGazeBrowser.ts</span>.</p>
+
+    <table>
+      <thead><tr><th>Channel</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>webview:open</code></td><td>Create BrowserView, navigate to URL, inject cursor.</td></tr>
+        <tr><td><code>webview:updateGaze</code></td><td>Forward gaze position; runs dwell logic in-page.</td></tr>
+        <tr><td><code>webview:youtubeCommand</code></td><td>Dispatch YouTube command (play, pause, skip-ad). See <a href="#youtube-commands">10.2</a>.</td></tr>
+        <tr><td><code>webview:setGazeConfig</code></td><td>Tune dwell timings, snap radii at runtime.</td></tr>
+        <tr><td><code>webview:click</code></td><td>Send a trusted click at the given BrowserView-local coordinate.</td></tr>
+        <tr><td><code>webview:setScrollMode</code></td><td>Enable / disable edge-gaze scroll for web pages.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ RENDERER ============ -->
+  <section id="renderer">
+    <p class="chapter-marker">Chapter 8</p>
+    <h1>The React Renderer Pipeline</h1>
+
+    <p>This is the longest chapter because the renderer is where user-perceived behaviour is most malleable, and where most of the v17 work landed. The renderer pipeline takes the WebSocket payload from
+    <a href="#transport">Chapter 6</a> and turns it into a cursor position on screen plus a dwell state-machine update.</p>
+
+    <pre class="mermaid">
+flowchart TB
+  classDef stage fill:#e1efe3,stroke:#2d5a3d,stroke-width:1.5px
+  classDef visual fill:#fbf3df,stroke:#8a5a1a,stroke-width:1.5px
+
+  WS[WebSocket frame<br/>x, y normalised, gaze_state]:::stage
+  COORD[Coordinate transform<br/>normalised → window pixels<br/>screen-vs-window resolve]:::stage
+  CLAMP[Edge overshoot clamp<br/>±48 px beyond viewport]:::stage
+  WMA[3-tap weighted MA<br/>0.45 / 0.30 / 0.25<br/>skipped when backend owns stability]:::stage
+  SNAP[Semantic snap<br/>computeSnap]:::stage
+  EMA[Velocity-adaptive EMA<br/>per-state alpha + edge boost]:::stage
+  R2[R2 visual anchor<br/>posRef ← target center<br/>during dwell]:::visual
+  POS[posRef ← rendered cursor]:::visual
+  RENDER[React state setX/setY<br/>cursor div, dwell ring, highlight]:::visual
+
+  WS --> COORD --> CLAMP --> WMA --> SNAP --> EMA --> R2 --> POS --> RENDER
+
+  POS -.shared.-> DWELL[dwellFrame loop<br/>see Chapter 9]:::stage
+    </pre>
+    <p class="diagram-caption"><span class="figure-num">Figure 8.1</span>The frontend stage graph in <span class="filename">GazeCursor.tsx</span>. The cursor state is shared by reference between the gaze-handler (sample driven) and the dwell-frame loop (60 Hz RAF driven).</p>
+
+    <h2 id="websocket-provider">8.1 &nbsp;WebSocketProvider — the subscription layer</h2>
+    <p class="filename">src/hooks/useWebSocket.tsx</p>
+    <p>The provider sits at the top of the React tree (see <span class="filename">src/main.tsx</span>). The critical contract is that <code>subscribeGaze(callback)</code> returns an unsubscribe function
+    and the callback is invoked once per WebSocket gaze message. Consumers (the cursor, individual screens) register independently.</p>
+
+    <h2 id="gaze-cursor">8.2 &nbsp;GazeCursor.tsx — anatomy of the cursor component</h2>
+    <p class="filename">src/components/core/GazeCursor.tsx (~1500 LOC, the largest single file in the renderer)</p>
+    <p>The component is structured around three independent loops:</p>
+
+    <ol>
+      <li><strong>Gaze data loop</strong> (<code>handleGaze</code>): triggered once per WebSocket message. Runs coordinate transform, 3-tap MA, snap, EMA, R2 anchor; updates <code>posRef</code> and
+        <code>lastRawPointRef</code>; calls <code>setX</code> / <code>setY</code>.</li>
+      <li><strong>Dwell frame loop</strong> (<code>dwellFrame</code> via <code>requestAnimationFrame</code>): runs at ~60 Hz, independent of gaze sample rate. Reads <code>posRef</code> and
+        <code>lastRawPointRef</code>; performs hit testing; runs the onset / dwell / lock / click state machine; fires
+        <code>HTMLElement.click()</code> when dwell completes.</li>
+      <li><strong>Refs collection loop</strong>: every ~500 ms, refresh the snap-target list (<code>collectSnapTargets</code>) and keyboard key positions (<code>collectKeyboardKeys</code>) so layout
+        changes don't desync the dwell hit test.</li>
+    </ol>
+
+    <p>Communication between loops is by ref mutation — no React state in the hot path because state updates trigger renders and we cannot afford 60 renders/second.</p>
+
+    <h2 id="coord-transform">8.3 &nbsp;Coordinate transformation</h2>
+    <p>The WebSocket payload's <code>x</code> / <code>y</code> can be in two coordinate spaces depending on <code>coord_space</code>:</p>
+
+    <ul>
+      <li><strong>window</strong> (preferred): already normalised to the app's content rect. Multiply by <code>window.innerWidth</code> / <code>window.innerHeight</code>.</li>
+      <li><strong>screen</strong> (legacy): normalised to the full screen. Must be re-projected using the window's screen position and size.</li>
+    </ul>
+
+    <p>The renderer maintains <code>windowBoundsRef</code> — a polled snapshot of <code>{x, y, width, height, screenWidth, screenHeight, isFullscreen, isMaximized}</code> — updated every two seconds by
+    the Electron main process. This is what enables the &ldquo;screen&rdquo;-coord-space re-projection.</p>
+
+    <h2 id="three-tap-ma">8.4 &nbsp;Three-tap weighted moving average</h2>
+    <p>The first frontend smoothing step. Weights <em>0.45 / 0.30 / 0.25</em> on the current, previous, and previous-previous samples:</p>
+
+    <pre><code>smoothedX = rawX * 0.45 + pre1.x * 0.30 + pre2.x * 0.25</code></pre>
+
+    <p>This is skipped when the backend reports <code>backendOnKey=true</code> or <code>backendMagnetPx &gt; 0.8 px</code>, because the backend is already actively pulling toward a target and additional
+    frontend smoothing would add directional bias.</p>
+
+    <p>The audit (companion <em>research brief</em> in this same docs folder) recommended dropping this MA in favour of a properly tuned One Euro β. It was retained in v17 because removing it
+    re-introduced jitter; the audit's conditions for safe removal include adaptive One Euro β tuning which is gated until R1 telemetry data has been collected.</p>
+
+    <h2 id="semantic-snap">8.5 &nbsp;Semantic snap</h2>
+    <p class="filename">src/utils/gazeSnapping.ts</p>
+    <p>Snap is a soft attraction toward gaze-enabled buttons. Targets are collected from the DOM by querying
+    <code>[data-gaze="true"], [data-gaze-always="true"], [data-gaze-toggle="true"]</code>. For each target, a center, a snap radius, and a max pull strength are computed based on the target's
+    <code>data-gaze-context</code> attribute.</p>
+
+    <p>Per-context configuration (v17.10):</p>
+
+    <table>
+      <thead><tr><th>Context</th><th>Radius (px)</th><th>Max strength</th><th>Proximity boost</th></tr></thead>
+      <tbody>
+        <tr><td>default</td><td>140</td><td>0.30</td><td>1.45&times; in inner 45%</td></tr>
+        <tr><td>keyboard</td><td>90</td><td>0.10</td><td>off (dense layout)</td></tr>
+        <tr><td>prediction</td><td>138</td><td>0.20</td><td>off (dense layout)</td></tr>
+        <tr><td>gazetoggle (priority 3)</td><td>220</td><td>0.36</td><td>1.45&times; in inner 45%</td></tr>
+      </tbody>
+    </table>
+
+    <p>The <strong>near-center proximity boost</strong> is the v17 addition. When the cursor enters the inner 45% of the snap radius, the pull strength is multiplied by 1.45 — this creates a clear
+    "lock-in" feel near the centre without affecting initial approach behaviour. The boost is gated by <code>useProximityBoost: true</code> in <code>getSnapConfig</code> so it doesn't apply on dense
+    layouts where it would cause inter-key snapping.</p>
+
+    <pre><code>// gazeSnapping.ts:147 — the proximity boost
+if (useProximityBoost &amp;&amp; proximity &gt;= 1 - NEAR_CENTER_PROXIMITY) {
+  snapStrength = Math.min(
+    maxStrength * NEAR_CENTER_BOOST_FACTOR,
+    snapStrength * NEAR_CENTER_BOOST_FACTOR,
+  );
+}</code></pre>
+
+    <h2 id="ema">8.6 &nbsp;EMA velocity-adaptive smoothing</h2>
+    <p>The third smoothing stage. Per-gaze-state alpha:</p>
+
+    <table>
+      <thead><tr><th>Classifier state</th><th>alpha (non-keyboard)</th><th>alpha (keyboard)</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>saccade</td><td>0.90</td><td>0.90</td><td>Near pass-through — cursor follows eye instantly.</td></tr>
+        <tr><td>glissade</td><td>0.65</td><td>0.65</td><td>Moderate — handles post-saccade settling.</td></tr>
+        <tr><td>fixation</td><td>0.36</td><td>0.38</td><td>Heavy — cursor settles slowly, resists tremor.</td></tr>
+        <tr><td>fixation &amp; distance &lt; 3 px</td><td>0.16</td><td>0.16</td><td>Sub-noise: extra-heavy.</td></tr>
+        <tr><td>backend locked</td><td>0.0 or 1.0</td><td>0.0 or 1.0</td><td>Backend already locked — frontend either freezes or follows verbatim.</td></tr>
+      </tbody>
+    </table>
+
+    <p>An additional <em>edge boost</em> raises alpha to 0.55 whenever the cursor is in the 100-px-deep edge zone AND moving further toward the edge. This prevents the cursor from getting "stuck" near
+    the screen border due to clamped backend coordinates.</p>
+
+    <h2 id="r2-anchor">8.7 &nbsp;R2 visual anchor — the heart of the v17 fix</h2>
+    <p>R2 is the most important change to the renderer in the v17 series. It addresses a fundamental problem: on ET5 at 60 cm, the hardware accuracy floor is 12&ndash;20 px (0.3&ndash;0.5°). No amount
+    of software smoothing can drive the residual below the hardware noise floor. So the cursor's <em>true position</em> will always wobble by 10&ndash;20 px around the target's centre.</p>
+
+    <p>R2's insight: <strong>decouple perceived accuracy from selection accuracy</strong>. Once the dwell state machine has confirmed a dwell target (post-onset), force the rendered cursor and
+    <code>posRef</code> to the target's bounding rect centre, every frame. The selection logic (lock-break, target-change detection) continues to read raw gaze; only the visual representation is
+    anchored.</p>
+
+    <pre><code>// GazeCursor.tsx — R2 anchor (excerpt)
+if (dwellTargetRef.current) {
+  const target = dwellTargetRef.current;
+  const rect = target.getBoundingClientRect();
+  if (rect.width &gt; 0 &amp;&amp; rect.height &gt; 0) {
+    posRef.current.x = rect.left + rect.width / 2;
+    posRef.current.y = rect.top + rect.height / 2;
+    setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+  }
+}
+
+setX(posRef.current.x);
+setY(posRef.current.y);</code></pre>
+
+    <p>A complementary mechanism — the <strong>onset preview anchor</strong> — runs <em>during</em> onset: between 100 ms and 250 ms of stable gaze on an onset candidate, <code>posRef</code> is
+    interpolated toward the candidate's centre with pull strength ramping 0 &rarr; 0.30. This makes the cursor visibly home in on a key during onset, killing the "cursor at corner before lock" panic
+    that was reported in earlier builds.</p>
+
+    <div class="callout">
+      <h5>Conceptual significance</h5>
+      <p>This is the cleanest example of the BayesGaze principle (Xu et al., Graphics Interface 2021): the cursor displayed to the user is a <em>statement of belief</em> about where they intend to
+      look, not a transcription of where the tracker says they are looking. The displayed position is the system's best guess at the user's intent — which is exactly what an AAC product should show.</p>
+    </div>
+
+    <h2 id="hit-zone-expansion">8.8 &nbsp;Hit-zone expansion (keyboard nearest-center)</h2>
+    <p class="filename">src/utils/hitZoneExpansion.ts</p>
+    <p>For keyboard keys specifically, the dwell hit test uses a different strategy than the generic multi-point hit test. Each key's bounding rect is inflated by <em>55 px</em>
+    (<code>KEYBOARD_SNAP_MARGIN</code>); gaze that falls inside any inflated rect is attributed to the key whose <em>centre is closest</em> to the gaze. This guarantees correct disambiguation when gaze
+    falls in the gap between two adjacent keys.</p>
+
+    <p>The 55-px margin was raised from 35 in v17.8 specifically to fix the "A" key loop on edge columns of the keyboard — at the left edge, raw gaze noise routinely exceeded 35 px outside the rect, but
+    is rarely greater than 55 px.</p>
+  </section>
+
+  <!-- ============ DWELL MACHINE ============ -->
+  <section id="dwell-machine">
+    <p class="chapter-marker">Chapter 9</p>
+    <h1>The Dwell State Machine</h1>
+
+    <p>This is where user-perceived selection accuracy actually lives. The state machine runs inside <code>dwellFrame</code> (an <code>requestAnimationFrame</code> loop at ~60 Hz) in
+    <span class="filename">GazeCursor.tsx</span>. It has five states (idle, onset, dwell, locked, click) and a half-dozen edge-handling refinements added across v17.6&ndash;v17.10.</p>
+
+    <pre class="mermaid">
+stateDiagram-v2
+  [*] --> IDLE
+  IDLE --> ONSET: cursor enters interactive element
+  ONSET --> IDLE: cursor leaves before 250 ms
+  ONSET --> ONSET: cursor stays on same element
+  ONSET --> DWELL: 250 ms stable + commit
+  DWELL --> LOCKED: progress ≥ 10% (≈ +100 ms)
+  LOCKED --> CLICK: progress ≥ 100% (≈ +900 ms)
+  LOCKED --> IDLE: lock-break (gated by target rect, v17.10)
+  CLICK --> COOLDOWN
+  COOLDOWN --> IDLE: 1300 ms passed
+  DWELL --> SAVED: gaze leaves element
+  SAVED --> DWELL: gaze returns within 1000 ms<br/>(progress resumed)
+  SAVED --> IDLE: 1000 ms expiry
+    </pre>
+    <p class="diagram-caption"><span class="figure-num">Figure 9.1</span>Dwell state machine. The <code>SAVED</code> state and the rect-gated lock-break are v17.6 and v17.10 additions respectively.</p>
+
+    <h2 id="onset">9.1 &nbsp;Onset phase — 250 ms anti-spurious filter</h2>
+    <p>Onset prevents "drive-by activations" — your gaze scanning across the keyboard shouldn't trigger every key you pass over. The mechanism is simple: when the cursor first enters an interactive
+    element, the element becomes the <em>onset candidate</em>. The candidate must remain stable for <code>ONSET_DELAY_MS = 250 ms</code> (or <code>ONSET_DELAY_ALWAYS_ACTIVE_MS = 100 ms</code> for
+    emergency / toggle buttons) before the dwell counter starts.</p>
+
+    <p>If the cursor leaves the candidate before 250 ms — or if a different element becomes the candidate — onset restarts. <em>This is exactly the loop that v17.8 / v17.9 / v17.10 attacked.</em> The
+    chain of failures that caused the "circle restarts at 25%" bug all live in this phase.</p>
+
+    <h2 id="onset-preview">9.2 &nbsp;Onset preview anchor — gentle pull during onset</h2>
+    <p>Once onset has been progressing for &gt; 100 ms, the rendered cursor is interpolated toward the candidate's centre with strength ramping 0 &rarr; 0.30 over the remaining 150 ms. By the time
+    onset commits, the cursor is visibly homed in on the candidate. This eliminates the "cursor drifts to corner then suddenly snaps to centre" sensation.</p>
+
+    <h2 id="dwell-phase">9.3 &nbsp;Dwell phase</h2>
+    <p>Once onset commits, <code>dwellTargetRef.current = clickable</code> and <code>dwellStartTimeRef.current = now</code>. Progress is computed as
+    <code>(now - dwellStartTimeRef) / effectiveDwell</code>. <code>effectiveDwell</code> is normally 1000 ms but can be context-specific (400 ms for emergency, configurable per-button via
+    <code>data-dwell-time</code>).</p>
+
+    <p>During this phase the R2 anchor (Chapter 8.7) is actively snapping <code>posRef</code> to the target centre on every gaze frame.</p>
+
+    <h2 id="lock">9.4 &nbsp;Lock acquisition — 10% threshold</h2>
+    <p>At 10% of dwell progress (~100 ms after dwell start, ~350 ms after gaze landed), the cursor becomes <strong>locked</strong>. <code>lockPosRef.current</code> is captured to
+    <code>posRef.current</code> (which is at the target centre by R2). From this point on, the cursor no longer moves with gaze — it stays at the lock position until either the dwell completes or the
+    user clearly looks away (lock-break).</p>
+
+    <h2 id="lock-break">9.5 &nbsp;Lock-break gating — the v17.10 fix</h2>
+    <p>Lock-break is the mechanism by which a user signals "I changed my mind, don't fire this dwell." Pre-v17.10, the gate was a single condition:</p>
+
+    <pre><code>if (distFromLock &gt; LOCK_BREAK_DISTANCE) {  // 80 px
+  // abort dwell
+}</code></pre>
+
+    <p>This was triggered by raw-gaze noise during legitimate fixation — Tobii ET5 noise of 50&ndash;80 px caused the lock-break to fire even though the user was still looking at the button. The
+    symptom: the dwell ring would fill to ~90 %, then everything would reset to zero without firing the click. The patient called it "the 90% abort" and Claude AI's screen-recording analysis pinpointed
+    it on the L key in "hello" at video timestamp 0:23.6.</p>
+
+    <p>The v17.10 fix gates lock-break on a second condition — the raw gaze must <em>also</em> be outside the dwell target's bounding rect (with 45 px tolerance):</p>
+
+    <pre><code>// GazeCursor.tsx (v17.10) — lock-break with rect gating
+if (isLockedRef.current) {
+  const distFromLock = Math.hypot(rawX - lockPosRef.current.x, rawY - lockPosRef.current.y);
+  let shouldBreakLock = distFromLock &gt; LOCK_BREAK_DISTANCE;
+
+  if (shouldBreakLock &amp;&amp; dwellTargetRef.current?.isConnected) {
+    const tRect = dwellTargetRef.current.getBoundingClientRect();
+    const LOCK_RECT_TOLERANCE = 45;
+    const insideTargetRect = (
+      rawX &gt;= tRect.left - LOCK_RECT_TOLERANCE
+      &amp;&amp; rawX &lt;= tRect.right + LOCK_RECT_TOLERANCE
+      &amp;&amp; rawY &gt;= tRect.top - LOCK_RECT_TOLERANCE
+      &amp;&amp; rawY &lt;= tRect.bottom + LOCK_RECT_TOLERANCE
+    );
+    if (insideTargetRect) shouldBreakLock = false;
+  }
+
+  if (shouldBreakLock) { /* abort dwell */ }
+  return;
+}</code></pre>
+
+    <p>Now lock-break requires <strong>both</strong> the distance condition <em>and</em> the rect condition. If the user is still genuinely looking at the button (raw gaze inside rect + tolerance), the
+    lock holds regardless of how far the noise pushes raw gaze from the lock position. Verified by post-fix video analysis: both Ls in "hello" fire cleanly on first dwell.</p>
+
+    <h2 id="click-fire">9.6 &nbsp;Click firing</h2>
+    <p>At 100% dwell progress, the state machine:</p>
+    <ol>
+      <li>Records a telemetry event (target id, rect, gaze position, residual, timing).</li>
+      <li>Calls <code>dwellTargetRef.current.click()</code> — a standard DOM click event.</li>
+      <li>Resets all state: <code>dwellTargetRef</code>, <code>onsetTargetRef</code>, <code>savedDwellRef</code>, <code>isLockedRef</code>, <code>highlightRect</code>, <code>dwellProgress</code>.</li>
+      <li>Sets <code>lastClickTimeRef = now</code> to start the post-click cooldown.</li>
+    </ol>
+
+    <p>Cooldown lasts 1000 ms + the per-action <code>cooldownAfterActivation</code> (default 300 ms = 1300 ms total). During cooldown, new dwells cannot start unless the target is a toggle / emergency
+    button.</p>
+
+    <h2 id="saved-dwell">9.7 &nbsp;SavedDwell &amp; visual continuity — v17.6 Option A</h2>
+    <p>Brief gaze excursions (blinks, ALS tremor) used to make the dwell ring visibly reset to 0% then start over when gaze returned. The patient perceived this as a "loop." Option A decouples the
+    visual ring from the logical dwell state:</p>
+
+    <ol>
+      <li>When gaze leaves a partially-dwelled target, <code>savedDwellRef</code> captures the current progress and a timestamp.</li>
+      <li>The dwell ring and highlight rectangle are <em>not</em> reset to zero. They remain visible at their last value.</li>
+      <li><code>savedDwellExpiryRef</code> is set to <code>now + 1000 ms</code> (FIXATION_TTL_MS).</li>
+      <li>If gaze returns to the same element within 1000 ms, the dwell resumes from the saved progress (the visual state already matched).</li>
+      <li>If 1000 ms expires without return, the visuals are cleared.</li>
+    </ol>
+
+    <p>The BrowserView equivalent uses <code>state.dwellingExpiryAt</code> with a 600 ms grace window on the <code>.dwelling</code> CSS class.</p>
+
+    <h2 id="anchored-hit-test">9.8 &nbsp;Anchored hit test — v17.7 Option B and v17.9 unification</h2>
+    <p>The hit test (which DOM element is under the gaze cursor?) was historically run against raw gaze on keyboard screens (the "v18 fast scanning" optimisation). This caused a subtle but fatal bug:
+    the cursor was rendered at <code>posRef</code> (post-snap, EMA, R2-anchored) — visibly on a key — but the hit test was running against <code>lastRawPointRef</code>, which drifted 30&ndash;60 px off
+    the key from gaze noise. The user saw the cursor on K; the hit test thought gaze was off K; <code>clickable = null</code>; loop.</p>
+
+    <p>v17.7 made the hit test use <code>posRef</code> when a dwell was active (post-onset). v17.9 generalised this to all phases (pre-onset too). The cursor render and the hit test are now the same
+    point — what you see is what you select.</p>
+
+    <h2 id="sticky">9.9 &nbsp;Edge-aware sticky tolerance</h2>
+    <p>A safety net for the very rare frame where all five multi-point hit-test points miss the rect. If <code>clickable === null</code> but a dwell or onset target is still set, check whether gaze is
+    within a tolerance of the target's rect; if yes, treat the target as the clickable.</p>
+
+    <p>Tolerances are edge-aware. Buttons within 80 px of any viewport edge use wider tolerances because Tobii noise at edges is empirically much larger:</p>
+
+    <table>
+      <thead><tr><th>Phase</th><th>Standard tolerance</th><th>Edge-button tolerance</th></tr></thead>
+      <tbody>
+        <tr><td>Dwell (post-onset)</td><td>50 px</td><td>110 px</td></tr>
+        <tr><td>Onset (pre-dwell)</td><td>80 px</td><td>130 px</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ BROWSER PIPELINE ============ -->
+  <section id="browser-pipeline">
+    <p class="chapter-marker">Chapter 10</p>
+    <h1>The BrowserView Pipeline</h1>
+
+    <p>When the user is in Web Browsing (especially YouTube), the renderer-side dwell logic does <em>not</em> drive selection of page content. Instead, an injected IIFE inside the BrowserView's
+    JavaScript context runs its own dwell loop. This is necessary because page content is in a separate process and the renderer's React state can't observe DOM changes on the page.</p>
+
+    <h2 id="in-page-cursor">10.1 &nbsp;In-page cursor injection</h2>
+    <p class="filename">electron/browser/browserGazeController.ts</p>
+    <p>On BrowserView load (after <code>dom-ready</code>), the main process injects a CSS sheet plus a JavaScript IIFE. The CSS defines <code>#gazeconnect-cursor</code>: a 52-px ring that follows gaze.
+    The IIFE creates the cursor div and exposes four functions on <code>window</code>:</p>
+
+    <ul>
+      <li><code>window.gcUpdateAndPoll(x, y, cursorEnabled)</code> — called by the main process on every gaze frame; updates the cursor position, runs the in-page dwell state machine, returns a click request when dwell completes.</li>
+      <li><code>window.gcHide()</code> — hide the cursor (called when gaze is outside the BrowserView bounds).</li>
+      <li><code>window.gcResetDwell()</code> — reset the in-page state machine (called after navigation).</li>
+      <li><code>window.gcBlockDwell(ms)</code> — suspend dwell-click activity for a window (called after a YouTube command so the page can settle).</li>
+    </ul>
+
+    <h2 id="youtube-commands">10.2 &nbsp;YouTube command pipeline</h2>
+    <p class="filename">electron/browser/youtubeController.ts</p>
+
+    <pre class="mermaid">
+flowchart LR
+  TB[Toolbar button<br/>e.g. Skip Ad]:::stage --> IPC[webview:youtubeCommand IPC]:::stage
+  IPC --> MAIN[Main process<br/>buildYoutubeCommandScript]:::stage
+  MAIN --> EXEC[view.webContents.executeJavaScript<br/>userGesture=true]:::stage
+  EXEC --> SCRIPT[In-page script<br/>findSkipButton + pressElement]:::stage
+  SCRIPT --> RESULT[YoutubeCommandResult<br/>blockDwellMs?]:::stage
+  RESULT --> BLOCK[gcBlockDwell — pause<br/>in-page dwell for 1.5 s]:::stage
+
+  classDef stage fill:#eef1f7,stroke:#2c4a7c
+    </pre>
+    <p class="diagram-caption"><span class="figure-num">Figure 10.1</span>YouTube command pipeline. The <code>userGesture=true</code> flag is critical for any DOM action that Chromium gates on user-gesture context.</p>
+
+    <p>The skip-ad command in particular is non-trivial. The injected script searches the page for the YouTube skip-ad button using a strict selector list, validates the rect dimensions (real skip buttons
+    are 50&ndash;320 px wide, 20&ndash;96 px tall, positioned in the lower-right of the player), and then dispatches a synthetic mouse-event sequence directly on the button:</p>
+
+    <pre><code>['pointerover', 'pointerdown', 'mousedown',
+ 'pointerup', 'mouseup', 'click'].forEach(type =&gt; {
+  el.dispatchEvent(new MouseEvent(type, { ... }));
+});
+el.click();  // belt and braces</code></pre>
+
+    <p>This bypasses Chromium's hit testing entirely, so an overlapping iframe or shadow-DOM element cannot intercept the click. After dispatching, the script returns <code>blockDwellMs: 1500</code> to
+    pause the in-page dwell so the user's gaze can't accidentally fire a follow-up click on the now-revealed video (which would otherwise toggle play/pause).</p>
+
+    <h2 id="bayesian">10.3 &nbsp;Bayesian card posterior — audit recommendation R8</h2>
+    <p>YouTube card grids are particularly hard for nearest-distance target selection because of tight spacing and gaze noise. v17.4 added a Bayesian posterior over visible cards:</p>
+
+    <pre><code>L_i        = exp(-d_i² / (2σ²))         per-card Gaussian likelihood
+P_new_i    = α · L_i + (1-α) · P_old_i  temporal smoothing
+P_renorm_i = P_new_i / Σ P_new_j        normalise over candidates
+commit     = argmax(P) when max(P) ≥ commitThreshold</code></pre>
+
+    <p>Defaults: <code>σ = 46 px</code>, <code>α = 0.32</code>, <code>commitThreshold = 0.45</code>, candidate pool = all visible cards within 1.55&times; the regular hit zone. Posterior decay rate
+    <code>(1-α)</code> per frame for cards no longer in the candidate set.</p>
+
+    <p>The posterior accumulates evidence across frames, so a single noisy gaze sample cannot flip the winning card. The temporal smoothing window is ~7 frames (~230 ms at 30 Hz), which matches the
+    in-page dwell onset of 280 ms.</p>
+
+    <h2 id="asymmetric-snap">10.4 &nbsp;Asymmetric snap / unsnap (Tobii US10,890,967)</h2>
+    <p>Cards and the skip-ad button use asymmetric hysteresis: the radius required to <em>acquire</em> a target is smaller than the radius required to <em>release</em> it. This prevents boundary flicker
+    when gaze sits near the snap zone edge.</p>
+
+    <table>
+      <thead><tr><th>Target</th><th>Snap-in radius</th><th>Unsnap radius</th></tr></thead>
+      <tbody>
+        <tr><td>YouTube card</td><td>130 px</td><td>230 px</td></tr>
+        <tr><td>Skip-ad button</td><td>140 px</td><td>250 px</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ TELEMETRY ============ -->
+  <section id="telemetry">
+    <p class="chapter-marker">Chapter 11</p>
+    <h1>Telemetry (R1)</h1>
+    <p class="filename">src/utils/gazeTelemetry.ts</p>
+
+    <p>The R1 telemetry module is a pure measurement layer added in v17 to support objective tuning. It records every dwell-click event with:</p>
+
+    <ul>
+      <li>Target id, context (<code>data-gaze-context</code>), and screen identifier</li>
+      <li>The target's bounding rect at click time</li>
+      <li>The geometric centre of the target</li>
+      <li>The raw gaze sample at click moment</li>
+      <li>The <strong>residual</strong>: <code>gaze − centre</code> as <code>(dx, dy, magnitude)</code></li>
+      <li>Onset-to-click duration and dwell-to-click duration</li>
+    </ul>
+
+    <p>Aggregates (median residual, MAD, drift vector, mean acquisition time, per-context breakdown) are computed on demand and exposed via <code>window.__gazeTelemetry.snapshot()</code> for live
+    inspection in DevTools. Every 20 clicks the module also prints a one-line summary to the renderer console:</p>
+
+    <pre><code>[GazeTelemetry] n=20 medianResidual=8.3px MAD=4.1px drift=(2.0,-5.0)px medianAcq=920ms</code></pre>
+
+    <p>The same shape of data is recorded BrowserView-side via <code>window.__gcTelemetry</code> — accessible from the BrowserView's DevTools, which is a separate browser-window context from the main
+    renderer.</p>
+
+    <div class="callout">
+      <h5>Strategic purpose</h5>
+      <p>R1 was the audit's #1 recommendation precisely because every subsequent tuning recommendation (R5 adaptive classifier, R6 continuous self-calibration, R10 ALS preset thresholds) requires
+      objective accuracy numbers from a real session. The telemetry buffer captures enough data after 200&ndash;500 real clicks to make those decisions empirically rather than subjectively.</p>
+    </div>
+  </section>
+
+  <!-- ============ CONFIG ============ -->
+  <section id="config">
+    <p class="chapter-marker">Chapter 12</p>
+    <h1>Configuration Reference</h1>
+
+    <p>The complete list of tunable constants, their source file, and their meaning. Values shown are v17.10 defaults.</p>
+
+    <h3>12.1 &nbsp;Frontend GazeCursor.tsx</h3>
+    <table>
+      <thead><tr><th>Constant</th><th>Value</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>ONSET_DELAY_MS</td><td>250 ms</td><td>Stable gaze required before dwell starts</td></tr>
+        <tr><td>ONSET_DELAY_ALWAYS_ACTIVE_MS</td><td>100 ms</td><td>Shorter onset for emergency / toggle</td></tr>
+        <tr><td>LOCK_THRESHOLD</td><td>0.10 (10%)</td><td>Dwell progress at which lock acquires</td></tr>
+        <tr><td>LOCK_BREAK_DISTANCE</td><td>80 px</td><td>Distance from lockPos to break lock</td></tr>
+        <tr><td>LOCK_RECT_TOLERANCE (v17.10)</td><td>45 px</td><td>Rect-gate tolerance on lock-break</td></tr>
+        <tr><td>FIXATION_TTL_MS</td><td>1000 ms</td><td>SavedDwell expiry</td></tr>
+        <tr><td>FIXATION_TTL_MIN_PROGRESS</td><td>0.05</td><td>Minimum progress to save</td></tr>
+        <tr><td>KEYBOARD_SNAP_MARGIN</td><td>55 px</td><td>Inflated bounds for keyboard hit test</td></tr>
+        <tr><td>STABLE_ZONE</td><td>8 px</td><td>Anti-jitter freeze zone during dwell</td></tr>
+        <tr><td>NOISE_THRESHOLD</td><td>3 px</td><td>EMA sub-noise threshold</td></tr>
+        <tr><td>EDGE_OVERSHOOT</td><td>48 px</td><td>Allowed cursor overshoot beyond viewport</td></tr>
+      </tbody>
+    </table>
+
+    <h3>12.2 &nbsp;Frontend gazeSnapping.ts</h3>
+    <table>
+      <thead><tr><th>Constant</th><th>Value</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>BASE_SNAP_RADIUS</td><td>140 px</td><td>Default snap reach</td></tr>
+        <tr><td>MAX_SNAP_STRENGTH</td><td>0.30</td><td>Default per-frame pull strength</td></tr>
+        <tr><td>NEAR_CENTER_PROXIMITY</td><td>0.45</td><td>Inner 45% of radius gets boost</td></tr>
+        <tr><td>NEAR_CENTER_BOOST_FACTOR</td><td>1.45&times;</td><td>Boost multiplier (cards / toggle only)</td></tr>
+        <tr><td>KEYBOARD_SNAP_RADIUS</td><td>90 px</td><td>Smaller — backend magnet handles keys</td></tr>
+        <tr><td>KEYBOARD_MAX_SNAP_STRENGTH</td><td>0.10</td><td>Weak — avoids dual-pull with backend</td></tr>
+        <tr><td>TOGGLE_SNAP_RADIUS</td><td>220 px</td><td>Larger — gaze-toggle button is easier to reach</td></tr>
+        <tr><td>TOGGLE_MAX_SNAP_STRENGTH</td><td>0.36</td><td>Stronger pull for accessibility-critical control</td></tr>
+      </tbody>
+    </table>
+
+    <h3>12.3 &nbsp;BrowserView gcConfig (browserGazeController.ts)</h3>
+    <table>
+      <thead><tr><th>Constant</th><th>Value</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>dwellMs</td><td>1100 ms</td><td>BrowserView dwell duration</td></tr>
+        <tr><td>onsetMs</td><td>280 ms</td><td>BrowserView onset duration</td></tr>
+        <tr><td>stabilityRadiusPx</td><td>60 px</td><td>Base dwell stability tolerance</td></tr>
+        <tr><td>targetRegionSlackPx</td><td>32 px</td><td>Rect+slack hold zone</td></tr>
+        <tr><td>youtubeCardHitZonePx</td><td>130 px</td><td>Card snap-in radius</td></tr>
+        <tr><td>youtubeCardUnsnapPx</td><td>230 px</td><td>Card hold radius (asymmetric)</td></tr>
+        <tr><td>youtubeSkipSnapPx</td><td>140 px</td><td>Skip-ad snap-in radius</td></tr>
+        <tr><td>youtubeSkipUnsnapPx</td><td>250 px</td><td>Skip-ad hold radius (asymmetric)</td></tr>
+        <tr><td>bayesianSigmaPx</td><td>46</td><td>Gaussian likelihood σ for cards</td></tr>
+        <tr><td>bayesianAlpha</td><td>0.32</td><td>Temporal posterior update weight</td></tr>
+        <tr><td>bayesianCommitThreshold</td><td>0.45</td><td>Minimum posterior to commit to a card</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ FRAME TRACE ============ -->
+  <section id="frame-trace">
+    <p class="chapter-marker">Chapter 13</p>
+    <h1>End-to-End Frame Trace</h1>
+
+    <p>A single gaze sample, in concrete numbers, from sensor to selection. The patient is typing the letter <code>L</code> in &ldquo;hello&rdquo; on a 23&Prime; 1080p display at 60 cm.</p>
+
+    <pre class="mermaid">
+sequenceDiagram
+  participant ET5 as Tobii ET5
+  participant CS as TobiiGazeHelper (C#)
+  participant PY as Python Pipeline
+  participant EL as Electron Main
+  participant RE as React Renderer
+  participant L  as L Key (DOM element)
+
+  ET5->>CS: raw (0.86, 0.54) @ t=12345.401s
+  Note over CS: GazePointDataStream callback
+  CS->>PY: TCP JSON {"x":0.86,"y":0.54,"t":12345.401}
+  Note over PY: SignalConditioner.process() — valid=true
+  Note over PY: Classifier: velocity 18°/s → fixation
+  Note over PY: One Euro: alpha=0.07 (fixation) → (0.857, 0.541)
+  Note over PY: Magnet: keyboard ctx → pull (0.857→0.853)
+  PY->>RE: WS {"x":0.853,"y":0.541, gaze_state:"fixation", ...}
+  Note over RE: coord transform: (0.853, 0.541) * (1920, 1080) = (1638, 584)
+  Note over RE: 3-tap MA: with prev frames (1635, 583), (1632, 582) → (1635, 583)
+  Note over RE: Semantic snap: nearest target = L key (1640, 580), pull 0.10 → (1635.5, 583.3)
+  Note over RE: EMA: alpha=0.38, dx=+3px → posRef (1633, 583)
+  Note over RE: R2 anchor: dwellTargetRef = L → posRef = L.center (1640, 580)
+  Note over RE: setX(1640); setY(580); dwell ring at 78%
+  RE->>RE: dwellFrame: posRef inside L rect → continue dwell
+  Note over RE: 220 ms later, progress = 1.0
+  RE->>L: dwellTargetRef.current.click()
+  L-->>RE: onClick handler: textfield += "l"
+    </pre>
+    <p class="diagram-caption"><span class="figure-num">Figure 13.1</span>A single L-keystroke from gaze to DOM click, with concrete coordinates and timings. Total ~1250 ms from gaze landing to click firing.</p>
+  </section>
+
+  <!-- ============ VERSION HISTORY ============ -->
+  <section id="version-history">
+    <p class="chapter-marker">Chapter 14</p>
+    <h1>Version History — the v17 series</h1>
+
+    <p>The v17 series was a focused multi-week debugging campaign driven by the patient's reports and verified by screen-recording analysis. The full chronological sequence:</p>
+
+    <h3>v17.1 &nbsp; <span class="tag fix">FIX</span> Keyboard snap revert</h3>
+    <p>Reverted v17.0's KEYBOARD_SNAP_RADIUS bump to v15 baseline (90 px / 0.10 strength). The bump had reintroduced the dual-pull with backend keyboard magnetism, causing inter-key snap jumps. Disabled
+    the new <em>near-center proximity boost</em> for keyboard and prediction-strip contexts via <code>useProximityBoost: false</code>.</p>
+
+    <h3>v17.2 &nbsp; <span class="tag fix">FIX</span> YouTube back button uses browser history</h3>
+    <p>Previously the YouTube panel's Back button always closed the panel entirely. Now it uses <code>browser.canGoBack</code> / <code>browser.goBack</code> first, only closing the panel when no history
+    remains.</p>
+
+    <h3>v17.3 &nbsp; <span class="tag new">NEW</span> Two-phase visual anchor (R2 Phase A + Phase B)</h3>
+    <p>Introduced the R2 visual anchor as a separate concept from the snap. Phase A: hard-snap posRef to dwell target centre post-onset. Phase B: smooth pull during onset (100&ndash;250 ms). Decouples
+    perceived accuracy from selection accuracy.</p>
+
+    <h3>v17.4 &nbsp; <span class="tag new">NEW</span> Sticky tolerance + Bayesian YouTube posterior</h3>
+    <p>Added sticky tolerance (35&ndash;70 px) as a safety net for the multi-point hit test. Introduced Bayesian posterior over YouTube cards (audit R8). The sticky tolerance proved too wide; rolled
+    back in v17.5.</p>
+
+    <h3>v17.5 &nbsp; <span class="tag fix">FIX</span> Narrow sticky + widen HIT_OFFSET</h3>
+    <p>Sticky tolerance reduced 70 → 35 (safety net only). The real flicker fix is multi-point <code>HIT_OFFSET</code> bumped 35 → 70 when a dwell is active. Bayesian α restored from 0.40 to 0.32 for
+    smoother transitions.</p>
+
+    <h3>v17.6 &nbsp; <span class="tag new">NEW</span> Visual continuity (Option A)</h3>
+    <p>Decoupled the dwell-ring visual from the logical dwell state. When gaze briefly leaves a target mid-dwell, the visible ring no longer resets to 0 — it persists at its last value during the
+    existing 1000 ms <code>savedDwellRef</code> grace window. BrowserView equivalent uses a 600 ms grace on the <code>.dwelling</code> CSS class.</p>
+
+    <h3>v17.7 &nbsp; <span class="tag new">NEW</span> Anchored hit test post-onset (Option B)</h3>
+    <p>Once a dwell target is committed, the multi-point hit test runs against <code>posRef</code> (the R2-anchored cursor position) instead of raw gaze. R2 keeps <code>posRef</code> at target centre,
+    so the hit test cannot miss.</p>
+
+    <h3>v17.8 &nbsp; <span class="tag fix">FIX</span> Onset-phase sticky + keyboard margin 55</h3>
+    <p>Extended sticky tolerance to also cover the onset phase (60 px standard, 100 px edge-aware). KEYBOARD_SNAP_MARGIN raised 35 → 55 to fix edge-key (A, Z, P) onset resets. Snap-targets-nearest-center
+    now runs as a fallback on keyboard screen too.</p>
+
+    <h3>v17.9 &nbsp; <span class="tag fix">FIX</span> Unified hit test on posRef</h3>
+    <p>Removed the v18 special case that used <code>lastRawPointRef</code> for keyboard screen hit testing. Hit test now uses <code>posRef</code> on <em>all</em> screens — cursor render and selection
+    point are the same. Sticky tolerance widened slightly (110 px edge / 50 px standard during dwell; 130 px / 80 px during onset).</p>
+
+    <h3>v17.10 &nbsp; <span class="tag fix">FIX</span> Lock-break gated by target rect — the 90% abort fix</h3>
+    <p>The single most important fix in the series, identified by Claude AI's frame-by-frame video analysis. Lock-break now requires <em>both</em> (a) raw gaze &gt; 80 px from lockPos and (b) raw gaze
+    outside dwell target's rect + 45 px tolerance. Previously trigger-on-(a)-alone aborted dwells at ~90% progress whenever Tobii ET5 noise pushed raw gaze beyond 80 px from centre during legitimate
+    fixation. Verified: the L-key 90% abort and the 15-second Chest/Nebulization loop both resolve.</p>
+
+    <hr/>
+
+    <h3>Audit recommendations: status</h3>
+    <p>Recommendations from the eye-gaze accuracy audit (companion document in this docs folder).</p>
+
+    <table>
+      <thead><tr><th>ID</th><th>Recommendation</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>R1</td><td>Session telemetry</td><td><span class="tag new">SHIPPED v17 series</span></td></tr>
+        <tr><td>R2</td><td>Visual anchor decoupling</td><td><span class="tag new">SHIPPED v17.3</span></td></tr>
+        <tr><td>R3</td><td>Remove 3-tap MA</td><td>Deferred — risks reintroducing jitter</td></tr>
+        <tr><td>R4</td><td>Full Bayesian over keyboard</td><td>Deferred — high regression risk</td></tr>
+        <tr><td>R5</td><td>Adaptive classifier thresholds</td><td>Deferred — needs R1 data first</td></tr>
+        <tr><td>R6</td><td>Continuous self-calibration</td><td>Roadmap — Apple US11,789,528 pattern</td></tr>
+        <tr><td>R7</td><td>Cascading dwell (Mott CHI'17)</td><td>Roadmap — opt-in typing mode</td></tr>
+        <tr><td>R8</td><td>Bayesian YouTube posterior</td><td><span class="tag new">SHIPPED v17.4</span></td></tr>
+        <tr><td>R9</td><td>Hardware tier evaluation</td><td>Deferred — separate decision</td></tr>
+        <tr><td>R10</td><td>Late-stage ALS preset</td><td>Roadmap</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ FILE MAP ============ -->
+  <section id="file-map">
+    <p class="chapter-marker">Chapter 15</p>
+    <h1>File Architecture Map</h1>
+
+    <p>Where to look in the codebase for each pipeline stage:</p>
+
+    <table>
+      <thead><tr><th>Pipeline stage</th><th>File</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Tobii bridge</td><td><span class="filename">tobii-helper/TobiiGazeHelper/Program.cs</span></td><td>C# .NET 6.0; binds to Tobii SDK</td></tr>
+        <tr><td>Python entry</td><td><span class="filename">python/main.py</span></td><td>asyncio orchestrator; routes everything</td></tr>
+        <tr><td>Signal conditioning</td><td><span class="filename">python/services/signal_conditioner.py</span></td><td>Validity / blink / loss / frozen</td></tr>
+        <tr><td>One Euro filter</td><td><span class="filename">python/services/one_euro_filter.py</span></td><td>Also hosts GravityWell + OptiKey filter</td></tr>
+        <tr><td>I-VT classifier</td><td><span class="filename">python/services/gaze_classifier.py</span></td><td>fixation / saccade / glissade</td></tr>
+        <tr><td>Calibration</td><td><span class="filename">python/services/calibration.py</span></td><td>9-point polynomial fit</td></tr>
+        <tr><td>WebSocket server</td><td><span class="filename">python/main.py</span></td><td>port 8765, JSON</td></tr>
+        <tr><td>WebSocket client</td><td><span class="filename">src/hooks/useWebSocket.tsx</span></td><td>Provider + subscribeGaze</td></tr>
+        <tr><td>Electron main</td><td><span class="filename">electron/main.ts</span></td><td>BrowserView orchestration, IPC handlers</td></tr>
+        <tr><td>BrowserView cursor</td><td><span class="filename">electron/browser/browserGazeController.ts</span></td><td>In-page dwell IIFE</td></tr>
+        <tr><td>YouTube controller</td><td><span class="filename">electron/browser/youtubeController.ts</span></td><td>Skip-ad / play-pause script builder</td></tr>
+        <tr><td>Cursor + dwell machine</td><td><span class="filename">src/components/core/GazeCursor.tsx</span></td><td>The heart of the renderer (1500 LOC)</td></tr>
+        <tr><td>Semantic snap</td><td><span class="filename">src/utils/gazeSnapping.ts</span></td><td>collectSnapTargets + computeSnap</td></tr>
+        <tr><td>Hit-zone expansion</td><td><span class="filename">src/utils/hitZoneExpansion.ts</span></td><td>findBestKeyboardKey</td></tr>
+        <tr><td>Edge hit-zone (cards)</td><td><span class="filename">src/utils/edgeHitZone.ts</span></td><td>Card-grid edge handling</td></tr>
+        <tr><td>Telemetry</td><td><span class="filename">src/utils/gazeTelemetry.ts</span></td><td>Ring buffer + window.__gazeTelemetry</td></tr>
+        <tr><td>Gaze control context</td><td><span class="filename">src/components/core/GazeControlToggle.tsx</span></td><td>Enable/disable state + cooldown timing</td></tr>
+        <tr><td>Web browsing screen</td><td><span class="filename">src/screens/WebBrowsingScreen.tsx</span></td><td>YouTube panel, BrowserView container</td></tr>
+        <tr><td>Alert mode</td><td><span class="filename">src/screens/AlertModeScreen.tsx</span></td><td>Auto-enable gaze on mount (v17)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ GLOSSARY ============ -->
+  <section id="glossary">
+    <p class="chapter-marker">Appendix</p>
+    <h1>Glossary</h1>
+
+    <dl>
+      <dt>AAC</dt>
+      <dd>Augmentative and Alternative Communication. Software/hardware that enables communication for people whose primary motor channels are impaired.</dd>
+
+      <dt>Dwell</dt>
+      <dd>A selection method where the user holds their gaze on a target for a fixed duration to confirm the selection. The duration in this app is 1000 ms (the dwell phase) plus 250 ms onset = 1250 ms
+        total from gaze landing to click.</dd>
+
+      <dt>Fixation</dt>
+      <dd>A period when the eye is approximately stationary (&lt; 65 °/s in this build). Fixations encode intentional looking and are the events the dwell machine accumulates.</dd>
+
+      <dt>Glissade</dt>
+      <dd>A short, low-velocity drift that follows a saccade as the eye settles. Distinct from both fixation and saccade.</dd>
+
+      <dt>I-VT</dt>
+      <dd>Identification-by-Velocity Threshold. The simplest and most widely used eye-movement event classifier. Salvucci &amp; Goldberg, ETRA 2000.</dd>
+
+      <dt>Lock</dt>
+      <dd>An internal state in the dwell machine, entered at 10% dwell progress. While locked, the cursor freezes at <code>lockPosRef</code> and only a deliberate gaze away (lock-break) cancels the
+        dwell.</dd>
+
+      <dt>Onset</dt>
+      <dd>The 250 ms anti-spurious filter that runs before the dwell phase. Prevents drive-by activations during gaze scanning.</dd>
+
+      <dt>posRef</dt>
+      <dd>The frontend's authoritative cursor position. A mutable ref shared between the gaze handler and the dwell frame loop. Set by the EMA, modified by R2 anchor, read by the hit test and the
+        render.</dd>
+
+      <dt>R2 visual anchor</dt>
+      <dd>The mechanism that snaps <code>posRef</code> to the dwell target's centre on every frame during dwell. Decouples perceived accuracy from selection accuracy.</dd>
+
+      <dt>Saccade</dt>
+      <dd>A fast (typically &gt; 150 °/s) ballistic eye movement from one fixation point to another.</dd>
+
+      <dt>SavedDwell</dt>
+      <dd>The mechanism that preserves dwell progress when gaze briefly leaves a target. If gaze returns within 1000 ms (<code>FIXATION_TTL_MS</code>), the dwell resumes from the saved progress.</dd>
+
+      <dt>Sticky tolerance</dt>
+      <dd>A safety net: when the multi-point hit test misses but a dwell or onset target is still set, the target is held if raw gaze is within a tolerance band of the rect.</dd>
+
+      <dt>Tobii ET5</dt>
+      <dd>Tobii Eye Tracker 5 — a consumer-grade gaming peripheral repurposed for accessibility use. 33 Hz gaze data rate; 50&ndash;95 cm operating distance.</dd>
+    </dl>
+  </section>
+
+  <footer class="book-end">
+    GazeConnect Pro &middot; Eye Tracking Pipeline Technical Reference &middot; v17.10 &middot; 2026
+  </footer>
+
+  </main>
+</div>
+
+<!-- ============ MERMAID ============ -->
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'neutral',
+    themeVariables: {
+      fontFamily: 'Inter, -apple-system, sans-serif',
+      primaryColor: '#eaf0eb',
+      primaryTextColor: '#1c2434',
+      primaryBorderColor: '#1f4d4d',
+      lineColor: '#4a5568',
+      tertiaryColor: '#fbf3df',
+    },
+    flowchart: {
+      curve: 'basis',
+      htmlLabels: true,
+    },
+    sequence: {
+      actorMargin: 60,
+      noteMargin: 12,
+      messageMargin: 35,
+      mirrorActors: false,
+    },
+  });
+</script>
+
+</body>
+</html>

@@ -2,6 +2,10 @@
 
 This document covers the internal architecture of GazeConnect Pro: how gaze data flows from hardware to UI action, how the three processes communicate, and how the React component hierarchy is organized.
 
+> **Build:** v4.8.0 (gaze pipeline v17.10)
+>
+> For the comprehensive end-to-end pipeline reference with Mermaid diagrams covering every stage and constant, see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html).
+
 ---
 
 ## System Overview
@@ -127,15 +131,25 @@ survey_data  — Survey load/save responses
 
 **Gaze data arrives via WebSocket** (`useWebSocket.tsx`):
 1. `useWebSocket` hook connects to `ws://localhost:8765`
-2. On each `gaze_data` message, updates `RealGazeContext`
-3. `GazeCursor` component reads from context to render the visual cursor
-4. `GazeButton` components read from context to detect dwell
+2. On each `gaze` message, listeners in `listenersRef.current` are notified directly (no React state update — avoids re-render storms at 33 Hz).
+3. `GazeCursor` component subscribes via `subscribeGaze(callback)` and runs the full frontend pipeline.
 
-**Dwell detection** (client-side, in `GazeButton.tsx`):
-1. GazeButton calculates if the gaze point is within its bounding rect
-2. If gaze stays within the rect for the configured dwell duration → triggers `onClick`
-3. Visual progress indicator fills during dwell
-4. Different dwell categories: `emergency` (400ms), `standard` (600ms), `homeScreenTile` (600ms), `safetyCritical` (1200ms)
+**Dwell detection** (centralised in `GazeCursor.tsx`, NOT per-button):
+1. A single animation-frame loop (`dwellFrame`, ~60 Hz) runs the entire dwell state machine: onset → dwell → lock → click.
+2. Hit testing identifies the active interactive element under the cursor on every frame (multi-point hit test + sticky tolerance + nearest-center fallback).
+3. Once dwell completes, `GazeCursor` calls `dwellTargetRef.current.click()` directly — the target element's `onClick` handler fires as if it were a normal mouse click.
+4. **`GazeButton` is a styling/affordance component**, not a dwell driver. It exposes `data-gaze*` attributes that the central machine consumes. This centralisation was a deliberate design choice that allows the v17 visual anchor (R2), savedDwell continuity, and lock-break gating to work consistently across all targets.
+
+**Dwell timings (v17.10)**: 250 ms onset + 1000 ms dwell + 1300 ms cooldown. Lock fires at 10 % dwell progress. Lock-break requires both raw-gaze > 80 px from `lockPos` AND raw-gaze outside the target rect + 45 px tolerance — see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html) Chapter 9 for the full state machine.
+
+**Frontend filter stack** (in `GazeCursor.tsx`, applied to each gaze sample):
+1. Coordinate transform (window vs. screen normalisation).
+2. Edge-overshoot clamp ±48 px beyond viewport.
+3. 3-tap weighted moving average (0.45/0.30/0.25).
+4. Semantic snap (`gazeSnapping.ts`) — soft attraction to nearest gaze-enabled target.
+5. Velocity-adaptive EMA per gaze state.
+6. **R2 visual anchor** (v17.3): once dwell target is set, `posRef` is snapped to target centre every frame.
+7. Render: `setX`, `setY` update the cursor div.
 
 ---
 

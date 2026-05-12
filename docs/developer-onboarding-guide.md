@@ -111,14 +111,23 @@ This launches all three processes. Use `--simulate` to use mouse cursor as gaze 
 | File | What It Does |
 |------|-------------|
 | `src/App.tsx` | Root component. Contains screen routing and global context providers. |
-| `src/components/core/GazeButton.tsx` | The primary interaction component. Every clickable element is a GazeButton with dwell detection. |
-| `src/components/core/GazeCursor.tsx` | Renders the visual gaze cursor overlay. Smoothing, multi-point hit testing, edge handling. |
+| `src/components/core/GazeCursor.tsx` | **The heart of the renderer (~1500 LOC).** Renders the visual gaze cursor + runs the centralised dwell state machine (onset → dwell → lock → click). Owns frontend smoothing (3-tap MA, EMA, R2 visual anchor), multi-point hit testing, sticky tolerance, savedDwell visual continuity. All other components rely on this for dwell detection. |
+| `src/components/core/GazeButton.tsx` | A styling / affordance component. Exposes `data-gaze*` attributes that `GazeCursor` consumes. **Not a dwell driver** — dwell is centralised in `GazeCursor.tsx` as of v17. |
+| `src/components/core/GazeControlToggle.tsx` | Gaze enable/disable state + cooldown timing. Provides the `useGazeControl` hook. |
 | `src/components/GlobalNavBar.tsx` | Top navigation bar present on every screen. |
 | `src/utils/design.ts` | All design tokens: colors, spacing, typography, screen themes. |
-| `src/hooks/useWebSocket.tsx` | WebSocket connection to the Python backend. Handles reconnection, message routing. |
-| `src/contexts/RealGazeContext.tsx` | Provides raw gaze coordinates to all components via React context. |
-| `electron/main.ts` | Electron main process. Creates the window, spawns Python and Tobii processes, handles IPC. |
-| `python/main.py` | Python entry point. Asyncio WebSocket server handling gaze data, word + sentence prediction, Datamuse API, TTS, survey persistence. |
+| `src/utils/gazeSnapping.ts` | Semantic snap — soft attraction toward gaze-enabled buttons. Per-context radii/strengths + the v17 near-center proximity boost. |
+| `src/utils/hitZoneExpansion.ts` | Center-weighted nearest-key selection for the keyboard. `KEYBOARD_SNAP_MARGIN = 55 px` (v17.8). |
+| `src/utils/gazeTelemetry.ts` | **R1 telemetry module (v17).** Records every dwell-click event with residual, drift vector, acquisition time. Inspect via `window.__gazeTelemetry.snapshot()` in DevTools. |
+| `src/hooks/useWebSocket.tsx` | WebSocket connection to the Python backend. Handles reconnection, message routing, and the `subscribeGaze` listener pattern. |
+| `src/hooks/useGazeBrowser.ts` | Hook wrapping all IPC for the embedded `BrowserView` (open / close / updateGaze / youtubeCommand / setGazeConfig / telemetry). |
+| `electron/main.ts` | Electron main process. Creates the window, spawns Python and Tobii processes, handles IPC. Owns the `BrowserView` for embedded web browsing. |
+| `electron/browser/browserGazeController.ts` | The injected IIFE that runs the in-page dwell cursor inside `BrowserView`. Bayesian YouTube card posterior (v17.4 / audit R8), asymmetric snap/unsnap, in-page visual continuity. |
+| `electron/browser/youtubeController.ts` | YouTube-specific command script builder. Skip-ad uses synthetic click dispatch + `blockDwellMs` to prevent follow-up gaze clicks toggling play/pause. |
+| `python/main.py` | Python entry point. Asyncio WebSocket server handling gaze data, word + sentence prediction, Datamuse API, TTS, survey persistence. Hosts `_apply_magnetism` (per-context magnetism) and the OptiKey pipeline orchestration. |
+| `python/services/signal_conditioner.py` | Validity / blink hold / tracking-loss / frozen detection. |
+| `python/services/one_euro_filter.py` | One Euro filter + OptiKey 4-zone stabilizer + GravityWell magnetism. |
+| `python/services/gaze_classifier.py` | I-VT fixation/saccade/glissade classifier (65 / 150 °/s thresholds with 2-of-N / 4-of-N hysteresis). |
 | `python/services/word_prediction.py` | Word prediction engine: n-gram model, smart bigrams (1,339 pairs), CIFG-LSTM neural fusion (1.9MB), vocabulary boosting, RecencyTracker, PatientBigramTracker, time-of-day boost. |
 | `python/prediction_guardrails.py` | Blocked words filter: 110 harmful/inappropriate words permanently filtered from predictions. |
 | `python/services/sentence_prediction.py` | Sentence completion engine: patient history, 180 templates, fuzzy matching. |
@@ -127,6 +136,16 @@ This launches all three processes. Use `--simulate` to use mouse cursor as gaze 
 | `CLAUDE.md` | Claude Code project context. Contains constraints and rules for AI-assisted development. |
 
 ---
+
+## Gaze Pipeline Docs Map
+
+For understanding the eye-tracking pipeline (the system's heart), read in this order:
+
+1. `docs/eye-tracking-pipeline-textbook.html` — **comprehensive technical reference** (v17.10). Open in a browser. Covers Tobii hardware → C# bridge → Python pipeline → WebSocket transport → Electron main → React renderer → dwell state machine → BrowserView pipeline → telemetry. Includes Mermaid flow diagrams and end-to-end frame trace.
+2. `docs/eye-gaze-pipeline-learning-guide.md` — narrative learning material covering the design choices, with a v17.x supplement.
+3. `docs/gaze-accuracy-and-word-prediction-guide.md` — joins gaze accuracy with word prediction. Part 4 has the full v17.x change history.
+4. `docs/technical-architecture-guide.md` — concise architecture overview with the 5-layer process model.
+5. `CLAUDE.md` — non-negotiable design constraints for any change to the gaze pipeline.
 
 ## Floor Plan Docs Map
 
@@ -140,6 +159,13 @@ Use these in this order:
    - All script commands (`v4`, `smart`, `v5`) with session-safe usage.
 4. `home_plan_readme.md`
    - Compact technical summary of floor-plan module wiring.
+
+## Word Prediction Docs Map
+
+1. `docs/word-prediction-system-complete-guide.md` — the canonical word-prediction reference.
+2. `docs/NEURAL_LANGUAGE_MODEL_COMPLETE_GUIDE.md` — deep dive on the CIFG-LSTM neural predictor.
+3. `docs/PREDICTION_SYSTEM_EXPLAINED.md` — plain-language explainer.
+4. `docs/gaze-accuracy-and-word-prediction-guide.md` Part 2 — how predictions flow into the keyboard UI.
 
 ---
 

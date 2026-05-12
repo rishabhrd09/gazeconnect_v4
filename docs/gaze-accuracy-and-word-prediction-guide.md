@@ -531,3 +531,100 @@ Manual gaze offset was applied in BOTH backend (`_screen_to_window_normalized`) 
 - **"Click Here" button:** Added to YouTube, QuickSearch, Social, and News panels (was only in WhatsApp)
 - **Edge-scroll indicators:** Added teal gradient overlays to YouTube, Social, and News panels (was only in QuickSearch)
 - **BrowserView dwell:** 1000ms dwell-click inside web content (injected via Electron main process)
+
+---
+
+### v17.x sub-series (May 2026) — visual anchor, lock-break gating, telemetry, Bayesian browser
+
+The v17 base above stabilized overlay and web browsing. The v17.x sub-series that followed (driven by clinical use with the patient and frame-by-frame screen-recording analysis) addressed deeper failure modes rooted in **hardware noise floor** of the Tobii ET5 and a **cursor/hit-test position mismatch** that had been latent in the codebase. For a comprehensive end-to-end pipeline reference incorporating all of these, see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html).
+
+#### v17.3 — R2 visual anchor (`GazeCursor.tsx`)
+Decouples *perceived accuracy* from *selection accuracy*. Once dwell onset commits, the cursor (`posRef`) is forced to the dwell target's bounding-rect centre on every frame. The user sees the cursor sit at the target centre even though the underlying gaze (with 10–20 px hardware noise) wobbles around it. Selection logic still reads raw gaze for lock-break and target-change detection.
+
+Plus a complementary **onset preview anchor**: during the 250 ms onset phase, the cursor is interpolated toward the candidate's centre with pull strength ramping 0 → 0.30 between 100 ms and 250 ms of stable gaze. The cursor visibly homes in on a key *during onset* instead of jittering on the edge.
+
+Reference: BayesGaze (Xu et al., Graphics Interface 2021); Apple US11,789,528 (visual confirmation cue separate from raw gaze position).
+
+#### v17.6 — Visual continuity layer (`GazeCursor.tsx`, `electron/browser/browserGazeController.ts`)
+SavedDwell already preserved *logical* dwell progress when gaze briefly left a target. But the *visual* dwell ring used to reset to 0 % and start over, creating a "loop" sensation. Option A keeps the ring and highlight visible at their last value during the existing 1000 ms grace; only when grace expires (or a different button takes focus) are the visuals cleared. Browser-side equivalent uses a 600 ms grace on the `.dwelling` CSS class.
+
+New ref: `savedDwellExpiryRef`. New script: `gcBlockDwell(durationMs)` in the BrowserView IIFE.
+
+#### v17.7 — Anchored hit test post-onset (Option B) (`GazeCursor.tsx`)
+Once a dwell target is committed, the multi-point hit test runs against `posRef` (the R2-anchored cursor position) instead of raw gaze. R2 keeps `posRef` at target centre, so the hit test always finds the target. Eliminates the "cursor visible on K but selection logic thinks gaze is off K" failure mode.
+
+#### v17.8 — Onset-phase sticky + keyboard margin 55 (`GazeCursor.tsx`, `hitZoneExpansion.ts`)
+Three related fixes shipped together:
+1. `KEYBOARD_SNAP_MARGIN` raised 35 → 55 px (`hitZoneExpansion.ts`). Fixes the edge-key loop on A, Z, P, ?, where raw-gaze noise routinely exceeded 35 px outside the rect.
+2. Snap-targets-nearest-center now runs as a *fallback* even on keyboard screen, so non-keyboard buttons (Word, Quick Phrases, Show Nav, prediction-strip phrases) get the same generous nearest-center treatment as keyboard keys.
+3. Sticky tolerance extended to also cover the onset phase, not just post-dwell. Edge-aware: 60 px standard / 100 px for buttons within 80 px of viewport edge.
+
+#### v17.9 — Unified hit test on `posRef` (`GazeCursor.tsx`)
+Removed the v18 special case that used `lastRawPointRef` (raw gaze) for keyboard hit testing. Hit test now uses `posRef` on *all* screens. Cursor render position and selection point are literally the same. What you see is what you select.
+
+Sticky tolerance widened slightly to absorb Tobii frame drops (110 px edge / 50 px standard during dwell; 130 px / 80 px during onset).
+
+#### v17.10 — Lock-break gated by target rect (`GazeCursor.tsx`)
+**The single most important fix in the series, isolated by Claude AI's frame-by-frame video analysis.** Pre-v17.10 lock-break used a single condition:
+
+```ts
+if (distFromLock > LOCK_BREAK_DISTANCE) { abort dwell; }   // 80 px
+```
+
+Tobii ET5 routinely produces 50–80 px raw-gaze noise during legitimate fixation (especially at screen edges where `EDGE_MODE` disables backend smoothing). A single noisy sample at 81 px from `lockPos` aborted dwells at ~90 % progress without firing the click. The patient called this "the 90 % abort."
+
+The fix requires *both* conditions:
+
+```ts
+let shouldBreakLock = distFromLock > LOCK_BREAK_DISTANCE;
+if (shouldBreakLock && dwellTargetRef.current?.isConnected) {
+  const tRect = dwellTargetRef.current.getBoundingClientRect();
+  const LOCK_RECT_TOLERANCE = 45;
+  const insideTargetRect = (
+    rawX >= tRect.left - LOCK_RECT_TOLERANCE
+    && rawX <= tRect.right + LOCK_RECT_TOLERANCE
+    && rawY >= tRect.top - LOCK_RECT_TOLERANCE
+    && rawY <= tRect.bottom + LOCK_RECT_TOLERANCE
+  );
+  if (insideTargetRect) shouldBreakLock = false;
+}
+```
+
+Lock only breaks when raw gaze is *both* >80 px from `lockPos` *and* outside the dwell target's rect + 45 px tolerance. Verified by post-fix recording: the L-key 90 % abort and the 15-second Chest/Nebulization loop both resolve.
+
+#### v17 — R1 audit recommendation: Telemetry (`src/utils/gazeTelemetry.ts`)
+New module. Records every dwell-click with target id, rect, raw-gaze residual (gaze − centre), and timing. 250-event ring buffer. Aggregates (median residual, MAD, drift vector, per-context breakdown) exposed via `window.__gazeTelemetry.snapshot()` in DevTools. BrowserView equivalent via `window.__gcTelemetry`.
+
+Provides objective accuracy numbers for tuning future iterations without subjective guesswork. Audit's R1 was the highest-priority "do first before further tuning" recommendation.
+
+#### v17 — R8 audit recommendation: Bayesian YouTube card posterior (`electron/browser/browserGazeController.ts`)
+Replaces nearest-distance YouTube card resolution with a Gaussian-likelihood posterior temporally smoothed across frames:
+
+```
+L_i      = exp(-d_i² / (2σ²))         per-card likelihood
+P_new_i  = α · L_i + (1-α) · P_old_i  temporal smoothing
+commit when max(P) >= commitThreshold
+```
+
+Defaults: σ = 46 px, α = 0.32, commit threshold 0.45, expanded candidate zone 1.55× the regular hit radius. A single noisy frame cannot flip the winning card.
+
+#### v17 — Asymmetric snap/unsnap on YouTube targets (Tobii US10,890,967 pattern)
+Card snap-in 130 px, unsnap (hold) 230 px. Skip-ad snap-in 140 px, unsnap 250 px. Once a target is committed the dwell tolerates wider drift before reset, preventing boundary flicker.
+
+#### v17 — Auto-enable gaze on Alert Mode and embedded browser
+`AlertModeScreen.tsx` and `WebBrowsingScreen.tsx` (embedded browser view) force-enable gaze on mount, respecting Mouse-Only Mode. The patient was getting stuck on these screens with gaze toggle off after navigating from elsewhere.
+
+#### Audit recommendations: status
+
+| ID | Recommendation | Status |
+|----|----------------|--------|
+| R1 | Session telemetry | **Shipped** v17 series |
+| R2 | Visual anchor decoupling | **Shipped** v17.3 |
+| R3 | Remove 3-tap MA | Deferred — risks reintroducing jitter |
+| R4 | Full Bayesian over keyboard | Deferred — high regression risk |
+| R5 | Adaptive classifier thresholds | Deferred — needs R1 data first |
+| R6 | Continuous self-calibration | Roadmap (Apple US11,789,528 pattern) |
+| R7 | Cascading dwell (Mott CHI'17) | Roadmap — opt-in typing mode |
+| R8 | Bayesian YouTube card posterior | **Shipped** v17.4 |
+| R9 | Hardware tier evaluation | Deferred — separate decision |
+| R10 | Late-stage ALS preset | Roadmap |
