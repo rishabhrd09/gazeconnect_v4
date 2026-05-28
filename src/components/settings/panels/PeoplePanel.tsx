@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
 import GazeButton from '../../core/GazeButton';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { generateDefaultPhrases } from '../../../services/defaultCustomization';
+import { MAX_ACTIVE_PEOPLE } from '../../../types/customization';
 import type { Person } from '../../../types/customization';
 
 interface PeoplePanelProps {
@@ -50,7 +51,9 @@ const AddPersonForm: React.FC<{
       backgroundColor: colors.background.secondary,
       borderRadius: layout.borderRadius.lg,
       border: `1px solid ${colors.accent.main}40`,
-      display: 'flex', flexDirection: 'column', gap: spacing[3],
+      display: 'flex',
+      flexDirection: 'column',
+      gap: spacing[3],
     }}>
       <div style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold, color: colors.accent.main }}>
         Add New Person
@@ -63,7 +66,7 @@ const AddPersonForm: React.FC<{
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="e.g. Papa"
+            placeholder="e.g. पापा"
             style={inputStyle}
           />
         </div>
@@ -74,7 +77,7 @@ const AddPersonForm: React.FC<{
           <input
             value={nameHi}
             onChange={e => setNameHi(e.target.value)}
-            placeholder="e.g. पापा"
+            placeholder="e.g. Papa"
             style={inputStyle}
           />
         </div>
@@ -97,44 +100,71 @@ const AddPersonForm: React.FC<{
 
 const PersonRow: React.FC<{
   person: Person;
+  isActive: boolean;
+  activeCount: number;
   isDarkMode: boolean;
+  onToggleActive: () => void;
   onRemove: () => void;
-}> = ({ person, isDarkMode, onRemove }) => {
+}> = ({ person, isActive, activeCount, isDarkMode, onToggleActive, onRemove }) => {
   const colors = isDarkMode ? darkColors : lightColors;
+  const canShow = isActive || activeCount < MAX_ACTIVE_PEOPLE;
+  const canHide = !isActive || activeCount > 1;
+  const toggleDisabled = isActive ? !canHide : !canShow;
+  const activeBorder = isActive ? colors.accent.main : colors.border.main;
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: spacing[3],
+      display: 'flex',
+      alignItems: 'center',
+      gap: spacing[3],
       padding: `${spacing[3]} ${spacing[4]}`,
       backgroundColor: colors.background.secondary,
       borderRadius: layout.borderRadius.lg,
-      border: `1px solid ${colors.border.main}`,
+      border: `1px solid ${activeBorder}`,
     }}>
       <div style={{
-        width: 40, height: 40, borderRadius: '50%',
-        backgroundColor: colors.accent.subtle,
-        border: `2px solid ${colors.accent.main}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 40,
+        height: 40,
+        borderRadius: '50%',
+        backgroundColor: isActive ? colors.accent.subtle : colors.background.tertiary,
+        border: `2px solid ${activeBorder}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         flexShrink: 0,
       }}>
         <span style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.accent.main }}>
           {person.name[0]}
         </span>
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>
           {person.name}
           <span style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginLeft: 8 }}>
             ({person.nameHi})
           </span>
         </div>
-        <div style={{ display: 'none', fontSize: typography.fontSize.sm, color: colors.text.tertiary }}>
-          {person.role}
-        </div>
-        <div style={{ display: 'none', fontSize: typography.fontSize.sm, color: colors.text.tertiary }}>
-          {person.role} · {person.phrases.length} phrases
+        <div style={{
+          fontSize: typography.fontSize.sm,
+          color: isActive ? colors.accent.main : colors.text.tertiary,
+          fontWeight: 600,
+        }}>
+          {isActive ? 'Shown on People screen' : 'Saved, hidden from People screen'}
         </div>
       </div>
+      <GazeButton
+        id={`toggle-active-${person.name}`}
+        size="sm"
+        variant={isActive ? 'success' : 'default'}
+        onClick={onToggleActive}
+        disabled={toggleDisabled}
+        isDarkMode={isDarkMode}
+        gazeEnabled={false}
+        gazeEnabledTimestamp={0}
+        style={{ minWidth: 120 }}
+      >
+        {isActive ? 'Shown' : activeCount >= MAX_ACTIVE_PEOPLE ? 'Max 9' : 'Show'}
+      </GazeButton>
       <GazeButton
         id={`remove-${person.name}`}
         size="sm"
@@ -153,8 +183,32 @@ const PersonRow: React.FC<{
 
 const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
   const colors = isDarkMode ? darkColors : lightColors;
-  const { people, addPerson, removePerson, resetPeople } = useCustomization();
+  const { people, addPerson, removePerson, resetPeople, updatePeople } = useCustomization();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const activeCount = people.filter(person => person.isActive !== false).length;
+
+  const handleAddPerson = useCallback((person: Person) => {
+    const willBeActive = activeCount < MAX_ACTIVE_PEOPLE;
+    addPerson({ ...person, isActive: willBeActive });
+    setLimitMessage(willBeActive ? null : `Saved as hidden. Hide another person before showing more than ${MAX_ACTIVE_PEOPLE}.`);
+  }, [activeCount, addPerson]);
+
+  const handleToggleActive = useCallback((person: Person) => {
+    const isActive = person.isActive !== false;
+    if (!isActive && activeCount >= MAX_ACTIVE_PEOPLE) {
+      setLimitMessage(`Only ${MAX_ACTIVE_PEOPLE} people can be shown at once. Hide one person, then show another.`);
+      return;
+    }
+    if (isActive && activeCount <= 1) {
+      setLimitMessage('Keep at least one person shown on the People screen.');
+      return;
+    }
+    setLimitMessage(null);
+    updatePeople(people.map(p => (
+      p.name === person.name ? { ...p, isActive: !isActive } : p
+    )));
+  }, [activeCount, people, updatePeople]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
@@ -169,14 +223,33 @@ const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
         fontSize: typography.fontSize.sm,
         color: colors.text.secondary,
       }}>
-        Manage the names in your care network. You can add or remove people whenever needed.
+        Manage saved names and choose up to {MAX_ACTIVE_PEOPLE} to show on the People screen.
+      </div>
+      <div style={{
+        padding: `${spacing[3]} ${spacing[4]}`,
+        backgroundColor: colors.background.secondary,
+        borderRadius: layout.borderRadius.lg,
+        border: `1px solid ${colors.accent.main}55`,
+        color: colors.text.primary,
+        fontSize: typography.fontSize.sm,
+        fontWeight: 700,
+      }}>
+        Displayed on People screen: {activeCount} / {MAX_ACTIVE_PEOPLE}
+        {limitMessage && (
+          <span style={{ color: colors.warning.main, marginLeft: spacing[3] }}>
+            {limitMessage}
+          </span>
+        )}
       </div>
 
       {people.map(person => (
         <PersonRow
           key={person.name}
           person={person}
+          isActive={person.isActive !== false}
+          activeCount={activeCount}
           isDarkMode={isDarkMode}
+          onToggleActive={() => handleToggleActive(person)}
           onRemove={() => removePerson(person.name)}
         />
       ))}
@@ -195,7 +268,7 @@ const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
         </div>
       )}
 
-      <AddPersonForm isDarkMode={isDarkMode} onAdd={addPerson} />
+      <AddPersonForm isDarkMode={isDarkMode} onAdd={handleAddPerson} />
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <GazeButton
@@ -217,7 +290,7 @@ const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
           title="Reset People?"
           message="This will replace all people with the default set. Your custom people will be lost."
           confirmLabel="Reset"
-          onConfirm={() => { resetPeople(); setShowResetConfirm(false); }}
+          onConfirm={() => { resetPeople(); setShowResetConfirm(false); setLimitMessage(null); }}
           onCancel={() => setShowResetConfirm(false)}
           isDarkMode={isDarkMode}
         />

@@ -24,7 +24,11 @@ export interface Person {
   nameHi: string;
   role: string;
   phrases: Phrase[];
+  /** Shown on PeopleScreen. Settings can store more people, but only 9 may be active. */
+  isActive?: boolean;
 }
+
+export const MAX_ACTIVE_PEOPLE = 9;
 
 export const ROLES = [
   'Son', 'Daughter', 'Wife', 'Husband',

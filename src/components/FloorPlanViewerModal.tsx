@@ -287,15 +287,17 @@ export function FloorPlanViewerModal({
     }}>
       {/* ═══ HEADER BAR ═══ */}
       <div style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center',
+        flexShrink: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap',
         padding: 'clamp(8px, 1.2vh, 14px) clamp(12px, 1.5vw, 24px)',
+        paddingLeft: 'clamp(300px, 28vw, 420px)',
+        minHeight: 'clamp(112px, 13vh, 148px)',
         borderBottom: `2px solid ${T_border}`, background: T_panel,
         gap: 'clamp(8px, 1vw, 16px)',
-        justifyContent: 'center',
+        justifyContent: 'flex-end',
         position: 'relative',
       }}>
         {/* Title */}
-        <div style={{ position: 'absolute', left: 'clamp(12px, 1.5vw, 24px)', top: '50%', transform: 'translateY(-50%)' }}>
+        <div style={{ position: 'absolute', left: 'clamp(12px, 1.5vw, 24px)', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
           <div style={{ fontSize: 'clamp(15px, 2vh, 22px)', fontWeight: 900, color: T_text, letterSpacing: '1.5px' }}>
             ARCHITECTURAL FLOOR PLAN
           </div>
@@ -305,12 +307,12 @@ export function FloorPlanViewerModal({
         </div>
 
         {/* Style Switcher */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {STYLES.map(s => (
-            <GazeButton key={s} id={`vs-${s}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={700}
+            <GazeButton key={s} id={`vs-${s}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
               onClick={() => setStyle(s)}
               style={{
-                padding: '8px 18px', minHeight: 'clamp(44px, 5.8vh, 60px)',
+                padding: '8px 12px', minHeight: 'clamp(84px, 9vh, 108px)', minWidth: 'clamp(104px, 8.5vw, 136px)',
                 borderRadius: '10px', fontWeight: 800,
                 fontSize: 'clamp(11px, 1.35vh, 14px)', letterSpacing: '0.6px',
                 background: style === s ? T_accentSubtle : T_card,
@@ -325,12 +327,12 @@ export function FloorPlanViewerModal({
 
         {/* Floor Toggle */}
         {hasFF && (
-          <div style={{ display: 'flex', gap: '8px', marginLeft: '0px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginLeft: '0px', flexWrap: 'wrap', justifyContent: 'center' }}>
             {(['ground', 'first'] as const).map(f => (
-              <GazeButton key={f} id={`vf-${f}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+              <GazeButton key={f} id={`vf-${f}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
                 onClick={() => setFloor(f)}
                 style={{
-                  padding: '8px 18px', minHeight: 'clamp(44px, 5.8vh, 60px)',
+                  padding: '8px 12px', minHeight: 'clamp(84px, 9vh, 108px)', minWidth: 'clamp(96px, 8vw, 128px)',
                   borderRadius: '10px', fontWeight: 800,
                   fontSize: 'clamp(11px, 1.35vh, 14px)',
                   background: floor === f ? T_accentSubtle : T_card,
@@ -345,10 +347,10 @@ export function FloorPlanViewerModal({
         )}
 
         {/* Close */}
-        <GazeButton id="close-fpv" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+        <GazeButton id="close-fpv" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
           onClick={onClose}
           style={{
-            padding: '10px 26px', minHeight: 'clamp(48px, 6vh, 64px)',
+            padding: '10px 18px', minHeight: 'clamp(84px, 9vh, 108px)', minWidth: 'clamp(116px, 9vw, 150px)',
             borderRadius: '10px', fontWeight: 900, fontSize: 'clamp(15px, 1.7vh, 19px)',
             background: T_card, border: `2px solid ${T_danger}`, color: T_text, marginLeft: '0px',
             fontFamily: UI_FONT,
@@ -448,7 +450,7 @@ export function FloorPlanViewerModal({
                 fontFamily: UI_FONT,
               }}
             />
-            <GazeButton id="apply-custom-notes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+            <GazeButton id="apply-custom-notes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 setAppliedNotes(customNotes.trim());
                 onSpeak('Custom notes applied. Regenerating floor plan.');
@@ -456,7 +458,7 @@ export function FloorPlanViewerModal({
               style={{
                 marginTop: '10px',
                 width: '100%',
-                minHeight: '44px',
+                minHeight: 'clamp(84px, 9vh, 108px)',
                 borderRadius: '8px',
                 fontWeight: 800,
                 fontSize: '13px',
@@ -523,10 +525,10 @@ export function FloorPlanViewerModal({
                 <code style={{ color: T_accent }}>cd tools && python floorplan_server.py</code><br /><br />
                 This runs on port 5050 and serves the PyCairo floor plan generator as an HTTP API.
               </div>
-              <GazeButton id="retry-gen" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+              <GazeButton id="retry-gen" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
                 onClick={doGenerate}
                 style={{
-                  padding: '10px 24px', minHeight: '40px', borderRadius: '10px',
+                  padding: '10px 24px', minHeight: 'clamp(84px, 9vh, 108px)', borderRadius: '10px',
                   background: T_accentSubtle, border: `2px solid ${T_accent}`,
                   color: T_accent, fontWeight: 800, fontSize: 'clamp(12px, 1.4vh, 16px)',
                 }}>
@@ -547,7 +549,7 @@ export function FloorPlanViewerModal({
                   boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
                 }}
               />
-              <GazeButton id="magnify-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+              <GazeButton id="magnify-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
                 onClick={() => setIsFullscreen(true)}
                 style={{
                   position: 'absolute', bottom: '60px', right: '320px', // Further inward, above the downloads
@@ -574,10 +576,10 @@ export function FloorPlanViewerModal({
                   DOWNLOAD PLAN
                 </div>
                 {(['png', 'pdf', 'svg'] as const).map(fmt => (
-                  <GazeButton key={fmt} id={`dl-${fmt}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+                  <GazeButton key={fmt} id={`dl-${fmt}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
                     onClick={() => handleDownload(fmt)}
                     style={{
-                      padding: '16px 12px', minHeight: '64px', borderRadius: '12px',
+                      padding: '16px 12px', minHeight: 'clamp(84px, 9vh, 108px)', borderRadius: '12px',
                       fontWeight: 900, fontSize: 'clamp(18px, 2vh, 22px)',
                       background: T_card, border: `3px solid ${T_border}`,
                       color: T_blue, textTransform: 'uppercase' as const,
@@ -612,7 +614,7 @@ export function FloorPlanViewerModal({
               }}
             />
           </div>
-          <GazeButton id="minimize-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+          <GazeButton id="minimize-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
             onClick={() => setIsFullscreen(false)}
             style={{
               position: 'absolute', bottom: '60px', right: '80px', // Further inward from corner

@@ -98,6 +98,7 @@ const PhrasesCategoryButton: React.FC<{
       isDarkMode={isDarkMode}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
+      dwellCategory="phraseButton"
       style={{
         width: '100%',
         backgroundColor: isSelected ? selectedBg : 'transparent',
@@ -294,6 +295,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
               isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
+              dwellCategory="phraseButton"
               style={{
                 width: '100%',
                 backgroundColor: isRecentSelected ? selectedBg : 'transparent',
@@ -447,7 +449,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                 id={`phrase-${index}`}
                 className="phrase-card"
                 size="lg"
-                context="phrases"
+                dwellCategory="phraseButton"
                 onClick={() => handlePhraseClick(phrase, index)}
                 isDarkMode={isDarkMode}
                 gazeEnabled={isGazeEnabled}

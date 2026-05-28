@@ -113,6 +113,7 @@ const ActivityCategoryButton: React.FC<{
       isDarkMode={isDarkMode}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
+      dwellCategory="phraseButton"
       style={{
         width: '100%',
         backgroundColor: isSelected ? selectedBg : 'transparent',
@@ -265,7 +266,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                   key={card.id}
                   id={card.type === 'web' ? 'act-cat-web' : `act-cat-${card.id}`}
                   size="lg"
-                  context="phrases"
+                  dwellCategory="phraseButton"
                   onClick={handleClick}
                   isDarkMode={isDarkMode}
                   gazeEnabled={isGazeEnabled}
@@ -354,7 +355,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
             <GazeButton
               id="act-back"
               size="lg"
-              context="phrases"
+              dwellCategory="phraseButton"
               onClick={() => { setSelectedCategory(null); setActivatedIdx(null); }}
               isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled}
@@ -382,7 +383,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                 key={idx}
                 id={`act-${selectedCategory}-${idx}`}
                 size="lg"
-                context="phrases"
+                dwellCategory="phraseButton"
                 onClick={() => speakItem(item.speak, idx)}
                 isDarkMode={isDarkMode}
                 gazeEnabled={isGazeEnabled}

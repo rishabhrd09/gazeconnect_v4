@@ -7,6 +7,7 @@ export interface Person {
   nameHi: string;
   role: string;
   phrases: { en: string; hi: string }[];
+  isActive?: boolean;
 }
 
 export const ROLES = [

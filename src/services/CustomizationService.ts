@@ -15,6 +15,7 @@ import type {
   ActivityCategory, AACCategory, Phrase, AppSettings, QuickWordsConfig,
   AlertModeCard, QuickWord,
 } from '../types/customization';
+import { MAX_ACTIVE_PEOPLE } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
 import {
   CARE_ACTIVITY_CATEGORIES,
@@ -26,6 +27,30 @@ import {
 
 const DEBOUNCE_MS = 500;
 const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
+
+const isPersonActive = (person: Person) => person.isActive !== false;
+
+const normalizePeople = (people: Person[]): Person[] => {
+  let activeCount = 0;
+  let hasActivePerson = false;
+
+  const normalized = people.map(person => {
+    const isActive = isPersonActive(person) && activeCount < MAX_ACTIVE_PEOPLE;
+    if (isActive) {
+      activeCount += 1;
+      hasActivePerson = true;
+    }
+    return person.isActive === isActive ? person : { ...person, isActive };
+  });
+
+  if (!hasActivePerson && normalized.length > 0) {
+    return normalized.map((person, index) => (
+      index === 0 ? { ...person, isActive: true } : person
+    ));
+  }
+
+  return normalized;
+};
 const MEDICAL_LABEL_UPDATES: Record<string, { en: string; hi: string }> = {
   'Check tube / mask position': { en: 'Check TT cuff / balloon pressure', hi: 'टीटी कफ / बैलून प्रेशर चेक करें' },
   'Wet my mouth': { en: 'Oral Care / Clean Teeth', hi: 'मुंह / दांत साफ करो' },
@@ -157,6 +182,7 @@ export class CustomizationService {
     this.data = this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
       this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true)
     )));
+    this.data = { ...this.data, people: normalizePeople(this.data.people) };
   }
 
   // ============================================
@@ -216,7 +242,7 @@ export class CustomizationService {
       // Deep merge quickWords to preserve coreWords and other new fields
       quickWords: mergedQuickWords,
       // Ensure arrays default to defaults if not present in saved data
-      people: shouldMigratePeople ? defaults.people : (saved.people ?? defaults.people),
+      people: normalizePeople(shouldMigratePeople ? defaults.people : (saved.people ?? defaults.people)),
       phraseCategories: saved.phraseCategories ?? defaults.phraseCategories,
       medicalSections: saved.medicalSections ?? defaults.medicalSections,
       homeQuickActions: saved.homeQuickActions ?? defaults.homeQuickActions,
@@ -503,19 +529,25 @@ export class CustomizationService {
   // when the reference is identical (Object.is comparison).
 
   updatePeople(people: Person[]): void {
-    this.data = { ...this.data, people };
+    this.data = { ...this.data, people: normalizePeople(people) };
     this.scheduleSave();
     this.notify();
   }
 
   addPerson(person: Person): void {
-    this.data = { ...this.data, people: [...this.data.people, person] };
+    const people = normalizePeople(this.data.people);
+    const activeCount = people.filter(isPersonActive).length;
+    const nextPerson = {
+      ...person,
+      isActive: person.isActive ?? activeCount < MAX_ACTIVE_PEOPLE,
+    };
+    this.data = { ...this.data, people: normalizePeople([...people, nextPerson]) };
     this.scheduleSave();
     this.notify();
   }
 
   removePerson(name: string): void {
-    this.data = { ...this.data, people: this.data.people.filter(p => p.name !== name) };
+    this.data = { ...this.data, people: normalizePeople(this.data.people.filter(p => p.name !== name)) };
     this.scheduleSave();
     this.notify();
   }
@@ -669,12 +701,13 @@ export class CustomizationService {
 
   resetToDefaults(): void {
     this.data = this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true);
+    this.data = { ...this.data, people: normalizePeople(this.data.people) };
     this.scheduleSave();
     this.notify();
   }
 
   resetPeople(): void {
-    this.data = { ...this.data, people: structuredClone(DEFAULT_CUSTOMIZATION.people) };
+    this.data = { ...this.data, people: normalizePeople(structuredClone(DEFAULT_CUSTOMIZATION.people)) };
     this.scheduleSave();
     this.notify();
   }

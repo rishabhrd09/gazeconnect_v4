@@ -36,26 +36,32 @@ export function generateDefaultPhrases(name: string, nameHi: string): Phrase[] {
 const DEFAULT_PEOPLE: CustomizationData['people'] = [
   {
     name: 'Rishabh', nameHi: 'Rishabh', role: 'Other',
+    isActive: true,
     phrases: generateDefaultPhrases('Rishabh', 'Rishabh'),
   },
   {
     name: 'Bhawana', nameHi: 'Bhawana', role: 'Other',
+    isActive: true,
     phrases: generateDefaultPhrases('Bhawana', 'Bhawana'),
   },
   {
     name: 'Parakh', nameHi: 'Parakh', role: 'Other',
+    isActive: true,
     phrases: generateDefaultPhrases('Parakh', 'Parakh'),
   },
   {
     name: 'Caretaker', nameHi: 'Caretaker', role: 'Other',
+    isActive: true,
     phrases: generateDefaultPhrases('Caretaker', 'Caretaker'),
   },
   {
     name: 'Nurse', nameHi: 'Nurse', role: 'Other',
+    isActive: true,
     phrases: generateDefaultPhrases('Nurse', 'Nurse'),
   },
   {
     name: 'Doctor', nameHi: 'Doctor', role: 'Other',
+    isActive: true,
     phrases: generateDefaultPhrases('Doctor', 'Doctor'),
   },
 ];
