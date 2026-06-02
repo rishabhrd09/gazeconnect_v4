@@ -87,6 +87,42 @@ const HomePhrasesIcon: React.FC<{
   );
 };
 
+const AlertModeShieldIcon: React.FC<{
+  size?: number | string;
+  color?: string;
+  strokeWidth?: number;
+  style?: React.CSSProperties;
+}> = ({ size = 56, color = 'currentColor', strokeWidth = 2.2, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="none"
+    aria-hidden="true"
+    style={style}
+  >
+    <path
+      d="M32 6.5 13.5 13.4v15.2c0 13.4 7.7 24.4 18.5 29 10.8-4.6 18.5-15.6 18.5-29V13.4L32 6.5Z"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+    />
+    <path
+      d="M32 12.2 18.7 17.1v11.5c0 9.4 5 17.8 13.3 22.2 8.3-4.4 13.3-12.8 13.3-22.2V17.1L32 12.2Z"
+      stroke={color}
+      strokeWidth={Math.max(1.2, strokeWidth * 0.55)}
+      strokeLinejoin="round"
+      opacity="0.34"
+    />
+    <path
+      d="M32 22.1v17.8M23.1 31h17.8"
+      stroke={color}
+      strokeWidth={strokeWidth + 0.25}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 type HomeThemePalette = {
   bg: string;
   cardBg: string;
@@ -589,7 +625,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             const alertCardColor = HIGH_PRIORITY_HOME_COLORS.alert_maroon;
             const DOCK_LABELS = useAlertLauncher ? [
               {
-                text: 'Alert\nMode',
+                text: 'Alert Mode',
                 textHi: undefined as string | undefined,
                 spoken: '__alert_mode__',
                 empty: false,
@@ -658,6 +694,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   const isEmpty = !isNav && !isAlertModeCard && item.empty;
                   const bg = isNav ? undefined : item.bg;
                   const bgShadow = isNav ? undefined : item.bgShadow;
+                  const useSoftAlertLauncher = isAlertModeCard && (isLight || isMix || isWarm);
+                  const alertLauncherBg = useSoftAlertLauncher
+                    ? 'linear-gradient(135deg, #FFF8EF 0%, #F4E7DD 100%)'
+                    : bg;
+                  const alertLauncherFg = useSoftAlertLauncher ? '#682825' : THEME.emergencyText;
+                  const alertLauncherBorder = useSoftAlertLauncher
+                    ? '1.5px solid rgba(104, 40, 37, 0.32)'
+                    : (isLight
+                      ? '1.5px solid rgba(74, 28, 32, 0.45)'
+                      : ((isLight || isMix || isWarm) ? THEME.cardBorder : 'none'));
+                  const alertLauncherShadow = useSoftAlertLauncher
+                    ? '0 14px 28px rgba(104, 40, 37, 0.15), inset 0 1px 0 rgba(255,255,255,0.72)'
+                    : undefined;
 
                   // Empty placeholder — dimmed, non-interactive, preserves grid layout
                   if (isEmpty) {
@@ -701,15 +750,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         justifySelf: isNav ? 'center' : undefined,
                         alignSelf: isAlertModeCard ? 'center' : undefined,
                         borderRadius: isNav ? '999px' : '24px',
-                        background: isNav ? NAV_BG : bg,
+                        background: isNav ? NAV_BG : alertLauncherBg,
                         border: isNav
                           ? `1px solid ${THEME.quickPhrasesBorder}`
-                          : (isLight
-                            ? '1.5px solid rgba(74, 28, 32, 0.45)'
-                            : ((isLight || isMix || isWarm) ? THEME.cardBorder : 'none')),
+                          : alertLauncherBorder,
                         boxShadow: isActivated
                           ? isNav ? ((isLight || isMix || isWarm) ? THEME.quickPhrasesShadow : '0 0 0 1px rgba(56, 189, 248, 0.12), 0 6px 16px rgba(0, 0, 0, 0.2)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 18px rgba(90, 37, 40, 0.18)' : ((isLight || isMix || isWarm) ? THEME.cardShadow : `0 6px 16px rgba(0,0,0,0.16), 0 0 0 1px ${bgShadow}28`))
-                          : isNav ? ((isLight || isMix || isWarm) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 16px rgba(90, 37, 40, 0.14)' : ((isLight || isMix || isWarm) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)')),
+                          : isNav ? ((isLight || isMix || isWarm) ? THEME.quickPhrasesShadow : '0 5px 12px rgba(0,0,0,0.16)') : (alertLauncherShadow ?? (isLight ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 16px rgba(90, 37, 40, 0.14)' : ((isLight || isMix || isWarm) ? THEME.cardShadow : '0 4px 12px rgba(0,0,0,0.14)'))),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -721,17 +768,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         cursor: 'pointer',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: isAlertModeCard ? 'clamp(18px, 2vw, 28px)' : '8px',
+                        width: '100%',
+                      }}>
+                        {isAlertModeCard && (
+                          <AlertModeShieldIcon
+                            size={64}
+                            color={alertLauncherFg}
+                            strokeWidth={2.35}
+                            style={{ flexShrink: 0, width: 'clamp(46px, 6vh, 68px)', height: 'clamp(46px, 6vh, 68px)' }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isAlertModeCard ? 'flex-start' : 'center', gap: '0px' }}>
                           <span style={{
-                            fontSize: !isNav ? 'clamp(24px, 3vh, 32px)' : 'clamp(22px, 2.8vh, 32px)',
-                            fontWeight: !isNav ? ((isLight || isMix || isWarm) ? 600 : 900) : ((isLight || isMix || isWarm) ? 600 : 700),
-                            color: isNav ? THEME.quickPhrasesText : THEME.emergencyText,
-                            lineHeight: 1.1,
-                            textAlign: 'center',
+                            fontSize: isAlertModeCard ? 'clamp(31px, 4vh, 46px)' : (!isNav ? 'clamp(24px, 3vh, 32px)' : 'clamp(22px, 2.8vh, 32px)'),
+                            fontWeight: isAlertModeCard ? 800 : (!isNav ? ((isLight || isMix || isWarm) ? 600 : 900) : ((isLight || isMix || isWarm) ? 600 : 700)),
+                            color: isNav ? THEME.quickPhrasesText : alertLauncherFg,
+                            lineHeight: isAlertModeCard ? 1 : 1.1,
+                            textAlign: isAlertModeCard ? 'left' : 'center',
                             fontFamily: ENGLISH_UI_FONT,
-                            whiteSpace: 'pre-wrap',
-                            letterSpacing: (isLight || isMix || isWarm) ? '0.01em' : (!isNav ? '0.6px' : '0.2px'),
+                            whiteSpace: isAlertModeCard ? 'nowrap' : 'pre-wrap',
+                            letterSpacing: isAlertModeCard ? 0 : ((isLight || isMix || isWarm) ? '0.01em' : (!isNav ? '0.6px' : '0.2px')),
                             textTransform: 'none',
                             textShadow: 'none',
                           }}>

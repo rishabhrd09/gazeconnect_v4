@@ -853,7 +853,7 @@ interface CompassMapScreenProps {
 // ─── Main Component ───────────────────────────────────────
 
 function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMapScreenProps) {
-  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
+  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze, enableGaze } = useGazeControl();
   const { isLight, isMix, isWarm } = useTheme();
   const ws = useWS();
 
@@ -914,6 +914,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // Compass map opens with the global NavBar hidden by default — the canvas is
   // the workspace; users press SHOW NAV when they need to navigate elsewhere.
   const [navHidden, setNavHidden] = useState(true);
+
+  // Compass Map is a direct-work screen: open with gaze ready and nav hidden
+  // so room placement can begin without a manual gaze-toggle round trip.
+  useEffect(() => {
+    setNavHidden(true);
+    enableGaze();
+  }, [enableGaze]);
 
   // Track Focus Lock state from Electron
   const [isFocusLocked, setIsFocusLocked] = useState(false);

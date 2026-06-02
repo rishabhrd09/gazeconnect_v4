@@ -19,6 +19,7 @@ const validEventChannels = [
   'webview:links',
   'webview:edge-scroll',
   'webview:closed',
+  'webview:playbackState',
   'ui-lock-toggled',
 ] as const;
 

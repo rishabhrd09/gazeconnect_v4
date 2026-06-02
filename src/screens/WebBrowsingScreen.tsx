@@ -865,51 +865,72 @@ const YT_CATS = [
 // that BrowserView doesn't reliably provide. JS injection with userGesture=true
 // is the production AAC pattern (used by Tobii Computer Control + Grid 3
 // browser overlays for in-page automation).
-// Toggle YouTube's player fullscreen — scoped strictly to the actively-playing
-// video on a watch page. Three guards prevent unwanted behaviors:
 //
-//   Guard 1 — pathname check: only run on /watch pages. Avoids trying to
-//     fullscreen anything on YouTube home, search results, channel pages
-//     (where <video> preview thumbnails would otherwise be candidates).
-//   Guard 2 — require a #movie_player container with a loaded video that
-//     has valid duration metadata. Filters out preview videos and players
-//     that haven't loaded yet.
-//   Guard 3 — only click .ytp-fullscreen-button (YouTube's own toggle,
-//     scoped to the player area). NEVER call element.requestFullscreen() —
-//     that's the browser-level fullscreen API which would fullscreen the
-//     entire BrowserView / Electron window.
-//
-// Calling this script on any non-watch page is a safe no-op.
+// v17.16 safety path: this maximizes YouTube inside the BrowserView, without
+// entering true browser fullscreen. True fullscreen hides every gaze-accessible
+// app control, so the injected cursor still auto-exits it if a page enters it.
 const YT_MAXIMIZE_SCRIPT = `
 (function () {
   try {
-    // Guard 1 — must be on a /watch page
-    if (!location.pathname || !location.pathname.startsWith('/watch')) {
-      return 'not-watch-page';
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(function () {});
     }
-    // Guard 2 — must have a loaded player with a real video
-    var player = document.getElementById('movie_player');
-    if (!player) return 'no-player';
-    var v = player.querySelector('video');
-    if (!v || !isFinite(v.duration) || v.duration <= 0) {
-      return 'video-not-loaded';
-    }
-    // Guard 3 — click YouTube's own fullscreen toggle (scoped to player only)
-    var fs = player.querySelector('.ytp-fullscreen-button');
-    if (fs) {
-      fs.click();
-      return 'fs-toggled';
-    }
-    return 'no-fullscreen-button';
-  } catch (e) { return 'err:' + (e && e.message); }
+  } catch (_) {}
+
+  var styleId = 'gazeconnect-youtube-inapp-maximize-style';
+  if (!document.getElementById(styleId)) {
+    var style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = [
+      'html.gazeconnect-youtube-inapp-maximize,',
+      'html.gazeconnect-youtube-inapp-maximize body { overflow: hidden !important; }',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #masthead-container,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #secondary,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #comments,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #meta,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #ticket-shelf,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #merch-shelf,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy ytd-watch-next-secondary-results-renderer { display: none !important; }',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #columns,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary-inner {',
+      '  display: block !important; width: 100vw !important; max-width: none !important;',
+      '  margin: 0 !important; padding: 0 !important;',
+      '}',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-outer,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-inner,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #movie_player {',
+      '  width: 100vw !important; max-width: none !important;',
+      '  height: 100vh !important; max-height: none !important;',
+      '  margin: 0 !important; padding: 0 !important;',
+      '}',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy video {',
+      '  width: 100% !important; height: 100% !important; object-fit: contain !important;',
+      '}'
+    ].join('\\n');
+    document.head.appendChild(style);
+  }
+
+  document.documentElement.classList.add('gazeconnect-youtube-inapp-maximize');
+  var player = document.querySelector('#movie_player');
+  if (player) {
+    try {
+      player.classList.add('ytp-big-mode');
+      player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 }));
+    } catch (_) {}
+  }
+  try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch (_) { window.scrollTo(0, 0); }
+  return 'in-app-video-maximized';
 })();
 `;
 
 const isValidYouTubeId = (id?: string) => !!id && /^[A-Za-z0-9_-]{11}$/.test(id);
 // Use the YouTube WATCH URL (not embed). Embed URLs fail with Error 153 for many
 // videos (T-Series, label music, news) because uploaders disable embedding.
-// The watch URL works universally; we then auto-send 'f' after load to maximize
-// the player inside the BrowserView (hiding sidebar/comments).
+// The watch URL works universally and plays inline (autoplay=1) inside the
+// in-app BrowserView. Fullscreen is intentionally NOT triggered (v17.16
+// safety path) — see YT_MAXIMIZE_SCRIPT above.
 const resolveYouTubeUrl = (video: any): string => {
     if (video?.url && typeof video.url === 'string') return video.url;
     const query = encodeURIComponent(`${video?.title || 'YouTube video'} ${video?.ch || ''}`.trim());
@@ -1970,11 +1991,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         };
     }, [playing]);
 
-    // Maximize toggle — manual fallback for when auto-maximize at 2.5s fails OR
-    // when the patient has exited fullscreen and wants to re-enter. The script
-    // clicks YouTube's own .ytp-fullscreen-button which is a toggle, so the
-    // same action both maximizes and minimizes (depending on current state).
-    // Falls back to keyboard 'f' if executeJs IPC isn't available yet.
+    // Maximizes the YouTube player inside the BrowserView while app controls
+    // remain visible. This deliberately does not enter true browser fullscreen.
     const maximizeVideo = useCallback(async () => {
         await browser.executeJs(YT_MAXIMIZE_SCRIPT);
     }, [browser]);
@@ -2103,6 +2121,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         }
     }, [browser.canGoBack, browser.goBack, stop]);
 
+    const playbackState = browser.videoPlaybackState;
+
     if (playing) return (
         <div style={{
             flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(12px,1.5vh,20px)', gap: 'clamp(10px,1.2vh,16px)', overflow: 'hidden',
@@ -2200,6 +2220,19 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', gap: 0 }}>
                 <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
                     {isWatchMode && <div style={watchModeBadgeStyle}>WATCH MODE · page gaze paused</div>}
+                    {playbackState.fullscreen && (
+                        <div style={{
+                            ...watchModeBadgeStyle,
+                            left: '50%',
+                            right: 'auto',
+                            transform: 'translateX(-50%)',
+                            background: 'rgba(16, 32, 31, 0.94)',
+                            color: CONTROL_MODE_TEXT,
+                            border: '1px solid rgba(169, 202, 199, 0.32)',
+                        }}>
+                            Exiting full screen / फुल स्क्रीन बंद हो रही है
+                        </div>
+                    )}
                     {!isWatchMode && browser.edgeScrollDirection === 'up' && (
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to bottom, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `${CR} ${CR} 0 0` }} />
                     )}
@@ -2219,10 +2252,9 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         </div>
                     </div>
                 </div>
-                {/* Up / Full Screen / Down dock — only in Control mode.
-                    Watch mode = video already fullscreen, no dock needed.
-                    Control mode = patient is interacting; gives 3 spatially-grouped
-                    "video state" controls: scroll up, fullscreen toggle, scroll down. */}
+                {/* Up / Max Video / Down dock — only in Control mode. The middle
+                    button maximizes the video inside the BrowserView, without
+                    entering true browser fullscreen. */}
                 {!isWatchMode && (
                     <ContentScrollDock
                         onUp={() => browser.scrollUp()}
@@ -2596,6 +2628,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     void T_chromeShadow;
     const [topic, setTopic] = useState<QuickTopic | null>(null);
     const [showLinksSidebar, setShowLinksSidebar] = useState(false);
+    const [largeLinkTargets, setLargeLinkTargets] = useState(true);
+    const [linkPage, setLinkPage] = useState(0);
     const viewRef = useRef<HTMLDivElement>(null);
     const hasInitRef = useRef(false);
     const toolbarGazeEnabled = isNavHidden ? true : ige;
@@ -2618,6 +2652,10 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     }, [ws.getQuickSnapshot]);
     const isWebTopic = !!topic && topic.mode === 'web';
     const isCardTopic = !!topic && topic.mode === 'card';
+
+    useEffect(() => {
+        setLinkPage(0);
+    }, [topic?.id, browser.pageLinks.length]);
 
     useEffect(() => {
         if (isWebTopic) onBrowserInteractionModeChange('watch');
@@ -2649,7 +2687,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
     const openTopic = useCallback((next: QuickTopic) => {
         setTopic(next);
-        setShowLinksSidebar(next.mode !== 'web');
+        setShowLinksSidebar(next.mode === 'web');
         disableGaze();
         if (next.mode === 'card' && !ws.quickSnapshot) {
             ws.getQuickSnapshot();
@@ -2676,7 +2714,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     const openLiveWebFromCard = useCallback(() => {
         if (!topic) return;
         setTopic({ ...topic, mode: 'web' });
-        setShowLinksSidebar(false);
+        setShowLinksSidebar(true);
         disableGaze();
     }, [topic, disableGaze]);
 
@@ -2693,6 +2731,16 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
             return;
         }
     }, [topic, ws.quickSnapshot, ws.speak]);
+
+    const linksPerPage = largeLinkTargets ? 4 : 6;
+    const totalLinkPages = Math.max(1, Math.ceil(browser.pageLinks.length / linksPerPage));
+    const currentLinkPage = Math.min(linkPage, totalLinkPages - 1);
+    const visiblePageLinks = browser.pageLinks.slice(
+        currentLinkPage * linksPerPage,
+        currentLinkPage * linksPerPage + linksPerPage,
+    );
+    const canPageLinksBack = currentLinkPage > 0;
+    const canPageLinksForward = currentLinkPage < totalLinkPages - 1;
 
     if (isWebTopic && topic) {
         return (
@@ -2782,7 +2830,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%', padding: 'clamp(8px,1vh,14px) clamp(16px,2vw,24px) 0', boxSizing: 'border-box', gap: 'clamp(12px,1.5vw,20px)' }}>
                     {showLinksSidebar && (
                         <div style={{
-                            flex: '0 0 clamp(280px, 25vw, 380px)',
+                            flex: '0 0 clamp(330px, 28vw, 460px)',
                             height: '100%',
                             background: T_chromeBg,
                             border: `1px solid ${T_chromeBorder}`,
@@ -2793,31 +2841,107 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                             gap: 'clamp(8px,1vh,12px)',
                             overflow: 'hidden',
                         }}>
-                            <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 700, color: T_chromeText, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <WebLayoutIcon size={22} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.1} />
-                                <span>Page Links</span>
+                            <div style={{ fontSize: 'clamp(16px,2vh,21px)', fontWeight: 800, color: T_chromeText, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <WebLayoutIcon size={24} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.1} />
+                                    <span>{largeLinkTargets ? 'Large Links' : 'Page Links'}</span>
+                                </span>
+                                <span style={{ fontSize: 'clamp(13px,1.5vh,16px)', color: T_chromeTextMuted, fontWeight: 700 }}>
+                                    {currentLinkPage + 1}/{totalLinkPages}
+                                </span>
                             </div>
-                            <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
-                                {browser.pageLinks.length ? browser.pageLinks.map((link, idx) => (
-                                    <GazeButton
-                                        key={`${link.href}-${idx}`}
-                                        id={`bv-link-${idx}`}
-                                        onClick={() => { browser.navigateTo(link.href); disableGaze(); }}
-                                        gazeEnabled={ige}
-                                        gazeEnabledTimestamp={ts}
-                                        isDarkMode dwellCategory="navigationButton"
-                                        style={{ ...cb, minHeight: 'clamp(72px,8.8vh,98px)', width: '100%', justifyContent: 'flex-start', textAlign: 'left' as const, fontSize: 'clamp(16px,2vh,21px)' }}
-                                    >
-                                        {link.text}
-                                    </GazeButton>
-                                )) : (
-                                    <div style={{ color: isLight ? 'rgba(74, 58, 42, 0.65)' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(255,255,255,0.5)', fontSize: 'clamp(14px,1.8vh,18px)' }}>No links detected on this page.</div>
+                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 'clamp(10px,1.2vh,14px)', minHeight: 0 }}>
+                                {browser.pageLinks.length ? visiblePageLinks.map((link, idx) => {
+                                    const absoluteIdx = currentLinkPage * linksPerPage + idx;
+                                    return (
+                                        <GazeButton
+                                            key={`${link.href}-${absoluteIdx}`}
+                                            id={`bv-link-${absoluteIdx}`}
+                                            onClick={() => { browser.navigateTo(link.href); disableGaze(); }}
+                                            gazeEnabled={ige}
+                                            gazeEnabledTimestamp={ts}
+                                            isDarkMode dwellCategory="navigationButton"
+                                            style={{
+                                                ...cb,
+                                                flex: '1 1 0',
+                                                minHeight: largeLinkTargets ? 'clamp(88px,10.8vh,124px)' : 'clamp(80px,8.8vh,98px)',
+                                                width: '100%',
+                                                justifyContent: 'center',
+                                                textAlign: 'center' as const,
+                                                fontSize: largeLinkTargets ? 'clamp(18px,2.25vh,24px)' : 'clamp(16px,2vh,21px)',
+                                                lineHeight: 1.14,
+                                                fontWeight: 820,
+                                                padding: 'clamp(10px,1.2vh,16px) clamp(12px,1vw,18px)',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
+                                            <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{link.text}</span>
+                                        </GazeButton>
+                                    );
+                                }) : (
+                                    <div style={{
+                                        color: isLight ? 'rgba(74, 58, 42, 0.65)' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(255,255,255,0.5)',
+                                        fontSize: 'clamp(16px,2vh,21px)',
+                                        minHeight: 'clamp(100px,14vh,150px)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        textAlign: 'center',
+                                        padding: 'clamp(12px,1.5vh,18px)',
+                                    }}>No large page links detected yet.</div>
                                 )}
                             </div>
-                            <GazeButton id="bv-links-refresh" onClick={() => browser.refreshLinks()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                                style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(72px,8.6vh,96px)', width: '100%', minWidth: 'auto' }}>
-                                <RefreshIcon size={24} color="currentColor" strokeWidth={2.3} />
-                                <span>Refresh Links</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'clamp(8px,1vw,12px)', flexShrink: 0 }}>
+                                <GazeButton
+                                    id="bv-links-prev"
+                                    onClick={() => setLinkPage((page) => Math.max(0, page - 1))}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    dwellCategory="backSkipButton"
+                                    disabled={!canPageLinksBack}
+                                    style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, opacity: canPageLinksBack ? 1 : 0.45 }}
+                                >
+                                    <BackIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <span>Prev</span>
+                                </GazeButton>
+                                <GazeButton
+                                    id="bv-links-refresh"
+                                    onClick={() => browser.refreshLinks()}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    dwellCategory="navigationButton"
+                                    style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0 }}
+                                >
+                                    <RefreshIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <span>Refresh</span>
+                                </GazeButton>
+                                <GazeButton
+                                    id="bv-links-next"
+                                    onClick={() => setLinkPage((page) => Math.min(totalLinkPages - 1, page + 1))}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    dwellCategory="navigationButton"
+                                    disabled={!canPageLinksForward}
+                                    style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, opacity: canPageLinksForward ? 1 : 0.45 }}
+                                >
+                                    <NextIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <span>Next</span>
+                                </GazeButton>
+                            </div>
+                            <GazeButton
+                                id="bv-links-size-toggle"
+                                onClick={() => { setLargeLinkTargets((value) => !value); setLinkPage(0); }}
+                                gazeEnabled={ige}
+                                gazeEnabledTimestamp={ts}
+                                isDarkMode
+                                dwellCategory="navigationButton"
+                                style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, flexShrink: 0 }}
+                            >
+                                <WebLayoutIcon size={24} color="currentColor" strokeWidth={2.1} />
+                                <span>{largeLinkTargets ? 'Compact Links' : 'Large Links'}</span>
                             </GazeButton>
                         </div>
                     )}

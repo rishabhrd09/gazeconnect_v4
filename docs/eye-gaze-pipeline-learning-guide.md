@@ -527,7 +527,11 @@ After the initial v17 work this document describes, a deeper debugging campaign 
 
 - **Asymmetric snap/unsnap** (Tobii Dynavox US10,890,967 pattern) applied to BrowserView YouTube targets: card snap-in 130 / unsnap 230, skip-ad snap-in 140 / unsnap 250.
 
-- **Auto-enable gaze** on AlertModeScreen and embedded-browser views — the patient was getting stuck with gaze toggle off on these screens.
+- **v17.15 — Stable embedded-browser cursor** (`browserGazeController.ts`). Adds candidate epochs, thumbnail/title snap rects, stable-winner gating, onset movement cancellation, and BrowserView telemetry. This is the current baseline for YouTube recommendation selection.
+
+- **v17.16 — Embedded-browser video safety** (`browserGazeController.ts`, `youtubeController.ts`, `WebBrowsingScreen.tsx`). While a video is playing, dwell inside the active video rect is suppressed so simply watching cannot toggle play/pause. True fullscreen is auto-exited for gaze safety. The side-dock **Full Screen** control is an in-app YouTube maximize only, keeping top and side app controls visible. Quick Search uses large paginated app-owned link targets instead of tiny native page links.
+
+- **Auto-enable gaze** on AlertModeScreen, embedded-browser views, and Compass Map — the patient was getting stuck with gaze toggle off on direct-work screens.
 
 ### What's *un*changed (the principles still hold)
 

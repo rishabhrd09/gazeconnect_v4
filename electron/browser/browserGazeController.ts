@@ -77,7 +77,35 @@ export function buildBrowserCursorInjectionScript(): string {
         lastFrameTs: 0,
         lastSuppressedEmitTs: 0,
         lastRouteUrl: location.href,
-        dwellState: 'idle'
+        dwellState: 'idle',
+        // v17.16 DoD-1/DoD-2 — active video + in-video dwell suppression.
+        // activeVideo is the largest visible <video>; videoPlaying is
+        // event-driven (play/pause/ended/emptied) with a 1 Hz .paused
+        // sanity reconcile; videoRect is refreshed each frame. While a
+        // video is playing and gaze is inside videoRect, dwell is frozen
+        // (dot only, no ring, no click) so the patient can't accidentally
+        // toggle play/pause by looking at the video. Suppression is
+        // confined to videoRect — the skip-ad button and everything
+        // outside the video stay dwell-clickable.
+        activeVideo: null,
+        videoPlaying: false,
+        videoRect: null,
+        videoSrc: '',
+        videoBoundEl: null,
+        lastVideoPollMs: 0,
+        lastScanEpoch: -1,
+        dwellSuppressedFrame: false,
+        // v17.16 DoD-10 — fullscreen auto-exit. A true-fullscreen video
+        // hides all gaze-accessible controls (lockout risk for an ALS
+        // user), so the injected script detects document.fullscreenElement
+        // while playing and calls exitFullscreen(), retrying up to 3× in a
+        // 2 s window (500 ms apart) before emitting fullscreenLockoutRisk.
+        // There is no user-facing entry point into fullscreen.
+        fsExitAttempts: 0,
+        fsExitWindowStart: 0,
+        fsExiting: false,
+        lastFsAttemptMs: 0,
+        lastFullscreen: false
       };
 
       window.gcConfig = Object.assign({
@@ -359,6 +387,169 @@ export function buildBrowserCursorInjectionScript(): string {
           width: clampedRight - cardRect.left,
           height: cardRect.height
         };
+      };
+
+      // === v17.16 DoD-1: ACTIVE VIDEO DETECTION + PLAYBACK STATE ========
+      // videoStart / videoPause / videoEnd are emitted to the events2
+      // ring. videoStart fires on the paused→playing transition (also if
+      // a video is already playing the first time we bind, e.g. autoplay).
+      const onVideoPlay = () => {
+        if (!state.videoPlaying) {
+          state.videoPlaying = true;
+          const v = state.activeVideo;
+          gcEmit('videoStart', {
+            src: (state.videoSrc || '').slice(0, 120),
+            durationS: (v && Number.isFinite(v.duration)) ? Math.round(v.duration) : -1
+          });
+        }
+      };
+      const onVideoPause = () => {
+        if (state.videoPlaying) {
+          state.videoPlaying = false;
+          const v = state.activeVideo;
+          gcEmit('videoPause', {
+            src: (state.videoSrc || '').slice(0, 120),
+            currentTimeS: (v && Number.isFinite(v.currentTime)) ? Math.round(v.currentTime) : -1
+          });
+        }
+      };
+      const onVideoEnded = () => {
+        state.videoPlaying = false;
+        gcEmit('videoEnd', { src: (state.videoSrc || '').slice(0, 120) });
+      };
+      const onVideoEmptied = () => { state.videoPlaying = false; };
+
+      const bindVideo = (v) => {
+        if (state.videoBoundEl === v) return;
+        if (state.videoBoundEl) {
+          try {
+            state.videoBoundEl.removeEventListener('play', onVideoPlay);
+            state.videoBoundEl.removeEventListener('pause', onVideoPause);
+            state.videoBoundEl.removeEventListener('ended', onVideoEnded);
+            state.videoBoundEl.removeEventListener('emptied', onVideoEmptied);
+          } catch (_) {}
+        }
+        state.videoBoundEl = v;
+        if (v) {
+          try {
+            v.addEventListener('play', onVideoPlay);
+            v.addEventListener('pause', onVideoPause);
+            v.addEventListener('ended', onVideoEnded);
+            v.addEventListener('emptied', onVideoEmptied);
+          } catch (_) {}
+          // Reset then re-emit videoStart if it's already running so an
+          // autoplay video that started before binding is still detected.
+          state.videoPlaying = false;
+          try {
+            if (!v.paused && !v.ended && v.readyState > 0) onVideoPlay();
+          } catch (_) {}
+        } else {
+          state.videoPlaying = false;
+        }
+      };
+
+      const scanActiveVideo = () => {
+        let best = null;
+        let bestArea = 0;
+        let vids = [];
+        try { vids = document.querySelectorAll('video'); } catch (_) { vids = []; }
+        for (let i = 0; i < vids.length; i++) {
+          const v = vids[i];
+          const r = safeRect(v);
+          if (!r || r.width <= 0 || r.height <= 0) continue;
+          const area = r.width * r.height;
+          if (area > bestArea) { bestArea = area; best = v; }
+        }
+        if (best !== state.activeVideo) {
+          state.activeVideo = best;
+          try {
+            state.videoSrc = best ? (best.currentSrc || best.src || '') : '';
+          } catch (_) { state.videoSrc = ''; }
+          bindVideo(best);
+        }
+      };
+
+      // Re-scan on candidate-epoch change OR at 1 Hz, and refresh the
+      // video rect every frame. Cheap; safeRect is already used widely.
+      const maintainVideoState = (nowMs) => {
+        if (state.candidateEpoch !== state.lastScanEpoch || (nowMs - state.lastVideoPollMs) >= 1000) {
+          state.lastScanEpoch = state.candidateEpoch;
+          state.lastVideoPollMs = nowMs;
+          scanActiveVideo();
+          const v = state.activeVideo;
+          if (v) {
+            let reallyPlaying = false;
+            try { reallyPlaying = !v.paused && !v.ended && v.readyState > 0; } catch (_) {}
+            if (reallyPlaying && !state.videoPlaying) onVideoPlay();
+            else if (!reallyPlaying && state.videoPlaying) {
+              let isPaused = true;
+              try { isPaused = v.paused; } catch (_) {}
+              if (isPaused) onVideoPause();
+            }
+          } else if (state.videoPlaying) {
+            state.videoPlaying = false;
+          }
+        }
+        if (state.activeVideo) {
+          const r = safeRect(state.activeVideo);
+          state.videoRect = r ? { l: r.left, t: r.top, w: r.width, h: r.height } : null;
+        } else {
+          state.videoRect = null;
+        }
+      };
+
+      // v17.16 DoD-10 — auto-exit any true fullscreen while a video is
+      // playing. Retries up to 3× (500 ms apart) within a 2 s window,
+      // then emits fullscreenLockoutRisk and stops. Driven by the main
+      // process playback poll (gcGetPlaybackState), which runs even when
+      // gaze frames are not arriving.
+      const maintainFullscreen = (nowMs) => {
+        let fsEl = null;
+        try { fsEl = document.fullscreenElement; } catch (_) {}
+        const isFs = !!fsEl;
+        state.lastFullscreen = isFs;
+        if (!isFs) {
+          state.fsExitWindowStart = 0;
+          state.fsExitAttempts = 0;
+          state.fsExiting = false;
+          return;
+        }
+        if (!state.videoPlaying || state.fsExiting) return;
+        if (state.fsExitWindowStart === 0 || (nowMs - state.fsExitWindowStart) > 2000) {
+          state.fsExitWindowStart = nowMs;
+          state.fsExitAttempts = 0;
+        }
+        if (state.fsExitAttempts >= 3) {
+          gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
+          return;
+        }
+        // First attempt fires immediately; subsequent attempts wait 500 ms.
+        if (state.fsExitAttempts > 0 && (nowMs - state.lastFsAttemptMs) < 500) return;
+        if (state.fsExitAttempts === 0) gcEmit('fullscreenEnter', {});
+        state.fsExitAttempts += 1;
+        state.lastFsAttemptMs = nowMs;
+        state.fsExiting = true;
+        try {
+          const p = document.exitFullscreen();
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              state.fsExiting = false;
+              gcEmit('fullscreenAutoExited', { success: true });
+            }).catch((err) => {
+              state.fsExiting = false;
+              gcEmit('fullscreenAutoExited', {
+                success: false,
+                reason: (err && err.message) ? String(err.message).slice(0, 80) : 'reject'
+              });
+              if (state.fsExitAttempts >= 3) gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
+            });
+          } else {
+            state.fsExiting = false;
+          }
+        } catch (err) {
+          state.fsExiting = false;
+          if (state.fsExitAttempts >= 3) gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
+        }
       };
 
       const stableKeyFor = (target, kind, href, label, rect) => [
@@ -815,6 +1006,30 @@ export function buildBrowserCursorInjectionScript(): string {
         return null;
       };
 
+      // v17.16 DoD-1 — playback snapshot for the main process poll.
+      // Running maintainVideoState/maintainFullscreen here means video
+      // detection and fullscreen auto-exit keep working even when gaze
+      // frames are not arriving (e.g. while Pause Gaze is active). Shape
+      // matches the webview:playbackState IPC payload the React rail
+      // consumes: { playing, hasVideo, rect:{l,t,w,h}|null, fullscreen }.
+      window.gcGetPlaybackState = () => {
+        try {
+          const nowMs = Date.now();
+          maintainVideoState(nowMs);
+          maintainFullscreen(nowMs);
+        } catch (_) { /* never throw from the poll */ }
+        const vr = state.videoRect;
+        let fs = false;
+        try { fs = !!document.fullscreenElement; } catch (_) {}
+        return {
+          playing: !!state.videoPlaying,
+          hasVideo: !!state.activeVideo,
+          rect: vr ? { l: vr.l, t: vr.t, w: vr.w, h: vr.h } : null,
+          fullscreen: fs,
+          src: (state.videoSrc || '').slice(0, 200)
+        };
+      };
+
       window.gcHide = () => {
         cursor.style.display = 'none';
         cursor.classList.remove('dwelling');
@@ -887,10 +1102,12 @@ export function buildBrowserCursorInjectionScript(): string {
       window.gcCleanup = () => {
         try { window.gcHide?.(); } catch (_) {}
         try { window.gcResetDwell?.(); } catch (_) {}
+        try { bindVideo(null); } catch (_) {}
         window.gcUpdateAndPoll = null;
       };
 
       const _gcUpdateAndPollInner = (x, y, cursorEnabled) => {
+        state.dwellSuppressedFrame = false;
         if (!cursorEnabled) {
           window.gcHide();
           return null;
@@ -911,6 +1128,55 @@ export function buildBrowserCursorInjectionScript(): string {
         const onsetMs = Number(cfg.onsetMs || 300);
         const postClickCooldownMs = Number(cfg.postClickCooldownMs || 900);
         const targetRegionSlackPx = Number(cfg.targetRegionSlackPx || 24);
+
+        // === v17.16 DoD-2: IN-VIDEO DWELL SUPPRESSION ==================
+        // While a video is playing and gaze is inside the video rect,
+        // freeze dwell: keep the cursor dot visible, but no dwelling ring,
+        // no posterior update, no onset, no commit. This stops the patient
+        // from accidentally toggling play/pause or seeking by looking at
+        // the video. Suppression is confined to the video rect, and the
+        // skip-ad button is explicitly exempt so ads can still be skipped
+        // by gaze. Everything outside the video rect (recommendations,
+        // toolbar, Back) keeps normal dwell. dwellSuppressed is emitted at
+        // ≤ 1 Hz so it doesn't flood the event ring.
+        if (state.videoPlaying && state.videoRect) {
+          const vr = state.videoRect;
+          const insideVideo =
+            x >= vr.l && x <= vr.l + vr.w &&
+            y >= vr.t && y <= vr.t + vr.h;
+          if (insideVideo) {
+            let skipExempt = false;
+            try {
+              const sb = findYoutubeSkipButton();
+              if (sb) {
+                const sr = safeRect(sb);
+                if (sr && distanceToRect(x, y, sr) <= skipUnsnapRadius()) skipExempt = true;
+              }
+            } catch (_) {}
+            if (!skipExempt) {
+              state.dwellSuppressedFrame = true;
+              state.dwellState = 'suppressed';
+              state.start = 0;
+              state.clicked = false;
+              state.targetKey = '';
+              state.targetRect = null;
+              state.onsetTargetRect = null;
+              state.onsetStartGaze = null;
+              state.onsetEmitted = false;
+              state.dwellingExpiryAt = 0;
+              cursor.style.display = 'block';
+              cursor.style.left = x + 'px';
+              cursor.style.top = y + 'px';
+              cursor.classList.remove('dwelling');
+              cursor.classList.remove('clicking');
+              if ((now - state.lastSuppressedEmitTs) >= 1000) {
+                state.lastSuppressedEmitTs = now;
+                gcEmit('dwellSuppressed', { gazeRel: { x: Math.round(x), y: Math.round(y) } });
+              }
+              return null;
+            }
+          }
+        }
 
         if (now < state.blockedUntil) {
           cursor.classList.remove('dwelling');
@@ -1226,6 +1492,10 @@ export function buildBrowserCursorInjectionScript(): string {
           gcEmit('routeChange', { url: location.href });
           state.lastRouteUrl = location.href;
         }
+        // v17.16 — keep the active-video reference and rect fresh so the
+        // in-video suppression test below uses this frame's geometry, not
+        // a stale rect from the slower main-process playback poll.
+        try { maintainVideoState(Date.now()); } catch (_) {}
         const tEnter = performance.now();
         const lastFrameTs = state.lastFrameTs || 0;
         const dtMs = lastFrameTs > 0 ? Math.round(tEnter - lastFrameTs) : 0;
@@ -1251,6 +1521,7 @@ export function buildBrowserCursorInjectionScript(): string {
             else if (el2 > onsetMs2) dwellState = 'dwell';
             else dwellState = 'onset';
           }
+          if (state.dwellSuppressedFrame) dwellState = 'suppressed';
           state.dwellState = dwellState;
           let cursorX = Math.round(x);
           let cursorY = Math.round(y);

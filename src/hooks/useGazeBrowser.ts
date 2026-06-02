@@ -18,7 +18,13 @@ interface BrowserViewBounds {
 type PageLink = { text: string; href: string };
 type EdgeScrollDirection = 'up' | 'down' | 'none';
 type ScrollMode = 'off' | 'armed';
-type YoutubeCommand = 'play' | 'play_pause' | 'next' | 'skip_ad' | 'show_controls' | 'hide_controls' | 'get_state';
+type YoutubeCommand = 'play' | 'play_pause' | 'next' | 'skip_ad' | 'show_controls' | 'hide_controls' | 'volume_up' | 'volume_down' | 'get_state';
+type VideoPlaybackState = {
+    playing: boolean;
+    hasVideo: boolean;
+    rect: { l: number; t: number; w: number; h: number } | null;
+    fullscreen: boolean;
+};
 type YoutubeCommandResult = {
     ok?: boolean;
     status?: 'done' | 'waiting_for_skip' | 'no_ad' | 'no_next' | 'buffering' | 'stalled' | 'failed' | string;
@@ -59,6 +65,12 @@ type BrowserGazeConfig = {
 };
 
 const getElectronAPI = () => (window as any).electronAPI;
+const defaultVideoPlaybackState = (): VideoPlaybackState => ({
+    playing: false,
+    hasVideo: false,
+    rect: null,
+    fullscreen: false,
+});
 
 export function useGazeBrowser() {
     const [isOpen, setIsOpen] = useState(false);
@@ -71,6 +83,7 @@ export function useGazeBrowser() {
     const [pageLinks, setPageLinks] = useState<PageLink[]>([]);
     const [edgeScrollDirection, setEdgeScrollDirection] = useState<EdgeScrollDirection>('none');
     const [scrollMode, setScrollModeState] = useState<ScrollMode>('off');
+    const [videoPlaybackState, setVideoPlaybackState] = useState<VideoPlaybackState>(() => defaultVideoPlaybackState());
     const boundsRef = useRef<BrowserViewBounds | null>(null);
     const cursorInsideRef = useRef(false);
 
@@ -110,6 +123,24 @@ export function useGazeBrowser() {
         return () => api.off('webview:edge-scroll', handler);
     }, []);
 
+    // BrowserView playback state listener. This is emitted by Electron from
+    // the injected web cursor so React can render gaze-safe video controls
+    // outside the BrowserView without touching the main app gaze pipeline.
+    useEffect(() => {
+        const api = getElectronAPI();
+        if (!api?.on) return;
+        const handler = (payload: Partial<VideoPlaybackState>) => {
+            setVideoPlaybackState({
+                playing: !!payload?.playing,
+                hasVideo: !!payload?.hasVideo,
+                rect: payload?.rect ?? null,
+                fullscreen: !!payload?.fullscreen,
+            });
+        };
+        api.on('webview:playbackState', handler);
+        return () => api.off('webview:playbackState', handler);
+    }, []);
+
     // Native BrowserView can be closed by Electron-side safety paths
     // (reset, unresponsive renderer, render-process-gone). Mirror that state
     // immediately so React never leaves a stale page floating over the app.
@@ -123,6 +154,7 @@ export function useGazeBrowser() {
             setEdgeScrollDirection('none');
             setScrollModeState('off');
             setHighContrast(false);
+            setVideoPlaybackState(defaultVideoPlaybackState());
             boundsRef.current = null;
             cursorInsideRef.current = false;
         };
@@ -146,6 +178,7 @@ export function useGazeBrowser() {
                 setPageLinks([]);
                 setHighContrast(false);
                 setZoomFactor(1.35);
+                setVideoPlaybackState(defaultVideoPlaybackState());
                 setLoading(false);
                 return true;
             }
@@ -168,6 +201,7 @@ export function useGazeBrowser() {
         setEdgeScrollDirection('none');
         setScrollModeState('off');
         setHighContrast(false);
+        setVideoPlaybackState(defaultVideoPlaybackState());
         boundsRef.current = null;
         cursorInsideRef.current = false;
     }, []);
@@ -353,6 +387,7 @@ export function useGazeBrowser() {
         setEdgeScrollDirection('none');
         setScrollModeState('off');
         setHighContrast(false);
+        setVideoPlaybackState(defaultVideoPlaybackState());
         boundsRef.current = null;
         cursorInsideRef.current = false;
     }, [closePage]);
@@ -427,5 +462,6 @@ export function useGazeBrowser() {
         pageLinks,
         edgeScrollDirection,
         scrollMode,
+        videoPlaybackState,
     };
 }
