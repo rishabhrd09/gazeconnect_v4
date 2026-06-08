@@ -10,14 +10,12 @@
 import React, {
   useReducer, useCallback, useMemo, useEffect, useState, useRef,
 } from 'react';
-import BaseGazeButton from '../components/core/GazeButton';
+import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { ArchitecturalCell } from '../components/ArchitecturalCell';
 import { FloorPlanViewerModal } from '../components/FloorPlanViewerModal';
-import { useDwellTime } from '../contexts/DwellTimeContext';
-import { DEFAULT_DWELL_TIMES } from '../config/dwellTimeConfig';
 import {
   compileCompassPayload,
   CompassMapPayload,
@@ -855,10 +853,9 @@ interface CompassMapScreenProps {
 // ─── Main Component ───────────────────────────────────────
 
 function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMapScreenProps) {
-  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
+  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze, enableGaze } = useGazeControl();
   const { isLight, isMix, isWarm } = useTheme();
   const ws = useWS();
-  const { settings: dwellSettings } = useDwellTime();
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
   const T_pageBg = isLight ? '#EBE0CC' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : THEME.bg;
@@ -893,20 +890,6 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const T_overlayDeep = isLight ? 'rgba(74, 58, 42, 0.62)' : isMix ? 'rgba(0,0,0,0.86)' : 'rgba(0,0,0,0.92)';
   const T_subSurface = isLight ? 'rgba(168, 148, 120, 0.18)' : isMix ? 'rgba(180, 147, 98, 0.10)' : 'rgba(255,255,255,0.05)';
 
-  const compassDwellScale = useMemo(() => {
-    const base = DEFAULT_DWELL_TIMES.compassMapAction || 1;
-    const target = dwellSettings.compassMapAction || base;
-    return Math.max(0.4, target / base);
-  }, [dwellSettings.compassMapAction]);
-
-  const GazeButton = useCallback((props: React.ComponentProps<typeof BaseGazeButton>) => {
-    const rawDwell = typeof props.dwellTime === 'number'
-      ? props.dwellTime
-      : DEFAULT_DWELL_TIMES.compassMapAction;
-    const scaledDwell = Math.max(500, Math.round(rawDwell * compassDwellScale));
-    return <BaseGazeButton {...props} dwellTime={scaledDwell} />;
-  }, [compassDwellScale]);
-
   const initialQueue = useMemo(() => generateGFQueue(), []);
   const [state, dispatch] = useReducer(compassReducer, initialQueue, createInitialState);
 
@@ -916,8 +899,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const [saveToast, setSaveToast] = useState(false);
   const [expansionReady, setExpansionReady] = useState(false);
   const [surveyLoading, setSurveyLoading] = useState(true);
-  const [dwellingCell, setDwellingCell] = useState<string | null>(null);
-  const [dwellProgress, setDwellProgress] = useState(0);
+  // v5: Removed dwellingCell/dwellProgress state — they powered a redundant
+  // per-cell progress bar that has been removed in favour of GazeButton's
+  // built-in DwellProgressRing/Shrink. Keeping the state would leak memory
+  // and add no-op renders.
   const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
   const [compiledPayload, setCompiledPayload] = useState<CompassMapPayload | null>(null);
   const [foundationReady, setFoundationReady] = useState(false);
@@ -929,6 +914,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // Compass map opens with the global NavBar hidden by default — the canvas is
   // the workspace; users press SHOW NAV when they need to navigate elsewhere.
   const [navHidden, setNavHidden] = useState(true);
+
+  // Compass Map is a direct-work screen: open with gaze ready and nav hidden
+  // so room placement can begin without a manual gaze-toggle round trip.
+  useEffect(() => {
+    setNavHidden(true);
+    enableGaze();
+  }, [enableGaze]);
 
   // Track Focus Lock state from Electron
   const [isFocusLocked, setIsFocusLocked] = useState(false);
@@ -1043,8 +1035,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   const surveyProcessed = useRef(false);
   const prevPhaseRef = useRef<CompassPhase>(state.phase);
-  const dwellAnimRef = useRef<number>(0);
-  const dwellStartRef = useRef<number>(0);
+  // v5: Removed dwellAnimRef/dwellStartRef — they backed the per-cell rAF
+  // loop driving the now-deleted bottom progress bar.
   const saveSurveyRef = useRef(ws.saveSurvey);
   const snapshotSurveyRef = useRef(ws.snapshotSurvey);
   const surveyDataRef = useRef(ws.surveyData);
@@ -1107,7 +1099,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     dispatch({
       type: 'PREFILL_FOUNDATION',
       foundation: {
-        facing: 'South',
+        // v6: Default facing changed 'South' → 'West' per ALS user preference
+        // (most common Indian residential orientation in our test bed). Plot
+        // size 40×60 kept as before — both are tweakable in the foundation
+        // questions, this is just the pre-fill so a power user can SKIP through.
+        facing: 'West',
         plotWidth: 40,
         plotDepth: 60,
         plotType: 'Middle Plot',
@@ -1119,13 +1115,30 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   }, [onSpeak]);
 
   // ── Session Resume (same app run only) ─────────────────────
+  // v6 BUGFIX: Removed COMPASS_LAST_BACKUP_KEY from the auto-hydration list.
+  // Previously: when the user clicked "Restart Map", we moved the current draft
+  // into LAST_BACKUP (so the explicit "LOAD PREVIOUS SESSION" button could still
+  // recover it) and cleared SESSION + PRIMARY. But this same hydration block was
+  // also reading LAST_BACKUP and picking the "best" of the three — so after the
+  // user navigated to Home and came back, it auto-restored the cells they had
+  // just intentionally deleted. Worse, line 1135 then wrote it back to PRIMARY,
+  // effectively un-doing the Restart.
+  //
+  // Correct contract:
+  //   - Auto-hydration on mount  → SESSION + PRIMARY only (current/in-progress work)
+  //   - LAST_BACKUP              → ONLY via the explicit "LOAD PREVIOUS SESSION"
+  //                                button in the foundation screen (line ~1957)
+  //
+  // This means: if you never clicked Restart, you resume exactly where you left
+  // off. If you clicked Restart, you get a clean slate next time you open the
+  // screen — and the "Load Previous Session" button is still there if you change
+  // your mind.
   useEffect(() => {
     let restoredFromDraft = false;
     try {
       const rawDraft = sessionStorage.getItem(COMPASS_DRAFT_KEY);
       const rawBackup = localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY);
-      const rawLastBackup = localStorage.getItem(COMPASS_LAST_BACKUP_KEY);
-      const draftToLoad = pickBestDraftRaw([rawDraft, rawBackup, rawLastBackup]);
+      const draftToLoad = pickBestDraftRaw([rawDraft, rawBackup]);
       if (draftToLoad) {
         const draft = parseCompassDraft(draftToLoad);
         if (draft && draft.state) {
@@ -1246,31 +1259,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     setExpansionReady(false); return undefined;
   }, [state.pendingExpansion]);
 
-  // ── Dwell-to-Select Timer (scaled by Compass setting) ─────
-  const CELL_DWELL_MS = useMemo(
-    () => Math.max(500, Math.round(2000 * compassDwellScale)),
-    [compassDwellScale],
-  );
-
-  const startCellDwell = useCallback((cellKey: string) => {
-    setDwellingCell(cellKey);
-    setDwellProgress(0);
-    dwellStartRef.current = performance.now();
-    const tick = () => {
-      const elapsed = performance.now() - dwellStartRef.current;
-      const pct = Math.min((elapsed / CELL_DWELL_MS) * 100, 100);
-      setDwellProgress(pct);
-      if (pct < 100) dwellAnimRef.current = requestAnimationFrame(tick);
-    };
-    dwellAnimRef.current = requestAnimationFrame(tick);
-  }, [CELL_DWELL_MS]);
-
-  const cancelCellDwell = useCallback(() => {
-    if (dwellAnimRef.current) cancelAnimationFrame(dwellAnimRef.current);
-    dwellAnimRef.current = 0;
-    setDwellingCell(null);
-    setDwellProgress(0);
-  }, []);
+  // ── v5: Dwell-to-Select Timer + helpers DELETED ────────────
+  // The old custom dwell timer (2000ms, rAF-driven) duplicated the dwell
+  // behaviour that GazeButton already provides. Cells now use GazeButton's
+  // built-in dwell (set via dwellCategory="compassMapAction" on the cell render). This:
+  //   - removes ~one rAF loop per cell hover (CPU win on 16 cells)
+  //   - kills the "two animations competing for foveal attention" problem
+  //   - keeps cell dwell scaling with the Compass setting via the local
+  //     dwellCategory="compassMapAction" so user dwell settings remain centralized.
 
   // ── Auto-disarm 45s ─────────────────────────────────────
   useEffect(() => {
@@ -1890,7 +1886,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 // cards (compass-direction question); more options use shorter cards.
                 const isFewOptions = q.options.length <= 4;
                 return (
-                  <GazeButton key={opt} id={`fq-${state.foundationStep}-${opt}`} gazeEnabled={isGazeEnabled && foundationReady} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+                  <GazeButton key={opt} id={`fq-${state.foundationStep}-${opt}`} gazeEnabled={isGazeEnabled && foundationReady} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                     onClick={() => handleFoundationAnswer(opt)}
                     style={{
                       flexBasis: q.columns === 2 ? 'calc(50% - 12px)' : 'calc(33.33% - 16px)',
@@ -1964,7 +1960,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             }}>
             {!foundationReady && (
               <>
-                <GazeButton id="f-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+                <GazeButton id="f-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                   onClick={() => { setFoundationReady(true); onSpeak('Ready. Please choose an option.'); }}
                   style={{ padding: 'clamp(16px, 2.4vh, 26px) clamp(38px, 4.4vw, 62px)', minHeight: 'clamp(84px, 11.5vh, 118px)', minWidth: 'clamp(240px, 24vw, 350px)', borderRadius: '20px', fontSize: 'clamp(26px, 3.4vh, 36px)', fontWeight: 900, letterSpacing: '0.5px', background: T_accentSubtle, border: `3px solid ${T_accent}`, color: T_accent }}>
                   READY
@@ -1973,7 +1969,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   !!localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY)
                   || !!localStorage.getItem(COMPASS_LAST_BACKUP_KEY)
                 ) && (
-                  <GazeButton id="f-restore" gazeEnabled={isGazeEnabled && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+                  <GazeButton id="f-restore" gazeEnabled={isGazeEnabled && !isConfirmationOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                     onClick={() => setShowRestoreConfirm(true)}
                     style={{ padding: 'clamp(16px, 2.4vh, 26px) clamp(32px, 4vw, 56px)', minHeight: 'clamp(84px, 11.5vh, 118px)', minWidth: 'clamp(320px, 34vw, 460px)', borderRadius: '20px', fontSize: 'clamp(24px, 3.1vh, 34px)', lineHeight: 1.1, textAlign: 'center', fontWeight: 900, background: T_cardBg, border: `3px solid ${T_info}`, color: T_info }}>
                     LOAD PREVIOUS SESSION
@@ -1987,12 +1983,12 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               </div>
             )}
             {state.foundationStep > 0 && (
-              <GazeButton id="f-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800} onClick={() => dispatch({ type: 'FOUNDATION_BACK' })}
+              <GazeButton id="f-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton" onClick={() => dispatch({ type: 'FOUNDATION_BACK' })}
                 style={{ padding: 'clamp(14px, 2.1vh, 22px) clamp(34px, 3.8vw, 54px)', minHeight: 'clamp(78px, 10.6vh, 108px)', minWidth: 'clamp(200px, 20vw, 290px)', borderRadius: '20px', fontSize: 'clamp(24px, 3.1vh, 32px)', fontWeight: 800, background: T_cardBg, border: `3px solid ${T_panelBorderSoft}`, color: T_textSub }}>
                 {'\u2190'} BACK
               </GazeButton>
             )}
-            <GazeButton id="f-skip" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+            <GazeButton id="f-skip" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
               onClick={() => { const dflt = q.parse ? q.parse(q.options[0]) : q.options[0]; dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: dflt }); onSpeak(`Skipped. Default: ${q.options[0]}.`); if (state.foundationStep === FOUNDATION_QUESTIONS.length - 1) dispatch({ type: 'COMPLETE_FOUNDATION', queue: generateGFQueue(), numFloors: state.foundation.numFloors || 'Single Floor' }); }}
               style={{ padding: 'clamp(14px, 2.1vh, 22px) clamp(34px, 3.8vw, 54px)', minHeight: 'clamp(78px, 10.6vh, 108px)', minWidth: 'clamp(200px, 20vw, 290px)', borderRadius: '20px', fontSize: 'clamp(24px, 3.1vh, 32px)', fontWeight: 800, background: T_cardBg, border: `3px solid ${T_panelBorderSoft}`, color: T_textSub }}>
               SKIP {'\u2192'}
@@ -2061,7 +2057,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         {refinementMode ? (
           <>
             {/* REFINEMENT MODE — 3-button layout (no dedicated EXIT) */}
-            <GazeButton id="strip-open-editor" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+            <GazeButton id="strip-open-editor" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 if (!selectedRefinementCell) { onSpeak('Select a cell first.'); return; }
                 setCellEditorOpen(true); setCellEditorTool(null); onSpeak('Cell editor opened. Choose a tool.');
@@ -2078,7 +2074,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             </GazeButton>
 
             {/* GENERATE REFINED PLAN — always available in refinement mode */}
-            <GazeButton id="strip-generate-refined" gazeEnabled={isGazeEnabled && state.placements.length >= 1 && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
+            <GazeButton id="strip-generate-refined" gazeEnabled={isGazeEnabled && state.placements.length >= 1 && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 if (state.placements.length < 1) { onSpeak('Place at least 1 room first.'); return; }
                 handleGenerateFloorPlan();
@@ -2098,7 +2094,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           <>
             {/* NORMAL PLACEMENT BUTTONS */}
             {/* BUTTON 0: FLOOR TOGGLE */}
-            <GazeButton id="strip-floor" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+            <GazeButton id="strip-floor" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 if (isConfirmationOpen) return;
                 if (isMultiFloor) {
@@ -2124,7 +2120,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               )}
             </GazeButton>
             {/* BUTTON 1: ROOMS (MENU) */}
-            <GazeButton id="strip-rooms" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+            <GazeButton id="strip-rooms" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => { setMenuOpen(true); onSpeak('Components menu.'); }}
               style={stripBtnStyle(true, T_accentSubtle)}>
               <div style={{ fontSize: 'clamp(26px, 3.2vh, 34px)', marginBottom: '-4px', color: T_textMain }}>{'☰'}</div>
@@ -2133,14 +2129,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
             {/* BUTTON 2: NEXT / KEEP 1 */}
             {state.pendingExpansion ? (
-              <GazeButton id="strip-keep" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+              <GazeButton id="strip-keep" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => dws({ type: 'EXPAND_ROOM', direction: 'none' })}
                 style={{ ...stripBtnStyle(true, 'rgba(234, 179, 8, 0.15)'), color: '#FACC15' }}>
                 <div style={{ fontSize: '24px' }}>TOP</div>
                 <div>KEEP 1</div>
               </GazeButton>
             ) : (
-              <GazeButton id="strip-next" gazeEnabled={isGazeEnabled && controlsUnlocked && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+              <GazeButton id="strip-next" gazeEnabled={isGazeEnabled && controlsUnlocked && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   if (isConfirmationOpen) return;
                   if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
@@ -2158,7 +2154,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             )}
 
             {/* BUTTON 3: GENERATE */}
-            <GazeButton id="strip-generate" gazeEnabled={isGazeEnabled && controlsUnlocked && state.placements.length >= 2 && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
+            <GazeButton id="strip-generate" gazeEnabled={isGazeEnabled && controlsUnlocked && state.placements.length >= 2 && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 if (isConfirmationOpen) return;
                 if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
@@ -2186,7 +2182,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen}
             gazeEnabledTimestamp={lastEnabledTimestamp}
             isDarkMode
-            dwellTime={1000}
+            dwellCategory="compassMapAction"
             onClick={() => {
               if (refinementMode) {
                 setRefinementMode(false);
@@ -2242,7 +2238,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <div style={{ fontSize: 24, fontWeight: 800, color: T_textSub, textAlign: 'center', maxWidth: 400 }}>
               Look at READY to select a room for refinement.
             </div>
-            <GazeButton id="map-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1500}
+            <GazeButton id="map-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => { setMapRefinementArmed(true); onSpeak('Select a room to refine.'); }}
               style={{ width: '280px', height: '140px', borderRadius: '24px', background: T_successSubtle, border: `4px solid ${T_accent}`, color: T_accent, fontSize: '32px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>
               READY
@@ -2300,7 +2296,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
           {/* Direction labels — inset tabs on the wall edges (architectural drawing style)
               Side walls use writing-mode vertical-rl so the text runs along the wall
-              naturally and stays inside the overflow:hidden boundary. */}
+              naturally and stays inside the overflow:hidden boundary.
+
+              v5: Added pointerEvents:'none' on all three labels. They sit at
+              z-index 3 above the grid (z-index 2) and visually overlap the
+              outer ~15px of edge cells (top of r1_c2/c3, left of r2_c1/r3_c1,
+              right of r2_c4/r3_c4). Without pointer-event opt-out, gaze landing
+              on those edges hit the label (which has no onClick) and produced
+              NO dwell — corners felt "dead" for users. They're informational
+              only; the cell beneath should always own the dwell. */}
           <div style={{
             position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3,
             padding: '4px 16px', borderRadius: '0 0 10px 10px',
@@ -2309,6 +2313,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, letterSpacing: '1px',
             fontVariantNumeric: 'tabular-nums',
             boxShadow: '0 2px 6px rgba(0,0,0,0.14)',
+            pointerEvents: 'none', userSelect: 'none',
           }}>BACK &middot; {backDir.toUpperCase()}</div>
           <div style={{
             position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', zIndex: 3,
@@ -2320,6 +2325,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             writingMode: 'vertical-rl' as const,
             textOrientation: 'mixed' as const,
             boxShadow: '2px 0 6px rgba(0,0,0,0.14)',
+            pointerEvents: 'none', userSelect: 'none',
           }}>LEFT &middot; {sideLabels.left.toUpperCase()}</div>
           <div style={{
             position: 'absolute', top: '50%', right: 0, transform: 'translateY(-50%)', zIndex: 3,
@@ -2331,16 +2337,21 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             writingMode: 'vertical-rl' as const,
             textOrientation: 'mixed' as const,
             boxShadow: '-2px 0 6px rgba(0,0,0,0.14)',
+            pointerEvents: 'none', userSelect: 'none',
           }}>RIGHT &middot; {sideLabels.right.toUpperCase()}</div>
 
-          {/* Grid */}
+          {/* Grid
+              v5: Bumped gap 2px → clamp(6px, 0.8vh, 10px) — eye-tracker jitter
+              (~5-15px even after filtering) was flipping dwell between adjacent
+              cells. A larger gap creates a "dead zone" so brief micro-saccades
+              land on neutral grout instead of cancelling/firing the wrong cell. */}
           <div style={{
             position: 'absolute', inset: '12px',
             display: 'grid',
             gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
             gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
-            gap: '2px',
-            padding: '2px',
+            gap: 'clamp(6px, 0.8vh, 10px)',
+            padding: 'clamp(4px, 0.6vh, 8px)',
             background: 'rgba(255,255,255,0.95)',
             borderRadius: '6px',
             zIndex: 2
@@ -2394,10 +2405,22 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
               return (
                 <GazeButton key={cellKey} id={`cell-${cellKey}`} gazeEnabled={cellGaze}
-                  gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={2000}
-                  onDwellStart={() => { setHoveredCell(cellKey); if (cellGaze) startCellDwell(cellKey); }}
-                  onDwellCancel={() => { if (hoveredCell === cellKey) setHoveredCell(null); cancelCellDwell(); }}
-                  onDwellComplete={() => { setHoveredCell(null); cancelCellDwell(); }}
+                  gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+                  // v5: Cell dwell 2000ms → 1300ms. The old value was the absolute
+                  // system MAX (dwellTiming.max = 2000), forcing the user to hold
+                  // gaze for 2 full seconds on a small target — exhausting and
+                  // gaze drift cancelled the dwell before completion. 1300ms is in
+                  // line with phrase/survey dwell (also "pick from many" decisions)
+                  // and the wrapper scales it by compassMapAction so users with
+                  // slower settings still get longer dwell.
+                  //
+                  // v5: Removed custom startCellDwell/cancelCellDwell hooks —
+                  // GazeButton's own DwellProgressRing/Shrink already shows progress.
+                  // Two simultaneous animations were wasting CPU and visually
+                  // competing for the user's foveal attention.
+                  onDwellStart={() => setHoveredCell(cellKey)}
+                  onDwellCancel={() => { if (hoveredCell === cellKey) setHoveredCell(null); }}
+                  onDwellComplete={() => setHoveredCell(null)}
                   onClick={() => {
                     if (isConfirmationOpen) return;
                     // Refinement mode — select cell + auto-open editor
@@ -2440,7 +2463,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                     width: '100%', height: '100%', border: 'none', background: 'transparent',
                     display: 'flex', overflow: 'hidden', padding: 0,
                     position: 'relative',
-                    ...(isHov && cellGaze ? { transform: 'scale(1.01)', zIndex: 10, boxShadow: '0 6px 16px rgba(0,0,0,0.18)' } : {})
+                    // v5: Removed nested transform:scale(1.01). GazeButton already
+                    // applies scale(1.02) on hover internally — stacking both pushed
+                    // the cell's outer edge into adjacent cells, occasionally firing
+                    // mouseleave on the wrong neighbor and cancelling the dwell.
+                    // Box-shadow alone provides clear "this cell is being looked at"
+                    // feedback without any geometric shift that breaks gaze targeting.
+                    ...(isHov && cellGaze ? { zIndex: 10, boxShadow: '0 6px 16px rgba(0,0,0,0.22)' } : {})
                   }}
                 >
                   <ArchitecturalCell
@@ -2560,9 +2589,12 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                       ✦
                     </div>
                   )}
-                  {dwellingCell === cellKey && dwellProgress > 0 && (
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, width: `${dwellProgress}%`, height: '4px', background: '#2DD4BF', zIndex: 20 }} />
-                  )}
+                  {/* v5: Removed duplicate bottom progress bar. The parent
+                      GazeButton already renders DwellProgressRing/Shrink centred
+                      on the cell — having a second progress indicator at the
+                      bottom edge competed for foveal attention and pulled the
+                      user's gaze toward the bottom of the cell, increasing the
+                      chance of drifting onto the cell below. */}
                 </GazeButton>
               );
             })}
@@ -2669,7 +2701,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${100 / GRID_COLS}%`, padding: '6px' }}>
               <GazeButton
                 id="ready-road-left"
-                gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+                gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   if (isConfirmationOpen) return;
                   if (state.armed) { dws({ type: 'DISARM_GRID' }); } else { dws({ type: 'ARM_GRID' }); }
@@ -2797,17 +2829,17 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         <div style={{ fontSize: 'clamp(14px, 1.8vh, 20px)', color: T_textSub, marginBottom: '32px' }}>{state.placements.length} rooms placed, {coveragePercent}% coverage</div>
         <div style={{ fontSize: 'clamp(18px, 2.2vh, 24px)', color: T_textMain, marginBottom: '24px', fontWeight: 700 }}>Map First Floor?</div>
         <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
-          <GazeButton id="start-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+          <GazeButton id="start-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
             onClick={() => { dispatch({ type: 'SWITCH_FLOOR', floor: 'first' }); onSpeak('Starting first floor. Place your rooms.'); }}
             style={{ padding: '16px 40px', minHeight: 'clamp(60px, 8vh, 80px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)', background: T_accentSubtle, border: `2px solid ${T_accent}`, color: T_accent }}>
             YES, MAP 1ST FLOOR
           </GazeButton>
-          <GazeButton id="no-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+          <GazeButton id="no-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
             onClick={() => { handleSave(); onSpeak('Saved ground floor only. Done.'); }}
             style={{ padding: '16px 40px', minHeight: 'clamp(60px, 8vh, 80px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, color: T_textSub }}>
             NO, FINISH
           </GazeButton>
-          <GazeButton id="gen-fp-transition" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
+          <GazeButton id="gen-fp-transition" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
             onClick={() => { handleSave(); handleGenerateFloorPlan(); }}
             style={{
               padding: '16px 40px', minHeight: 'clamp(60px, 8vh, 80px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)',
@@ -2835,7 +2867,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               Do you really want to replace <span style={{ color: oldLib?.color || T_textMain, fontWeight: 700 }}>{oldLib?.roomLabel}</span> with <span style={{ color: newLib?.color || T_textMain, fontWeight: 700 }}>{newLib?.roomLabel}</span>?
             </div>
             <div style={{ display: 'flex', gap: '40px', justifyContent: 'center' }}>
-              <GazeButton id="confirm-replace-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+              <GazeButton id="confirm-replace-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   dws({ type: 'PLACE_ROOM', cell: confirmReplace.cell });
                   setConfirmReplace(null);
@@ -2843,7 +2875,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 style={{ padding: '38px 90px', minHeight: '126px', borderRadius: '24px', background: isLight ? T_accent : isMix ? T_accent : '#334155', border: `4px solid ${T_textMain}`, color: T_textInverse, fontSize: '38px', fontWeight: 900, minWidth: '390px' }}>
                 YES
               </GazeButton>
-              <GazeButton id="confirm-replace-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+              <GazeButton id="confirm-replace-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                 onClick={() => setConfirmReplace(null)}
                 style={{ padding: '38px 90px', minHeight: '126px', borderRadius: '24px', background: 'transparent', border: `4px solid ${T_textDim}`, color: T_textSub, fontSize: '38px', fontWeight: 900, minWidth: '360px' }}>
                 CANCEL
@@ -2866,7 +2898,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               Do you really want to generate the floor plan now?
             </div>
             <div style={{ display: 'flex', gap: '50px', justifyContent: 'center' }}>
-              <GazeButton id="confirm-gen-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
+              <GazeButton id="confirm-gen-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   setConfirmGenerate(false);
                   handleGenerateFloorPlan();
@@ -2874,7 +2906,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: isLight ? T_accent : isMix ? T_accent : '#334155', border: `5px solid ${T_textMain}`, color: T_textInverse, fontSize: '38px', fontWeight: 900, minWidth: '420px' }}>
                 YES
               </GazeButton>
-              <GazeButton id="confirm-gen-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+              <GazeButton id="confirm-gen-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                 onClick={() => setConfirmGenerate(false)}
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: 'transparent', border: `5px solid ${T_textDim}`, color: T_textSub, fontSize: '38px', fontWeight: 900, minWidth: '380px' }}>
                 NO
@@ -2894,7 +2926,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               This will load your last saved grid layout.
             </div>
             <div style={{ display: 'flex', gap: '50px', justifyContent: 'center' }}>
-              <GazeButton id="confirm-restore-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
+              <GazeButton id="confirm-restore-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   try {
                     const item = pickBestDraftRaw([
@@ -2923,7 +2955,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: T_info, border: 'none', color: T_textInverse, fontSize: '38px', fontWeight: 900, minWidth: '420px' }}>
                 YES, RESTORE
               </GazeButton>
-              <GazeButton id="confirm-restore-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+              <GazeButton id="confirm-restore-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                 onClick={() => setShowRestoreConfirm(false)}
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: 'transparent', border: `5px solid ${T_textDim}`, color: T_textSub, fontSize: '38px', fontWeight: 900, minWidth: '380px' }}>
                 CANCEL
@@ -2944,12 +2976,12 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               This will erase your current placements and let you start over<br />with new dimensions and facing.
             </div>
             <div style={{ display: 'flex', gap: '50px', justifyContent: 'center' }}>
-              <GazeButton id="confirm-restart-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1200}
+              <GazeButton id="confirm-restart-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={executeRestartCompass}
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: isLight ? `${T_danger}18` : isMix ? `${T_danger}26` : '#451a1a', border: `5px solid ${T_danger}`, color: T_danger, fontSize: '38px', fontWeight: 900, minWidth: '420px' }}>
                 YES, RESTART
               </GazeButton>
-              <GazeButton id="confirm-restart-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+              <GazeButton id="confirm-restart-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                 onClick={() => setShowRestartConfirm(false)}
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: 'transparent', border: `5px solid ${T_textDim}`, color: T_textSub, fontSize: '38px', fontWeight: 900, minWidth: '380px' }}>
                 CANCEL
@@ -2990,7 +3022,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             </span>
           </div>
           {/* Center: CLOSE */}
-          <GazeButton id="close-menu" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600}
+          <GazeButton id="close-menu" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
             onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}
             style={{ padding: '10px 36px', minHeight: 'clamp(52px, 6vh, 68px)', borderRadius: '12px', fontWeight: 900, fontSize: 'clamp(16px, 1.9vh, 21px)', background: T_cardBg, border: `2px solid ${T_danger}`, color: T_textMain, letterSpacing: '1.5px', flexShrink: 0 }}>
             {'\u2715'} CLOSE
@@ -3004,10 +3036,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <span style={{ color: T_textMain, fontSize: 'clamp(16px, 2vh, 22px)', fontWeight: 800, flex: 1 }}>
               Remove {removalP.roomLabel}?
             </span>
-            <GazeButton id="rm-yes" gazeEnabled={isGazeEnabled} dwellTime={1000} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+            <GazeButton id="rm-yes" gazeEnabled={isGazeEnabled} dwellCategory="compassMapAction" gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => { dws({ type: 'REMOVE_PLACED_ROOM', placementId: menuConfirmRemove! }); setMenuConfirmRemove(null); }}
               style={{ padding: '10px 30px', minHeight: 'clamp(50px, 5.5vh, 64px)', background: isLight ? `${T_danger}26` : isMix ? `${T_danger}33` : '#2d1515', border: `2px solid ${T_danger}`, borderRadius: '12px', color: T_danger, fontSize: 'clamp(15px, 1.7vh, 19px)', fontWeight: 900 }}>YES, REMOVE</GazeButton>
-            <GazeButton id="rm-no" gazeEnabled={isGazeEnabled} dwellTime={600} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+            <GazeButton id="rm-no" gazeEnabled={isGazeEnabled} dwellCategory="backSkipButton" gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => setMenuConfirmRemove(null)}
               style={{ padding: '10px 30px', minHeight: 'clamp(50px, 5.5vh, 64px)', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, borderRadius: '12px', color: T_textMain, fontSize: 'clamp(15px, 1.7vh, 19px)', fontWeight: 800 }}>CANCEL</GazeButton>
           </div>
@@ -3033,7 +3065,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               const isCurr = idx === state.currentIndex;
               const lib = ROOM_LIBRARY[room.roomId];
               return (
-                <GazeButton key={`m-${room.roomId}-${idx}`} id={`m-${room.roomId}-${idx}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+                <GazeButton key={`m-${room.roomId}-${idx}`} id={`m-${room.roomId}-${idx}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                   onClick={() => {
                     if (!menuCardsEnabled) {
                       onSpeak('Press READY first, then select a room.');
@@ -3108,14 +3140,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         <div style={{ marginTop: 'clamp(52px, 6vh, 90px)', padding: '0 clamp(20px, 2.5vw, 36px) clamp(16px, 2.4vh, 34px)', background: T_panelBg, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(30px, 4vw, 72px)' }}>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <GazeButton id="back-map" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={700}
+              <GazeButton id="back-map" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                 onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}
                 style={{ width: menuNavSize, height: menuNavSize, minHeight: menuNavSize, borderRadius: '50%', fontWeight: 900, fontSize: 'clamp(18px, 2.2vh, 28px)', background: T_cardBg, border: `3px solid ${T_accent}`, color: T_accent, letterSpacing: '0.7px', whiteSpace: 'pre-line', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.05 }}>
                 BACK{'\n'}TO MAP
               </GazeButton>
             </div>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <GazeButton id="menu-gaze-toggle" gazeEnabled alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800} onClick={toggleGaze}
+              <GazeButton id="menu-gaze-toggle" gazeEnabled alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="gazeToggle" onClick={toggleGaze}
                 style={{
                   width: menuNavSize,
                   height: menuNavSize,
@@ -3139,7 +3171,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               </GazeButton>
             </div>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <GazeButton id="menu-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={800}
+              <GazeButton id="menu-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   setMenuReady(!menuReady);
                   onSpeak(menuReady ? 'Ready mode off.' : 'Ready. Select any room card.');
@@ -3206,7 +3238,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           gazeEnabledTimestamp={lastEnabledTimestamp}
           isDarkMode
           alwaysActive
-          dwellTime={1200}
+          dwellCategory="navigationButton"
           onClick={() => { setNavHidden(false); onSpeak('Navigation restored.'); }}
           style={{
             position: 'fixed', top: '12px', right: '24px', zIndex: 100,
@@ -3235,7 +3267,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           gazeEnabled={isGazeEnabled}
           gazeEnabledTimestamp={lastEnabledTimestamp}
           isDarkMode
-          dwellTime={1400}
+          dwellCategory="navigationButton"
           onClick={() => { setNavHidden(true); onSpeak('Navigation hidden. Look at SHOW NAV to restore.'); }}
           style={{
             position: 'fixed', top: '175px', right: '24px', zIndex: 100,
@@ -3344,8 +3376,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         const rcShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
             : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
             : 'none';
-        const roomCard = (id: string, rid: string, onClick: () => void, dwell = 1500) => (
-          <GazeButton key={id} id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={dwell}
+        const roomCard = (id: string, rid: string, onClick: () => void, _dwell = 1500) => (
+          <GazeButton key={id} id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
             onClick={() => { onClick(); setRoomPage(0); }}
             style={{ flex: '1 1 200px', minWidth: '200px', maxWidth: '240px', minHeight: '140px', borderRadius: '16px', border: rcBorder, background: rcBg, color: rcText, fontSize: '24px', fontWeight: 800, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', boxShadow: rcShadow }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: ROOM_LIBRARY[rid]?.color || '#555' }} />
@@ -3353,8 +3385,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           </GazeButton>
         );
 
-        const bigBtn = (id: string, label: string, color: string, bg: string, border: string, onClick: () => void, dwell = 1000, extra?: React.CSSProperties) => (
-          <GazeButton id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={dwell}
+        const bigBtn = (id: string, label: string, color: string, bg: string, border: string, onClick: () => void, _dwell = 1000, extra?: React.CSSProperties) => (
+          <GazeButton id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
             onClick={onClick}
             style={{ minWidth: '140px', minHeight: '80px', borderRadius: '16px', border: `2px solid ${border}`, background: bg, color, fontSize: '18px', fontWeight: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', ...extra }}>
             {label}
@@ -3394,7 +3426,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               ? T_textMain
               : '#64748B';
           return (
-            <GazeButton id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={900}
+            <GazeButton id={id} gazeEnabled={effectiveGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => { if (action) { action(); } else { setCellEditorTool(tool); triggerReadingCooldown(); setRoomPage(0); onSpeak(`${label} tool.`); } }}
               style={{
                 width: '100%',
@@ -3445,7 +3477,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               </div>
 
               {/* Center BACK/EXIT Button — large gaze-friendly target */}
-              <GazeButton id="focus-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode alwaysActive dwellTime={1200}
+              <GazeButton id="focus-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode alwaysActive dwellCategory="backSkipButton"
                 onClick={editorBack}
                 style={{
                   minHeight: 'clamp(96px, 11vh, 120px)',
@@ -3541,7 +3573,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                       <div style={{ fontSize: 28, fontWeight: 900, color: T_textInverse, textAlign: 'center', maxWidth: 600, marginBottom: 30 }}>
                         Look at READY to enable tools.
                       </div>
-                      <GazeButton id="ce-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1000}
+                      <GazeButton id="ce-ready" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                         onClick={() => { setRefinementArmed(true); triggerReadingCooldown(); onSpeak('Tools enabled.'); }}
                         style={{ width: '280px', height: '140px', borderRadius: '24px', background: T_panelBg, border: `4px solid ${T_accent}`, color: T_accent, fontSize: '32px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px rgba(0,0,0,0.18)' }}>
                         READY
@@ -3844,14 +3876,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 {refinementArmed && toolSideBtn('ts-expand', '⇔', 'EXPAND', 'expand', '#497775', () => { openExpandOverlay(); triggerReadingCooldown(); })}
                 <div style={{ flex: 1 }} />
                 {refinementArmed && hasCellRefinement && (
-                  <GazeButton id="ts-reset" gazeEnabled={isGazeEnabled && !readingCooldown} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1500}
+                  <GazeButton id="ts-reset" gazeEnabled={isGazeEnabled && !readingCooldown} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                     onClick={resetCellRefinements}
                     style={{ width: '100%', height: '80px', borderRadius: '14px', border: `2px solid ${isLight ? 'rgba(140, 63, 63, 0.42)' : isMix ? 'rgba(214, 130, 100, 0.42)' : 'rgba(239,83,80,0.3)'}`, background: isLight ? 'rgba(140, 63, 63, 0.10)' : isMix ? 'rgba(214, 130, 100, 0.10)' : 'rgba(239,83,80,0.06)', color: isLight ? '#8C3F3F' : isMix ? '#D68264' : '#EF5350', fontSize: '15px', fontWeight: 800, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 10px', flexShrink: 0 }}>
                     <span style={{ fontSize: '24px' }}>✕</span>
                     <span>RESET</span>
                   </GazeButton>
                 )}
-                <GazeButton id="ts-exit" gazeEnabled={isGazeEnabled && !readingCooldown} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1200}
+                <GazeButton id="ts-exit" gazeEnabled={isGazeEnabled && !readingCooldown} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                   onClick={() => { setCellEditorOpen(false); setCellEditorTool(null); setRefinementArmed(false); onSpeak('Editor closed.'); }}
                   style={{ width: '100%', height: '80px', borderRadius: '14px', border: isLight ? `1.5px solid ${lightColors.border.main}` : isMix ? '2px solid rgba(180,147,98,0.32)' : '2px solid rgba(255,255,255,0.08)', background: isLight ? lightColors.background.elevated : isMix ? 'rgba(36, 31, 24, 0.92)' : 'rgba(255,255,255,0.03)', color: T_textMain, fontSize: '15px', fontWeight: 800, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 10px', flexShrink: 0, marginBottom: '24px' }}>
                   <span style={{ fontSize: '24px' }}>←</span>
@@ -3941,7 +3973,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           <div style={{ position: 'fixed', top: '100px', left: '50%', transform: 'translateX(-50%)', zIndex: 10000, background: '#0F2A1F', border: '2px solid #10B981', borderRadius: '16px', padding: '16px 32px', display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#497775', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#FFF', fontSize: '16px', fontWeight: 700 }}>✓</span></div>
             <span style={{ color: T_textMain, fontSize: '18px', fontWeight: 800 }}>Compass Map Saved!</span>
-            <GazeButton id="toast-ok" gazeEnabled={isGazeEnabled} alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={600} onClick={() => setSaveToast(false)}
+            <GazeButton id="toast-ok" gazeEnabled={isGazeEnabled} alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton" onClick={() => setSaveToast(false)}
               style={{ marginLeft: '16px', minWidth: '120px', height: '80px', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, borderRadius: '14px', color: T_textMain, fontSize: '18px', fontWeight: 700 }}>
               OK
             </GazeButton>

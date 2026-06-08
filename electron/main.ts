@@ -59,6 +59,10 @@ let isUiLocked = false;
 let activeBrowserView: BrowserView | null = null; // Gaze-controlled BrowserView
 let activeBrowserViewSessionId = 0;
 let lastNavState: { canGoBack: boolean; canGoForward: boolean; url: string } | null = null;
+// v17.16 — last playback state sent to React, for change-detection so we
+// only emit webview:playbackState on transitions, not every poll.
+let lastPlaybackState: { playing: boolean; hasVideo: boolean; fullscreen: boolean } | null = null;
+let playbackPollInFlight = false;
 const domainZoomPrefs = new Map<string, number>();
 const DEFAULT_WEB_ZOOM = 1.35;
 let lastEdgeScrollAt = 0;
@@ -186,6 +190,7 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
 
   await disposeBrowserView(mainWindow, view, reason);
   lastNavState = null;
+  lastPlaybackState = null;
   resetEdgeScrollState();
   mainWindow?.webContents.send('webview:links', { links: [] });
   mainWindow?.webContents.send('webview:closed', { reason });
@@ -328,6 +333,61 @@ function sendBrowserNavState(force = false): void {
     });
   } catch (err) {
     console.error('Failed to send navigation state:', err);
+  }
+}
+
+// v17.16 — poll the injected gcGetPlaybackState() and forward playback
+// transitions to React via webview:playbackState. Change-detected on
+// playing/hasVideo/fullscreen so we only emit on transitions. The rect is
+// included in the payload for React layout but is not part of the
+// change test (in-video suppression uses the in-page rect, not this copy).
+// gcGetPlaybackState() also drives the injected video re-scan and the
+// fullscreen auto-exit, so this poll must keep running even while gaze is
+// paused — that is why it is a dedicated interval, not piggybacked on the
+// per-frame gaze return.
+async function sendBrowserPlaybackState(): Promise<void> {
+  const view = activeBrowserView;
+  const sessionId = activeBrowserViewSessionId;
+  if (!mainWindow || !view || view.webContents.isDestroyed()) return;
+  if (playbackPollInFlight) return;
+  playbackPollInFlight = true;
+  try {
+    const raw: any = await view.webContents.executeJavaScript(
+      'window.gcGetPlaybackState ? window.gcGetPlaybackState() : null'
+    );
+    if (
+      !mainWindow ||
+      activeBrowserView !== view ||
+      activeBrowserViewSessionId !== sessionId ||
+      view.webContents.isDestroyed()
+    ) {
+      return;
+    }
+    if (!raw || typeof raw !== 'object') return;
+    const next = {
+      playing: !!raw.playing,
+      hasVideo: !!raw.hasVideo,
+      fullscreen: !!raw.fullscreen,
+    };
+    if (
+      lastPlaybackState &&
+      lastPlaybackState.playing === next.playing &&
+      lastPlaybackState.hasVideo === next.hasVideo &&
+      lastPlaybackState.fullscreen === next.fullscreen
+    ) {
+      return;
+    }
+    lastPlaybackState = next;
+    mainWindow.webContents.send('webview:playbackState', {
+      playing: next.playing,
+      hasVideo: next.hasVideo,
+      rect: raw.rect || null,
+      fullscreen: next.fullscreen,
+    });
+  } catch {
+    /* page may be navigating / destroyed — ignore */
+  } finally {
+    playbackPollInFlight = false;
   }
 }
 
@@ -1207,6 +1267,7 @@ function setupIpcHandlers(): void {
         await closeActiveBrowserView('replace');
       }
       lastNavState = null;
+      lastPlaybackState = null;
       resetEdgeScrollState();
       mainWindow.webContents.send('webview:links', { links: [] });
       highContrastEnabled = false;
@@ -1331,6 +1392,19 @@ function setupIpcHandlers(): void {
       }, 1000);
 
       (view as any)._navPoll = pollInterval;
+
+      // v17.16 — playback-state poll. Faster than the 1 s nav poll so the
+      // Watch Mode rail appears promptly on play; also drives the injected
+      // video re-scan + fullscreen auto-exit even when gaze is paused.
+      const playbackPoll = setInterval(() => {
+        if (activeBrowserView !== view || !mainWindow || view.webContents.isDestroyed()) {
+          clearInterval(playbackPoll);
+          return;
+        }
+        void sendBrowserPlaybackState();
+      }, 200);
+
+      (view as any)._playbackPoll = playbackPoll;
 
       await view.webContents.loadURL(url);
       sendBrowserNavState(true);

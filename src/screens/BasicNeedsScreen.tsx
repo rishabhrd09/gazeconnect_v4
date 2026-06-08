@@ -57,7 +57,7 @@ const BasicNeedsScreen: React.FC<Props> = ({
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '18px',
         padding: '8px 4px',
-        overflowY: 'auto',
+        overflow: 'hidden',
         alignContent: 'start',
       }}>
         {NEEDS.map((n: Item) => (

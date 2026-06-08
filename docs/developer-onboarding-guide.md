@@ -23,8 +23,8 @@ Install the following before cloning:
 ## Clone & Setup
 
 ```powershell
-git clone https://github.com/rishabhrd09/gazeconnect_v3.git
-cd gazeconnect_v3
+git clone https://github.com/rishabhrd09/gazeconnect_v4.git
+cd gazeconnect_v4
 .\setup.bat
 ```
 
@@ -111,8 +111,8 @@ This launches all three processes. Use `--simulate` to use mouse cursor as gaze 
 | File | What It Does |
 |------|-------------|
 | `src/App.tsx` | Root component. Contains screen routing and global context providers. |
-| `src/components/core/GazeCursor.tsx` | **The heart of the renderer (~1500 LOC).** Renders the visual gaze cursor + runs the centralised dwell state machine (onset → dwell → lock → click). Owns frontend smoothing (3-tap MA, EMA, R2 visual anchor), multi-point hit testing, sticky tolerance, savedDwell visual continuity. All other components rely on this for dwell detection. |
-| `src/components/core/GazeButton.tsx` | A styling / affordance component. Exposes `data-gaze*` attributes that `GazeCursor` consumes. **Not a dwell driver** — dwell is centralised in `GazeCursor.tsx` as of v17. |
+| `src/components/core/GazeButton.tsx` | Canonical React gaze button. Owns button-level hover/dwell visuals, reads tunable `dwellCategory` values, emits `data-gaze*` metadata, and enforces the 80px AAC target floor. |
+| `src/components/core/GazeCursor.tsx` | Global renderer cursor and external dwell path for raw `data-gaze` targets such as shared chrome. Owns visual anchoring, sticky hit testing, saved-dwell continuity, and telemetry. Do not add custom rAF dwell loops on top of it. |
 | `src/components/core/GazeControlToggle.tsx` | Gaze enable/disable state + cooldown timing. Provides the `useGazeControl` hook. |
 | `src/components/GlobalNavBar.tsx` | Top navigation bar present on every screen. |
 | `src/utils/design.ts` | All design tokens: colors, spacing, typography, screen themes. |
@@ -120,10 +120,10 @@ This launches all three processes. Use `--simulate` to use mouse cursor as gaze 
 | `src/utils/hitZoneExpansion.ts` | Center-weighted nearest-key selection for the keyboard. `KEYBOARD_SNAP_MARGIN = 55 px` (v17.8). |
 | `src/utils/gazeTelemetry.ts` | **R1 telemetry module (v17).** Records every dwell-click event with residual, drift vector, acquisition time. Inspect via `window.__gazeTelemetry.snapshot()` in DevTools. |
 | `src/hooks/useWebSocket.tsx` | WebSocket connection to the Python backend. Handles reconnection, message routing, and the `subscribeGaze` listener pattern. |
-| `src/hooks/useGazeBrowser.ts` | Hook wrapping all IPC for the embedded `BrowserView` (open / close / updateGaze / youtubeCommand / setGazeConfig / telemetry). |
+| `src/hooks/useGazeBrowser.ts` | Hook wrapping all IPC for the embedded `BrowserView` (open / close / updateGaze / youtubeCommand / playbackState / setGazeConfig / telemetry / page links). |
 | `electron/main.ts` | Electron main process. Creates the window, spawns Python and Tobii processes, handles IPC. Owns the `BrowserView` for embedded web browsing. |
-| `electron/browser/browserGazeController.ts` | The injected IIFE that runs the in-page dwell cursor inside `BrowserView`. Bayesian YouTube card posterior (v17.4 / audit R8), asymmetric snap/unsnap, in-page visual continuity. |
-| `electron/browser/youtubeController.ts` | YouTube-specific command script builder. Skip-ad uses synthetic click dispatch + `blockDwellMs` to prevent follow-up gaze clicks toggling play/pause. |
+| `electron/browser/browserGazeController.ts` | Injected IIFE that runs the in-page dwell cursor inside `BrowserView`. Includes v17.15 Bayesian YouTube card posterior, thumbnail/title snap rects, in-video dwell suppression, playback snapshots, and true-fullscreen auto-exit. |
+| `electron/browser/youtubeController.ts` | YouTube-specific command script builder. Handles play/pause, next, skip-ad, show/hide controls, volume up/down, and state readback. |
 | `python/main.py` | Python entry point. Asyncio WebSocket server handling gaze data, word + sentence prediction, Datamuse API, TTS, survey persistence. Hosts `_apply_magnetism` (per-context magnetism) and the OptiKey pipeline orchestration. |
 | `python/services/signal_conditioner.py` | Validity / blink hold / tracking-loss / frozen detection. |
 | `python/services/one_euro_filter.py` | One Euro filter + OptiKey 4-zone stabilizer + GravityWell magnetism. |
@@ -183,6 +183,55 @@ These constraints are critical for ALS accessibility. Violating them breaks the 
 
 ---
 
+## Current Feature Standards
+
+Use this section before adding any new screen, toolbar, modal, or embedded-browser feature.
+
+### React screens
+
+- Prefer `GazeButton` for patient-facing controls.
+- Use `dwellCategory="..."`; avoid raw `dwellTime={...}` except for a documented safety exception.
+- Keep gaze targets at or above 80px on the shorter axis.
+- Avoid hover/selection transforms that move geometry. Color/fill changes are safer than scale.
+- Keep main screens non-scrollable. If content cannot fit at 1366x768, use paging or fewer active items.
+- Keep emergency and gaze-toggle recovery controls reachable after navigation.
+
+### Dwell architecture
+
+The app has multiple gaze paths by design:
+
+- React AAC controls: `GazeButton`.
+- Shared/raw chrome: `GazeCursor` reading `data-gaze*` metadata.
+- Embedded BrowserView content: injected cursor from `electron/browser/browserGazeController.ts`.
+
+Do not stack a new `requestAnimationFrame` dwell loop or custom progress bar on the same target as one of these systems. A single target should have one dwell owner.
+
+### Embedded browser / YouTube
+
+- BrowserView page content is not part of the React DOM. App overlays do not reliably sit above it; put patient controls in React regions outside the BrowserView.
+- Current YouTube controls are the top toolbar plus the right side dock. There is intentionally no bottom rail.
+- The side-dock **Full Screen** button is an in-app video maximize only. It must not enter true browser fullscreen.
+- True fullscreen is auto-exited by the injected script because it hides gaze-accessible recovery controls.
+- While a video is playing, dwell inside the video rect is suppressed. Controls outside the video rect must remain usable.
+- Quick Search / page-link actions should prefer the large app-owned link sidebar over tiny native web links.
+
+### Compass Map
+
+Compass Map is a direct-work placement screen. It opens with navigation hidden and gaze enabled so room placement can begin immediately. Preserve that behavior unless a clinician explicitly asks for a different entry flow.
+
+### Protected validated surfaces
+
+Treat these as high-risk files. Do not modify them for unrelated feature work:
+
+- `src/screens/KeyboardScreen.tsx`
+- `src/components/core/GazeButton.tsx`
+- `src/components/core/GazeCursor.tsx`
+- `src/config/dwellTimeConfig.ts`
+
+Only change them for a verified high-severity bug, and smoke-test keyboard typing immediately after.
+
+---
+
 ## Testing
 
 ### Manual testing checklist
@@ -196,10 +245,25 @@ These constraints are critical for ALS accessibility. Violating them breaks the 
 - [ ] TTS speaks selected phrases
 - [ ] Navigation between all screens works via GlobalNavBar and Home tiles
 - [ ] Content fits within viewport without scrolling (test at 1920x1080 and 1366x768)
+- [ ] Web Browsing: YouTube in-video dwell suppresses accidental play/pause, side-dock Full Screen keeps app controls visible, and Quick Search link cards are 80px+ targets
+- [ ] Compass Map opens with gaze enabled and nav hidden for immediate placement
 
 ### Simulation mode testing
 
 Run `.\start-dev.bat --simulate` and use your mouse cursor as gaze input. This tests the full pipeline except the Tobii hardware layer.
+
+### Type and diff checks
+
+Run these before handing code to a tester:
+
+```powershell
+node --max-old-space-size=4096 .\node_modules\typescript\bin\tsc --noEmit
+node --max-old-space-size=4096 .\node_modules\typescript\bin\tsc -p tsconfig.electron.json
+git diff --check
+git diff --stat -- src/screens/KeyboardScreen.tsx src/components/core/GazeButton.tsx src/components/core/GazeCursor.tsx src/config/dwellTimeConfig.ts
+```
+
+The protected-file diff should be empty unless the task explicitly targeted one of those files.
 
 ---
 

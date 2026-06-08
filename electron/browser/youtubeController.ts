@@ -7,6 +7,8 @@ export type YoutubeCommand =
   | 'skip_ad'
   | 'show_controls'
   | 'hide_controls'
+  | 'volume_up'
+  | 'volume_down'
   | 'get_state';
 
 export type YoutubeCommandResult = {
@@ -32,6 +34,8 @@ export const YOUTUBE_COMMANDS = new Set<YoutubeCommand>([
   'skip_ad',
   'show_controls',
   'hide_controls',
+  'volume_up',
+  'volume_down',
   'get_state',
 ]);
 
@@ -404,6 +408,26 @@ export function buildYoutubeCommandScript(command: YoutubeCommand): string {
         document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
         player.dispatchEvent?.(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
         return { ok: true, status: 'done', detail: 'mousemove_controls', youtubeState };
+      }
+
+      if (command === 'volume_up' || command === 'volume_down') {
+        const target = video || document.querySelector('video');
+        if (!target) return { ok: false, status: 'failed', detail: 'no_video', youtubeState };
+        try {
+          const step = 0.1;
+          let vol = Number(target.volume);
+          if (!isFinite(vol)) vol = 0.5;
+          if (command === 'volume_up') {
+            target.muted = false;
+            vol = Math.min(1, vol + step);
+          } else {
+            vol = Math.max(0, vol - step);
+          }
+          target.volume = vol;
+          return { ok: true, status: 'done', detail: 'volume:' + vol.toFixed(2), youtubeState: getYoutubeState() };
+        } catch (_) {
+          return { ok: false, status: 'failed', detail: 'volume_error', youtubeState };
+        }
       }
 
       return { ok: false, status: 'failed', detail: 'unhandled_command', youtubeState };

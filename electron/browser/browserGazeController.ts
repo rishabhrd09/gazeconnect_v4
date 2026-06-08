@@ -45,7 +45,67 @@ export function buildBrowserCursorInjectionScript(): string {
         // (now + grace) so the .dwelling CSS class is NOT removed
         // immediately — the patient sees the ring stay lit through
         // brief gaze excursions instead of flickering off and back.
-        dwellingExpiryAt: 0
+        dwellingExpiryAt: 0,
+        // v17.15 candidate-epoch: bumped on scroll, resize, route
+        // change, mutation batch, or candidate-list churn. Posteriors
+        // soft-decay (× 0.30) or hard-clear depending on hardness.
+        candidateEpoch: 0,
+        candidateListSig: '',
+        lastEpochMs: 0,
+        pendingMutationCount: 0,
+        pendingMutationFrame: 0,
+        // v17.15 stable-winner gate: Bayesian winner must hold for
+        // 4 frames AND margin >= 0.10 before onset can start.
+        winnerStableId: '',
+        winnerStableCount: 0,
+        bayesianWinnerId: '',
+        bayesianWinnerP: 0,
+        bayesianSecondP: 0,
+        bayesianFoundCandidate: false,
+        // v17.15 onset-movement cancel: snapshot target rect at onset
+        // start; cancel if center shifts > 24 px or > 30 % of shorter
+        // side. Prevents commits drifting onto a relocated card.
+        onsetTargetRect: null,
+        onsetStartGaze: null,
+        onsetEmitted: false,
+        // v17.15 telemetry rings: frames (4000 entries, per-frame),
+        // events2 (500 entries, per-event). Existing per-click ring
+        // (state.telemetry) is preserved untouched.
+        frames: [],
+        events2: [],
+        sessionStartTs: performance.now(),
+        lastFrameTs: 0,
+        lastSuppressedEmitTs: 0,
+        lastRouteUrl: location.href,
+        dwellState: 'idle',
+        // v17.16 DoD-1/DoD-2 — active video + in-video dwell suppression.
+        // activeVideo is the largest visible <video>; videoPlaying is
+        // event-driven (play/pause/ended/emptied) with a 1 Hz .paused
+        // sanity reconcile; videoRect is refreshed each frame. While a
+        // video is playing and gaze is inside videoRect, dwell is frozen
+        // (dot only, no ring, no click) so the patient can't accidentally
+        // toggle play/pause by looking at the video. Suppression is
+        // confined to videoRect — the skip-ad button and everything
+        // outside the video stay dwell-clickable.
+        activeVideo: null,
+        videoPlaying: false,
+        videoRect: null,
+        videoSrc: '',
+        videoBoundEl: null,
+        lastVideoPollMs: 0,
+        lastScanEpoch: -1,
+        dwellSuppressedFrame: false,
+        // v17.16 DoD-10 — fullscreen auto-exit. A true-fullscreen video
+        // hides all gaze-accessible controls (lockout risk for an ALS
+        // user), so the injected script detects document.fullscreenElement
+        // while playing and calls exitFullscreen(), retrying up to 3× in a
+        // 2 s window (500 ms apart) before emitting fullscreenLockoutRisk.
+        // There is no user-facing entry point into fullscreen.
+        fsExitAttempts: 0,
+        fsExitWindowStart: 0,
+        fsExiting: false,
+        lastFsAttemptMs: 0,
+        lastFullscreen: false
       };
 
       window.gcConfig = Object.assign({
@@ -116,6 +176,18 @@ export function buildBrowserCursorInjectionScript(): string {
         'ytd-playlist-panel-video-renderer',
         'ytd-reel-item-renderer'
       ].join(',');
+
+      // v17.15 DoD-2: compact / sidebar card classes whose snap target
+      // must be clamped to the visible thumbnail+title region rather
+      // than the full renderer rect. Fixes the "cursor flies to the
+      // far-right edge of the sidebar" regression.
+      const compactCardSelectorList = [
+        'ytd-compact-video-renderer',
+        'ytd-compact-playlist-renderer',
+        'ytd-compact-radio-renderer',
+        'ytd-playlist-panel-video-renderer'
+      ];
+      const compactCardSelector = compactCardSelectorList.join(',');
 
       const videoAnchorSelector = [
         'a#thumbnail[href*="/watch"]',
@@ -204,6 +276,280 @@ export function buildBrowserCursorInjectionScript(): string {
           x <= rect.right + slack &&
           y >= rect.top - slack &&
           y <= rect.bottom + slack;
+      };
+
+      // v17.15 telemetry — per-event ring (events2). Distinct from the
+      // existing per-click ring (state.telemetry) which is preserved.
+      const gcEmit = (kind, payload) => {
+        try {
+          const e = { t: Math.round(performance.now() - state.sessionStartTs), kind: kind };
+          if (payload) for (const k in payload) e[k] = payload[k];
+          state.events2.push(e);
+          if (state.events2.length > 500) state.events2.shift();
+        } catch (_) { /* never throw from telemetry */ }
+      };
+
+      // v17.15 telemetry — per-frame ring. ~2 min at 30 Hz.
+      const gcPushFrame = (frame) => {
+        try {
+          state.frames.push(frame);
+          if (state.frames.length > 4000) state.frames.shift();
+        } catch (_) { /* never throw from telemetry */ }
+      };
+
+      // v17.15 DoD-1 — candidate-epoch bump. 'soft' decays posteriors
+      // by 0.30 ×; 'hard' clears them and resets the stable-winner
+      // gate. batchSize is the count of changed candidates from a
+      // mutation batch (optional).
+      const bumpEpoch = (hardness, batchSize) => {
+        state.candidateEpoch += 1;
+        state.lastEpochMs = performance.now();
+        if (hardness === 'hard') {
+          state.cardPosteriors = {};
+          state.winnerStableId = '';
+          state.winnerStableCount = 0;
+        } else {
+          const p = state.cardPosteriors;
+          for (const k in p) {
+            p[k] *= 0.30;
+            if (p[k] < 0.02) delete p[k];
+          }
+        }
+        if (typeof batchSize === 'number') {
+          gcEmit('mutationBatch', { size: batchSize, hardEpoch: hardness === 'hard' });
+        }
+      };
+
+      // v17.15 DoD-2 — snap target for compact/sidebar cards.
+      // Returns the visible thumbnail+title union (clipped to the card
+      // rect) for compact selectors; the full card rect otherwise.
+      // Falls back to dropping the right 40 % of the card if neither
+      // thumbnail nor title element is found.
+      const getCardSnapRect = (card) => {
+        const cardRect = safeRect(card);
+        if (!cardRect) return null;
+        let isCompact = false;
+        try {
+          if (card.matches?.(compactCardSelector)) isCompact = true;
+        } catch (_) {}
+        if (!isCompact) return cardRect;
+
+        let thumbRect = null;
+        try {
+          const t = card.querySelector('a#thumbnail')
+            || card.querySelector('#thumbnail')
+            || card.querySelector('ytd-thumbnail');
+          if (t) thumbRect = safeRect(t);
+        } catch (_) {}
+
+        let titleRect = null;
+        try {
+          const tt = card.querySelector('#video-title')
+            || card.querySelector('[id="video-title"]')
+            || card.querySelector('h3');
+          if (tt) titleRect = safeRect(tt);
+        } catch (_) {}
+
+        const parts = [thumbRect, titleRect].filter(Boolean);
+        if (parts.length > 0) {
+          let left = parts[0].left;
+          let top = parts[0].top;
+          let right = parts[0].right;
+          let bottom = parts[0].bottom;
+          for (let i = 1; i < parts.length; i++) {
+            if (parts[i].left < left) left = parts[i].left;
+            if (parts[i].top < top) top = parts[i].top;
+            if (parts[i].right > right) right = parts[i].right;
+            if (parts[i].bottom > bottom) bottom = parts[i].bottom;
+          }
+          left = Math.max(cardRect.left, left);
+          top = Math.max(cardRect.top, top);
+          right = Math.min(cardRect.right, right);
+          bottom = Math.min(cardRect.bottom, bottom);
+          if (right > left && bottom > top) {
+            return {
+              left: Math.round(left),
+              top: Math.round(top),
+              right: Math.round(right),
+              bottom: Math.round(bottom),
+              width: Math.round(right - left),
+              height: Math.round(bottom - top)
+            };
+          }
+        }
+
+        const clampedRight = Math.round(cardRect.left + cardRect.width * 0.6);
+        return {
+          left: cardRect.left,
+          top: cardRect.top,
+          right: clampedRight,
+          bottom: cardRect.bottom,
+          width: clampedRight - cardRect.left,
+          height: cardRect.height
+        };
+      };
+
+      // === v17.16 DoD-1: ACTIVE VIDEO DETECTION + PLAYBACK STATE ========
+      // videoStart / videoPause / videoEnd are emitted to the events2
+      // ring. videoStart fires on the paused→playing transition (also if
+      // a video is already playing the first time we bind, e.g. autoplay).
+      const onVideoPlay = () => {
+        if (!state.videoPlaying) {
+          state.videoPlaying = true;
+          const v = state.activeVideo;
+          gcEmit('videoStart', {
+            src: (state.videoSrc || '').slice(0, 120),
+            durationS: (v && Number.isFinite(v.duration)) ? Math.round(v.duration) : -1
+          });
+        }
+      };
+      const onVideoPause = () => {
+        if (state.videoPlaying) {
+          state.videoPlaying = false;
+          const v = state.activeVideo;
+          gcEmit('videoPause', {
+            src: (state.videoSrc || '').slice(0, 120),
+            currentTimeS: (v && Number.isFinite(v.currentTime)) ? Math.round(v.currentTime) : -1
+          });
+        }
+      };
+      const onVideoEnded = () => {
+        state.videoPlaying = false;
+        gcEmit('videoEnd', { src: (state.videoSrc || '').slice(0, 120) });
+      };
+      const onVideoEmptied = () => { state.videoPlaying = false; };
+
+      const bindVideo = (v) => {
+        if (state.videoBoundEl === v) return;
+        if (state.videoBoundEl) {
+          try {
+            state.videoBoundEl.removeEventListener('play', onVideoPlay);
+            state.videoBoundEl.removeEventListener('pause', onVideoPause);
+            state.videoBoundEl.removeEventListener('ended', onVideoEnded);
+            state.videoBoundEl.removeEventListener('emptied', onVideoEmptied);
+          } catch (_) {}
+        }
+        state.videoBoundEl = v;
+        if (v) {
+          try {
+            v.addEventListener('play', onVideoPlay);
+            v.addEventListener('pause', onVideoPause);
+            v.addEventListener('ended', onVideoEnded);
+            v.addEventListener('emptied', onVideoEmptied);
+          } catch (_) {}
+          // Reset then re-emit videoStart if it's already running so an
+          // autoplay video that started before binding is still detected.
+          state.videoPlaying = false;
+          try {
+            if (!v.paused && !v.ended && v.readyState > 0) onVideoPlay();
+          } catch (_) {}
+        } else {
+          state.videoPlaying = false;
+        }
+      };
+
+      const scanActiveVideo = () => {
+        let best = null;
+        let bestArea = 0;
+        let vids = [];
+        try { vids = document.querySelectorAll('video'); } catch (_) { vids = []; }
+        for (let i = 0; i < vids.length; i++) {
+          const v = vids[i];
+          const r = safeRect(v);
+          if (!r || r.width <= 0 || r.height <= 0) continue;
+          const area = r.width * r.height;
+          if (area > bestArea) { bestArea = area; best = v; }
+        }
+        if (best !== state.activeVideo) {
+          state.activeVideo = best;
+          try {
+            state.videoSrc = best ? (best.currentSrc || best.src || '') : '';
+          } catch (_) { state.videoSrc = ''; }
+          bindVideo(best);
+        }
+      };
+
+      // Re-scan on candidate-epoch change OR at 1 Hz, and refresh the
+      // video rect every frame. Cheap; safeRect is already used widely.
+      const maintainVideoState = (nowMs) => {
+        if (state.candidateEpoch !== state.lastScanEpoch || (nowMs - state.lastVideoPollMs) >= 1000) {
+          state.lastScanEpoch = state.candidateEpoch;
+          state.lastVideoPollMs = nowMs;
+          scanActiveVideo();
+          const v = state.activeVideo;
+          if (v) {
+            let reallyPlaying = false;
+            try { reallyPlaying = !v.paused && !v.ended && v.readyState > 0; } catch (_) {}
+            if (reallyPlaying && !state.videoPlaying) onVideoPlay();
+            else if (!reallyPlaying && state.videoPlaying) {
+              let isPaused = true;
+              try { isPaused = v.paused; } catch (_) {}
+              if (isPaused) onVideoPause();
+            }
+          } else if (state.videoPlaying) {
+            state.videoPlaying = false;
+          }
+        }
+        if (state.activeVideo) {
+          const r = safeRect(state.activeVideo);
+          state.videoRect = r ? { l: r.left, t: r.top, w: r.width, h: r.height } : null;
+        } else {
+          state.videoRect = null;
+        }
+      };
+
+      // v17.16 DoD-10 — auto-exit any true fullscreen while a video is
+      // playing. Retries up to 3× (500 ms apart) within a 2 s window,
+      // then emits fullscreenLockoutRisk and stops. Driven by the main
+      // process playback poll (gcGetPlaybackState), which runs even when
+      // gaze frames are not arriving.
+      const maintainFullscreen = (nowMs) => {
+        let fsEl = null;
+        try { fsEl = document.fullscreenElement; } catch (_) {}
+        const isFs = !!fsEl;
+        state.lastFullscreen = isFs;
+        if (!isFs) {
+          state.fsExitWindowStart = 0;
+          state.fsExitAttempts = 0;
+          state.fsExiting = false;
+          return;
+        }
+        if (!state.videoPlaying || state.fsExiting) return;
+        if (state.fsExitWindowStart === 0 || (nowMs - state.fsExitWindowStart) > 2000) {
+          state.fsExitWindowStart = nowMs;
+          state.fsExitAttempts = 0;
+        }
+        if (state.fsExitAttempts >= 3) {
+          gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
+          return;
+        }
+        // First attempt fires immediately; subsequent attempts wait 500 ms.
+        if (state.fsExitAttempts > 0 && (nowMs - state.lastFsAttemptMs) < 500) return;
+        if (state.fsExitAttempts === 0) gcEmit('fullscreenEnter', {});
+        state.fsExitAttempts += 1;
+        state.lastFsAttemptMs = nowMs;
+        state.fsExiting = true;
+        try {
+          const p = document.exitFullscreen();
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              state.fsExiting = false;
+              gcEmit('fullscreenAutoExited', { success: true });
+            }).catch((err) => {
+              state.fsExiting = false;
+              gcEmit('fullscreenAutoExited', {
+                success: false,
+                reason: (err && err.message) ? String(err.message).slice(0, 80) : 'reject'
+              });
+              if (state.fsExitAttempts >= 3) gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
+            });
+          } else {
+            state.fsExiting = false;
+          }
+        } catch (err) {
+          state.fsExiting = false;
+          if (state.fsExitAttempts >= 3) gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
+        }
       };
 
       const stableKeyFor = (target, kind, href, label, rect) => [
@@ -358,11 +704,14 @@ export function buildBrowserCursorInjectionScript(): string {
           if (!isVisible(card)) continue;
           const anchor = card.querySelector(videoAnchorSelector);
           if (!anchor || !isVisible(anchor)) continue;
-          const rect = safeRect(card);
-          const distance = distanceToRect(x, y, rect);
-          // If this card is the currently locked dwell target, allow a
-          // wider hold zone (unsnap > snap-in). Otherwise use snap-in.
-          const limit = isLockedYoutubeCard(anchor) ? unsnap : snapIn;
+          // v17.15 DoD-2 — unlocked cards: distance to snap rect
+          // (thumbnail+title region). Locked cards: distance to full
+          // rect (wider hold zone via unsnap radius).
+          const isLocked = isLockedYoutubeCard(anchor);
+          const fullRect = safeRect(card);
+          const snapRect = isLocked ? fullRect : (getCardSnapRect(card) || fullRect);
+          const distance = distanceToRect(x, y, snapRect);
+          const limit = isLocked ? unsnap : snapIn;
           if (distance <= limit && distance < bestDistance) {
             bestDistance = distance;
             best = anchor;
@@ -401,8 +750,15 @@ export function buildBrowserCursorInjectionScript(): string {
       };
 
       const bayesianYoutubeCard = (x, y) => {
-        if (!window.gcConfig?.bayesianCardsEnabled) return null;
+        state.bayesianFoundCandidate = false;
+        if (!window.gcConfig?.bayesianCardsEnabled) {
+          state.bayesianWinnerId = '';
+          state.bayesianWinnerP = 0;
+          state.bayesianSecondP = 0;
+          return null;
+        }
         const snapIn = cardSnapInRadius();
+        const unsnap = cardUnsnapRadius();
         const expandedZone = snapIn * Number(window.gcConfig?.bayesianExpandedZoneMult || 1.5);
         const sigma = Number(window.gcConfig?.bayesianSigmaPx || 42);
         const sigma2 = sigma * sigma;
@@ -415,22 +771,59 @@ export function buildBrowserCursorInjectionScript(): string {
           if (!isVisible(card)) continue;
           const anchor = card.querySelector(videoAnchorSelector);
           if (!anchor || !isVisible(anchor)) continue;
-          const rect = safeRect(card);
-          if (!rect) continue;
-          const dist = distanceToRect(x, y, rect);
-          if (dist > expandedZone) continue;
-          const key = cardPosteriorKey(anchor, rect);
-          candidates.push({ anchor, rect, dist, key });
+          const fullRect = safeRect(card);
+          if (!fullRect) continue;
+          // v17.15 DoD-2 — distance is computed against the snap rect
+          // (thumbnail+title union for compact cards, full rect for
+          // others). Locked cards additionally check the full rect
+          // against the wider unsnap radius so the hold zone is not
+          // shrunk by the snap-rect clamp.
+          const snapRect = getCardSnapRect(card) || fullRect;
+          const distSnap = distanceToRect(x, y, snapRect);
+          const isLocked = isLockedYoutubeCard(anchor);
+          if (isLocked) {
+            const distFull = distanceToRect(x, y, fullRect);
+            if (distFull > Math.max(expandedZone, unsnap)) continue;
+          } else {
+            if (distSnap > expandedZone) continue;
+          }
+          // v17.15.2 — likelihood distance is to the snap-rect CENTRE,
+          // not the rect edge. Adjacent vertically-stacked sidebar
+          // cards (ytd-compact-video-renderer, ~120 px apart, ~10 px
+          // gap) had near-identical edge-distances when gaze was on
+          // either card — both ~0 and ~10 — so the Bayesian
+          // likelihoods were near-equal and the stable-winner margin
+          // gate never passed. Centre-distance produces a meaningful
+          // ratio (~5 vs ~120 → likelihood ratio ~30:1) so the
+          // posterior converges cleanly on whichever card the
+          // patient is actually fixating. Rect-distance is still
+          // used for the pool filter above so the candidate pool is
+          // unchanged.
+          const snapCx = (snapRect.left + snapRect.right) / 2;
+          const snapCy = (snapRect.top + snapRect.bottom) / 2;
+          const distCenter = Math.hypot(x - snapCx, y - snapCy);
+          const key = cardPosteriorKey(anchor, fullRect);
+          candidates.push({ anchor, fullRect, snapRect, dist: distCenter, key });
         }
 
-        // v17.4: AGGRESSIVE decay for cards no longer in the candidate
-        // set. Previously we faded slowly via (1-alpha), which meant a
-        // previously-fixated card kept a stale ~0.85 posterior for many
-        // frames AFTER gaze had moved on — preventing the NEW card
-        // from ever crossing the commit threshold. Now we multiply by
-        // bayesianOutOfZoneDecay (default 0.35 = 65% loss per frame),
-        // so a stale belief drops below the 0.45 commit threshold
-        // within 1–2 frames of looking away.
+        // v17.15.1 — sig is recorded for telemetry only. The earlier
+        // version bumped a soft epoch whenever this filtered pool
+        // changed, but on dense sidebars the pool boundary
+        // fluctuates with normal tracker jitter (a card at the edge
+        // of the expanded zone enters / leaves between frames). That
+        // decayed posteriors by × 0.30 every frame, locking the
+        // steady-state below the 0.45 commit threshold so clicks on
+        // sidebar cards never fired. MutationObserver still catches
+        // real DOM changes (additions, removals, attribute shifts);
+        // out-of-zone decay (× 0.35) still handles cards leaving the
+        // pool. So pool churn from gaze drift does not need its own
+        // bump.
+        const sig = candidates.length + '|' + candidates.slice(0, 5).map((c) => c.key).join(',');
+        state.candidateListSig = sig;
+
+        // Out-of-zone aggressive decay — preserved from earlier
+        // iterations so a stale belief drops below the commit
+        // threshold within 1–2 frames after gaze moves on.
         const outOfZoneDecay = Number(window.gcConfig?.bayesianOutOfZoneDecay || 0.35);
         const candidateKeySet = new Set(candidates.map((c) => c.key));
         const posteriors = state.cardPosteriors;
@@ -441,9 +834,27 @@ export function buildBrowserCursorInjectionScript(): string {
           }
         }
 
-        if (candidates.length === 0) return null;
+        if (candidates.length === 0) {
+          if (state.winnerStableId !== '') {
+            gcEmit('targetSwitch', {
+              fromId: state.winnerStableId,
+              toId: null,
+              fromType: 'youtube_card',
+              toType: null,
+              gaze: { x: Math.round(x), y: Math.round(y) }
+            });
+          }
+          state.winnerStableId = '';
+          state.winnerStableCount = 0;
+          state.bayesianWinnerId = '';
+          state.bayesianWinnerP = 0;
+          state.bayesianSecondP = 0;
+          return null;
+        }
 
-        // Likelihoods.
+        state.bayesianFoundCandidate = true;
+
+        // Likelihoods on snap-rect distance.
         let likelihoodSum = 0;
         const likelihoods = candidates.map((c) => {
           const l = Math.exp(-(c.dist * c.dist) / (2 * sigma2));
@@ -461,30 +872,68 @@ export function buildBrowserCursorInjectionScript(): string {
           posteriors[c.key] = alpha * likelihoods[i] + (1 - alpha) * prev;
         }
 
-        // Renormalise (sum across all live posteriors = 1).
+        // Renormalise across live posteriors.
         let totalP = 0;
         for (const k in posteriors) totalP += posteriors[k];
         if (totalP > 0) {
           for (const k in posteriors) posteriors[k] /= totalP;
         }
 
-        // Pick max posterior among current candidates.
+        // Top-1 / Top-2 across current candidates.
         let bestCandidate = null;
         let bestP = 0;
+        let secondP = 0;
         for (const c of candidates) {
           const p = posteriors[c.key] || 0;
           if (p > bestP) {
+            secondP = bestP;
             bestP = p;
             bestCandidate = c;
+          } else if (p > secondP) {
+            secondP = p;
           }
         }
 
-        if (!bestCandidate) return null;
-        // Always allow a locked card to keep winning even below the
-        // commit threshold — once committed, we stay until the dwell
-        // logic above breaks lock (gaze leaves the unsnap radius).
+        if (!bestCandidate) {
+          state.bayesianWinnerId = '';
+          state.bayesianWinnerP = 0;
+          state.bayesianSecondP = 0;
+          return null;
+        }
+
+        // v17.15 DoD-3 — stable-winner tracking. Onset is gated on the
+        // same winner holding for 4 frames AND margin >= 0.10.
+        const winnerId = bestCandidate.key;
+        if (state.winnerStableId === winnerId) {
+          state.winnerStableCount += 1;
+        } else {
+          if (state.winnerStableId !== '') {
+            gcEmit('targetSwitch', {
+              fromId: state.winnerStableId,
+              toId: winnerId,
+              fromType: 'youtube_card',
+              toType: 'youtube_card',
+              gaze: { x: Math.round(x), y: Math.round(y) }
+            });
+          }
+          state.winnerStableId = winnerId;
+          state.winnerStableCount = 1;
+        }
+        state.bayesianWinnerId = winnerId;
+        state.bayesianWinnerP = bestP;
+        state.bayesianSecondP = secondP;
+
+        const margin = bestP - secondP;
         const lockedWin = isLockedYoutubeCard(bestCandidate.anchor);
-        if (!lockedWin && bestP < commitThreshold) return null;
+
+        // Locked cards bypass the gate (already-committed targets keep
+        // winning). For unlocked, require stable winner + margin +
+        // commit threshold.
+        if (!lockedWin) {
+          if (state.winnerStableCount < 4) return null;
+          if (margin < 0.10) return null;
+          if (bestP < commitThreshold) return null;
+        }
 
         return clickRequestFor(bestCandidate.anchor, x, y, 'youtube_nearest_card', true);
       };
@@ -527,10 +976,16 @@ export function buildBrowserCursorInjectionScript(): string {
         if (ytAtPoint) return ytAtPoint;
 
         // R8: Bayesian posterior wins if it has converged on a card.
-        // Falls through to nearest-distance otherwise so behaviour
-        // degrades gracefully if the posterior hasn't built up yet.
+        // v17.15 DoD-3: if Bayesian found candidates but the stable-
+        // winner gate has not passed, do NOT fall through to
+        // nearestYoutubeCard — that would bypass the gate via raw
+        // distance and re-introduce the flicker the gate is meant to
+        // prevent. Return null so dwell does not accumulate this
+        // frame. Direct on-element hits via youtubeTargetFromElement
+        // (above) still bypass the gate because they're explicit.
         const ytBayesian = bayesianYoutubeCard(x, y);
         if (ytBayesian) return ytBayesian;
+        if (state.bayesianFoundCandidate) return null;
 
         const ytNearby = nearestYoutubeCard(x, y);
         if (ytNearby) return ytNearby;
@@ -551,6 +1006,30 @@ export function buildBrowserCursorInjectionScript(): string {
         return null;
       };
 
+      // v17.16 DoD-1 — playback snapshot for the main process poll.
+      // Running maintainVideoState/maintainFullscreen here means video
+      // detection and fullscreen auto-exit keep working even when gaze
+      // frames are not arriving (e.g. while Pause Gaze is active). Shape
+      // matches the webview:playbackState IPC payload the React rail
+      // consumes: { playing, hasVideo, rect:{l,t,w,h}|null, fullscreen }.
+      window.gcGetPlaybackState = () => {
+        try {
+          const nowMs = Date.now();
+          maintainVideoState(nowMs);
+          maintainFullscreen(nowMs);
+        } catch (_) { /* never throw from the poll */ }
+        const vr = state.videoRect;
+        let fs = false;
+        try { fs = !!document.fullscreenElement; } catch (_) {}
+        return {
+          playing: !!state.videoPlaying,
+          hasVideo: !!state.activeVideo,
+          rect: vr ? { l: vr.l, t: vr.t, w: vr.w, h: vr.h } : null,
+          fullscreen: fs,
+          src: (state.videoSrc || '').slice(0, 200)
+        };
+      };
+
       window.gcHide = () => {
         cursor.style.display = 'none';
         cursor.classList.remove('dwelling');
@@ -564,6 +1043,18 @@ export function buildBrowserCursorInjectionScript(): string {
         state.targetKey = '';
         state.targetRect = null;
         state.dwellingExpiryAt = 0;
+        // v17.15 — clear onset snapshot and stable-winner tracking so
+        // the next BrowserView entry starts fresh. Posteriors are
+        // preserved (managed by epoch decay).
+        state.onsetTargetRect = null;
+        state.onsetStartGaze = null;
+        state.onsetEmitted = false;
+        state.winnerStableId = '';
+        state.winnerStableCount = 0;
+        state.bayesianWinnerId = '';
+        state.bayesianWinnerP = 0;
+        state.bayesianSecondP = 0;
+        state.bayesianFoundCandidate = false;
       };
 
       // Reset dwell WITHOUT clearing blockedUntil — used after a click
@@ -575,6 +1066,14 @@ export function buildBrowserCursorInjectionScript(): string {
         state.targetKey = '';
         state.targetRect = null;
         state.dwellingExpiryAt = 0;
+        // v17.15 — also clear onset snapshot and stable-winner gate so
+        // the next acquisition re-stabilises rather than inheriting a
+        // partial count from the prior click.
+        state.onsetTargetRect = null;
+        state.onsetStartGaze = null;
+        state.onsetEmitted = false;
+        state.winnerStableId = '';
+        state.winnerStableCount = 0;
         cursor.classList.remove('dwelling');
         cursor.classList.remove('clicking');
       };
@@ -590,6 +1089,12 @@ export function buildBrowserCursorInjectionScript(): string {
         state.clicked = false;
         state.targetKey = '';
         state.targetRect = null;
+        // v17.15 — block also clears onset and stable-winner tracking.
+        state.onsetTargetRect = null;
+        state.onsetStartGaze = null;
+        state.onsetEmitted = false;
+        state.winnerStableId = '';
+        state.winnerStableCount = 0;
         cursor.classList.remove('dwelling');
         cursor.classList.remove('clicking');
       };
@@ -597,10 +1102,12 @@ export function buildBrowserCursorInjectionScript(): string {
       window.gcCleanup = () => {
         try { window.gcHide?.(); } catch (_) {}
         try { window.gcResetDwell?.(); } catch (_) {}
+        try { bindVideo(null); } catch (_) {}
         window.gcUpdateAndPoll = null;
       };
 
-      window.gcUpdateAndPoll = (x, y, cursorEnabled) => {
+      const _gcUpdateAndPollInner = (x, y, cursorEnabled) => {
+        state.dwellSuppressedFrame = false;
         if (!cursorEnabled) {
           window.gcHide();
           return null;
@@ -621,6 +1128,55 @@ export function buildBrowserCursorInjectionScript(): string {
         const onsetMs = Number(cfg.onsetMs || 300);
         const postClickCooldownMs = Number(cfg.postClickCooldownMs || 900);
         const targetRegionSlackPx = Number(cfg.targetRegionSlackPx || 24);
+
+        // === v17.16 DoD-2: IN-VIDEO DWELL SUPPRESSION ==================
+        // While a video is playing and gaze is inside the video rect,
+        // freeze dwell: keep the cursor dot visible, but no dwelling ring,
+        // no posterior update, no onset, no commit. This stops the patient
+        // from accidentally toggling play/pause or seeking by looking at
+        // the video. Suppression is confined to the video rect, and the
+        // skip-ad button is explicitly exempt so ads can still be skipped
+        // by gaze. Everything outside the video rect (recommendations,
+        // toolbar, Back) keeps normal dwell. dwellSuppressed is emitted at
+        // ≤ 1 Hz so it doesn't flood the event ring.
+        if (state.videoPlaying && state.videoRect) {
+          const vr = state.videoRect;
+          const insideVideo =
+            x >= vr.l && x <= vr.l + vr.w &&
+            y >= vr.t && y <= vr.t + vr.h;
+          if (insideVideo) {
+            let skipExempt = false;
+            try {
+              const sb = findYoutubeSkipButton();
+              if (sb) {
+                const sr = safeRect(sb);
+                if (sr && distanceToRect(x, y, sr) <= skipUnsnapRadius()) skipExempt = true;
+              }
+            } catch (_) {}
+            if (!skipExempt) {
+              state.dwellSuppressedFrame = true;
+              state.dwellState = 'suppressed';
+              state.start = 0;
+              state.clicked = false;
+              state.targetKey = '';
+              state.targetRect = null;
+              state.onsetTargetRect = null;
+              state.onsetStartGaze = null;
+              state.onsetEmitted = false;
+              state.dwellingExpiryAt = 0;
+              cursor.style.display = 'block';
+              cursor.style.left = x + 'px';
+              cursor.style.top = y + 'px';
+              cursor.classList.remove('dwelling');
+              cursor.classList.remove('clicking');
+              if ((now - state.lastSuppressedEmitTs) >= 1000) {
+                state.lastSuppressedEmitTs = now;
+                gcEmit('dwellSuppressed', { gazeRel: { x: Math.round(x), y: Math.round(y) } });
+              }
+              return null;
+            }
+          }
+        }
 
         if (now < state.blockedUntil) {
           cursor.classList.remove('dwelling');
@@ -713,10 +1269,31 @@ export function buildBrowserCursorInjectionScript(): string {
           }
           state.x = x;
           state.y = y;
+          // v17.15 DoD-4 — snapshot the new target rect at onset start
+          // so a mid-onset re-flow can be detected and the dwell
+          // cancelled before commit.
+          const newTargetKey = clickReq?.key || '';
+          const targetChanged = state.targetKey !== newTargetKey;
           state.start = now;
           state.clicked = false;
-          state.targetKey = clickReq?.key || '';
+          state.targetKey = newTargetKey;
           state.targetRect = clickReq?.rect || null;
+          if (clickReq && clickReq.rect && targetChanged) {
+            state.onsetTargetRect = {
+              left: clickReq.rect.left,
+              top: clickReq.rect.top,
+              right: clickReq.rect.right,
+              bottom: clickReq.rect.bottom,
+              width: clickReq.rect.width,
+              height: clickReq.rect.height
+            };
+            state.onsetStartGaze = { x: Math.round(x), y: Math.round(y) };
+            state.onsetEmitted = false;
+          } else if (!clickReq) {
+            state.onsetTargetRect = null;
+            state.onsetStartGaze = null;
+            state.onsetEmitted = false;
+          }
           cursor.classList.remove('clicking');
           return null;
         }
@@ -725,6 +1302,43 @@ export function buildBrowserCursorInjectionScript(): string {
         // visual-continuity expiry. From here the live dwell drives
         // the ring class as normal.
         state.dwellingExpiryAt = 0;
+
+        // v17.15 DoD-4 — cancel onset if the active target's centre has
+        // moved materially since onset start. Threshold: 24 px absolute
+        // OR 30 % of the rect's shorter side, whichever fires first.
+        // Without this, a YouTube re-flow mid-dwell (lazy thumbnail,
+        // ad insertion) drags the commit onto whichever card landed
+        // under the gaze after the shift.
+        if (state.onsetTargetRect && clickReq && clickReq.rect && !state.clicked) {
+          const r0 = state.onsetTargetRect;
+          const r1 = clickReq.rect;
+          const c0x = (r0.left + r0.right) / 2;
+          const c0y = (r0.top + r0.bottom) / 2;
+          const c1x = (r1.left + r1.right) / 2;
+          const c1y = (r1.top + r1.bottom) / 2;
+          const shiftPx = Math.hypot(c1x - c0x, c1y - c0y);
+          const shorterDim = Math.max(1, Math.min(
+            r0.right - r0.left,
+            r0.bottom - r0.top
+          ));
+          if (shiftPx > 24 || shiftPx > 0.30 * shorterDim) {
+            gcEmit('onsetCancel', {
+              candId: state.targetKey || null,
+              reason: 'candidate_moved',
+              shiftPx: Math.round(shiftPx)
+            });
+            state.start = 0;
+            state.onsetTargetRect = null;
+            state.onsetStartGaze = null;
+            state.onsetEmitted = false;
+            state.targetKey = '';
+            state.targetRect = null;
+            cursor.classList.remove('dwelling');
+            cursor.classList.remove('clicking');
+            state.dwellingExpiryAt = 0;
+            return null;
+          }
+        }
 
         if (sameTarget && clickReq?.rect) {
           // Refresh the rect — page content can shift while the user
@@ -735,7 +1349,26 @@ export function buildBrowserCursorInjectionScript(): string {
         }
 
         const elapsed = now - state.start;
-        if (elapsed > onsetMs && !state.clicked) cursor.classList.add('dwelling');
+        if (elapsed > onsetMs && !state.clicked) {
+          cursor.classList.add('dwelling');
+          // v17.15 DoD-5 — emit onsetStart once per onset window.
+          if (!state.onsetEmitted) {
+            state.onsetEmitted = true;
+            const orect = state.onsetTargetRect;
+            gcEmit('onsetStart', {
+              candId: state.targetKey || null,
+              candType: clickReq?.kind || null,
+              rect: orect ? {
+                l: orect.left,
+                t: orect.top,
+                w: orect.right - orect.left,
+                h: orect.bottom - orect.top
+              } : null,
+              posterior: state.bayesianWinnerP || 0,
+              margin: (state.bayesianWinnerP || 0) - (state.bayesianSecondP || 0)
+            });
+          }
+        }
 
         // === v17.3 R2: TWO-PHASE VISUAL ANCHOR IN BROWSERVIEW ==========
         // Mirror of the main-app two-phase anchor:
@@ -812,6 +1445,19 @@ export function buildBrowserCursorInjectionScript(): string {
                 dwellToClickMs: now - state.start
               });
               if (state.telemetry.length > 200) state.telemetry.shift();
+
+              // v17.15 DoD-5 — dwellCommit event in the events2 ring.
+              gcEmit('dwellCommit', {
+                candId: clickReq.key,
+                candType: clickReq.kind,
+                dwellToCommitMs: now - state.start,
+                finalGaze: { x: Math.round(x), y: Math.round(y) },
+                residual: {
+                  dx: Math.round(dx),
+                  dy: Math.round(dy),
+                  mag: Math.round(Math.sqrt(dx * dx + dy * dy))
+                }
+              });
             }
           } catch (_) { /* never block click on telemetry */ }
 
@@ -821,6 +1467,13 @@ export function buildBrowserCursorInjectionScript(): string {
             state.start = Date.now();
             state.targetKey = '';
             state.targetRect = null;
+            // v17.15 — reset onset and stable-winner state so the next
+            // dwell starts fresh.
+            state.onsetTargetRect = null;
+            state.onsetStartGaze = null;
+            state.onsetEmitted = false;
+            state.winnerStableId = '';
+            state.winnerStableCount = 0;
           }, postClickCooldownMs);
           return clickReq;
         }
@@ -828,14 +1481,111 @@ export function buildBrowserCursorInjectionScript(): string {
         return null;
       };
 
+      // v17.15 wrapper — per-frame telemetry shell around the inner
+      // dwell loop. The inner function is _gcUpdateAndPollInner; this
+      // wrapper captures dtMs, dwellState, snap distance, and posts a
+      // frame entry to __gcTelemetry.frames each call. Also handles
+      // routeChange detection and trackingLost events.
+      window.gcUpdateAndPoll = (x, y, cursorEnabled) => {
+        if (location.href !== state.lastRouteUrl) {
+          bumpEpoch('hard');
+          gcEmit('routeChange', { url: location.href });
+          state.lastRouteUrl = location.href;
+        }
+        // v17.16 — keep the active-video reference and rect fresh so the
+        // in-video suppression test below uses this frame's geometry, not
+        // a stale rect from the slower main-process playback poll.
+        try { maintainVideoState(Date.now()); } catch (_) {}
+        const tEnter = performance.now();
+        const lastFrameTs = state.lastFrameTs || 0;
+        const dtMs = lastFrameTs > 0 ? Math.round(tEnter - lastFrameTs) : 0;
+        state.lastFrameTs = tEnter;
+        if (dtMs > 100 && lastFrameTs > 0) {
+          gcEmit('trackingLost', { gapMs: dtMs });
+        }
+        let result = null;
+        try {
+          result = _gcUpdateAndPollInner(x, y, cursorEnabled);
+        } catch (_err) { /* never throw from the gaze loop */ }
+        try {
+          const cfg = window.gcConfig || {};
+          const dwellMs2 = Number(cfg.dwellMs || 1200);
+          const onsetMs2 = Number(cfg.onsetMs || 300);
+          const nowMs = Date.now();
+          let dwellState = 'idle';
+          if (state.clicked) {
+            dwellState = nowMs < state.blockedUntil ? 'cooldown' : 'idle';
+          } else if (state.start > 0) {
+            const el2 = nowMs - state.start;
+            if (el2 > dwellMs2) dwellState = 'commit';
+            else if (el2 > onsetMs2) dwellState = 'dwell';
+            else dwellState = 'onset';
+          }
+          if (state.dwellSuppressedFrame) dwellState = 'suppressed';
+          state.dwellState = dwellState;
+          let cursorX = Math.round(x);
+          let cursorY = Math.round(y);
+          if (cursor && cursor.style) {
+            const lx = parseFloat(cursor.style.left);
+            const ly = parseFloat(cursor.style.top);
+            if (Number.isFinite(lx)) cursorX = Math.round(lx);
+            if (Number.isFinite(ly)) cursorY = Math.round(ly);
+          }
+          const winMargin = Math.round(
+            (((state.bayesianWinnerP || 0) - (state.bayesianSecondP || 0)) * 1000)
+          ) / 1000;
+          const snapDist = state.targetRect
+            ? Math.round(distanceToRect(x, y, state.targetRect))
+            : -1;
+          gcPushFrame({
+            t: Math.round(performance.now() - state.sessionStartTs),
+            ageMs: -1,
+            dtMs: dtMs,
+            gx: Math.round(x),
+            gy: Math.round(y),
+            cx: cursorX,
+            cy: cursorY,
+            candId: state.targetKey || null,
+            candType: result ? (result.kind || null) : null,
+            winId: state.bayesianWinnerId || null,
+            winMargin: winMargin,
+            snapDist: snapDist,
+            dwellState: dwellState,
+            epoch: state.candidateEpoch
+          });
+        } catch (_) { /* never throw from telemetry */ }
+        return result;
+      };
+
       // R1: expose BrowserView telemetry for live inspection.
       // From the BrowserView DevTools console:
-      //   __gcTelemetry.snapshot()  → aggregates
-      //   __gcTelemetry.events()    → raw event ring
-      //   __gcTelemetry.clear()     → wipe buffer
+      //   __gcTelemetry.snapshot()  → aggregates (per-click ring)
+      //   __gcTelemetry.events()    → raw per-click ring
+      //   __gcTelemetry.frames()    → v17.15 per-frame ring (4000)
+      //   __gcTelemetry.events2()   → v17.15 per-event ring (500)
+      //   __gcTelemetry.dump()      → JSON blob for save / paste
+      //   __gcTelemetry.clear()     → wipe buffers
       window.__gcTelemetry = {
         events: function () { return state.telemetry.slice(); },
-        clear: function () { state.telemetry.length = 0; state.clickSeq = 0; },
+        clear: function () {
+          state.telemetry.length = 0;
+          state.clickSeq = 0;
+          state.frames.length = 0;
+          state.events2.length = 0;
+        },
+        frames: function () { return state.frames.slice(); },
+        events2: function () { return state.events2.slice(); },
+        dump: function () {
+          return {
+            frames: state.frames.slice(),
+            events2: state.events2.slice(),
+            snapshot: window.__gcTelemetry.snapshot(),
+            posteriors: window.__gcTelemetry.posteriors(),
+            candidateEpoch: state.candidateEpoch,
+            lastRouteUrl: state.lastRouteUrl,
+            sessionStartTs: state.sessionStartTs
+          };
+        },
         snapshot: function () {
           var t = state.telemetry;
           if (!t || t.length === 0) return null;
@@ -873,6 +1623,92 @@ export function buildBrowserCursorInjectionScript(): string {
           return snap;
         }
       };
+
+      // v17.15 DoD-1 — candidate-epoch listeners. Scroll uses a 100 ms
+      // leading + trailing throttle. Route changes via popstate /
+      // hashchange / yt-navigate-finish trigger hard epochs.
+      try {
+        let scrollLastFire = 0;
+        let scrollTrailingTimer = null;
+        const scrollEpoch = () => {
+          const t = performance.now();
+          if (t - scrollLastFire >= 100) {
+            scrollLastFire = t;
+            bumpEpoch('soft');
+          } else if (!scrollTrailingTimer) {
+            scrollTrailingTimer = setTimeout(() => {
+              scrollTrailingTimer = null;
+              scrollLastFire = performance.now();
+              bumpEpoch('soft');
+            }, 100);
+          }
+        };
+        window.addEventListener('scroll', scrollEpoch, { passive: true, capture: true });
+        window.addEventListener('resize', () => bumpEpoch('hard'));
+        window.addEventListener('popstate', () => {
+          bumpEpoch('hard');
+          if (location.href !== state.lastRouteUrl) {
+            gcEmit('routeChange', { url: location.href });
+            state.lastRouteUrl = location.href;
+          }
+        });
+        window.addEventListener('hashchange', () => {
+          if (location.href !== state.lastRouteUrl) {
+            bumpEpoch('hard');
+            gcEmit('routeChange', { url: location.href });
+            state.lastRouteUrl = location.href;
+          }
+        });
+        document.addEventListener('yt-navigate-finish', () => {
+          bumpEpoch('hard');
+          if (location.href !== state.lastRouteUrl) {
+            gcEmit('routeChange', { url: location.href });
+            state.lastRouteUrl = location.href;
+          }
+        });
+      } catch (_) { /* listeners best-effort */ }
+
+      // v17.15 DoD-1 — MutationObserver, batched per animation frame.
+      // Only mutations touching candidate-relevant elements increment
+      // the epoch. ≥ 5 changed candidates in one batch → hard epoch.
+      try {
+        const candidateSelectorAll = videoCardSelector + ',' + videoAnchorSelector + ',' + skipButtonSelector;
+        const mo = new MutationObserver((records) => {
+          let touched = 0;
+          for (let i = 0; i < records.length; i++) {
+            const r = records[i];
+            const nodes = [];
+            if (r.target) nodes.push(r.target);
+            if (r.addedNodes) for (let j = 0; j < r.addedNodes.length; j++) nodes.push(r.addedNodes[j]);
+            if (r.removedNodes) for (let j = 0; j < r.removedNodes.length; j++) nodes.push(r.removedNodes[j]);
+            let hit = false;
+            for (let k = 0; k < nodes.length && !hit; k++) {
+              const n = nodes[k];
+              if (!n) continue;
+              try {
+                if (n.matches && n.matches(candidateSelectorAll)) hit = true;
+                else if (n.querySelector && n.querySelector(candidateSelectorAll)) hit = true;
+              } catch (_) {}
+            }
+            if (hit) touched += 1;
+          }
+          if (touched === 0) return;
+          state.pendingMutationCount += touched;
+          if (state.pendingMutationFrame) return;
+          state.pendingMutationFrame = requestAnimationFrame(() => {
+            const count = state.pendingMutationCount;
+            state.pendingMutationCount = 0;
+            state.pendingMutationFrame = 0;
+            bumpEpoch(count >= 5 ? 'hard' : 'soft', count);
+          });
+        });
+        mo.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'class', 'hidden', 'aria-hidden']
+        });
+      } catch (_) { /* observer best-effort */ }
 
       return 'injected';
     })();

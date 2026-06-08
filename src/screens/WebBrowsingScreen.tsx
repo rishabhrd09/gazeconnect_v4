@@ -704,7 +704,7 @@ const useBrowserViewBoundsSync = (
 const BackBtn = ({ onClick, ige, ts, toggleGaze, label = "← Home Grid", showHome = true, centerGaze = false }: { onClick: () => void; ige: boolean; ts: number; toggleGaze: () => void; label?: string; showHome?: boolean; centerGaze?: boolean }) => (
     <div style={{ position: 'relative', width: '100%', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '60px', padding: centerGaze ? '12px 0 24px 0' : '24px 0', flexShrink: 0 }}>
         {showHome && !centerGaze && (
-            <GazeButton id="nav-back" onClick={onClick} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+            <GazeButton id="nav-back" onClick={onClick} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                 style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     height: 'clamp(64px, 8.5vh, 90px)', padding: '0 clamp(40px, 6vw, 80px)',
@@ -865,51 +865,72 @@ const YT_CATS = [
 // that BrowserView doesn't reliably provide. JS injection with userGesture=true
 // is the production AAC pattern (used by Tobii Computer Control + Grid 3
 // browser overlays for in-page automation).
-// Toggle YouTube's player fullscreen — scoped strictly to the actively-playing
-// video on a watch page. Three guards prevent unwanted behaviors:
 //
-//   Guard 1 — pathname check: only run on /watch pages. Avoids trying to
-//     fullscreen anything on YouTube home, search results, channel pages
-//     (where <video> preview thumbnails would otherwise be candidates).
-//   Guard 2 — require a #movie_player container with a loaded video that
-//     has valid duration metadata. Filters out preview videos and players
-//     that haven't loaded yet.
-//   Guard 3 — only click .ytp-fullscreen-button (YouTube's own toggle,
-//     scoped to the player area). NEVER call element.requestFullscreen() —
-//     that's the browser-level fullscreen API which would fullscreen the
-//     entire BrowserView / Electron window.
-//
-// Calling this script on any non-watch page is a safe no-op.
+// v17.16 safety path: this maximizes YouTube inside the BrowserView, without
+// entering true browser fullscreen. True fullscreen hides every gaze-accessible
+// app control, so the injected cursor still auto-exits it if a page enters it.
 const YT_MAXIMIZE_SCRIPT = `
 (function () {
   try {
-    // Guard 1 — must be on a /watch page
-    if (!location.pathname || !location.pathname.startsWith('/watch')) {
-      return 'not-watch-page';
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(function () {});
     }
-    // Guard 2 — must have a loaded player with a real video
-    var player = document.getElementById('movie_player');
-    if (!player) return 'no-player';
-    var v = player.querySelector('video');
-    if (!v || !isFinite(v.duration) || v.duration <= 0) {
-      return 'video-not-loaded';
-    }
-    // Guard 3 — click YouTube's own fullscreen toggle (scoped to player only)
-    var fs = player.querySelector('.ytp-fullscreen-button');
-    if (fs) {
-      fs.click();
-      return 'fs-toggled';
-    }
-    return 'no-fullscreen-button';
-  } catch (e) { return 'err:' + (e && e.message); }
+  } catch (_) {}
+
+  var styleId = 'gazeconnect-youtube-inapp-maximize-style';
+  if (!document.getElementById(styleId)) {
+    var style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = [
+      'html.gazeconnect-youtube-inapp-maximize,',
+      'html.gazeconnect-youtube-inapp-maximize body { overflow: hidden !important; }',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #masthead-container,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #secondary,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #comments,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #meta,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #ticket-shelf,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #merch-shelf,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy ytd-watch-next-secondary-results-renderer { display: none !important; }',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #columns,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary-inner {',
+      '  display: block !important; width: 100vw !important; max-width: none !important;',
+      '  margin: 0 !important; padding: 0 !important;',
+      '}',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-outer,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-inner,',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #movie_player {',
+      '  width: 100vw !important; max-width: none !important;',
+      '  height: 100vh !important; max-height: none !important;',
+      '  margin: 0 !important; padding: 0 !important;',
+      '}',
+      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy video {',
+      '  width: 100% !important; height: 100% !important; object-fit: contain !important;',
+      '}'
+    ].join('\\n');
+    document.head.appendChild(style);
+  }
+
+  document.documentElement.classList.add('gazeconnect-youtube-inapp-maximize');
+  var player = document.querySelector('#movie_player');
+  if (player) {
+    try {
+      player.classList.add('ytp-big-mode');
+      player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 }));
+    } catch (_) {}
+  }
+  try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch (_) { window.scrollTo(0, 0); }
+  return 'in-app-video-maximized';
 })();
 `;
 
 const isValidYouTubeId = (id?: string) => !!id && /^[A-Za-z0-9_-]{11}$/.test(id);
 // Use the YouTube WATCH URL (not embed). Embed URLs fail with Error 153 for many
 // videos (T-Series, label music, news) because uploaders disable embedding.
-// The watch URL works universally; we then auto-send 'f' after load to maximize
-// the player inside the BrowserView (hiding sidebar/comments).
+// The watch URL works universally and plays inline (autoplay=1) inside the
+// in-app BrowserView. Fullscreen is intentionally NOT triggered (v17.16
+// safety path) — see YT_MAXIMIZE_SCRIPT above.
 const resolveYouTubeUrl = (video: any): string => {
     if (video?.url && typeof video.url === 'string') return video.url;
     const query = encodeURIComponent(`${video?.title || 'YouTube video'} ${video?.ch || ''}`.trim());
@@ -1203,27 +1224,27 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     marginBottom: 'clamp(14px,2vh,22px)',
                 }}>
                     <div style={{ ...connectedToolbarStyle, flex: 1 }}>
-                        <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                             style={{ ...toolbarBtnConnected('emergency', false, nextPos()), fontWeight: 800, letterSpacing: '0.08em' }}>
                             <XIcon size={26} color="currentColor" strokeWidth={2.4} />
                             <span>Close</span>
                         </GazeButton>
                         <GazeButton id="n-read" onClick={() => onSpeak(`${sel.title}. ${sel.summary || sel.description || ''}`)} gazeEnabled={ige}
-                            gazeEnabledTimestamp={ts} isDarkMode style={toolbarBtnConnected('secondary', false, nextPos())}>
+                            gazeEnabledTimestamp={ts} isDarkMode dwellCategory="phraseButton" style={toolbarBtnConnected('secondary', false, nextPos())}>
                             <SpeakIcon size={26} color="currentColor" strokeWidth={2.3} />
                             <span>Read</span>
                         </GazeButton>
-                        <GazeButton id="n-reader" onClick={openReaderView} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="n-reader" onClick={openReaderView} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="phraseButton"
                             style={toolbarBtnConnected('primary', false, nextPos())}>
                             <BookIcon size={26} color="currentColor" strokeWidth={2.2} />
                             <span>Read Full Story</span>
                         </GazeButton>
-                        <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                             style={toolbarBtnConnected('emergency', false, nextPos())}>
                             <span>Stop</span>
                         </GazeButton>
                         <GazeButton id="n-scroll" onClick={() => scrollRef.current?.scrollBy({ top: 280, behavior: 'smooth' })} gazeEnabled={ige}
-                            gazeEnabledTimestamp={ts} isDarkMode style={toolbarBtnConnected('primary', false, nextPos())}>
+                            gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton" style={toolbarBtnConnected('primary', false, nextPos())}>
                             <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
                             <span>Scroll</span>
                         </GazeButton>
@@ -1299,7 +1320,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                     onClick={() => selectItem(it)}
                                     gazeEnabled={ige}
                                     gazeEnabledTimestamp={ts}
-                                    isDarkMode
+                                    isDarkMode dwellCategory="navigationButton"
                                     style={{
                                         ...cs,
                                         alignItems: 'flex-start',
@@ -1658,7 +1679,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     display: 'flex', alignItems: 'center', gap: 'clamp(12px, 1.2vw, 18px)',
                     flexShrink: 0,
                 }}>
-                    <GazeButton id="n-ref" onClick={() => { setIsLoading(true); ws.refreshNews(cat, 9); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="n-ref" onClick={() => { setIsLoading(true); ws.refreshNews(cat, 9); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(72px, 8.5vh, 96px)', minWidth: 'clamp(140px, 12vw, 180px)', fontSize: 'clamp(18px, 2.2vh, 24px)' }}>
                         <RefreshIcon size={26} color="currentColor" strokeWidth={2.3} />
                         <span>Refresh</span>
@@ -1800,16 +1821,16 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     display: 'flex', alignItems: 'stretch', gap: 'clamp(12px, 1.2vw, 18px)',
                     flexShrink: 0,
                 }}>
-                    <GazeButton id="n-auto" onClick={startAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="n-auto" onClick={startAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)' }}>
                         <SpeakIcon size={28} color="currentColor" strokeWidth={2.3} />
                         <span>Auto-Read</span>
                     </GazeButton>
-                    <GazeButton id="n-pause" onClick={pauseAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="n-pause" onClick={pauseAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)' }}>
                         <span>{autoReadPaused ? 'Resume' : 'Pause'}</span>
                     </GazeButton>
-                    <GazeButton id="n-stop-auto" onClick={stopAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="n-stop-auto" onClick={stopAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                         style={{ ...toolbarBtn('emergency', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)', fontWeight: 800 }}>
                         <span>Stop</span>
                     </GazeButton>
@@ -1970,11 +1991,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         };
     }, [playing]);
 
-    // Maximize toggle — manual fallback for when auto-maximize at 2.5s fails OR
-    // when the patient has exited fullscreen and wants to re-enter. The script
-    // clicks YouTube's own .ytp-fullscreen-button which is a toggle, so the
-    // same action both maximizes and minimizes (depending on current state).
-    // Falls back to keyboard 'f' if executeJs IPC isn't available yet.
+    // Maximizes the YouTube player inside the BrowserView while app controls
+    // remain visible. This deliberately does not enter true browser fullscreen.
     const maximizeVideo = useCallback(async () => {
         await browser.executeJs(YT_MAXIMIZE_SCRIPT);
     }, [browser]);
@@ -2103,6 +2121,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         }
     }, [browser.canGoBack, browser.goBack, stop]);
 
+    const playbackState = browser.videoPlaybackState;
+
     if (playing) return (
         <div style={{
             flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(12px,1.5vh,20px)', gap: 'clamp(10px,1.2vh,16px)', overflow: 'hidden',
@@ -2116,31 +2136,31 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                 {/* WATCH MODE — 3 buttons (Emergency · Pause/Play · Show Controls) */}
                 {isWatchMode && <>
                     {isNavHidden && <GazeButton id="yt-emergency" onClick={onEmergency}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
                         style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
                         <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Emergency</span>
                     </GazeButton>}
                     <GazeButton id="yt-watch-back" onClick={handleYouTubeBack}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
                         <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Back</span>
                     </GazeButton>
                     <GazeButton id="yt-playpause" onClick={playPauseYouTube}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Pause / Play</span>
                     </GazeButton>
                     <GazeButton id="yt-next" onClick={nextYouTubeVideo}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <NextIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Next</span>
                     </GazeButton>
                     <GazeButton id="yt-show-controls" onClick={toggleBrowserInteractionMode}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
                         <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
                         <span>Show Controls</span>
@@ -2150,38 +2170,38 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                 {/* CONTROL MODE — large AAC controls for reliable video use */}
                 {!isWatchMode && <>
                     {isNavHidden && <GazeButton id="yt-emergency-c" onClick={onEmergency}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
                         style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
                         <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Emergency</span>
                     </GazeButton>}
                     <GazeButton id="yt-back" onClick={isNavHidden ? handleYouTubeBack : stop}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
                         <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>{isNavHidden ? 'Back' : 'Close'}</span>
                     </GazeButton>
                     <GazeButton id="yt-playpause-c" onClick={playPauseYouTube}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Pause / Play</span>
                     </GazeButton>
                     <GazeButton id="yt-skip-ad" onClick={skipYouTubeAdReliable}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <span>Skip Ad</span>
                     </GazeButton>
                     {isYouTubeWatchPage && isPlayableYouTubePage && <>
                         <GazeButton id="yt-hide-controls" onClick={toggleBrowserInteractionMode}
-                            gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                            gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                             style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
                             <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
                             <span>Hide Controls</span>
                         </GazeButton>
                     </>}
                     {isNavHidden && <GazeButton id="yt-toggle-nav" onClick={() => onNavHiddenToggle?.(!isNavHidden)}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
                         <WebLayoutIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
                         <span>Show Nav</span>
@@ -2200,6 +2220,19 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', gap: 0 }}>
                 <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
                     {isWatchMode && <div style={watchModeBadgeStyle}>WATCH MODE · page gaze paused</div>}
+                    {playbackState.fullscreen && (
+                        <div style={{
+                            ...watchModeBadgeStyle,
+                            left: '50%',
+                            right: 'auto',
+                            transform: 'translateX(-50%)',
+                            background: 'rgba(16, 32, 31, 0.94)',
+                            color: CONTROL_MODE_TEXT,
+                            border: '1px solid rgba(169, 202, 199, 0.32)',
+                        }}>
+                            Exiting full screen / फुल स्क्रीन बंद हो रही है
+                        </div>
+                    )}
                     {!isWatchMode && browser.edgeScrollDirection === 'up' && (
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to bottom, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `${CR} ${CR} 0 0` }} />
                     )}
@@ -2219,10 +2252,9 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         </div>
                     </div>
                 </div>
-                {/* Up / Full Screen / Down dock — only in Control mode.
-                    Watch mode = video already fullscreen, no dock needed.
-                    Control mode = patient is interacting; gives 3 spatially-grouped
-                    "video state" controls: scroll up, fullscreen toggle, scroll down. */}
+                {/* Up / Max Video / Down dock — only in Control mode. The middle
+                    button maximizes the video inside the BrowserView, without
+                    entering true browser fullscreen. */}
                 {!isWatchMode && (
                     <ContentScrollDock
                         onUp={() => browser.scrollUp()}
@@ -2475,21 +2507,21 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
             background: T_pageBg,
         }}>
             <div style={{ display: 'flex', gap: '12px', flexShrink: 0, flexWrap: 'wrap' }}>
-                <GazeButton id="kb-back" onClick={() => setSelArt(null)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="kb-back" onClick={() => setSelArt(null)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                     style={actionButton(WEB_ACCENTS.goldText, 'rgba(49, 36, 20, 0.72)', 'rgba(178, 138, 69, 0.22)')}>
                     <BackIcon size={26} color="currentColor" strokeWidth={2.4} />
                     <span>Back</span>
                 </GazeButton>
                 <GazeButton id="kb-read" onClick={() => onSpeak(selArt.title + '. ' + selArt.content)} gazeEnabled={ige}
-                    gazeEnabledTimestamp={ts} isDarkMode style={actionButton(TL, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER)}>
+                    gazeEnabledTimestamp={ts} isDarkMode dwellCategory="phraseButton" style={actionButton(TL, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER)}>
                     <SpeakIcon size={26} color="currentColor" strokeWidth={2.3} />
                     <span>Read</span>
                 </GazeButton>
                 <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
-                <GazeButton id="kb-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="kb-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                     style={actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER)}>Stop</GazeButton>
                 <GazeButton id="kb-scr" onClick={() => scrollRef.current?.scrollBy({ top: 250, behavior: 'smooth' })} gazeEnabled={ige}
-                    gazeEnabledTimestamp={ts} isDarkMode style={actionButton(WEB_ACCENTS.blueText)}>
+                    gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton" style={actionButton(WEB_ACCENTS.blueText)}>
                     <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
                     <span>Scroll</span>
                 </GazeButton>
@@ -2522,7 +2554,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                     const selectedAccentLine = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : accent;
                     return (
                         <GazeButton key={c.id} id={`kc-${c.id}`} onClick={() => { setSelCat(c.id); setSelArt(null); }}
-                            gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                            gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             style={{
                                 width: '100%', padding: 'clamp(14px,1.8vh,20px) 14px', textAlign: 'left' as const,
                                 background: isSel ? selectedBg : 'transparent',
@@ -2542,7 +2574,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gridTemplateRows: 'repeat(3,1fr)', gap: GAP, overflow: 'hidden', minHeight: 0 }}>
                 {selCat && ws.knowledgeArticles.length ? ws.knowledgeArticles.slice(0, 6).map((a: any, i: number) => (
                     <GazeButton key={a.id} id={`ka-${i}`} onClick={() => { setSelArt({ ...a, content: a.summary || 'Loading...' }); ws.getKnowledgeArticle(a.id); }}
-                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={{
                             ...cs,
                             justifyContent: 'space-between',
@@ -2596,6 +2628,8 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     void T_chromeShadow;
     const [topic, setTopic] = useState<QuickTopic | null>(null);
     const [showLinksSidebar, setShowLinksSidebar] = useState(false);
+    const [largeLinkTargets, setLargeLinkTargets] = useState(true);
+    const [linkPage, setLinkPage] = useState(0);
     const viewRef = useRef<HTMLDivElement>(null);
     const hasInitRef = useRef(false);
     const toolbarGazeEnabled = isNavHidden ? true : ige;
@@ -2618,6 +2652,10 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     }, [ws.getQuickSnapshot]);
     const isWebTopic = !!topic && topic.mode === 'web';
     const isCardTopic = !!topic && topic.mode === 'card';
+
+    useEffect(() => {
+        setLinkPage(0);
+    }, [topic?.id, browser.pageLinks.length]);
 
     useEffect(() => {
         if (isWebTopic) onBrowserInteractionModeChange('watch');
@@ -2649,7 +2687,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
     const openTopic = useCallback((next: QuickTopic) => {
         setTopic(next);
-        setShowLinksSidebar(next.mode !== 'web');
+        setShowLinksSidebar(next.mode === 'web');
         disableGaze();
         if (next.mode === 'card' && !ws.quickSnapshot) {
             ws.getQuickSnapshot();
@@ -2676,7 +2714,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     const openLiveWebFromCard = useCallback(() => {
         if (!topic) return;
         setTopic({ ...topic, mode: 'web' });
-        setShowLinksSidebar(false);
+        setShowLinksSidebar(true);
         disableGaze();
     }, [topic, disableGaze]);
 
@@ -2694,6 +2732,16 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         }
     }, [topic, ws.quickSnapshot, ws.speak]);
 
+    const linksPerPage = largeLinkTargets ? 4 : 6;
+    const totalLinkPages = Math.max(1, Math.ceil(browser.pageLinks.length / linksPerPage));
+    const currentLinkPage = Math.min(linkPage, totalLinkPages - 1);
+    const visiblePageLinks = browser.pageLinks.slice(
+        currentLinkPage * linksPerPage,
+        currentLinkPage * linksPerPage + linksPerPage,
+    );
+    const canPageLinksBack = currentLinkPage > 0;
+    const canPageLinksForward = currentLinkPage < totalLinkPages - 1;
+
     if (isWebTopic && topic) {
         return (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg, paddingBottom: 'clamp(10px, 1.5vh, 20px)' }}>
@@ -2708,25 +2756,25 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         {/* READ MODE — minimal, nav-aware */}
                         {isWatchMode && <>
                             {isNavHidden && <GazeButton id="bv-emergency-r" onClick={onEmergency}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
                                 style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
                                 <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Emergency</span>
                             </GazeButton>}
                             <GazeButton id="bv-playpause-r" onClick={() => browser.typeText('k')}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected('secondary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
                                 <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Pause / Play</span>
                             </GazeButton>
                             <GazeButton id="bv-scroll-r" onClick={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected(browser.scrollMode === 'armed' ? 'secondary' : 'primary', !!isNavHidden, 'middle')}>
                                 <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
                                 <span>{browser.scrollMode === 'armed' ? 'Scroll On' : 'Scroll'}</span>
                             </GazeButton>
                             <GazeButton id="bv-show-controls" onClick={toggleBrowserInteractionMode}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
                                 <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
                                 <span>Show Controls</span>
@@ -2736,31 +2784,31 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         {/* CONTROL MODE — full toolset, no duplicates with global nav */}
                         {!isWatchMode && <>
                             {isNavHidden && <GazeButton id="bv-emergency-c" onClick={onEmergency}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
                                 style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
                                 <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Emergency</span>
                             </GazeButton>}
                             <GazeButton id="bv-back" onClick={isNavHidden ? handleBrowserBack : closeWebTopic}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
                                 <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>{isNavHidden ? 'Back' : 'Close'}</span>
                             </GazeButton>
                             <GazeButton id="bv-hide-controls" onClick={toggleBrowserInteractionMode}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, 'middle')}>
                                 <BookIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
                                 <span>Hide Controls</span>
                             </GazeButton>
                             <GazeButton id="bv-links-toggle" onClick={() => setShowLinksSidebar((s) => !s)}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected('secondary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
                                 {showLinksSidebar ? <XIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} /> : <WebLayoutIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.1} />}
                                 <span>{showLinksSidebar ? 'Hide Links' : 'Links'}</span>
                             </GazeButton>
                             {isNavHidden && <GazeButton id="bv-toggle-nav" onClick={() => { setShowLinksSidebar(false); onNavHiddenToggle?.(!isNavHidden); }}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
                                 <WebLayoutIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.1} />
                                 <span>Show Nav</span>
@@ -2782,7 +2830,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%', padding: 'clamp(8px,1vh,14px) clamp(16px,2vw,24px) 0', boxSizing: 'border-box', gap: 'clamp(12px,1.5vw,20px)' }}>
                     {showLinksSidebar && (
                         <div style={{
-                            flex: '0 0 clamp(280px, 25vw, 380px)',
+                            flex: '0 0 clamp(330px, 28vw, 460px)',
                             height: '100%',
                             background: T_chromeBg,
                             border: `1px solid ${T_chromeBorder}`,
@@ -2793,31 +2841,107 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                             gap: 'clamp(8px,1vh,12px)',
                             overflow: 'hidden',
                         }}>
-                            <div style={{ fontSize: 'clamp(16px,2vh,20px)', fontWeight: 700, color: T_chromeText, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <WebLayoutIcon size={22} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.1} />
-                                <span>Page Links</span>
+                            <div style={{ fontSize: 'clamp(16px,2vh,21px)', fontWeight: 800, color: T_chromeText, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <WebLayoutIcon size={24} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.1} />
+                                    <span>{largeLinkTargets ? 'Large Links' : 'Page Links'}</span>
+                                </span>
+                                <span style={{ fontSize: 'clamp(13px,1.5vh,16px)', color: T_chromeTextMuted, fontWeight: 700 }}>
+                                    {currentLinkPage + 1}/{totalLinkPages}
+                                </span>
                             </div>
-                            <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 }}>
-                                {browser.pageLinks.length ? browser.pageLinks.map((link, idx) => (
-                                    <GazeButton
-                                        key={`${link.href}-${idx}`}
-                                        id={`bv-link-${idx}`}
-                                        onClick={() => { browser.navigateTo(link.href); disableGaze(); }}
-                                        gazeEnabled={ige}
-                                        gazeEnabledTimestamp={ts}
-                                        isDarkMode
-                                        style={{ ...cb, minHeight: 'clamp(72px,8.8vh,98px)', width: '100%', justifyContent: 'flex-start', textAlign: 'left' as const, fontSize: 'clamp(16px,2vh,21px)' }}
-                                    >
-                                        {link.text}
-                                    </GazeButton>
-                                )) : (
-                                    <div style={{ color: isLight ? 'rgba(74, 58, 42, 0.65)' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(255,255,255,0.5)', fontSize: 'clamp(14px,1.8vh,18px)' }}>No links detected on this page.</div>
+                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 'clamp(10px,1.2vh,14px)', minHeight: 0 }}>
+                                {browser.pageLinks.length ? visiblePageLinks.map((link, idx) => {
+                                    const absoluteIdx = currentLinkPage * linksPerPage + idx;
+                                    return (
+                                        <GazeButton
+                                            key={`${link.href}-${absoluteIdx}`}
+                                            id={`bv-link-${absoluteIdx}`}
+                                            onClick={() => { browser.navigateTo(link.href); disableGaze(); }}
+                                            gazeEnabled={ige}
+                                            gazeEnabledTimestamp={ts}
+                                            isDarkMode dwellCategory="navigationButton"
+                                            style={{
+                                                ...cb,
+                                                flex: '1 1 0',
+                                                minHeight: largeLinkTargets ? 'clamp(88px,10.8vh,124px)' : 'clamp(80px,8.8vh,98px)',
+                                                width: '100%',
+                                                justifyContent: 'center',
+                                                textAlign: 'center' as const,
+                                                fontSize: largeLinkTargets ? 'clamp(18px,2.25vh,24px)' : 'clamp(16px,2vh,21px)',
+                                                lineHeight: 1.14,
+                                                fontWeight: 820,
+                                                padding: 'clamp(10px,1.2vh,16px) clamp(12px,1vw,18px)',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
+                                            <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{link.text}</span>
+                                        </GazeButton>
+                                    );
+                                }) : (
+                                    <div style={{
+                                        color: isLight ? 'rgba(74, 58, 42, 0.65)' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(255,255,255,0.5)',
+                                        fontSize: 'clamp(16px,2vh,21px)',
+                                        minHeight: 'clamp(100px,14vh,150px)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        textAlign: 'center',
+                                        padding: 'clamp(12px,1.5vh,18px)',
+                                    }}>No large page links detected yet.</div>
                                 )}
                             </div>
-                            <GazeButton id="bv-links-refresh" onClick={() => browser.refreshLinks()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                                style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(72px,8.6vh,96px)', width: '100%', minWidth: 'auto' }}>
-                                <RefreshIcon size={24} color="currentColor" strokeWidth={2.3} />
-                                <span>Refresh Links</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'clamp(8px,1vw,12px)', flexShrink: 0 }}>
+                                <GazeButton
+                                    id="bv-links-prev"
+                                    onClick={() => setLinkPage((page) => Math.max(0, page - 1))}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    dwellCategory="backSkipButton"
+                                    disabled={!canPageLinksBack}
+                                    style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, opacity: canPageLinksBack ? 1 : 0.45 }}
+                                >
+                                    <BackIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <span>Prev</span>
+                                </GazeButton>
+                                <GazeButton
+                                    id="bv-links-refresh"
+                                    onClick={() => browser.refreshLinks()}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    dwellCategory="navigationButton"
+                                    style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0 }}
+                                >
+                                    <RefreshIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <span>Refresh</span>
+                                </GazeButton>
+                                <GazeButton
+                                    id="bv-links-next"
+                                    onClick={() => setLinkPage((page) => Math.min(totalLinkPages - 1, page + 1))}
+                                    gazeEnabled={ige}
+                                    gazeEnabledTimestamp={ts}
+                                    isDarkMode
+                                    dwellCategory="navigationButton"
+                                    disabled={!canPageLinksForward}
+                                    style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, opacity: canPageLinksForward ? 1 : 0.45 }}
+                                >
+                                    <NextIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <span>Next</span>
+                                </GazeButton>
+                            </div>
+                            <GazeButton
+                                id="bv-links-size-toggle"
+                                onClick={() => { setLargeLinkTargets((value) => !value); setLinkPage(0); }}
+                                gazeEnabled={ige}
+                                gazeEnabledTimestamp={ts}
+                                isDarkMode
+                                dwellCategory="navigationButton"
+                                style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, flexShrink: 0 }}
+                            >
+                                <WebLayoutIcon size={24} color="currentColor" strokeWidth={2.1} />
+                                <span>{largeLinkTargets ? 'Compact Links' : 'Large Links'}</span>
                             </GazeButton>
                         </div>
                     )}
@@ -2887,23 +3011,23 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                 background: T_pageBg,
             }}>
                 <div style={{ display: 'flex', gap: 'clamp(14px,2vw,24px)', flexWrap: 'wrap' }}>
-                    <GazeButton id="qs-card-back" onClick={() => { setTopic(null); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="qs-card-back" onClick={() => { setTopic(null); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                         style={actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER)}>
                         <BackIcon size={26} color="currentColor" strokeWidth={2.4} />
                         <span>Back</span>
                     </GazeButton>
-                    <GazeButton id="qs-card-refresh" onClick={() => ws.getQuickSnapshot(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="qs-card-refresh" onClick={() => ws.getQuickSnapshot(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={actionButton(INFO)}>
                         <RefreshIcon size={24} color="currentColor" strokeWidth={2.3} />
                         <span>Refresh Data</span>
                     </GazeButton>
                     <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
-                    <GazeButton id="qs-card-open-web" onClick={openLiveWebFromCard} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="qs-card-open-web" onClick={openLiveWebFromCard} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={actionButton(SUCCESS, 'rgba(36, 48, 32, 0.70)', SUCCESS_BORDER)}>
                         <ExternalIcon size={26} color="currentColor" strokeWidth={2.3} />
                         <span>Open Live Web</span>
                     </GazeButton>
-                    <GazeButton id="qs-card-read" onClick={speakCardSummary} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                    <GazeButton id="qs-card-read" onClick={speakCardSummary} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="phraseButton"
                         style={actionButton(TL, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER)}>
                         <SpeakIcon size={26} color="currentColor" strokeWidth={2.3} />
                         <span>Read Answer Aloud</span>
@@ -3095,7 +3219,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
         }}>
             {/* ── HORIZONTAL TOOLBAR ── */}
             <div style={{ ...toolbarStyle, flexShrink: 0 }}>
-                <GazeButton id="bv-close" onClick={close} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="bv-close" onClick={close} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                     style={{
                         ...actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER), flex: 1, minWidth: 'clamp(100px,10vw,140px)',
                         fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
@@ -3103,7 +3227,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
                     <XIcon size={26} color="currentColor" strokeWidth={2.4} />
                     <span>Close</span>
                 </GazeButton>
-                <GazeButton id="bv-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="bv-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                     style={{
                         ...actionButton(WEB_ACCENTS.tealText, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER), flex: 1.2, minWidth: 'clamp(120px,12vw,160px)',
                         fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
@@ -3111,7 +3235,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
                     <PointerIcon size={28} color="currentColor" strokeWidth={2.2} />
                     <span>Click Here</span>
                 </GazeButton>
-                <GazeButton id="bv-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="bv-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                     style={{
                         ...actionButton(WEB_ACCENTS.blueText), flex: 1, minWidth: 'clamp(100px,10vw,130px)',
                         fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
@@ -3119,7 +3243,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
                     <ArrowUpIcon size={26} color="currentColor" strokeWidth={2.3} />
                     <span>Up</span>
                 </GazeButton>
-                <GazeButton id="bv-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="bv-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                     style={{
                         ...actionButton(WEB_ACCENTS.blueText), flex: 1, minWidth: 'clamp(100px,10vw,130px)',
                         fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
@@ -3130,7 +3254,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
 
                 <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
 
-                <GazeButton id="bv-back" onClick={() => browser.canGoBack && browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="bv-back" onClick={() => browser.canGoBack && browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                     disabled={!browser.canGoBack}
                     style={{
                         ...actionButton(WEB_ACCENTS.goldText, 'rgba(49, 36, 20, 0.72)', 'rgba(178, 138, 69, 0.22)'), flex: 1, minWidth: 'clamp(80px,8vw,110px)',
@@ -3139,7 +3263,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
                     <BackIcon size={26} color="currentColor" strokeWidth={2.4} />
                     <span>Back</span>
                 </GazeButton>
-                <GazeButton id="bv-fwd" onClick={() => browser.canGoForward && browser.goForward()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="bv-fwd" onClick={() => browser.canGoForward && browser.goForward()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                     disabled={!browser.canGoForward}
                     style={{
                         ...actionButton(WEB_ACCENTS.blueText), flex: 1, minWidth: 'clamp(80px,8vw,110px)',
@@ -3182,7 +3306,7 @@ const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidde
                 <p style={{ fontSize: 'clamp(15px,2vh,19px)', color: isWarm ? '#6A625B' : 'rgba(255,255,255,0.5)', lineHeight: 1.6, margin: 0, textAlign: 'center', maxWidth: '420px' }}>
                     Connect WhatsApp to send messages using eye gaze. Scan a QR code with your phone.
                 </p>
-                <GazeButton id="wa-connect" onClick={() => setConnected(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                <GazeButton id="wa-connect" onClick={() => setConnected(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                     style={{
                         ...actionButton(WEB_ACCENTS.oliveText, 'rgba(36, 48, 32, 0.70)', SUCCESS_BORDER),
                         padding: 'clamp(18px,2.4vh,26px) clamp(40px,5.5vw,60px)', fontSize: 'clamp(17px,2.2vh,22px)', fontWeight: 700, borderRadius: '50px'
@@ -3237,22 +3361,22 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                     padding: '0 clamp(16px,2vw,24px)', boxSizing: 'border-box'
                 }}>
                     <div style={toolbarStyle}>
-                        <GazeButton id="soc-close" onClick={() => { browser.closePage(); setTopic(null); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-close" onClick={() => { browser.closePage(); setTopic(null); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                             style={{ ...browserToolbarButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER), flex: 1 }}>
                             <XIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.4} />
                             <span>Close</span>
                         </GazeButton>
-                        <GazeButton id="soc-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             style={{ ...browserToolbarButton(WEB_ACCENTS.tealText, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER), flex: 1 }}>
                             <PointerIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} />
                             <span>Click Here</span>
                         </GazeButton>
-                        <GazeButton id="soc-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             style={{ ...browserToolbarButton(WEB_ACCENTS.blueText), flex: 1 }}>
                             <ArrowUpIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.3} />
                             <span>Up</span>
                         </GazeButton>
-                        <GazeButton id="soc-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             style={{ ...browserToolbarButton(WEB_ACCENTS.blueText), flex: 1 }}>
                             <ArrowDownIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.3} />
                             <span>Down</span>
@@ -3260,17 +3384,17 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
 
                         <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
 
-                        <GazeButton id="soc-back" onClick={() => browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-back" onClick={() => browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                             style={{ ...browserToolbarButton(WEB_ACCENTS.goldText, 'rgba(49, 36, 20, 0.72)', 'rgba(178, 138, 69, 0.22)'), flex: 1 }}>
                             <BackIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.4} />
                             <span>{browser.canGoBack ? 'Back' : 'Exit'}</span>
                         </GazeButton>
-                        <GazeButton id="soc-zoom-in" onClick={() => browser.adjustZoom(0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-zoom-in" onClick={() => browser.adjustZoom(0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             style={{ ...browserToolbarButton(SOFT_INFO), minWidth: 'clamp(92px,7vw,118px)' }}>
                             <ZoomIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} direction="in" />
                             <span>+</span>
                         </GazeButton>
-                        <GazeButton id="soc-zoom-out" onClick={() => browser.adjustZoom(-0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        <GazeButton id="soc-zoom-out" onClick={() => browser.adjustZoom(-0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             style={{ ...browserToolbarButton(SOFT_INFO), minWidth: 'clamp(92px,7vw,118px)' }}>
                             <ZoomIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} direction="out" />
                             <span>-</span>
@@ -3352,7 +3476,7 @@ const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden
                         onClick={card.onClick}
                         gazeEnabled={ige}
                         gazeEnabledTimestamp={ts}
-                        isDarkMode
+                        isDarkMode dwellCategory="navigationButton"
                         style={{
                             ...cb,
                             flex: 1,

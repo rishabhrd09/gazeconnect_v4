@@ -9,17 +9,18 @@
  * - GazeControlProvider properly resets on navigation
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { darkColors, lightColors } from './utils/design';
 import { WebSocketProvider, useWS } from './hooks/useWebSocket';
 import { GazeControlProvider, useGazeControl } from './components/core/GazeControlToggle';
-import { RealGazeProvider, useRealGaze } from './contexts/RealGazeContext';
+import { RealGazeProvider } from './contexts/RealGazeContext';
 import { GazeCursor } from './components/core/GazeCursor';
+import GazeButton from './components/core/GazeButton';
 import ErrorBoundary from './components/core/ErrorBoundary';
 import DevDebugOverlay from './components/core/DebugOverlay';
 import { GazeDebugOverlay } from './components/core/GazeDebugOverlay';
 import { CustomizationProvider, useCustomization } from './contexts/CustomizationContext';
-import { DwellTimeProvider, useDwellTime } from './contexts/DwellTimeContext';
+import { DwellTimeProvider } from './contexts/DwellTimeContext';
 import { FocusModeProvider, useFocusMode } from './contexts/FocusModeContext';
 import { AlertModeProvider, useAlertMode } from './contexts/AlertModeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -97,92 +98,45 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
  * Fixed position, bottom-right corner, always accessible
  */
 const PersistentEmergencyButton: React.FC<{
-  onSpeak: (text: string) => void; isDarkMode: boolean; emergencyDwellTime?: number;
-}> = ({ onSpeak, isDarkMode, emergencyDwellTime }) => {
-  const { settings: dwellSettings } = useDwellTime();
-  const fallbackDwell = emergencyDwellTime ?? dwellSettings.emergencyButton;
+  onSpeak: (text: string) => void; isDarkMode: boolean;
+}> = ({ onSpeak, isDarkMode }) => {
   const colors = isDarkMode ? darkColors : lightColors;
-  const { hasRealGaze } = useRealGaze();
-  const { isMouseMode } = useGazeControl();
-  const [hovered, setHovered] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const dwellRef = useRef<NodeJS.Timeout | null>(null);
-  const progressRef = useRef<number | null>(null);
-  const startRef = useRef(0);
-  const dwellMs = fallbackDwell;
-
-  const clear = () => {
-    if (dwellRef.current) clearTimeout(dwellRef.current);
-    if (progressRef.current) cancelAnimationFrame(progressRef.current);
-  };
-
-  const tick = useCallback(() => {
-    const p = Math.min(1, (Date.now() - startRef.current) / dwellMs);
-    setProgress(p);
-    if (p < 1) progressRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  const handleEnter = () => {
-    // Mouse Only Mode: no dwell, click only
-    if (isMouseMode) {
-      setHovered(true);
-      return;
-    }
-
-    // CRITICAL: Skip mouse dwell when real gaze is active
-    if (hasRealGaze) {
-      setHovered(true);
-      return; // No dwell timer - clicks still work
-    }
-
-    setHovered(true); startRef.current = Date.now();
-    progressRef.current = requestAnimationFrame(tick);
-    dwellRef.current = setTimeout(() => {
-      onSpeak("I need help immediately! This is an emergency!");
-      setProgress(0); setHovered(false);
-    }, dwellMs);
-  };
-
-  const handleLeave = () => { setHovered(false); setProgress(0); clear(); };
 
   return (
-    <button
-      onMouseEnter={handleEnter} onMouseLeave={handleLeave}
+    <GazeButton
+      id="persistent-emergency"
+      variant="emergency"
+      alwaysActive
+      gazeEnabled
+      dwellCategory="medicalUrgent"
       onClick={() => onSpeak("I need help immediately! This is an emergency!")}
+      isDarkMode={isDarkMode}
+      ariaLabel="Emergency help"
       style={{
-        position: 'fixed', bottom: 14, left: 14,
-        width: 56, height: 56,
+        position: 'fixed',
+        bottom: 'clamp(14px, 2vh, 24px)',
+        left: 'clamp(14px, 2vw, 24px)',
+        width: 'clamp(88px, 10vh, 120px)',
+        height: 'clamp(88px, 10vh, 120px)',
+        minWidth: 'clamp(88px, 10vh, 120px)',
+        minHeight: 'clamp(88px, 10vh, 120px)',
+        padding: 0,
         borderRadius: '50%',
-        backgroundColor: hovered ? colors.emergency.main : colors.emergency.subtle,
+        backgroundColor: colors.emergency.subtle,
         border: `2px solid ${colors.emergency.main}`,
-        color: hovered ? '#fff' : colors.emergency.main,
+        color: colors.emergency.main,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', zIndex: 900,
-        transition: 'all 150ms',
-        boxShadow: hovered ? `0 0 20px ${colors.emergency.main}60` : 'none',
+        zIndex: 900,
+        boxShadow: `0 0 20px ${colors.emergency.main}40`,
       }}
     >
-      {/* Progress ring around emergency button - only show if no real gaze */}
-      {hovered && progress > 0 && !hasRealGaze && (
-        <svg width={56} height={56} style={{
-          position: 'absolute', top: 0, left: 0,
-          transform: 'rotate(-90deg)', pointerEvents: 'none',
-        }}>
-          <circle cx={28} cy={28} r={25}
-            fill="none" stroke={colors.emergency.main} strokeWidth={3}
-            strokeDasharray={2 * Math.PI * 25}
-            strokeDashoffset={2 * Math.PI * 25 * (1 - progress)}
-            strokeLinecap="round" />
-        </svg>
-      )}
-      {/* SOS icon */}
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="8" x2="12" y2="12" />
         <line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
-    </button>
+    </GazeButton>
   );
 };
 
@@ -226,7 +180,7 @@ const InnerApp: React.FC = () => {
   const [quickWordsReturnScreen, setQuickWordsReturnScreen] = useState<string | null>(null);
 
   // Destructure settings for convenience
-  const { isDarkMode, showHindi, ttsRate, ttsVolume, emergencyDwellTime, ttsLanguage } = settings;
+  const { isDarkMode, showHindi, ttsRate, ttsVolume, ttsLanguage } = settings;
 
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -459,7 +413,7 @@ const InnerApp: React.FC = () => {
           Compass-map / advanced-map / floor-plan-survey: floating widget would overlap the road
           bar / canvas area and break the "plot drawing" feel — Emergency is in the top NavBar. */}
       {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && currentScreen !== 'web' && currentScreen !== 'compass-map' && currentScreen !== 'advanced-map' && currentScreen !== 'floor-plan-survey' && (
-        <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} emergencyDwellTime={emergencyDwellTime || 1200} />
+        <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} />
       )}
 
       {/* Connection indicator */}

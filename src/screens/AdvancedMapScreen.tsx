@@ -7,13 +7,11 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import BaseGazeButton from '../components/core/GazeButton';
+import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { ArchitecturalCell } from '../components/ArchitecturalCell';
 import { FloorPlanViewerModal } from '../components/FloorPlanViewerModal';
-import { useDwellTime } from '../contexts/DwellTimeContext';
-import { DEFAULT_DWELL_TIMES } from '../config/dwellTimeConfig';
 import {
   CompassMapPayload,
 } from '../utils/floorplanApi';
@@ -208,7 +206,6 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
   const { isLight, isMix, isWarm } = useTheme();
   const ws = useWS();
-  const { settings: dwellSettings } = useDwellTime();
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
   const T_pageBg = isLight ? '#EBE0CC' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : THEME.bg;
@@ -250,20 +247,6 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const T_refineMapText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : THEME.violet;
   // Right plot canvas bg (slightly cooler than panel)
   const T_canvasBg = isLight ? '#E5DAC2' : isMix ? '#15110C' : '#08131F';
-
-  const compassDwellScale = useMemo(() => {
-    const base = DEFAULT_DWELL_TIMES.compassMapAction || 1;
-    const target = dwellSettings.compassMapAction || base;
-    return Math.max(0.4, target / base);
-  }, [dwellSettings.compassMapAction]);
-
-  const GazeButton = useCallback((props: React.ComponentProps<typeof BaseGazeButton>) => {
-    const rawDwell = typeof props.dwellTime === 'number'
-      ? props.dwellTime
-      : DEFAULT_DWELL_TIMES.compassMapAction;
-    const scaledDwell = Math.max(500, Math.round(rawDwell * compassDwellScale));
-    return <BaseGazeButton {...props} dwellTime={scaledDwell} />;
-  }, [compassDwellScale]);
 
   // Phase starts at room_selection (Phase 1)
   const [phase, setPhase] = useState<AdvancedPhase>('room_selection');
@@ -678,7 +661,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
     if (navHidden) {
       return (
         <GazeButton id="nav-restore" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-          alwaysActive dwellTime={1200}
+          alwaysActive dwellCategory="navigationButton"
           onClick={() => { setNavHidden(false); onSpeak('Navigation restored.'); }}
           style={{
             position: 'fixed', top: 24, right: 118, zIndex: 100,
@@ -698,33 +681,35 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
     return (
       <div style={{
         position: 'fixed', top: 24, right: 58, zIndex: 100,
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 8,
         background: navPanelBg,
         border: `1px solid ${navPanelBorder}`,
         borderRadius: 14, padding: 10,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(12px)',
-        width: 220,
+        width: 'clamp(290px, 24vw, 340px)',
       }}>
         {/* Row: Back + Home + Gaze */}
-        <div style={{ display: 'flex', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <GazeButton id="adv-back" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+            dwellCategory="backSkipButton"
             onClick={() => { handleSave(); onNavigate('compass-map'); }}
-            style={{ height: 52, flex: 1, borderRadius: 8, background: navBtnBg, border: `1px solid ${navBtnBorder}`, color: navBackText, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ minHeight: 'clamp(88px, 10vh, 112px)', flex: 1, borderRadius: 10, background: navBtnBg, border: `1px solid ${navBtnBorder}`, color: navBackText, fontSize: 'clamp(13px, 1.6vh, 16px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             ← Back
           </GazeButton>
           <GazeButton id="adv-home" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+            dwellCategory="navigationButton"
             onClick={() => onNavigate('home')}
-            style={{ height: 52, flex: 1, borderRadius: 8, background: navHomeBg, border: `1px solid ${navHomeBorder}`, color: navHomeText, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ minHeight: 'clamp(88px, 10vh, 112px)', flex: 1, borderRadius: 10, background: navHomeBg, border: `1px solid ${navHomeBorder}`, color: navHomeText, fontSize: 'clamp(13px, 1.6vh, 16px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Home
           </GazeButton>
           <GazeButton id="adv-gaze" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-            alwaysActive onClick={toggleGaze}
+            alwaysActive dwellCategory="gazeToggle" onClick={toggleGaze}
             style={{
-              width: 52, height: 52, borderRadius: '50%', flexShrink: 0, padding: 0,
+              width: 'clamp(88px, 10vh, 112px)', height: 'clamp(88px, 10vh, 112px)', borderRadius: '50%', flexShrink: 0, padding: 0,
               border: `2px solid ${isGazeEnabled ? navHomeText : navGazeBorderInactive}`,
               background: isGazeEnabled ? navHomeBg : 'transparent',
-              color: isGazeEnabled ? navHomeText : navGazeColorInactive, fontSize: 11, fontWeight: 700,
+              color: isGazeEnabled ? navHomeText : navGazeColorInactive, fontSize: 12, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 200ms ease'
             }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -736,20 +721,20 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
         {/* Emergency — preserved as-is for safety/visibility */}
         <GazeButton id="adv-emergency" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-          alwaysActive onClick={() => onSpeak('I need help immediately!')}
-          style={{ height: 58, width: '100%', borderRadius: 8, background: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.5)', color: '#F87171', fontSize: 16, fontWeight: 900, letterSpacing: '0.12em', fontFamily: EMERGENCY_FONT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          alwaysActive dwellCategory="medicalUrgent" onClick={() => onSpeak('I need help immediately!')}
+          style={{ minHeight: 'clamp(88px, 10vh, 112px)', width: '100%', borderRadius: 10, background: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.5)', color: '#F87171', fontSize: 'clamp(16px, 1.9vh, 20px)', fontWeight: 900, letterSpacing: '0.12em', fontFamily: EMERGENCY_FONT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           EMERGENCY
         </GazeButton>
 
         {/* Hide Nav */}
         <GazeButton id="hide-nav-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-          dwellTime={1400}
+          dwellCategory="navigationButton"
           onClick={() => { setNavHidden(true); onSpeak('Navigation hidden. Look at NAV button to restore.'); }}
           style={{
-            height: 36, width: '100%', borderRadius: 8,
+            minHeight: 'clamp(84px, 9vh, 104px)', width: '100%', borderRadius: 10,
             background: hideNavBg,
             border: `1px solid ${hideNavBorder}`,
-            color: hideNavText, fontSize: 11, fontWeight: 600,
+            color: hideNavText, fontSize: 'clamp(13px, 1.5vh, 16px)', fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
           HIDE NAV
@@ -793,7 +778,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                 return (
                   <GazeButton key={key} id={`room-${key}`}
                     gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-                    dwellTime={1000}
+                    dwellCategory="compassMapAction"
                     onClick={() => selectRoom(key)}
                     style={{
                       height: 88, minWidth: 130, borderRadius: 10,
@@ -1014,7 +999,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           <GazeButton key={p.key} id={`phase-${p.key}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => { setPhase(p.key); setSelectedCell(null); }}
             style={{
-              flex: 1, minHeight: 52, borderRadius: 10,
+              flex: 1, minHeight: 'clamp(80px, 8.5vh, 100px)', borderRadius: 10,
               background: isActive
                 ? (isLight ? `${pc}22` : isMix ? `${pc}33` : `${darkPc}26`)
                 : T_subSurfaceFaint,
@@ -1037,18 +1022,18 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           <div style={{ display: 'flex', gap: 6 }}>
             <GazeButton id="tool-vsplit" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => handleSplit('vertical')}
-              style={{ flex: 1, height: 36, borderRadius: 8, background: isLight ? T_splitFill : isMix ? `${T_splitFill}55` : 'rgba(139,92,246,0.15)', border: `1.5px solid ${T_splitFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#C4B5FD', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ flex: 1, minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: isLight ? T_splitFill : isMix ? `${T_splitFill}55` : 'rgba(139,92,246,0.15)', border: `1.5px solid ${T_splitFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#C4B5FD', fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               V-Split
             </GazeButton>
             <GazeButton id="tool-hsplit" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => handleSplit('horizontal')}
-              style={{ flex: 1, height: 36, borderRadius: 8, background: isLight ? T_splitFill : isMix ? `${T_splitFill}55` : 'rgba(139,92,246,0.15)', border: `1.5px solid ${T_splitFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#C4B5FD', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ flex: 1, minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: isLight ? T_splitFill : isMix ? `${T_splitFill}55` : 'rgba(139,92,246,0.15)', border: `1.5px solid ${T_splitFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#C4B5FD', fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               H-Split
             </GazeButton>
           </div>
           <GazeButton id="tool-desel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => setSelectedCell(null)}
-            style={{ height: 30, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Cancel
           </GazeButton>
         </div>
@@ -1080,11 +1065,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                 setSelectedCell(null);
               }}
               style={{
-                height: 36, borderRadius: 8,
+                minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8,
                 background: isLight ? w.color : isMix ? `${w.color}33` : `${w.color}15`,
                 border: `1px solid ${w.color}${isLight ? '' : '40'}`,
                 color: isLight ? T_textInverse : w.color,
-                fontSize: 11, fontWeight: 700,
+                fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
               {w.label}
@@ -1092,7 +1077,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           ))}
           <GazeButton id="wall-desel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => setSelectedCell(null)}
-            style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Cancel
           </GazeButton>
         </div>
@@ -1117,12 +1102,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               onSpeak('Marked as open to below.');
               setSelectedCell(null);
             }}
-            style={{ height: 40, borderRadius: 8, background: isLight ? T_wallsFill : isMix ? `${T_wallsFill}55` : 'rgba(59,130,246,0.15)', border: `1.5px solid ${T_wallsFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#93C5FD', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: isLight ? T_wallsFill : isMix ? `${T_wallsFill}55` : 'rgba(59,130,246,0.15)', border: `1.5px solid ${T_wallsFill}`, color: isLight ? T_textInverse : isMix ? T_textInverse : '#93C5FD', fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Mark as Open to Below
           </GazeButton>
           <GazeButton id="void-desel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => setSelectedCell(null)}
-            style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             Cancel
           </GazeButton>
         </div>
@@ -1209,7 +1194,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               </div>
               <GazeButton id="stair-combo-cancel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => setSelectedCell(null)}
-                style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 Cancel
               </GazeButton>
             </div>
@@ -1256,7 +1241,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               </div>
               <GazeButton id="stair-cancel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => setSelectedCell(null)}
-                style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 Cancel
               </GazeButton>
             </div>
@@ -1305,7 +1290,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             </div>
             <GazeButton id="rotate-cancel" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => setSelectedCell(null)}
-              style={{ height: 28, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ minHeight: 'clamp(80px, 8.5vh, 96px)', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(12px, 1.4vh, 15px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Cancel
             </GazeButton>
           </div>
@@ -1378,12 +1363,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           <div style={{ padding: '12px 14px', borderTop: `1px solid ${T_panelBorderSoft}`, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
             <GazeButton id="adv-back-rooms" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={switchToRooms}
-              style={{ height: 52, width: '100%', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              style={{ minHeight: 'clamp(84px, 9vh, 104px)', width: '100%', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(13px, 1.5vh, 16px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               ← Back to Rooms
             </GazeButton>
             <GazeButton id="adv-generate-ref" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={handleGenerate}
-              style={{ height: 64, width: '100%', borderRadius: 8, background: T_generatePlanBg, border: `2px solid ${T_generatePlanBorder}`, color: T_generatePlanText, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              style={{ minHeight: 'clamp(88px, 10vh, 112px)', width: '100%', borderRadius: 8, background: T_generatePlanBg, border: `2px solid ${T_generatePlanBorder}`, color: T_generatePlanText, fontSize: 'clamp(16px, 1.9vh, 20px)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               Generate Plan
             </GazeButton>
           </div>
@@ -1452,7 +1437,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
         gridTemplateRows: 'repeat(4, 1fr)',
-        gap: 0,
+        gap: 'clamp(6px, 0.8vh, 10px)',
         padding: '28px 32px 8px 32px',
       }}>
         {RENDER_ORDER.map((cellKey) => {
@@ -1497,7 +1482,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           return (
             <GazeButton key={cellKey} id={`cell-${cellKey}`}
               gazeEnabled={isGazeEnabled && cellClickable}
-              gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellTime={1200}
+              gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => handleCellClick(cellKey)}
               contentFill
               style={{
@@ -1506,7 +1491,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                 background: 'transparent',
                 display: 'flex', overflow: 'hidden', padding: 0,
                 position: 'relative',
-                ...(isSelected ? { transform: 'scale(1.02)', zIndex: 10, boxShadow: '0 0 15px rgba(45,212,191,0.5)' } : {}),
+                ...(isSelected ? { outline: '3px solid #2DD4BF', outlineOffset: '-3px', zIndex: 10, boxShadow: '0 0 15px rgba(45,212,191,0.5)' } : {}),
                 ...(isRoomHighlight ? { boxShadow: `0 0 12px ${ROOM_LIBRARY[selectedRoomId]?.color || '#2DD4BF'}60` } : {}),
               }}>
               {/* Staircase cell with combo layout */}

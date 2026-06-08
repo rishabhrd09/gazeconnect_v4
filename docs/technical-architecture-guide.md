@@ -2,7 +2,7 @@
 
 This document covers the internal architecture of GazeConnect Pro: how gaze data flows from hardware to UI action, how the three processes communicate, and how the React component hierarchy is organized.
 
-> **Build:** v4.8.0 (gaze pipeline v17.10)
+> **Build:** v4.8.0 (gaze pipeline v17.16 browser safety layer)
 >
 > For the comprehensive end-to-end pipeline reference with Mermaid diagrams covering every stage and constant, see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html).
 
@@ -134,13 +134,14 @@ survey_data  — Survey load/save responses
 2. On each `gaze` message, listeners in `listenersRef.current` are notified directly (no React state update — avoids re-render storms at 33 Hz).
 3. `GazeCursor` component subscribes via `subscribeGaze(callback)` and runs the full frontend pipeline.
 
-**Dwell detection** (centralised in `GazeCursor.tsx`, NOT per-button):
-1. A single animation-frame loop (`dwellFrame`, ~60 Hz) runs the entire dwell state machine: onset → dwell → lock → click.
-2. Hit testing identifies the active interactive element under the cursor on every frame (multi-point hit test + sticky tolerance + nearest-center fallback).
-3. Once dwell completes, `GazeCursor` calls `dwellTargetRef.current.click()` directly — the target element's `onClick` handler fires as if it were a normal mouse click.
-4. **`GazeButton` is a styling/affordance component**, not a dwell driver. It exposes `data-gaze*` attributes that the central machine consumes. This centralisation was a deliberate design choice that allows the v17 visual anchor (R2), savedDwell continuity, and lock-break gating to work consistently across all targets.
+**Dwell detection** uses three intentional paths:
+1. `GazeButton` is the canonical React control for AAC screens. It reads user-tunable `dwellCategory` values and renders button-level dwell feedback.
+2. `GazeCursor` is the global renderer cursor and external dwell path for raw `data-gaze*` targets. It provides visual anchoring, sticky hit testing, saved-dwell continuity, and telemetry.
+3. Embedded BrowserView content is handled by the injected script in `electron/browser/browserGazeController.ts`, because BrowserView page DOM is outside the React renderer.
 
-**Dwell timings (v17.10)**: 250 ms onset + 1000 ms dwell + 1300 ms cooldown. Lock fires at 10 % dwell progress. Lock-break requires both raw-gaze > 80 px from `lockPos` AND raw-gaze outside the target rect + 45 px tolerance — see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html) Chapter 9 for the full state machine.
+Do not add a fourth dwell loop to a target that is already owned by one of these systems. The old failure mode was a raw `<button data-gaze>` plus custom `requestAnimationFrame` dwell plus a separate progress bar racing on the same element.
+
+**Main-app dwell timings (v17.x)**: the validated defaults remain category-driven through `src/config/dwellTimeConfig.ts` and `DwellTimeContext`. Keyboard behavior is user-validated; changes to `KeyboardScreen.tsx`, `GazeButton.tsx`, `GazeCursor.tsx`, or `dwellTimeConfig.ts` require a verified high-severity bug and immediate keyboard smoke testing.
 
 **Frontend filter stack** (in `GazeCursor.tsx`, applied to each gaze sample):
 1. Coordinate transform (window vs. screen normalisation).
@@ -150,6 +151,23 @@ survey_data  — Survey load/save responses
 5. Velocity-adaptive EMA per gaze state.
 6. **R2 visual anchor** (v17.3): once dwell target is set, `posRef` is snapped to target centre every frame.
 7. Render: `setX`, `setY` update the cursor div.
+
+### Embedded BrowserView gaze path
+
+The embedded browser has a separate gaze stack:
+
+1. React receives gaze from the Python backend through `useWebSocket.tsx`.
+2. `src/hooks/useGazeBrowser.ts` maps window coordinates into BrowserView-local coordinates and sends `webview:updateGaze`.
+3. `electron/main.ts` executes the injected BrowserView cursor script and receives click requests.
+4. Trusted click events are sent with Electron `sendInputEvent`.
+5. Browser telemetry is available in the BrowserView page context through `window.gcState`, `window.gcGetPlaybackState()`, and `window.gcState.events2`.
+
+YouTube-specific safety in v17.16:
+
+- v17.15 Bayesian card selection and thumbnail/title snap rects remain the baseline for video recommendations.
+- While a video is playing, dwell inside the active video rect is suppressed so looking at the video does not toggle play/pause.
+- True fullscreen is auto-exited. The visible side-dock **Full Screen** button only maximizes the video inside the BrowserView and keeps app controls visible.
+- Quick Search uses an app-owned large-link sidebar for 80px+ gaze targets instead of relying on tiny native web links.
 
 ---
 

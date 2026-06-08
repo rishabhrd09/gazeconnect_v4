@@ -16,6 +16,14 @@ export async function disposeBrowserView(
   }
 
   try {
+    const playbackPoll = (view as any)._playbackPoll;
+    if (playbackPoll) clearInterval(playbackPoll);
+    (view as any)._playbackPoll = null;
+  } catch {
+    // Ignore cleanup races.
+  }
+
+  try {
     (view as any)._browserViewCleanup?.();
     (view as any)._browserViewCleanup = null;
   } catch {

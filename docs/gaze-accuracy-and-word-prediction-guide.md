@@ -611,8 +611,14 @@ Defaults: σ = 46 px, α = 0.32, commit threshold 0.45, expanded candidate zone 
 #### v17 — Asymmetric snap/unsnap on YouTube targets (Tobii US10,890,967 pattern)
 Card snap-in 130 px, unsnap (hold) 230 px. Skip-ad snap-in 140 px, unsnap 250 px. Once a target is committed the dwell tolerates wider drift before reset, preventing boundary flicker.
 
-#### v17 — Auto-enable gaze on Alert Mode and embedded browser
-`AlertModeScreen.tsx` and `WebBrowsingScreen.tsx` (embedded browser view) force-enable gaze on mount, respecting Mouse-Only Mode. The patient was getting stuck on these screens with gaze toggle off after navigating from elsewhere.
+#### v17.15 — Stable embedded-browser cursor
+`electron/browser/browserGazeController.ts` now uses candidate epochs, thumbnail/title snap rects, stable-winner gating, onset movement cancellation, and BrowserView telemetry for YouTube card selection. This is the current baseline for recommendation clicks and should not be retuned without telemetry.
+
+#### v17.16 — Embedded-browser video safety
+The BrowserView cursor suppresses dwell inside the active video rect while playback is running, so looking at a YouTube video does not accidentally toggle play/pause. Playback state flows through `webview:playbackState` into `useGazeBrowser.ts`. True browser fullscreen is auto-exited; the visible side-dock **Full Screen** button only maximizes the YouTube player inside the BrowserView so app controls remain visible. Quick Search now has large paginated app-owned link targets for gaze selection.
+
+#### v17 — Auto-enable gaze on direct-work screens
+`AlertModeScreen.tsx`, `WebBrowsingScreen.tsx`, and `CompassMapScreen.tsx` force-enable gaze on mount, respecting Mouse-Only Mode. Compass Map also opens with nav hidden so room placement can begin immediately.
 
 #### Audit recommendations: status
 

@@ -229,6 +229,7 @@ const SaveConfirmModal = ({ mode, onClose, isLight = false }: { mode: 'generate'
                         : 'Your progress has been saved. You can resume anytime from Design Home.'}
                 </p>
                 <GazeButton id="modal-ok" onClick={onClose} gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
+                    dwellCategory="navigationButton"
                     style={{ padding: 'clamp(12px, 1.8vh, 20px) clamp(32px, 5vw, 64px)', background: tAccent, color: '#FFF', borderRadius: '12px', fontSize: 'clamp(14px, 1.8vh, 20px)', fontWeight: 700, border: 'none' }}>
                     OK {mode === 'generate' ? '\u2014 Return to Home' : ''}
                 </GazeButton>
@@ -581,6 +582,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                 gazeEnabled={effectiveGazeActive}
                                 gazeEnabledTimestamp={navGazeTimestamp}
                                 isDarkMode={isDarkMode}
+                                dwellCategory="navigationButton"
                                 style={{
                                     flex: '1 1 0',
                                     minWidth: 0,
@@ -1089,6 +1091,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         gazeEnabled={effectiveGazeActive}
                         gazeEnabledTimestamp={navGazeTimestamp}
                         isDarkMode={isDarkMode}
+                        dwellCategory="backSkipButton"
                         style={{
                             padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
                             background: isLight ? lightColors.background.elevated : 'rgba(255,255,255,0.04)',
@@ -1113,6 +1116,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         gazeEnabled={effectiveGazeActive}
                         gazeEnabledTimestamp={navGazeTimestamp}
                         isDarkMode={isDarkMode}
+                        dwellCategory="navigationButton"
                         style={{
                             padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
                             background: T_accentSoft,
@@ -1139,6 +1143,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             gazeEnabled={effectiveGazeActive}
                             gazeEnabledTimestamp={navGazeTimestamp}
                             isDarkMode={isDarkMode}
+                            dwellCategory="compassMapAction"
                             style={{
                                 padding: 'clamp(26px, 3.2vh, 40px) clamp(32px, 3.6vw, 52px)',
                                 background: isLight ? 'rgba(31, 107, 126, 0.16)' : 'rgba(100, 181, 246, 0.12)',
@@ -1167,6 +1172,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             gazeEnabled={effectiveGazeActive}
                             gazeEnabledTimestamp={navGazeTimestamp}
                             isDarkMode={isDarkMode}
+                            dwellCategory="surveyOption"
                             style={{
                                 padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
                                 background: T_accent,
@@ -1193,6 +1199,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         gazeEnabled={effectiveGazeActive}
                         gazeEnabledTimestamp={navGazeTimestamp}
                         isDarkMode={isDarkMode}
+                        dwellCategory="backSkipButton"
                         style={{
                             padding: 'clamp(26px, 3.2vh, 40px) clamp(36px, 4vw, 60px)',
                             background: T_warningSoft,
@@ -1240,6 +1247,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             <div style={{ display: 'flex', gap: 'clamp(8px, 1vw, 16px)' }}>
                                 <GazeButton id="save-summary" onClick={handleSaveProgress}
                                     gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
+                                    dwellCategory="compassMapAction"
                                     style={{
                                         padding: 'clamp(10px, 1.4vh, 16px) clamp(18px, 2.2vw, 30px)',
                                         background: T_accentSoft,
@@ -1252,6 +1260,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                 </GazeButton>
                                 <GazeButton id="close-summary" onClick={() => setShowSummary(false)}
                                     gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
+                                    dwellCategory="backSkipButton"
                                     style={{
                                         padding: 'clamp(10px, 1.4vh, 16px) clamp(18px, 2.2vw, 30px)',
                                         background: T_accent, color: '#FFF', borderRadius: '12px',
