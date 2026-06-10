@@ -3588,7 +3588,10 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const ws = useWS();
     const { settings: dwellSettings, currentStage } = useDwellTime();
     const { hasRealGaze } = useRealGaze();
-    const [gp, setGp] = useState({ x: 0, y: 0 });
+    // v17.17: gaze position lives in a ref ONLY. It used to be mirrored into
+    // useState on every frame, which re-rendered this entire ~3800-line
+    // component at 66Hz (plus every mousemove) — and nothing ever read the
+    // state. Consumers all use gpRef.
     const gpRef = useRef({ x: 0, y: 0 });
     const [windowBounds, setWindowBounds] = useState<{ x: number; y: number; width: number; height: number; screenWidth: number; screenHeight: number; scaleFactor: number; isFullScreen: boolean; isMaximized: boolean; } | null>(null);
     const windowBoundsRef = useRef<typeof windowBounds>(null);
@@ -3718,7 +3721,6 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             rawY = Math.max(0, Math.min(window.innerHeight, rawY));
 
             gpRef.current = { x: rawX, y: rawY };
-            setGp({ x: rawX, y: rawY });
         });
         return unsub;
     }, [ws.subscribeGaze]);
@@ -3729,7 +3731,6 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             // Only use mouse position when no real gaze data is present
             if (!hasRealGaze) {
                 gpRef.current = { x: e.clientX, y: e.clientY };
-                setGp({ x: e.clientX, y: e.clientY });
             }
         };
         window.addEventListener('mousemove', h);
