@@ -3742,24 +3742,50 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     // can make the page cursor appear offset from the user's actual gaze.
     // Keep only a tiny 1.5px jitter gate, snap large moves (>18px), and otherwise
     // use high-alpha EWMA so dense web and YouTube controls track promptly.
+    //
+    // v17.17: forwarding is event-driven (per gaze frame, ~66Hz) instead of a
+    // 33ms poll. The poll added up to 33ms of lag, dropped roughly every other
+    // frame the page-side dwell could have ticked on, and kept re-sending the
+    // last held position through blinks (so the page dwell advanced on stale
+    // gaze — see gapPause on the page side for the matching fix). A mousemove
+    // path keeps simulation mode working: with no eye tracker there are no WS
+    // gaze frames at all, so mouse-as-gaze must forward on its own events.
     const smoothedGazeRef = useRef<{ x: number; y: number } | null>(null);
+    const hasRealGazeRef = useRef(hasRealGaze);
+    useEffect(() => { hasRealGazeRef.current = hasRealGaze; }, [hasRealGaze]);
     useEffect(() => {
         if (!browser.isOpen) return;
         smoothedGazeRef.current = null;
-        const interval = setInterval(() => {
+        // Min spacing between IPC sends. ET5 frames arrive every ~15.2ms so
+        // real gaze always passes; this only caps high-rate mousemove bursts
+        // (and any future 133Hz tracker mode) at ~70Hz.
+        const MIN_FORWARD_INTERVAL_MS = 14;
+        let lastSentAt = 0;
+
+        const forward = () => {
             const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed' && view !== 'youtube';
             if (!ige || (isBrowserWatchMode && !allowWatchScroll)) {
-                smoothedGazeRef.current = null;
-                browser.hideGazeCursor();
+                // Hide once per transition — the old poll re-sent the hide IPC
+                // every 33ms for as long as the state lasted.
+                if (smoothedGazeRef.current) {
+                    smoothedGazeRef.current = null;
+                    browser.hideGazeCursor();
+                }
                 return;
             }
+            const nowMs = Date.now();
+            if (nowMs - lastSentAt < MIN_FORWARD_INTERVAL_MS) return;
+            lastSentAt = nowMs;
+
             const raw = gpRef.current;
             const prev = smoothedGazeRef.current;
             const activeBounds = browser.boundsRef.current;
 
             if (view === 'youtube' && isYtVideoActive && activeBounds && raw.y < activeBounds.y + 96) {
-                smoothedGazeRef.current = null;
-                browser.hideGazeCursor();
+                if (prev) {
+                    smoothedGazeRef.current = null;
+                    browser.hideGazeCursor();
+                }
                 return;
             }
 
@@ -3794,9 +3820,29 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             };
             smoothedGazeRef.current = next;
             browser.updateGazeCursor(next.x, next.y, allowWatchScroll ? { cursor: false } : undefined);
-        }, 33);
-        return () => clearInterval(interval);
-    }, [browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
+        };
+
+        // Real gaze: one forward per backend frame. The gpRef-filling
+        // subscription above is registered first (earlier effect), so
+        // gpRef already holds this frame's transformed position.
+        const unsub = ws.subscribeGaze(() => forward());
+        // Simulation fallback: forward on mouse movement when no real
+        // gaze stream exists.
+        const onMouse = () => {
+            if (!hasRealGazeRef.current) forward();
+        };
+        window.addEventListener('mousemove', onMouse);
+        // Entering a hidden state (gaze off / watch mode) must hide even
+        // if no further frames arrive.
+        if (!ige || (isBrowserWatchMode && !(browser.scrollMode === 'armed' && view !== 'youtube'))) {
+            smoothedGazeRef.current = null;
+            browser.hideGazeCursor();
+        }
+        return () => {
+            unsub();
+            window.removeEventListener('mousemove', onMouse);
+        };
+    }, [ws.subscribeGaze, browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
 
     const goBack = useCallback(() => {
         browser.closePage();
