@@ -115,8 +115,21 @@ export const GazeCursor: React.FC = () => {
   const { isLight, isWarm } = useTheme();
   const isMouseMode = gazeControl.isMouseMode;
 
-  const [x, setX] = useState(window.innerWidth / 2);
-  const [y, setY] = useState(window.innerHeight / 2);
+  // v17.18: cursor position is written straight to the DOM element via
+  // cursorElRef + transform — it is NOT React state. setX/setY used to run
+  // on every gaze frame (66Hz), scheduling a full reconciliation of this
+  // component (ring SVG, dot, highlight, status bar) per frame; rAF-stall
+  // telemetry pointed here. React renders (triggered by dwellProgress etc.)
+  // re-derive the same transform from posRef, so the two writers can never
+  // disagree.
+  const cursorElRef = useRef<HTMLDivElement | null>(null);
+  const applyCursorTransform = useCallback((px: number, py: number) => {
+    const el = cursorElRef.current;
+    if (el) {
+      // translate(-50%,-50%) centers the element regardless of CURSOR_SIZE.
+      el.style.transform = `translate3d(${px}px, ${py}px, 0) translate(-50%, -50%)`;
+    }
+  }, []);
   const [dwellProgress, setDwellProgress] = useState(0);
   const [targetName, setTargetName] = useState<string>('');
   const [isLocked, setIsLocked] = useState(false);
@@ -965,8 +978,7 @@ export const GazeCursor: React.FC = () => {
         const centerY = rect.top + rect.height / 2;
         posRef.current.x = centerX;
         posRef.current.y = centerY;
-        setX(centerX);
-        setY(centerY);
+        applyCursorTransform(centerX, centerY);
         // v16: Show visual highlight around the selected element
         setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
       }
@@ -986,8 +998,7 @@ export const GazeCursor: React.FC = () => {
       const centerY = rect.top + rect.height / 2;
       posRef.current.x = centerX;
       posRef.current.y = centerY;
-      setX(centerX);
-      setY(centerY);
+      applyCursorTransform(centerX, centerY);
       setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
 
@@ -1298,8 +1309,7 @@ export const GazeCursor: React.FC = () => {
           setHighlightRect(null);
         }
         posRef.current = { x: rawX, y: rawY };
-        setX(rawX);
-        setY(rawY);
+        applyCursorTransform(rawX, rawY);
       }
       return; // Don't move cursor while locked
     }
@@ -1457,9 +1467,8 @@ export const GazeCursor: React.FC = () => {
       }
     }
 
-    setX(posRef.current.x);
-    setY(posRef.current.y);
-  }, [enabled, reportGazeReceived]);
+    applyCursorTransform(posRef.current.x, posRef.current.y);
+  }, [enabled, reportGazeReceived, applyCursorTransform]);
 
   // v17: Handle gaze_lost events — pause dwell during blink/stale/gap
   // When backend detects blink or tracking loss, we freeze dwell progress
@@ -1528,14 +1537,20 @@ export const GazeCursor: React.FC = () => {
         />
       )}
 
-      {/* Gaze Cursor */}
+      {/* Gaze Cursor — position is driven by direct DOM transform writes
+          (applyCursorTransform) at gaze rate; the transform below only
+          covers the initial mount and re-derives the SAME value from
+          posRef on React re-renders, so the two writers stay consistent. */}
       <div
+        ref={cursorElRef}
         data-cursor="true"
         className={`gaze-cursor-ring${dwellProgress > 0 ? ' dwelling' : ''}${isLocked ? ' locked' : ''}`}
         style={{
           position: 'fixed',
-          left: x - CURSOR_SIZE / 2,
-          top: y - CURSOR_SIZE / 2,
+          left: 0,
+          top: 0,
+          transform: `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0) translate(-50%, -50%)`,
+          willChange: 'transform',
           width: CURSOR_SIZE,
           height: CURSOR_SIZE,
           borderRadius: '50%',
