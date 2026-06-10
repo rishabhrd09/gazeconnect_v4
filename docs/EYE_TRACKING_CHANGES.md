@@ -108,10 +108,45 @@ After the on-rig A/B (results above), plain `.\start-dev.bat` now gets the impro
 - A/B snapshots preserved in `docs/baselines/session-{A,B}-*.json`.
 - **Browser cursor (YouTube / quick search):** no code changes — deliberately. Its dwell only advances on frame arrival (can't click during gaps), it emits `trackingLost` at >100ms gaps, and its v17.15/v17.16 Bayesian constants are telemetry-calibrated and spec-protected. It gains the biggest win automatically: backend stalls (which froze it equally) are gone with async TTS.
 
+## Entry 7 — 2026-06-11 — Browser cursor: dwell progress retention (config, default ON)
+
+**Symptom:** on YouTube/web pages, a tremor excursion mid-dwell reset the in-page dwell to 0 even though the ring stayed visually lit (v17.6 grace kept the CSS class, not the timer). The app cursor has had save-and-resume since v10; the browser cursor had nothing.
+**Change:** `browserGazeController.ts` — on stability break, progress ≥5% is saved per `targetKey`; re-acquiring the SAME target within `gcConfig.progressRetentionMs` (1000ms) resumes from the saved fraction, skipping onset. Save invalidated by click commit, different-target dwell start, TTL, gcHide/gcResetDwell/gcBlockDwell. Resumes emit `dwellResumed` to the `events2` ring.
+**Rollback:** `window.gcConfig.progressRetentionEnabled = false` (BrowserView DevTools).
+
+## Entry 8 — 2026-06-11 — Browser cursor: gap pause (config, default ON)
+
+**Symptom:** the in-page dwell timer is wall-clock (`now - state.start`); a blink/look-away mid-dwell counted toward the dwell — the browser-side twin of the app-cursor mid-blink misfire (A/B: 480px outlier → 109px after the app fix).
+**Change:** `gcUpdateAndPoll` wrapper — frame gaps > `gcConfig.gapPauseMs` (150ms, matches app stale threshold + backend TTLs) shift `state.start`/`savedProgressAt`/`dwellingExpiryAt` forward by the gap: progress freezes, never advances or resets.
+**Rollback:** `window.gcConfig.gapPauseEnabled = false`.
+
+## Entry 9 — 2026-06-11 — Browser forwarding: per-frame (66Hz) instead of 30Hz poll
+
+**Symptom:** renderer forwarded gaze to the BrowserView via a 33ms `setInterval` — up to 33ms added lag, ~half the tracker frames dropped, last-held position re-sent through blinks (page dwell advanced on stale gaze), hide-IPC re-sent every 33ms in watch mode.
+**Change:** `WebBrowsingScreen.tsx` — forwarding now fires per WS gaze frame; a mousemove path keeps simulation mode working (no WS frames exist without the tracker); 14ms min-interval guard bounds IPC ≈70Hz; hide sent once per transition. Filter behavior (snap >18px, jitter gate <1.5px, EMA alphas) byte-identical.
+**Rollback:** `git revert` (transparent transport change; no behavioral constants touched).
+
+## Entry 10 — 2026-06-11 — Browser cursor: WMA(3) prefilter
+
+`WebBrowsingScreen.tsx` — the same 0.45/0.30/0.25 three-sample pre-smoothing the app cursor applies before its EMA, now applied to the page-cursor input. Causal, ~zero added lag at 66Hz. Resets on hide/session reopen. Rollback: `git revert`.
+
+## Entry 11 — 2026-06-11 — Render-load fixes (app + web screen)
+
+- `GazeCursor.tsx`: cursor position moved off React state onto direct DOM `translate3d` writes — `setX/setY` used to schedule a full component reconciliation per gaze frame (66Hz). React renders re-derive the identical transform from `posRef`, so the writers can't disagree. Visuals unchanged. Measure on-rig via `freezes.byKind.raf_stall`.
+- `WebBrowsingScreen.tsx`: removed the `gp` useState — written every gaze frame + every mousemove, never read anywhere, re-rendered the entire ~3800-line component at 66Hz.
+
+## Entry 12 — 2026-06-11 — Double-speak fixed
+
+`App.tsx handleSpeak` fired BOTH browser `speechSynthesis` AND backend pyttsx3 when connected (two overlapping voices on every SPEAK). Backend is now the sole voice when connected; browser synthesis remains the offline fallback. Rollback: `git revert`.
+
+**New tooling:** `scripts/check-injected-script.js` — `new Function()` parse check for the injected browser script (a template literal tsc cannot validate). Run after any `browserGazeController.ts` edit.
+
 ## Rollback instructions (current state)
 
 Each improvement reverts independently, without code edits:
 - Speech back to old (blocking) behavior: set `GAZECONNECT_TTS_ASYNC=0` before `start-dev.bat`.
 - Dwell behaviors back to old: in DevTools console — `window.__gazeFlags.set('dwellPauseOnGap', false)` and/or `window.__gazeFlags.set('lockBreakProgressRetention', false)` (persists across restarts).
+- Browser-cursor behaviors back to old: in the BrowserView DevTools console — `window.gcConfig.progressRetentionEnabled = false` (Entry 7) and/or `window.gcConfig.gapPauseEnabled = false` (Entry 8). These reset on page reload; for a persistent revert, `git revert` the commit.
 - Telemetry additions are measurement-only (no behavior); removal = `git revert`.
+- Transport/render changes (Entries 9–12) have no behavioral constants; revert their individual commits if needed.
 - Hard rollback of everything: `git checkout de1aee6` (or revert the commits on top of it).
