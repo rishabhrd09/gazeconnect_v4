@@ -238,8 +238,15 @@ const InnerApp: React.FC = () => {
 
   const handleSpeak = useCallback((text: string) => {
     if (text.trim()) {
-      speakText(text, ttsRate, ttsVolume, ttsLanguage || 'english');
-      if (ws.isConnected && ws.speak) ws.speak(text);
+      // v17.18: one voice, not two. Backend pyttsx3 (async worker, SAPI5)
+      // is the primary path; browser speechSynthesis is the offline
+      // fallback only. Both used to fire together, so the patient heard
+      // two overlapping voices on every SPEAK.
+      if (ws.isConnected && ws.speak) {
+        ws.speak(text);
+      } else {
+        speakText(text, ttsRate, ttsVolume, ttsLanguage || 'english');
+      }
     }
   }, [ttsRate, ttsVolume, ttsLanguage, ws]);
 
