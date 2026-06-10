@@ -53,12 +53,79 @@ export interface TelemetrySnapshot {
   medianAcquisitionMs: number;
   perContextCount: Record<string, number>;
   perContextMedianResidual: Record<string, number>;
+  /** Dwell interruption aggregates (corner-flicker evidence). */
+  interrupts: {
+    total: number;
+    byKind: Record<string, number>;
+    nearEdgeCount: number;
+    /** interruptions per completed click — the corner-flicker headline number */
+    perClick: number;
+  };
+  /** Freeze/stall aggregates (>200ms acceptance criterion). */
+  freezes: {
+    count: number;
+    over200Count: number;
+    maxMs: number;
+    byKind: Record<string, number>;
+  };
+}
+
+/**
+ * A dwell interruption: progress that was lost or suspended before the
+ * click fired. Recorded so corner-flicker fixes can be judged by data
+ * (resets per selection) instead of feel.
+ */
+export interface DwellInterruptEvent {
+  seq: number;
+  ts: number;
+  /** 'lock_break' | 'target_lost' | 'expired' | 'resumed' */
+  kind: string;
+  targetId: string;
+  screen: string;
+  /** Dwell progress (0-1) at the moment of interruption */
+  progress: number;
+  /** Target rect within 80px of a viewport edge (corner/edge buttons) */
+  nearEdge: boolean;
+}
+
+/** A detected stall: gaze frames stopped or the rAF loop stalled. */
+export interface FreezeEvent {
+  seq: number;
+  ts: number;
+  /** 'gaze_gap' (no WS gaze frames) | 'raf_stall' (render loop blocked) */
+  kind: string;
+  durationMs: number;
 }
 
 const RING_SIZE = 250;
+const INTERRUPT_RING_SIZE = 400;
+const FREEZE_RING_SIZE = 200;
 const events: DwellTelemetryEvent[] = [];
+const interruptEvents: DwellInterruptEvent[] = [];
+const freezeEvents: FreezeEvent[] = [];
 let sequence = 0;
+let interruptSequence = 0;
+let freezeSequence = 0;
 let consoleLogCounter = 0;
+
+/**
+ * Record a dwell interruption (lock-break, target loss, TTL expiry, resume).
+ * Pure measurement — called from GazeCursor's reset/save/resume paths.
+ */
+export function recordDwellInterrupt(
+  partial: Omit<DwellInterruptEvent, 'seq' | 'ts'>,
+): void {
+  const ev: DwellInterruptEvent = { seq: ++interruptSequence, ts: Date.now(), ...partial };
+  if (interruptEvents.length >= INTERRUPT_RING_SIZE) interruptEvents.shift();
+  interruptEvents.push(ev);
+}
+
+/** Record a freeze/stall episode (>threshold gap in gaze frames or rAF). */
+export function recordFreeze(kind: string, durationMs: number): void {
+  const ev: FreezeEvent = { seq: ++freezeSequence, ts: Date.now(), kind, durationMs };
+  if (freezeEvents.length >= FREEZE_RING_SIZE) freezeEvents.shift();
+  freezeEvents.push(ev);
+}
 
 /** Record a dwell-completion event. Called from the dwell-click firing path. */
 export function recordDwellEvent(
@@ -97,9 +164,61 @@ export function recordDwellEvent(
   }
 }
 
+/** Aggregate the interruption + freeze rings (always computable). */
+function getAuxAggregates(): Pick<TelemetrySnapshot, 'interrupts' | 'freezes'> {
+  const byKind: Record<string, number> = {};
+  let nearEdgeCount = 0;
+  for (const e of interruptEvents) {
+    byKind[e.kind] = (byKind[e.kind] || 0) + 1;
+    if (e.nearEdge && e.kind !== 'resumed') nearEdgeCount++;
+  }
+  // 'resumed' is recovery, not loss — exclude from the per-click loss rate
+  const lossCount = interruptEvents.filter((e) => e.kind !== 'resumed').length;
+
+  const fByKind: Record<string, number> = {};
+  let over200 = 0;
+  let maxMs = 0;
+  for (const f of freezeEvents) {
+    fByKind[f.kind] = (fByKind[f.kind] || 0) + 1;
+    if (f.durationMs > 200) over200++;
+    if (f.durationMs > maxMs) maxMs = f.durationMs;
+  }
+
+  return {
+    interrupts: {
+      total: lossCount,
+      byKind,
+      nearEdgeCount,
+      perClick: events.length > 0 ? lossCount / events.length : lossCount,
+    },
+    freezes: {
+      count: freezeEvents.length,
+      over200Count: over200,
+      maxMs,
+      byKind: fByKind,
+    },
+  };
+}
+
 /** Compute aggregate stats over the current event ring. */
 export function getSnapshot(): TelemetrySnapshot | null {
-  if (events.length === 0) return null;
+  if (events.length === 0) {
+    // No clicks yet — still surface interruption/freeze data if any exists.
+    if (interruptEvents.length === 0 && freezeEvents.length === 0) return null;
+    return {
+      count: 0,
+      medianResidualPx: 0,
+      madPx: 0,
+      meanResidualPx: 0,
+      maxResidualPx: 0,
+      driftVector: { dx: 0, dy: 0, mag: 0 },
+      meanAcquisitionMs: 0,
+      medianAcquisitionMs: 0,
+      perContextCount: {},
+      perContextMedianResidual: {},
+      ...getAuxAggregates(),
+    };
+  }
 
   const mags = events.map((e) => e.residual.mag).sort((a, b) => a - b);
   const acqs = events.map((e) => e.onsetToClickMs).sort((a, b) => a - b);
@@ -144,7 +263,18 @@ export function getSnapshot(): TelemetrySnapshot | null {
     medianAcquisitionMs: medianAcq,
     perContextCount,
     perContextMedianResidual,
+    ...getAuxAggregates(),
   };
+}
+
+/** Return a copy of the interruption ring. */
+export function getInterruptEvents(): DwellInterruptEvent[] {
+  return interruptEvents.slice();
+}
+
+/** Return a copy of the freeze ring. */
+export function getFreezeEvents(): FreezeEvent[] {
+  return freezeEvents.slice();
 }
 
 /** Return a copy of the event ring (for export / inspection). */
@@ -152,20 +282,27 @@ export function getEvents(): DwellTelemetryEvent[] {
   return events.slice();
 }
 
-/** Wipe the buffer — handy at start of a controlled test session. */
+/** Wipe the buffers — handy at start of a controlled test session. */
 export function clearTelemetry(): void {
   events.length = 0;
+  interruptEvents.length = 0;
+  freezeEvents.length = 0;
   sequence = 0;
+  interruptSequence = 0;
+  freezeSequence = 0;
   consoleLogCounter = 0;
 }
 
 // Expose to renderer for live inspection. `window.__gazeTelemetry.snapshot()`
-// in DevTools returns current aggregates. `.events()` returns raw events.
-// `.clear()` resets the buffer.
+// in DevTools returns current aggregates. `.events()` returns raw click events,
+// `.interruptions()` the dwell-interruption ring, `.freezes()` the stall ring.
+// `.clear()` resets all buffers.
 if (typeof window !== 'undefined') {
   (window as unknown as { __gazeTelemetry: unknown }).__gazeTelemetry = {
     snapshot: getSnapshot,
     events: getEvents,
+    interruptions: getInterruptEvents,
+    freezes: getFreezeEvents,
     clear: clearTelemetry,
   };
 }

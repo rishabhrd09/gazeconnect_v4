@@ -23,7 +23,8 @@ import { computeEdgeExpansion, isPointInExpandedRect } from '../../utils/edgeHit
 import { computeScreenProfile } from '../../utils/screenProfile';
 import { useTheme } from '../../contexts/ThemeContext';
 import { collectKeyboardKeys, findBestKeyboardKey, type KeyRect } from '../../utils/hitZoneExpansion';
-import { recordDwellEvent } from '../../utils/gazeTelemetry';
+import { recordDwellEvent, recordDwellInterrupt, recordFreeze } from '../../utils/gazeTelemetry';
+import { gazeFlags } from '../../utils/gazeFlags';
 
 // === TUNING PARAMETERS ===
 const CURSOR_SIZES: Record<string, number> = { small: 50, medium: 70, large: 90 };
@@ -70,6 +71,24 @@ const ALPHA_NOISE = 0.20;        // light jitter smoothing
 const ALPHA_SLOW = 0.35;         // moderate convergence during fixation
 const ALPHA_NORMAL = 0.55;       // medium transition response
 const ALPHA_FAST = 0.85;         // near-raw for saccades
+
+// === DWELL PAUSE-ON-GAP (flag: gazeFlags.dwellPauseOnGap, default OFF) ===
+// When enabled, dwell/onset timers freeze (never reset, never advance) while
+// gaze is stale or the backend reports blink/oob/frozen. 150ms matches the
+// backend's POINT_TTL_SECONDS / FRAME_GAP_HOLD_SECONDS.
+const DWELL_PAUSE_STALE_MS = 150;
+// Freeze instrumentation threshold — episodes longer than this are recorded
+// to window.__gazeTelemetry (acceptance criterion: none >200ms in normal use).
+const FREEZE_RECORD_MS = 200;
+
+// Edge proximity for interruption telemetry — same 80px definition the
+// sticky-target logic uses for "edge button".
+const isRectNearEdge = (rect: { left: number; top: number; right: number; bottom: number }): boolean => (
+  rect.left < 80
+  || rect.top < 80
+  || rect.right > window.innerWidth - 80
+  || rect.bottom > window.innerHeight - 80
+);
 
 // Anti-jitter stabilization zone.
 // v17: Widened 4 → 8 px. Tobii ET5 noise floor on ALS gaze is routinely
@@ -123,6 +142,16 @@ export const GazeCursor: React.FC = () => {
   const lastRawPointRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2, t: Date.now() });
   const suppressPullUntilRef = useRef(0);
   const prevBackendOnKeyRef = useRef(false);
+
+  // === DWELL PAUSE-ON-GAP + FREEZE INSTRUMENTATION REFS ===
+  // lastGazeFrameAtRef: wall-clock time of the last WS gaze frame (0 = none yet).
+  // lastSignalStateRef: backend SignalConditioner state of the latest frame
+  //   ('valid' | 'blink' | 'oob' | 'frozen' | 'lost'; missing field = 'valid').
+  // lastDwellTickRef: previous dwellFrame timestamp, for pause time-shifting
+  //   and rAF-stall detection.
+  const lastGazeFrameAtRef = useRef<number>(0);
+  const lastSignalStateRef = useRef<string>('valid');
+  const lastDwellTickRef = useRef<number>(0);
 
   // v15: OptiKey-style 3-sample pre-smoothing (SmoothWhenChangingGazeTarget)
   // Reduces directional bias before EMA amplifies it.
@@ -198,12 +227,24 @@ export const GazeCursor: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Send gaze offset to backend when settings change
+  // Send gaze offset to backend when settings change.
+  // The `ws` context object is rebuilt on every provider render (each
+  // predictions update), so this effect re-runs constantly — the ref gate
+  // ensures we only actually SEND when the offset values change or the
+  // connection re-establishes (backend resets offset to 0 on restart).
+  // Without the gate this spammed set_gaze_offset many times per second
+  // (observed live in the 2026-06-11 session logs as [GAZE-OFFSET] floods).
+  const lastSentOffsetRef = useRef<{ x: number; y: number; connected: boolean } | null>(null);
   useEffect(() => {
     const offsetX = settings.gazeOffsetX ?? 0;
     const offsetY = settings.gazeOffsetY ?? 0;
+    const prev = lastSentOffsetRef.current;
+    if (prev && prev.x === offsetX && prev.y === offsetY && prev.connected === ws.isConnected) {
+      return;
+    }
     if (ws.setGazeOffset) {
       ws.setGazeOffset(offsetX, offsetY);
+      lastSentOffsetRef.current = { x: offsetX, y: offsetY, connected: ws.isConnected };
     }
   }, [settings.gazeOffsetX, settings.gazeOffsetY, ws]);
 
@@ -448,6 +489,14 @@ export const GazeCursor: React.FC = () => {
   const dwellFrame = useCallback(() => {
     const now = Date.now();
 
+    // === FREEZE INSTRUMENTATION (always on, measurement only) ===
+    // frameDt is also reused by the flagged pause-on-gap block below.
+    const frameDt = lastDwellTickRef.current > 0 ? now - lastDwellTickRef.current : 0;
+    lastDwellTickRef.current = now;
+    if (frameDt > FREEZE_RECORD_MS) {
+      try { recordFreeze('raf_stall', frameDt); } catch { /* never block the loop */ }
+    }
+
     // Mouse-Only Mode: no dwell detection at all
     if (isMouseMode) {
       if (dwellTargetRef.current) {
@@ -461,6 +510,24 @@ export const GazeCursor: React.FC = () => {
       }
       frameRef.current = requestAnimationFrame(dwellFrame);
       return;
+    }
+
+    // === DWELL PAUSE-ON-GAP (flag: dwellPauseOnGap, default OFF) ==========
+    // While gaze is stale (no fresh frame >150ms) or the backend signal
+    // state is blink/oob/frozen, freeze every dwell-related clock by
+    // shifting its start/expiry forward by this frame's dt. Progress
+    // neither advances (no mid-blink clicks) nor resets (no corner
+    // restart loops); the saved-progress TTL also stops burning down.
+    // Only engages once at least one real gaze frame has arrived, so
+    // mouse-simulation sessions (no WS gaze frames) are unaffected.
+    if (gazeFlags.dwellPauseOnGap && lastGazeFrameAtRef.current > 0 && frameDt > 0) {
+      const gazeAge = now - lastGazeFrameAtRef.current;
+      if (gazeAge > DWELL_PAUSE_STALE_MS || lastSignalStateRef.current !== 'valid') {
+        if (dwellStartTimeRef.current > 0) dwellStartTimeRef.current += frameDt;
+        if (onsetStartTimeRef.current > 0) onsetStartTimeRef.current += frameDt;
+        if (savedDwellExpiryRef.current > 0) savedDwellExpiryRef.current += frameDt;
+        if (savedDwellRef.current) savedDwellRef.current.timestamp += frameDt;
+      }
     }
 
     // Cooldown check — uses configurable cooldown from DwellTimeContext
@@ -721,6 +788,17 @@ export const GazeCursor: React.FC = () => {
     // Without this, the dwell circle could linger indefinitely at its
     // saved progress level after the user has clearly moved on.
     if (savedDwellRef.current && savedDwellExpiryRef.current > 0 && now > savedDwellExpiryRef.current) {
+      // Telemetry: saved progress expired without resume (measurement only)
+      try {
+        const lostEl = savedDwellRef.current.element;
+        recordDwellInterrupt({
+          kind: 'expired',
+          targetId: lostEl.id || (lostEl.textContent || '').trim().slice(0, 40),
+          screen: ws.currentScreen || 'unknown',
+          progress: savedDwellRef.current.progress,
+          nearEdge: lostEl.isConnected ? isRectNearEdge(lostEl.getBoundingClientRect()) : false,
+        });
+      } catch { /* measurement only */ }
       savedDwellRef.current = null;
       savedDwellExpiryRef.current = 0;
       setDwellProgress(0);
@@ -750,6 +828,17 @@ export const GazeCursor: React.FC = () => {
           };
           savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
           didCaptureSave = true;
+          // Telemetry: dwell progress suspended mid-fixation (measurement only)
+          try {
+            const r = dwellTargetRef.current.getBoundingClientRect();
+            recordDwellInterrupt({
+              kind: 'target_lost',
+              targetId: dwellTargetRef.current.id || (dwellTargetRef.current.textContent || '').trim().slice(0, 40),
+              screen: ws.currentScreen || 'unknown',
+              progress: currentProgress,
+              nearEdge: isRectNearEdge(r),
+            });
+          } catch { /* measurement only */ }
         }
       }
 
@@ -800,6 +889,16 @@ export const GazeCursor: React.FC = () => {
         // Resume from saved progress — skip onset since target was already validated
         onsetCompletedRef.current = true;
         const savedProgress = savedDwellRef.current.progress;
+        // Telemetry: successful resume (recovery, not a loss — measurement only)
+        try {
+          recordDwellInterrupt({
+            kind: 'resumed',
+            targetId: clickable.id || (clickable.textContent || '').trim().slice(0, 40),
+            screen: ws.currentScreen || 'unknown',
+            progress: savedProgress,
+            nearEdge: isRectNearEdge(clickable.getBoundingClientRect()),
+          });
+        } catch { /* measurement only */ }
         savedDwellRef.current = null;
         // v17.6 Option A: live dwell is taking over; clear the visual
         // continuity expiry so the next save-and-resume cycle starts
@@ -987,6 +1086,18 @@ export const GazeCursor: React.FC = () => {
 
     if (!data || typeof data.x !== 'number' || typeof data.y !== 'number') return;
 
+    // === FREEZE INSTRUMENTATION + PAUSE-ON-GAP INPUTS ===
+    // Record gaze-stream gaps >200ms (measurement only) and track the
+    // latest frame time + signal state for the flagged dwell pause logic.
+    if (lastGazeFrameAtRef.current > 0) {
+      const gapMs = now - lastGazeFrameAtRef.current;
+      if (gapMs > FREEZE_RECORD_MS) {
+        try { recordFreeze('gaze_gap', gapMs); } catch { /* measurement only */ }
+      }
+    }
+    lastGazeFrameAtRef.current = now;
+    lastSignalStateRef.current = typeof data.signal_state === 'string' ? data.signal_state : 'valid';
+
     // Track gaze state from backend classifier
     gazeStateRef.current = data.gaze_state;
     const backendZone = typeof data?.backend_zone === 'string' ? data.backend_zone : '';
@@ -1133,13 +1244,59 @@ export const GazeCursor: React.FC = () => {
       }
 
       if (shouldBreakLock) {
+        // === LOCK-BREAK PROGRESS RETENTION (flag, default OFF) ============
+        // Mirror the hit-test-miss save path: preserve dwell progress in
+        // the fixation-TTL store so re-fixating the same target within
+        // FIXATION_TTL_MS resumes instead of restarting from 0. Baseline
+        // behavior (flag off) discards all progress here.
+        let lockBreakSaved = false;
+        const brokenTarget = dwellTargetRef.current;
+        let brokenProgress = 0;
+        if (brokenTarget && dwellStartTimeRef.current > 0) {
+          const tCtx = (getTargetAttr(brokenTarget, 'data-gaze-context') || '').trim().toLowerCase();
+          const tIsToggle = brokenTarget.getAttribute('data-gaze-toggle') === 'true';
+          const effDwell = _getEffectiveDwell(brokenTarget, tCtx, dwellSettingsRef.current, tIsToggle,
+            isKeyboardScreenRef.current, isCompassScreenRef.current, getTargetAttr);
+          brokenProgress = Math.min(1, (now - dwellStartTimeRef.current) / effDwell);
+          if (gazeFlags.lockBreakProgressRetention
+            && brokenProgress >= FIXATION_TTL_MIN_PROGRESS && brokenProgress < 1) {
+            savedDwellRef.current = { element: brokenTarget, progress: brokenProgress, timestamp: now };
+            savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
+            lockBreakSaved = true;
+          }
+          // Telemetry: lock-break interruption (measurement only, always on)
+          try {
+            recordDwellInterrupt({
+              kind: 'lock_break',
+              targetId: brokenTarget.id || (brokenTarget.textContent || '').trim().slice(0, 40),
+              screen: ws.currentScreen || 'unknown',
+              progress: brokenProgress,
+              nearEdge: brokenTarget.isConnected ? isRectNearEdge(brokenTarget.getBoundingClientRect()) : false,
+            });
+          } catch { /* measurement only */ }
+        }
+
         isLockedRef.current = false;
         setIsLocked(false);
         dwellTargetRef.current = null;
         dwellStartTimeRef.current = 0;
-        setDwellProgress(0);
-        setTargetName('');
-        setHighlightRect(null);
+        if (lockBreakSaved) {
+          // Reset onset identity so re-acquiring this target goes through
+          // the "new target" branch, where the saved-progress resume path
+          // lives. Without this, the sticky-target path can fresh-start
+          // the dwell and silently discard the save.
+          onsetTargetRef.current = null;
+          onsetStartTimeRef.current = 0;
+          onsetCompletedRef.current = false;
+        }
+        if (!lockBreakSaved) {
+          // Baseline behavior: clear visuals. With a save active, keep the
+          // ring/highlight for visual continuity (v17.6 Option A semantics);
+          // the dwellFrame expiry check clears them if no resume happens.
+          setDwellProgress(0);
+          setTargetName('');
+          setHighlightRect(null);
+        }
         posRef.current = { x: rawX, y: rawY };
         setX(rawX);
         setY(rawY);

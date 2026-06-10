@@ -1,0 +1,117 @@
+# Eye Tracking Changes Log
+
+Companion to [EYE_TRACKING_COMPARISON.md](EYE_TRACKING_COMPARISON.md) (baseline audit + metrics).
+Rule: **one variable at a time, behind a preset/flag, default = current behavior, measured before/after.**
+
+---
+
+## Entry 0 — 2026-06-10 — Baseline established (NO behavior changes)
+
+**Changed:** nothing in app code. Added the two docs in `docs/`. Ran existing tests and the offline replay harness; recorded results in EYE_TRACKING_COMPARISON.md §3.
+
+**Verified rollback story (the "one switch"):**
+- Current working behavior is the **default**: backend preset `balanced` + all `ENABLE_*` flags at shipped values + frontend constants as-is. Nothing needs to be flipped to get today's behavior.
+- Every future behavioral change must land as either (a) a **new** entry in `ACTIVE_FILTER_PROFILES` + `FilterPreset` enum (both required — main.py:2506-09 validates the enum first), selectable/revertible at runtime via the `set_filter_preset` WS message, or (b) a new `ENABLE_*`-style flag defaulting to current behavior.
+- Hard fallback (code-level, one line each): `USE_OPTIKEY_PIPELINE=False` reverts the whole backend filter chain to the legacy One-Euro path; `ENABLE_*` constants at main.py:766-784 roll back individual behaviors; `ENABLE_DUAL_PULL_REDUCTION` (GazeCursor.tsx:61) on the frontend.
+- Full rollback of any committed change: `git revert <commit>` — baseline commit is `de1aee6`.
+
+**Baseline results (details in COMPARISON §3):** 4/4 edge-stability, 9/9 pipeline-mapping, typecheck OK; replay: tremor RMS 9.64px/0.244° (94.4% locked), pursuit RMS 57.6px (71.8% locked), fixation/blink/drift RMS 0. Backend pipeline compute ≤0.31ms/frame. `test_ml_training_data.py` fails pre-existing (`torch` missing — training-only).
+
+---
+
+## Entry 1 — 2026-06-10 — TTS moved off the event loop (env-gated, default OFF)
+
+**Symptom:** cursor/dwell hangs (baseline finding #1: `pyttsx3 runAndWait()` runs synchronously on the asyncio loop — every utterance froze TCP ingest + pipeline + broadcast for its full duration).
+**Change:** `python/main.py` TTSEngine — `GAZECONNECT_TTS_ASYNC=1` (env var) routes speak/rate/volume through a dedicated daemon worker thread that owns the engine (SAPI5 thread affinity). `stop` drains the queue and interrupts. Env unset = byte-for-byte the original synchronous path.
+**Measured:** smoke test — async mode blocks the main thread **3.7ms** per speak call (vs full utterance duration). On-rig confirmation pending (protocol step 8).
+**Rollback:** unset `GAZECONNECT_TTS_ASYNC` (or set to 0) and restart the backend.
+
+## Entry 2 — 2026-06-10 — Runtime gaze flags + dwell pause-on-gap (flag, default OFF)
+
+**Symptom:** dwell advances on wall clock through blinks/gaps (baseline finding: click can fire mid-blink; `gaze_lost` handler is a no-op).
+**Change:** new `src/utils/gazeFlags.ts` — persisted runtime switches, togglable in DevTools (`window.__gazeFlags.set/get/reset`), no code edit needed. Flag `dwellPauseOnGap`: in GazeCursor, while gaze is stale (no frame >150ms, matching backend TTLs) or `signal_state` ≠ 'valid' (blink/oob/frozen), all dwell clocks (dwell start, onset start, saved-progress TTL, resume window) shift forward by the frame dt — progress neither advances nor resets. Guards: requires ≥1 real gaze frame received (mouse-sim sessions unaffected); flag OFF = exact current behavior (timer code untouched when disabled).
+**Measured:** typecheck + all suites pass; behavioral effect needs on-rig A/B (blink mid-dwell: baseline clicks through, flagged build pauses).
+**Rollback:** `window.__gazeFlags.set('dwellPauseOnGap', false)` or `.reset()`.
+
+## Entry 3 — 2026-06-10 — Lock-break progress retention (flag, default OFF)
+
+**Symptom:** corner flicker — at corners, raw-noise excursions break the progressive lock and discard all dwell progress (the hit-test-miss path saves progress for 1s resume; the lock-break path didn't).
+**Change:** GazeCursor lock-break path — flag `lockBreakProgressRetention`: on lock break, save progress into the existing fixation-TTL store (same `savedDwellRef` mechanism, same 1s TTL, same ≥5% minimum) and keep the ring/highlight visible (v17.6 Option A semantics). Flag OFF = baseline discard.
+**Measured:** offline corner baseline now exists (COMPARISON §3: corners 5.9–12.6px RMS / ~97% lock vs 0px / 100% center). On-rig metric: `interrupts.byKind.lock_break` and resets-per-selection from telemetry, corners vs center.
+**Rollback:** `window.__gazeFlags.set('lockBreakProgressRetention', false)` or `.reset()`.
+
+## Entry 4 — 2026-06-10 — Instrumentation: freeze + dwell-interruption telemetry (always-on, measurement only)
+
+**Why:** acceptance criteria require evidence for "no freeze >200ms" and "corner flicker reduced" — neither was measurable.
+**Change:** `src/utils/gazeTelemetry.ts` + GazeCursor: (a) freeze ring — gaze-stream gaps >200ms (`gaze_gap`) and rAF-loop stalls >200ms (`raf_stall`); (b) dwell-interruption ring — `lock_break` / `target_lost` / `expired` / `resumed` events with progress + nearEdge (80px) classification. New DevTools surface: `window.__gazeTelemetry.snapshot()` now includes `interrupts` (total, byKind, nearEdgeCount, perClick) and `freezes` (count, over200Count, maxMs, byKind); raw rings via `.interruptions()` / `.freezes()`. Recording is try/catch-wrapped ring pushes — no behavior change.
+**Rollback:** none needed (pure measurement); `git revert` if unwanted.
+
+## Entry 5 — 2026-06-10 — Corner segments in synthetic traces (test-only)
+
+`python/tests/gaze_synthetic_traces.py` now emits 4 corner fixations (1.5s each, same 2px sigma as center) + labeled transitions; fixture regenerated. Existing segment metrics are unchanged (same seed). This is the offline corner A/B rig.
+
+---
+
+## On-rig A/B results — 2026-06-11 (real Tobii ET5, developer as test user)
+
+Session A: baseline (flags off, sync TTS), 00:13–00:25, 71 clicks. Session B: `GAZECONNECT_TTS_ASYNC=1` + both flags on, ~01:59–02:05, 34 clicks. Same exercise. Snapshots + console logs: `session-A*.txt` / `session-B*.txt` (repo root, not committed).
+
+| Metric (per-click normalized where rates) | A (baseline) | B (flags on) | Read |
+|---|---|---|---|
+| gaze-stream gaps >200ms | 47 (0.66/click), max **30.6s** | 6 (0.18/click), max 3.6s | −73%; confounded by look-aways (gaze_gap can't distinguish backend stall from user looking off-screen) |
+| stale-sample drops (`[POINT-TTL]`, unambiguous backend-stall evidence) | 1 drop @ **5.3s** age | 0 | backend stalls eliminated in B |
+| TTS during session | backend speak never fired (chat_history empty for A) | speak fired 02:01:55 via async worker; `[LATENCY]` cadence ticked 02:01:52→:00→:08 uninterrupted | **async TTS verified end-to-end on rig**; A-side speech counterfactual not captured (A never backend-spoke) |
+| lock-breaks | 55 (0.78/click), 31 near edge | 19 (0.56/click), 10 near edge | −28%/click |
+| resumes after lock-break | n/a (discard) | 2 | retention works but rarely rescues — most breaks are likely intentional gaze departures |
+| max click residual | **479.8px** (a mid-gap/mid-blink misfire) | 108.7px | the A outlier is exactly the failure mode `dwellPauseOnGap` prevents (n=1, suggestive) |
+| median residual / keyboard median | 31.1 / 33.1px | 43.8 / 44.3px | **worse in B — but confounded**: B typed with DevTools docked (app squeezed ~1365px → smaller keys), ~2AM fatigue, drift vector grew to (−8.8,−22.3) suggesting head-position/calibration shift. Needs controlled re-check before judging the flags |
+| median acquisition | 1751ms | 1751ms | identical (sanity check — dwell config unchanged) |
+
+Verdict: TTS async = clear keep (zero observed cost, verified live). Flags = promising on interruption metrics, accuracy re-check required under controlled conditions (daytime, DevTools closed, same calibration) before considering default-on.
+
+Also observed live in B's console: `[GAZE-OFFSET] Manual offset set: X=0.0px Y=0.0px` spams many times/second during typing — confirms the audited risk that GazeCursor re-sends `set_gaze_offset` on every WS-context re-render (predictions updates). Harmless to gaze math but wasteful (WS traffic + log I/O). Candidate next small fix: gate the send on value change.
+
+## Real-rig baseline protocol (run before any tuning; needs the user at the Tobii)
+
+1. `.\start-dev.bat` — confirm console prints `Build OK.` AND does **not** print any "Falling back to simulation mode" line (four silent-fallback paths exist: start-dev.bat:92-121).
+2. Confirm real-gaze mode in-app: bottom-left status indicator must show real gaze (not mouse-sim) and >25 msg/s (GazeCursor.tsx:1437-56). There is no payload-level simulation marker — the indicator is the only check.
+3. Capture from the Python console after ~5 min of normal use:
+   - `[LATENCY]` lines (per-stage ms) — expect ≈0.2ms total
+   - `Gaze broadcast rate` lines (actual WS msgs/sec, every 10s)
+   - `[GAP-HOLD]` / `[POINT-TTL]` counts
+   - sample_rate_hz from any `[PIPELINE]` context (also in payload) — establishes whether the ET5 delivers ~33/66/133Hz here
+   - Helper window: `[QUALITY] Frame gap` lines + max gap
+4. Controlled typing test: type a fixed pangram twice on the keyboard screen, then in DevTools run `window.__gazeTelemetry.snapshot()` and save the JSON (median residual px, MAD, drift, acquisition ms, per-context). Save as `docs/baselines/telemetry-baseline-<date>.json`.
+5. Corner test: type 10 characters using only corner/edge keys (Q, P, Z, M, backspace) with Ctrl+Shift+G overlay on; note dwell-ring resets per selection (count manually or from snapshot per-target events) and any visible flicker between adjacent targets.
+6. 9-point accuracy: run the in-app calibration screen once *without saving* (or read its per-point error logs `[CALIB]` — per-point offset px is logged) for a 9-point accuracy read, especially corners.
+7. Hang watch: note any cursor freeze >200ms and what was happening (speaking? predictions? blink?). Expect freezes during TTS utterances (verified blocking call — COMPARISON §4.1).
+8. TTS hang confirmation (2 min): have the app speak a long sentence while moving gaze — if the cursor freezes for the utterance duration, finding #1 is confirmed on-rig.
+
+## Planned change ladder (each gated on the rig baseline above; one at a time)
+
+| # | Change | Status | Mechanism | Measure |
+|---|--------|--------|-----------|---------|
+| 1 | Move TTS `speak()` off the event loop | **DONE (Entry 1)** | `GAZECONNECT_TTS_ASYNC=1`, default off | hang episodes during speech before/after |
+| 2 | Debug-gate the always-on per-frame INFO logs (wire `GAZE_DEBUG`) | deferred — logs are already frame-throttled (every 266–500 frames); low value vs multi-file touch | env var | console I/O cost on rig |
+| 3 | Dwell pause-on-gap in frontend | **DONE (Entry 2)** | flag `dwellPauseOnGap`, default off | mid-blink misclicks; corner resets |
+| 4 | Corner: progress retention on lock-break | **DONE (Entry 3)** | flag `lockBreakProgressRetention`, default off | `interrupts.byKind.lock_break` per selection |
+| 5 | Cursor render via `transform`/direct-DOM instead of state-driven `left/top` | pending — needs on-rig render measurement first (freeze telemetry from Entry 4 supplies it) | FE flag, default off | `freezes.byKind.raf_stall` profile |
+| 6 | Filter consolidation experiment (backend-only stability vs FE smoothing) | pending — needs on-rig baseline + corner edge-zone study | new preset, A/B vs `balanced` | telemetry residual + corner RMS |
+| 7 | Corner edge-zone filter tuning (push corner RMS 5.9–12.6px toward center 0px) | pending — candidate params identified, must not break edge reachability tests | new backend preset | replay corner_* labels + on-rig corner test |
+
+## Entry 6 — 2026-06-11 — FINAL: validated improvements become the defaults
+
+After the on-rig A/B (results above), plain `.\start-dev.bat` now gets the improved behavior with no env vars or DevTools steps:
+- **TTS async is default ON** (`main.py`): the env var is now an opt-out — `GAZECONNECT_TTS_ASYNC=0` reverts to the old synchronous path. Verified live: pipeline cadence uninterrupted through a real utterance, stale drops 1→0.
+- **`dwellPauseOnGap` and `lockBreakProgressRetention` default ON** (`gazeFlags.ts`): A/B showed lock-breaks −28%/click, 2 rescued resumes, worst click residual 480px→109px, no felt regression ("overall keyboard experience was nice"). Median-residual delta (31→44px) attributed to confounds (DevTools-docked viewport, 2AM, drift) — to be re-checked in normal daytime use; if typing feels off, revert per below and report.
+- **`set_gaze_offset` spam fix** (GazeCursor): offset now sent only when the value changes or the WS reconnects (was: many sends/second on every prediction update — observed in the 2026-06-11 session logs).
+- A/B snapshots preserved in `docs/baselines/session-{A,B}-*.json`.
+- **Browser cursor (YouTube / quick search):** no code changes — deliberately. Its dwell only advances on frame arrival (can't click during gaps), it emits `trackingLost` at >100ms gaps, and its v17.15/v17.16 Bayesian constants are telemetry-calibrated and spec-protected. It gains the biggest win automatically: backend stalls (which froze it equally) are gone with async TTS.
+
+## Rollback instructions (current state)
+
+Each improvement reverts independently, without code edits:
+- Speech back to old (blocking) behavior: set `GAZECONNECT_TTS_ASYNC=0` before `start-dev.bat`.
+- Dwell behaviors back to old: in DevTools console — `window.__gazeFlags.set('dwellPauseOnGap', false)` and/or `window.__gazeFlags.set('lockBreakProgressRetention', false)` (persists across restarts).
+- Telemetry additions are measurement-only (no behavior); removal = `git revert`.
+- Hard rollback of everything: `git checkout de1aee6` (or revert the commits on top of it).

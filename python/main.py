@@ -91,6 +91,8 @@ from prediction_guardrails import (
     tokenize_prediction_text,
 )
 import threading
+import os
+import queue
 from services.fatigue_monitor import (
     FatigueDetector, BreakReminderManager, DryEyeMonitor, FatigueLevel
 )
@@ -641,38 +643,97 @@ class TobiiReceiver:
 # ============================================
 
 class TTSEngine:
-    """Text-to-speech engine."""
+    """Text-to-speech engine.
+
+    All pyttsx3 work runs on a dedicated worker thread so runAndWait() no
+    longer blocks the asyncio event loop — the verified #1 gaze-freeze
+    source (cursor froze for the full utterance; see
+    docs/EYE_TRACKING_COMPARISON.md §4.1). Verified on the real rig
+    2026-06-11: pipeline ticked through a live utterance uninterrupted,
+    zero stale-sample drops (docs/EYE_TRACKING_CHANGES.md, A/B results).
+    The worker owns the engine (SAPI5/COM thread affinity).
+
+    Rollback to the old synchronous behavior without a code edit:
+    set GAZECONNECT_TTS_ASYNC=0 before starting the backend.
+    """
 
     def __init__(self, enabled: bool = True):
         self.engine = None
         self.is_speaking = False
         self.enabled = enabled
+        # Default ON since the 2026-06-11 on-rig A/B; '0'/'false'/'no'/'off' reverts to sync.
+        self.async_mode = os.environ.get('GAZECONNECT_TTS_ASYNC', '1').strip().lower() not in ('0', 'false', 'no', 'off')
+        self._queue: Optional['queue.Queue'] = None
+        self._worker: Optional[threading.Thread] = None
 
         if not self.enabled:
             return
 
-        if TTS_AVAILABLE:
+        if not TTS_AVAILABLE:
+            return
+
+        if self.async_mode:
+            self._queue = queue.Queue()
+            self._worker = threading.Thread(target=self._worker_loop, name='tts-worker', daemon=True)
+            self._worker.start()
+            logger.info("TTS engine: async worker mode (default; set GAZECONNECT_TTS_ASYNC=0 to revert to sync)")
+            return
+
+        logger.info("TTS engine: synchronous mode (GAZECONNECT_TTS_ASYNC=0)")
+
+        self._init_engine()
+
+    def _init_engine(self):
+        """Initialize pyttsx3 on the calling thread (engine has thread affinity)."""
+        try:
+            self.engine = pyttsx3.init()
+            self.engine.setProperty('rate', 150)
+            self.engine.setProperty('volume', 1.0)
+
+            # Get available voices
+            voices = self.engine.getProperty('voices')
+            if voices:
+                # Prefer female voice if available
+                for voice in voices:
+                    if 'female' in voice.name.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        break
+
+            logger.info("TTS engine initialized")
+        except Exception as e:
+            logger.error(f"TTS initialization error: {e}")
+            self.engine = None
+
+    def _worker_loop(self):
+        """Async mode: own the engine and process commands off the event loop."""
+        self._init_engine()
+        while True:
+            cmd, value = self._queue.get()
             try:
-                self.engine = pyttsx3.init()
-                self.engine.setProperty('rate', 150)
-                self.engine.setProperty('volume', 1.0)
-
-                # Get available voices
-                voices = self.engine.getProperty('voices')
-                if voices:
-                    # Prefer female voice if available
-                    for voice in voices:
-                        if 'female' in voice.name.lower():
-                            self.engine.setProperty('voice', voice.id)
-                            break
-
-                logger.info("TTS engine initialized")
+                if cmd == 'speak':
+                    if self.engine:
+                        self.is_speaking = True
+                        self.engine.say(value)
+                        self.engine.runAndWait()
+                    else:
+                        logger.warning(f"TTS not available. Would speak: {value}")
+                elif cmd == 'rate':
+                    if self.engine:
+                        self.engine.setProperty('rate', value)
+                elif cmd == 'volume':
+                    if self.engine:
+                        self.engine.setProperty('volume', max(0.0, min(1.0, value)))
             except Exception as e:
-                logger.error(f"TTS initialization error: {e}")
-                self.engine = None
+                logger.error(f"TTS error: {e}")
+            finally:
+                self.is_speaking = False
 
     def speak(self, text: str):
         """Speak text."""
+        if self.async_mode and self._queue is not None:
+            self._queue.put(('speak', text))
+            return
+
         if not self.engine:
             logger.warning(f"TTS not available. Would speak: {text}")
             return
@@ -688,6 +749,13 @@ class TTSEngine:
 
     def stop(self):
         """Stop speaking."""
+        if self.async_mode and self._queue is not None:
+            # Drop queued utterances, then interrupt the current one.
+            try:
+                while not self._queue.empty():
+                    self._queue.get_nowait()
+            except Exception:
+                pass
         if self.engine:
             try:
                 self.engine.stop()
@@ -697,11 +765,17 @@ class TTSEngine:
 
     def set_rate(self, rate: int):
         """Set speech rate (words per minute)."""
+        if self.async_mode and self._queue is not None:
+            self._queue.put(('rate', rate))
+            return
         if self.engine:
             self.engine.setProperty('rate', rate)
 
     def set_volume(self, volume: float):
         """Set volume (0.0 to 1.0)."""
+        if self.async_mode and self._queue is not None:
+            self._queue.put(('volume', max(0.0, min(1.0, volume))))
+            return
         if self.engine:
             self.engine.setProperty('volume', max(0.0, min(1.0, volume)))
 
