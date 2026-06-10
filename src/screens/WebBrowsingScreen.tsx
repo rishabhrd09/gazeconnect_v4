@@ -3751,11 +3751,20 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     // path keeps simulation mode working: with no eye tracker there are no WS
     // gaze frames at all, so mouse-as-gaze must forward on its own events.
     const smoothedGazeRef = useRef<{ x: number; y: number } | null>(null);
+    // v17.17: 3-sample weighted moving average over the raw input, the same
+    // 0.45/0.30/0.25 pre-smoothing the main-app cursor applies before its EMA
+    // (GazeCursor "SmoothWhenChangingGazeTarget"). Causal, ~zero added lag at
+    // 66Hz; takes the sample-to-sample sawtooth out of the page cursor before
+    // the EMA and the page-side stability radius see it.
+    const wmaPrev1Ref = useRef<{ x: number; y: number } | null>(null);
+    const wmaPrev2Ref = useRef<{ x: number; y: number } | null>(null);
     const hasRealGazeRef = useRef(hasRealGaze);
     useEffect(() => { hasRealGazeRef.current = hasRealGaze; }, [hasRealGaze]);
     useEffect(() => {
         if (!browser.isOpen) return;
         smoothedGazeRef.current = null;
+        wmaPrev1Ref.current = null;
+        wmaPrev2Ref.current = null;
         // Min spacing between IPC sends. ET5 frames arrive every ~15.2ms so
         // real gaze always passes; this only caps high-rate mousemove bursts
         // (and any future 133Hz tracker mode) at ~70Hz.
@@ -3771,23 +3780,39 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                     smoothedGazeRef.current = null;
                     browser.hideGazeCursor();
                 }
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
                 return;
             }
             const nowMs = Date.now();
             if (nowMs - lastSentAt < MIN_FORWARD_INTERVAL_MS) return;
             lastSentAt = nowMs;
 
-            const raw = gpRef.current;
+            const gazeNow = gpRef.current;
             const prev = smoothedGazeRef.current;
             const activeBounds = browser.boundsRef.current;
 
-            if (view === 'youtube' && isYtVideoActive && activeBounds && raw.y < activeBounds.y + 96) {
+            if (view === 'youtube' && isYtVideoActive && activeBounds && gazeNow.y < activeBounds.y + 96) {
                 if (prev) {
                     smoothedGazeRef.current = null;
                     browser.hideGazeCursor();
                 }
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
                 return;
             }
+
+            // WMA(3) prefilter — weights match the main cursor.
+            const w1 = wmaPrev1Ref.current;
+            const w2 = wmaPrev2Ref.current;
+            const raw = (w1 && w2)
+                ? {
+                    x: gazeNow.x * 0.45 + w1.x * 0.30 + w2.x * 0.25,
+                    y: gazeNow.y * 0.45 + w1.y * 0.30 + w2.y * 0.25,
+                }
+                : { x: gazeNow.x, y: gazeNow.y };
+            wmaPrev2Ref.current = w1 ? { x: w1.x, y: w1.y } : { x: gazeNow.x, y: gazeNow.y };
+            wmaPrev1Ref.current = { x: gazeNow.x, y: gazeNow.y };
 
             if (!prev) {
                 smoothedGazeRef.current = { x: raw.x, y: raw.y };
