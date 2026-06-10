@@ -105,7 +105,18 @@ export function buildBrowserCursorInjectionScript(): string {
         fsExitWindowStart: 0,
         fsExiting: false,
         lastFsAttemptMs: 0,
-        lastFullscreen: false
+        lastFullscreen: false,
+        // v17.17 — dwell progress retention (mirror of the main app's
+        // savedDwellRef / FIXATION_TTL mechanism). When stabilityHeld
+        // breaks mid-dwell, the accumulated fraction is saved here; if
+        // gaze re-acquires the SAME targetKey within
+        // gcConfig.progressRetentionMs, the dwell resumes from the
+        // saved fraction instead of restarting at 0. The patient's
+        // dominant failure mode on YouTube cards was 60-80% dwell →
+        // brief tremor excursion → full restart.
+        savedProgress: 0,
+        savedProgressKey: '',
+        savedProgressAt: 0
       };
 
       window.gcConfig = Object.assign({
@@ -145,7 +156,13 @@ export function buildBrowserCursorInjectionScript(): string {
         bayesianAlpha: 0.32,                 // v17.5: 0.40 → 0.32, restore smoother transitions
         bayesianCommitThreshold: 0.45,       // keep at 0.45 — easier commits help dwell
         bayesianOutOfZoneDecay: 0.35,        // keep aggressive — clears stale beliefs
-        bayesianExpandedZoneMult: 1.55       // 1.6 → 1.55, slight trim
+        bayesianExpandedZoneMult: 1.55,      // 1.6 → 1.55, slight trim
+        // v17.17 — dwell progress retention on stability loss. Same
+        // semantics as the main app (FIXATION_TTL_MS=1000, min 5%).
+        // Rollback without code edits:
+        //   window.gcConfig.progressRetentionEnabled = false
+        progressRetentionEnabled: true,
+        progressRetentionMs: 1000
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -1043,6 +1060,10 @@ export function buildBrowserCursorInjectionScript(): string {
         state.targetKey = '';
         state.targetRect = null;
         state.dwellingExpiryAt = 0;
+        // v17.17 — leaving the BrowserView discards saved progress.
+        state.savedProgress = 0;
+        state.savedProgressKey = '';
+        state.savedProgressAt = 0;
         // v17.15 — clear onset snapshot and stable-winner tracking so
         // the next BrowserView entry starts fresh. Posteriors are
         // preserved (managed by epoch decay).
@@ -1066,6 +1087,10 @@ export function buildBrowserCursorInjectionScript(): string {
         state.targetKey = '';
         state.targetRect = null;
         state.dwellingExpiryAt = 0;
+        // v17.17 — explicit reset discards saved progress.
+        state.savedProgress = 0;
+        state.savedProgressKey = '';
+        state.savedProgressAt = 0;
         // v17.15 — also clear onset snapshot and stable-winner gate so
         // the next acquisition re-stabilises rather than inheriting a
         // partial count from the prior click.
@@ -1089,6 +1114,10 @@ export function buildBrowserCursorInjectionScript(): string {
         state.clicked = false;
         state.targetKey = '';
         state.targetRect = null;
+        // v17.17 — toolbar commands discard saved progress.
+        state.savedProgress = 0;
+        state.savedProgressKey = '';
+        state.savedProgressAt = 0;
         // v17.15 — block also clears onset and stable-winner tracking.
         state.onsetTargetRect = null;
         state.onsetStartGaze = null;
@@ -1267,6 +1296,32 @@ export function buildBrowserCursorInjectionScript(): string {
           } else {
             cursor.classList.remove('dwelling');
           }
+
+          // v17.17 — save dwell progress before it is discarded below.
+          // Fraction maps the post-onset portion of the dwell: 0 at
+          // onset completion, 1 at commit. Saved only when meaningful
+          // (>= 5%, mirrors FIXATION_TTL_MIN_PROGRESS in the app).
+          if (cfg.progressRetentionEnabled !== false &&
+              !state.clicked && state.start > 0 && state.targetKey) {
+            const elapsedAtBreak = now - state.start;
+            if (elapsedAtBreak > onsetMs) {
+              const frac = Math.min(0.99,
+                (elapsedAtBreak - onsetMs) / Math.max(1, dwellMs - onsetMs));
+              if (frac >= 0.05) {
+                state.savedProgress = frac;
+                state.savedProgressKey = state.targetKey;
+                state.savedProgressAt = now;
+              }
+            }
+          }
+          // TTL expiry — a save that was never resumed dies here.
+          if (state.savedProgressKey &&
+              (now - state.savedProgressAt) >= Number(cfg.progressRetentionMs || 1000)) {
+            state.savedProgress = 0;
+            state.savedProgressKey = '';
+            state.savedProgressAt = 0;
+          }
+
           state.x = x;
           state.y = y;
           // v17.15 DoD-4 — snapshot the new target rect at onset start
@@ -1278,6 +1333,14 @@ export function buildBrowserCursorInjectionScript(): string {
           state.clicked = false;
           state.targetKey = newTargetKey;
           state.targetRect = clickReq?.rect || null;
+          // v17.17 — a dwell starting on a DIFFERENT target invalidates
+          // the save (mirror of the app's fresh-onset clear). Same-key
+          // re-acquisition keeps it for the resume path.
+          if (newTargetKey && state.savedProgressKey && newTargetKey !== state.savedProgressKey) {
+            state.savedProgress = 0;
+            state.savedProgressKey = '';
+            state.savedProgressAt = 0;
+          }
           if (clickReq && clickReq.rect && targetChanged) {
             state.onsetTargetRect = {
               left: clickReq.rect.left,
@@ -1302,6 +1365,26 @@ export function buildBrowserCursorInjectionScript(): string {
         // visual-continuity expiry. From here the live dwell drives
         // the ring class as normal.
         state.dwellingExpiryAt = 0;
+
+        // v17.17 — resume saved dwell progress. Stability is held on the
+        // same targetKey the save belongs to and the TTL hasn't expired:
+        // reconstruct state.start so elapsed maps back to the saved
+        // fraction. Onset is skipped (the target was already validated),
+        // matching the app cursor's resume semantics.
+        if (state.savedProgressKey && state.savedProgressKey === state.targetKey &&
+            !state.clicked && cfg.progressRetentionEnabled !== false) {
+          if ((now - state.savedProgressAt) < Number(cfg.progressRetentionMs || 1000)) {
+            const resumeElapsed = state.savedProgress * Math.max(1, dwellMs - onsetMs) + onsetMs;
+            state.start = now - resumeElapsed;
+            gcEmit('dwellResumed', {
+              candId: state.targetKey,
+              frac: Math.round(state.savedProgress * 100) / 100
+            });
+          }
+          state.savedProgress = 0;
+          state.savedProgressKey = '';
+          state.savedProgressAt = 0;
+        }
 
         // v17.15 DoD-4 — cancel onset if the active target's centre has
         // moved materially since onset start. Threshold: 24 px absolute
@@ -1409,6 +1492,10 @@ export function buildBrowserCursorInjectionScript(): string {
           state.clickSeq += 1;
           state.lastClickKey = clickReq.key || '';
           state.blockedUntil = now + postClickCooldownMs;
+          // v17.17 — a committed click consumes any saved progress.
+          state.savedProgress = 0;
+          state.savedProgressKey = '';
+          state.savedProgressAt = 0;
           clickReq.id = state.clickSeq;
           cursor.classList.remove('dwelling');
           cursor.classList.add('clicking');
