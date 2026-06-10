@@ -162,7 +162,13 @@ export function buildBrowserCursorInjectionScript(): string {
         // Rollback without code edits:
         //   window.gcConfig.progressRetentionEnabled = false
         progressRetentionEnabled: true,
-        progressRetentionMs: 1000
+        progressRetentionMs: 1000,
+        // v17.17 — pause dwell clocks across gaze-stream gaps longer
+        // than gapPauseMs (matches the app-side 150ms stale threshold
+        // and the backend POINT_TTL). Rollback:
+        //   window.gcConfig.gapPauseEnabled = false
+        gapPauseEnabled: true,
+        gapPauseMs: 150
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -1589,6 +1595,22 @@ export function buildBrowserCursorInjectionScript(): string {
         state.lastFrameTs = tEnter;
         if (dtMs > 100 && lastFrameTs > 0) {
           gcEmit('trackingLost', { gapMs: dtMs });
+        }
+        // v17.17 — gap pause: dwell must not advance across gaps in the
+        // incoming gaze stream (blink, look-away, renderer stall). The
+        // dwell timer is wall-clock (now - state.start), so a gap would
+        // otherwise count toward the dwell and can jump-commit the
+        // moment frames resume — the same mid-blink misfire the main
+        // app's dwellPauseOnGap flag eliminates (on-rig validated
+        // 2026-06-11: worst click residual 480px → 109px). Shifting the
+        // clocks forward by the gap freezes progress without resetting.
+        // Rollback: window.gcConfig.gapPauseEnabled = false
+        const cfgGap = window.gcConfig || {};
+        if (cfgGap.gapPauseEnabled !== false && lastFrameTs > 0 &&
+            dtMs > Number(cfgGap.gapPauseMs || 150)) {
+          if (state.start > 0) state.start += dtMs;
+          if (state.savedProgressAt > 0) state.savedProgressAt += dtMs;
+          if (state.dwellingExpiryAt > 0) state.dwellingExpiryAt += dtMs;
         }
         let result = null;
         try {
