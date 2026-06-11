@@ -95,6 +95,13 @@ type BrowserGazeConfig = {
   edgeMaxDeltaPx: number;
   edgeThrottleMs: number;
   edgeMaxBurstMs: number;
+  // v17.18 dwell-safety toggles. Living here (and in the per-page seed)
+  // means a rollback set once persists across page loads — a value set only
+  // on window.gcConfig dies with the document.
+  progressRetentionEnabled: boolean;
+  progressRetentionMs: number;
+  gapPauseEnabled: boolean;
+  gapPauseMs: number;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -123,6 +130,10 @@ let browserGazeConfig: BrowserGazeConfig = {
   edgeMaxDeltaPx: 36,
   edgeThrottleMs: 120,
   edgeMaxBurstMs: 6000,
+  progressRetentionEnabled: true,
+  progressRetentionMs: 1000,
+  gapPauseEnabled: true,
+  gapPauseMs: 150,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -1328,6 +1339,10 @@ function setupIpcHandlers(): void {
           youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
           youtubeSkipUnsnapPx: browserGazeConfig.youtubeSkipUnsnapPx,
           youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
+          progressRetentionEnabled: browserGazeConfig.progressRetentionEnabled,
+          progressRetentionMs: browserGazeConfig.progressRetentionMs,
+          gapPauseEnabled: browserGazeConfig.gapPauseEnabled,
+          gapPauseMs: browserGazeConfig.gapPauseMs,
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1759,6 +1774,12 @@ function setupIpcHandlers(): void {
       edgeMaxDeltaPx: clampNumber(config?.edgeMaxDeltaPx, browserGazeConfig.edgeMaxDeltaPx, 18, 90),
       edgeThrottleMs: clampNumber(config?.edgeThrottleMs, browserGazeConfig.edgeThrottleMs, 80, 220),
       edgeMaxBurstMs: clampNumber(config?.edgeMaxBurstMs, browserGazeConfig.edgeMaxBurstMs, 2000, 10000),
+      progressRetentionEnabled: typeof config?.progressRetentionEnabled === 'boolean'
+        ? config.progressRetentionEnabled : browserGazeConfig.progressRetentionEnabled,
+      progressRetentionMs: clampNumber(config?.progressRetentionMs, browserGazeConfig.progressRetentionMs, 300, 3000),
+      gapPauseEnabled: typeof config?.gapPauseEnabled === 'boolean'
+        ? config.gapPauseEnabled : browserGazeConfig.gapPauseEnabled,
+      gapPauseMs: clampNumber(config?.gapPauseMs, browserGazeConfig.gapPauseMs, 100, 600),
     };
 
     if (activeBrowserView) {
@@ -1773,6 +1794,10 @@ function setupIpcHandlers(): void {
         youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
         youtubeSkipUnsnapPx: browserGazeConfig.youtubeSkipUnsnapPx,
         youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
+        progressRetentionEnabled: browserGazeConfig.progressRetentionEnabled,
+        progressRetentionMs: browserGazeConfig.progressRetentionMs,
+        gapPauseEnabled: browserGazeConfig.gapPauseEnabled,
+        gapPauseMs: browserGazeConfig.gapPauseMs,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(

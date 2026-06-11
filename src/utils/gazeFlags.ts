@@ -34,6 +34,22 @@ export interface GazeFlags {
    * already gets. Helps corner buttons where noise breaks the lock.
    */
   lockBreakProgressRetention: boolean;
+  /**
+   * In-page BROWSER cursor (YouTube / quick search): save dwell progress
+   * across stability breaks and resume within 1s on the same target.
+   * Forwarded into the BrowserView via browserGazeConfig
+   * (progressRetentionEnabled) so it persists across page loads —
+   * setting window.gcConfig in the page only lasts one document.
+   * Applied when the web screen (re)configures the browser.
+   */
+  browserProgressRetention: boolean;
+  /**
+   * In-page BROWSER cursor: freeze dwell clocks across >150ms gaps in
+   * the gaze stream (blink / look-away / stall) instead of letting the
+   * wall-clock dwell jump-commit when frames resume. Forwarded as
+   * browserGazeConfig.gapPauseEnabled (persists across page loads).
+   */
+  browserGapPause: boolean;
 }
 
 const STORAGE_KEY = 'gazeconnect_gaze_flags';
@@ -41,6 +57,8 @@ const STORAGE_KEY = 'gazeconnect_gaze_flags';
 const DEFAULTS: GazeFlags = {
   dwellPauseOnGap: true,
   lockBreakProgressRetention: true,
+  browserProgressRetention: true,
+  browserGapPause: true,
 };
 
 function loadStored(): Partial<GazeFlags> {

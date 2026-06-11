@@ -62,6 +62,12 @@ type BrowserGazeConfig = {
     edgeMaxDeltaPx?: number;
     edgeThrottleMs?: number;
     edgeMaxBurstMs?: number;
+    // v17.18 dwell-safety toggles (seeded into every new page by the main
+    // process, so a rollback survives page loads — unlike window.gcConfig).
+    progressRetentionEnabled?: boolean;
+    progressRetentionMs?: number;
+    gapPauseEnabled?: boolean;
+    gapPauseMs?: number;
 };
 
 const getElectronAPI = () => (window as any).electronAPI;

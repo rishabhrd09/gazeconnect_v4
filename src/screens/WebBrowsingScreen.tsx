@@ -12,6 +12,7 @@ import { useRealGaze } from '../contexts/RealGazeContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useDwellTime } from '../contexts/DwellTimeContext';
+import { gazeFlags } from '../utils/gazeFlags';
 import {
     BackIcon,
     BrainIcon,
@@ -3615,6 +3616,13 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             edgeMaxDeltaPx: currentStage === 'caregiver' ? 42 : currentStage === 'late_als' ? 28 : 36,
             edgeThrottleMs: currentStage === 'caregiver' ? 100 : 130,
             edgeMaxBurstMs: currentStage === 'late_als' ? 5200 : 6000,
+            // v17.18 dwell-safety toggles, driven by the same localStorage
+            // gazeFlags system as the app cursor so a rollback set in the
+            // MAIN app DevTools (window.__gazeFlags.set('browserProgressRetention', false))
+            // persists across restarts AND page loads. Read at effect time;
+            // re-applied whenever this screen reconfigures the browser.
+            progressRetentionEnabled: gazeFlags.browserProgressRetention,
+            gapPauseEnabled: gazeFlags.browserGapPause,
         });
     }, [browser.setGazeConfig, currentStage, dwellSettings.cooldownAfterActivation, dwellSettings.onsetDelay, dwellSettings.standardButton]);
 
