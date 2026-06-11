@@ -2605,7 +2605,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
 };
 
 // ── QUICK SEARCH PANEL (with gaze cursor forwarding) ──
-const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onEmergency }: {
+const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onEmergency, onSpeak }: {
     ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>; gpRef: React.MutableRefObject<{ x: number; y: number }>;
     goBack: () => void;
     disableGaze: () => void;
@@ -2616,6 +2616,9 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     onTopicActive?: (active: boolean) => void;
     onNavHiddenToggle?: (hidden: boolean) => void;
     onEmergency: () => void;
+    // v17.18: ALL speech must flow through App.handleSpeak so the routing
+    // rules apply (volume-0 mute, TTS-health fallback, overlap cancel).
+    onSpeak: (t: string) => void;
 }) => {
     const ws = useWS();
     const { isLight, isMix, isWarm } = useTheme();
@@ -2721,17 +2724,20 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
     const speakCardSummary = useCallback(() => {
         if (!topic || !ws.quickSnapshot) return;
+        // v17.18: routed through App.handleSpeak (was a raw ws.speak that
+        // bypassed volume-0 mute, the TTS-health fallback, and the
+        // pre-speak browser-utterance cancel).
         if (topic.id === 'local_weather') {
             const d = ws.quickSnapshot.weather;
-            ws.speak(d?.ok ? `Weather in ${d.city}. Temperature ${d.temp_c} degrees. ${d.condition || ''}` : 'Weather data is unavailable right now.');
+            onSpeak(d?.ok ? `Weather in ${d.city}. Temperature ${d.temp_c} degrees. ${d.condition || ''}` : 'Weather data is unavailable right now.');
             return;
         }
         if (topic.id === 'cricket_score') {
             const d = ws.quickSnapshot.cricket;
-            ws.speak(d?.ok ? `${d.match}. ${d.summary}. ${d.status}.` : 'Cricket score is unavailable right now.');
+            onSpeak(d?.ok ? `${d.match}. ${d.summary}. ${d.status}.` : 'Cricket score is unavailable right now.');
             return;
         }
-    }, [topic, ws.quickSnapshot, ws.speak]);
+    }, [topic, ws.quickSnapshot, onSpeak]);
 
     const linksPerPage = largeLinkTargets ? 4 : 6;
     const totalLinkPages = Math.max(1, Math.ceil(browser.pageLinks.length / linksPerPage));
@@ -3963,7 +3969,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 {view === 'news' && <NewsPanel ige={ige} ts={ts} onSpeak={onSpeak} goBack={goBack} disableGaze={disableGaze} browser={browser} gpRef={gpRef} isNavHidden={isNavHidden} />}
                 {view === 'youtube' && <YouTubePanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onVideoActive={setIsYtVideoActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} />}
                 {view === 'knowledge' && <KnowledgePanel ige={ige} ts={ts} onSpeak={onSpeak} isNavHidden={isNavHidden} />}
-                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} />}
+                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} onSpeak={onSpeak} />}
                 {view === 'whatsapp' && <WhatsAppPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} isNavHidden={isNavHidden} />}
                 {view === 'social' && <SocialPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} isNavHidden={isNavHidden} setView={setView} />}
             </div>
