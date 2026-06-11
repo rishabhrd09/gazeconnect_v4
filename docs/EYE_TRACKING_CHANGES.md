@@ -172,6 +172,53 @@ A multi-agent adversarial review of the Entry 7–12 range raised 18 findings; e
 
 `main.ts` + `gazeFlags.ts`: `progressRetentionEnabled/Ms` + `gapPauseEnabled/Ms` are now part of `browserGazeConfig` (type, defaults, setGazeConfig whitelist, per-page seed) and driven by two new localStorage gazeFlags — `browserProgressRetention`, `browserGapPause` (default ON). A rollback set once now survives page loads AND restarts.
 
+## Entry 17 — 2026-06-11 — Browser cursor: per-frame focus churn removed (config, default ON)
+
+**Symptom:** `clickRequestFor` called `target.focus()` on EVERY resolved frame (~33Hz) — focus flipped between elements as gaze moved over a page: visible focus-ring flicker on links/buttons, search boxes popping suggestion dropdowns from a mere glance, and keyboard focus stolen from the field the patient was typing in. A direct flicker/instability source on ordinary (non-YouTube) pages.
+**Change:** `browserGazeController.ts` — focus now happens once, at click-commit time (right before the trusted click; the trusted mouseDown focuses natively anyway, so this only covers exotic widgets).
+**Rollback:** `window.gcConfig.focusOnResolve = true` (also a `browserGazeConfig` key — persists via setGazeConfig/per-page seed).
+
+## Entry 18 — 2026-06-11 — Browser cursor: per-frame scan diet (transparent perf change)
+
+**Symptom:** the YouTube resolution ladder (skip-ad sweep = 3 document-wide `querySelectorAll` passes incl. case-insensitive attribute matchers; Bayesian card pool + nearest-card scan with per-card `getComputedStyle`) ran on every gaze frame on EVERY site. Off-YouTube the selectors are a guaranteed no-match — pure page-main-thread waste (~33Hz) on the most common browsing case (search/news/wiki), competing with the dwell loop itself.
+**Change:** `browserGazeController.ts` — (a) the whole YouTube ladder is gated on `location.hostname` matching youtube.com/youtu.be (refreshed on route change); (b) on YouTube, the skip-button sweep result is cached: cached node revalidated every frame (stale/hidden drops instantly), full sweep at most every 300ms or after a hard DOM epoch. Worst case: a brand-new skip button becomes snap-eligible ≤300ms late (they persist for seconds).
+**Rollback:** behavior-neutral by construction off-YouTube; `git revert` if anything YouTube-side feels different.
+
+## Entry 19 — 2026-06-11 — Browser cursor: small-target probe snap (config, default ON)
+
+**Symptom:** outside YouTube there was no acquisition aid at all — the page resolved only what was directly under the gaze point, and links/buttons/video controls on dense pages are far smaller than the ALS gaze noise floor (median click residual 31–44px on-rig vs ~20px link heights). Small targets needed pixel-perfect fixation; misses resolved nothing and dwell never started.
+**Change:** `browserGazeController.ts` `probeSnapTarget` — when a frame resolves nothing interactive, hit-test a ring of offsets (8 directions × 2 radii, ≤16 `elementFromPoint` calls, no document scans) and snap to the nearest interactive element whose rect is within `probeSnapRadiusPx` (36px default) of the gaze point. Runs last in the ladder, so it can never override a direct hit. Clicks land at the element center (`probe_snap` kind in telemetry).
+**Rollback:** `window.gcConfig.probeSnapEnabled = false`; radius tunable via `probeSnapRadiusPx` (8–80).
+
+## Entry 20 — 2026-06-11 — Browser cursor: dwell progress arc + inter-frame smoothing (config, default ON)
+
+- **Progress arc:** the in-page ring was binary (yellow = dwelling) — the patient couldn't tell a 20% dwell from a 90% one and tended to anxiously re-fixate; the app cursor has always shown progress. A conic-gradient arc (`--gc-frac`, driven per frame) now sweeps 0→360° across the dwell. Rollback: `window.gcConfig.progressArcEnabled = false`.
+- **Smoothing:** the ET5 delivers ~33Hz, so the cursor stepped ~30ms apart (visibly choppier than OptiKey's display-rate cursor). A 60ms linear `left/top` CSS transition lets the compositor interpolate between frames (~1 frame of visual lag, position math untouched — purely visual). Re-shows after a hide commit transition-free so the cursor never "sweeps in" from a stale position. Rollback: `window.gcConfig.cursorSmoothingMs = 0`.
+
+## Entry 21 — 2026-06-11 — Browser cursor: body-safe injection (page-load cursor gap closed)
+
+**Symptom:** "cursor freezes during page load." Injection runs at navigation commit (`did-navigate`) — but the script did `document.body.appendChild` and `mo.observe(document.body)`, and `<body>` often doesn't exist yet at commit. The whole injection IIFE threw, leaving the page with NO cursor and NO dwell from commit until the `dom-ready` re-injection — seconds on heavy pages. The MutationObserver registration failing also meant pages injected early ran with no DOM-epoch detection.
+**Change:** `browserGazeController.ts` — cursor attaches to `document.body || document.documentElement` (position:fixed renders identically under `<html>`); observer watches the same fallback root (covers the body subtree once the parser creates it).
+**Rollback:** `git revert` (pure crash fix; no behavioral constants).
+
+## Entry 22 — 2026-06-11 — Edge scroll: smoother cadence, same speed (config)
+
+**Symptom:** armed edge-scroll moved in 18–36px jumps every 120ms (~8Hz) — visibly chunky for reading.
+**Change:** `main.ts` defaults — 9–18px at a 45ms throttle (~every other 33Hz gaze frame): same ~150–300 px/s, ~2.5× finer steps. Clamp floors widened (deltas 4/8px, throttle 30ms) so tuning down stays possible.
+**Rollback (runtime):** `setGazeConfig({ edgeMinDeltaPx: 18, edgeMaxDeltaPx: 36, edgeThrottleMs: 120 })`.
+
+## Entry 23 — 2026-06-11 — Transport + observability (transparent)
+
+- `webview:updateGaze` is now a one-way `ipcRenderer.send` (was `invoke`) — the handler returns nothing, so the per-frame reply message was pure main-process overhead. The `ipcMain.handle` registration is kept for compatibility. Rollback: `git revert`.
+- Dwell clicks now log unconditionally (1s-throttled) via `browserDiagnostics.info` — the 2026-06-11 on-rig captures contained ZERO browser-path lines because everything routed through the `DEBUG_BROWSER_GAZE`-gated `debug()`, making click behavior unverifiable after the fact. Full diagnostics still require `DEBUG_BROWSER_GAZE=1`.
+
+## Entry 24 — 2026-06-11 — Backend: push-on-frame gaze broadcast (env, default ON)
+
+**Symptom:** session-log analysis confirmed the ET5 delivers ~33Hz (broadcast ceiling 33 msgs/s in every capture) while the broadcast loop ticks at 66Hz and only sends on ticks — each frame waited 0–15.2ms (mean ~7.6ms) for the next tick. Avoidable glass-to-glass latency on every frame, app-wide (keyboard AND browser).
+**Change:** `python/main.py` — the gaze path sets an `asyncio.Event` the moment a frame is stored; the broadcast loop waits on it (50ms timeout keeps rate-logging/dead-client sweeps alive through gaps) and sends immediately. The paced loop remains intact behind the flag. Startup line now reports the actual mode instead of the misleading "~66Hz".
+**Measured:** offline replay byte-identical to baseline (tremor 9.636px/94.36%, pursuit 57.569px/71.8%); pipeline 9/9, edge stability 4/4, TTS 5/5 pass. Latency delta needs on-rig confirmation (expect `Gaze broadcast` rate unchanged at ~33 msgs/s, but frame-to-send delay ≈0).
+**Rollback:** `GAZECONNECT_GAZE_PUSH=0` before starting the backend.
+
 ## Rollback instructions (current state)
 
 Each improvement reverts independently, without code edits:
@@ -181,4 +228,6 @@ Each improvement reverts independently, without code edits:
 - Speech routing back to old behavior: `git revert` the Entry 14 commit (the old behavior — two overlapping voices — is itself the bug, so no runtime flag is provided).
 - Telemetry additions are measurement-only (no behavior); removal = `git revert`.
 - Transport/render changes (Entries 9–12) have no behavioral constants; revert their individual commits if needed.
+- Web-cursor precision/comfort pass (Entries 17–22), persistent via `setGazeConfig` or per-page `window.gcConfig`: `focusOnResolve = true` (Entry 17 old behavior), `probeSnapEnabled = false` (Entry 19), `progressArcEnabled = false` / `cursorSmoothingMs = 0` (Entry 20), `{ edgeMinDeltaPx: 18, edgeMaxDeltaPx: 36, edgeThrottleMs: 120 }` (Entry 22). Entries 18/21/23 are behavior-neutral perf/crash/transport fixes — `git revert` only.
+- Backend push broadcast back to paced loop: `GAZECONNECT_GAZE_PUSH=0` before `start-dev.bat` (Entry 24).
 - Hard rollback of everything: `git checkout de1aee6` (or revert the commits on top of it).
