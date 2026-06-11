@@ -102,6 +102,12 @@ type BrowserGazeConfig = {
   progressRetentionMs: number;
   gapPauseEnabled: boolean;
   gapPauseMs: number;
+  // v17.19 web-cursor precision/comfort toggles (same persistence rationale).
+  probeSnapEnabled: boolean;
+  probeSnapRadiusPx: number;
+  progressArcEnabled: boolean;
+  cursorSmoothingMs: number;
+  focusOnResolve: boolean;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -126,14 +132,25 @@ let browserGazeConfig: BrowserGazeConfig = {
   edgeHoldMs: 650,
   edgeZonePct: 0.20,
   edgeDeadZonePct: 0.02,
-  edgeMinDeltaPx: 18,
-  edgeMaxDeltaPx: 36,
-  edgeThrottleMs: 120,
+  // v17.19 — smoother edge scroll: ~same speed (150–300 px/s) in smaller,
+  // more frequent steps (was 18–36px every 120ms ≈ 8Hz chunks; now 9–18px
+  // at a 45ms throttle ≈ every other 33Hz gaze frame). Old feel is one
+  // setGazeConfig away: { edgeMinDeltaPx: 18, edgeMaxDeltaPx: 36,
+  // edgeThrottleMs: 120 }.
+  edgeMinDeltaPx: 9,
+  edgeMaxDeltaPx: 18,
+  edgeThrottleMs: 45,
   edgeMaxBurstMs: 6000,
   progressRetentionEnabled: true,
   progressRetentionMs: 1000,
   gapPauseEnabled: true,
   gapPauseMs: 150,
+  // v17.19 — see browserGazeController.ts gcConfig defaults for rationale.
+  probeSnapEnabled: true,
+  probeSnapRadiusPx: 36,
+  progressArcEnabled: true,
+  cursorSmoothingMs: 60,
+  focusOnResolve: false,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -1343,6 +1360,11 @@ function setupIpcHandlers(): void {
           progressRetentionMs: browserGazeConfig.progressRetentionMs,
           gapPauseEnabled: browserGazeConfig.gapPauseEnabled,
           gapPauseMs: browserGazeConfig.gapPauseMs,
+          probeSnapEnabled: browserGazeConfig.probeSnapEnabled,
+          probeSnapRadiusPx: browserGazeConfig.probeSnapRadiusPx,
+          progressArcEnabled: browserGazeConfig.progressArcEnabled,
+          cursorSmoothingMs: browserGazeConfig.cursorSmoothingMs,
+          focusOnResolve: browserGazeConfig.focusOnResolve,
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1770,9 +1792,9 @@ function setupIpcHandlers(): void {
       edgeHoldMs: clampNumber(config?.edgeHoldMs, browserGazeConfig.edgeHoldMs, 300, 1600),
       edgeZonePct: clampNumber(config?.edgeZonePct, browserGazeConfig.edgeZonePct, 0.06, 0.22),
       edgeDeadZonePct: clampNumber(config?.edgeDeadZonePct, browserGazeConfig.edgeDeadZonePct, 0.01, 0.04),
-      edgeMinDeltaPx: clampNumber(config?.edgeMinDeltaPx, browserGazeConfig.edgeMinDeltaPx, 12, 70),
-      edgeMaxDeltaPx: clampNumber(config?.edgeMaxDeltaPx, browserGazeConfig.edgeMaxDeltaPx, 18, 90),
-      edgeThrottleMs: clampNumber(config?.edgeThrottleMs, browserGazeConfig.edgeThrottleMs, 80, 220),
+      edgeMinDeltaPx: clampNumber(config?.edgeMinDeltaPx, browserGazeConfig.edgeMinDeltaPx, 4, 70),
+      edgeMaxDeltaPx: clampNumber(config?.edgeMaxDeltaPx, browserGazeConfig.edgeMaxDeltaPx, 8, 90),
+      edgeThrottleMs: clampNumber(config?.edgeThrottleMs, browserGazeConfig.edgeThrottleMs, 30, 220),
       edgeMaxBurstMs: clampNumber(config?.edgeMaxBurstMs, browserGazeConfig.edgeMaxBurstMs, 2000, 10000),
       progressRetentionEnabled: typeof config?.progressRetentionEnabled === 'boolean'
         ? config.progressRetentionEnabled : browserGazeConfig.progressRetentionEnabled,
@@ -1780,6 +1802,14 @@ function setupIpcHandlers(): void {
       gapPauseEnabled: typeof config?.gapPauseEnabled === 'boolean'
         ? config.gapPauseEnabled : browserGazeConfig.gapPauseEnabled,
       gapPauseMs: clampNumber(config?.gapPauseMs, browserGazeConfig.gapPauseMs, 100, 600),
+      probeSnapEnabled: typeof config?.probeSnapEnabled === 'boolean'
+        ? config.probeSnapEnabled : browserGazeConfig.probeSnapEnabled,
+      probeSnapRadiusPx: clampNumber(config?.probeSnapRadiusPx, browserGazeConfig.probeSnapRadiusPx, 8, 80),
+      progressArcEnabled: typeof config?.progressArcEnabled === 'boolean'
+        ? config.progressArcEnabled : browserGazeConfig.progressArcEnabled,
+      cursorSmoothingMs: clampNumber(config?.cursorSmoothingMs, browserGazeConfig.cursorSmoothingMs, 0, 200),
+      focusOnResolve: typeof config?.focusOnResolve === 'boolean'
+        ? config.focusOnResolve : browserGazeConfig.focusOnResolve,
     };
 
     if (activeBrowserView) {
@@ -1798,6 +1828,11 @@ function setupIpcHandlers(): void {
         progressRetentionMs: browserGazeConfig.progressRetentionMs,
         gapPauseEnabled: browserGazeConfig.gapPauseEnabled,
         gapPauseMs: browserGazeConfig.gapPauseMs,
+        probeSnapEnabled: browserGazeConfig.probeSnapEnabled,
+        probeSnapRadiusPx: browserGazeConfig.probeSnapRadiusPx,
+        progressArcEnabled: browserGazeConfig.progressArcEnabled,
+        cursorSmoothingMs: browserGazeConfig.cursorSmoothingMs,
+        focusOnResolve: browserGazeConfig.focusOnResolve,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(
@@ -1874,9 +1909,11 @@ function setupIpcHandlers(): void {
 
   // Inject visible gaze cursor into BrowserView so user can see where they're looking
   // Inject visible gaze cursor into BrowserView with AUTOMATIC DWELL CLICKING
-  // Inject visible gaze cursor into BrowserView with AUTOMATIC DWELL CLICKING
   // v2: OPTIMIZED - cursor update is fire-and-forget, click check runs separately
-  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) => {
+  // v17.19: registered on BOTH ipcMain.handle (legacy invoke) and ipcMain.on
+  // (one-way send — no reply message per frame). The preload now uses send;
+  // the handle registration keeps older renderer code working.
+  const handleWebviewGazeFrame = (x: number, y: number, options?: { cursor?: boolean }) => {
     const view = activeBrowserView;
     const sessionId = activeBrowserViewSessionId;
     if (!view || view.webContents.isDestroyed()) return;
@@ -1960,7 +1997,9 @@ function setupIpcHandlers(): void {
             const clickReq = JSON.parse(json);
             const cx = Math.round(clickReq.x);
             const cy = Math.round(clickReq.y);
-            browserDiagnostics.debug(
+            // v17.19: info (always-on, 1s-throttled) — dwell clicks were
+            // invisible in on-rig console captures without DEBUG_BROWSER_GAZE.
+            browserDiagnostics.info(
               'gaze-dwell-click',
               `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
               1000
@@ -1970,7 +2009,11 @@ function setupIpcHandlers(): void {
         }
       }).catch(() => { });
     } catch { /* ignore */ }
-  });
+  };
+  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) =>
+    handleWebviewGazeFrame(x, y, options));
+  ipcMain.on('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) =>
+    handleWebviewGazeFrame(x, y, options));
 
   // Mouse Only Mode: renderer can query current state
   ipcMain.handle('mouse-only-mode:get', () => isMouseOnlyMode);

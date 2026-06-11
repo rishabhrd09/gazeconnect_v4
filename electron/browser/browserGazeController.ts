@@ -17,6 +17,20 @@ export const BROWSER_CURSOR_CSS = `
     transform: translate(-50%, -50%) scale(0.9);
     box-shadow: 0 0 40px rgba(34,197,94,0.8);
   }
+  /* v17.19 — dwell progress arc (gcConfig.progressArcEnabled). The app
+     cursor has always shown dwell progress; the in-page ring was binary
+     (yellow = dwelling), so the patient could not tell a dwell at 20%
+     from one at 90% and tended to anxiously re-fixate. The arc sweeps
+     0 -> 360deg as --gc-frac goes 0 -> 1 (set per frame). */
+  #gazeconnect-cursor::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    background: conic-gradient(#FACC15 calc(var(--gc-frac, 0) * 360deg), transparent 0deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+    opacity: 0; transition: opacity 100ms;
+    pointer-events: none;
+  }
+  #gazeconnect-cursor.dwelling::after { opacity: 1; }
 `;
 
 export function buildBrowserCursorInjectionScript(): string {
@@ -123,7 +137,10 @@ export function buildBrowserCursorInjectionScript(): string {
         // gaze parked off-target near the anchor can never inflate a save
         // (review finding: inflated clocks produced ~0.99 saves that
         // committed faster than human reaction on glance-back).
-        lastOnTargetAt: 0
+        lastOnTargetAt: 0,
+        // v17.19 — last applied cursorSmoothingMs (so the transition
+        // string is only rewritten when the config value changes).
+        lastSmoothMs: -1
       };
 
       window.gcConfig = Object.assign({
@@ -175,15 +192,72 @@ export function buildBrowserCursorInjectionScript(): string {
         // and the backend POINT_TTL). Rollback:
         //   window.gcConfig.gapPauseEnabled = false
         gapPauseEnabled: true,
-        gapPauseMs: 150
+        gapPauseMs: 150,
+        // v17.19 — small-target probe snap: when the gaze point itself
+        // resolves to nothing interactive, probe a ring of offsets and
+        // snap to the nearest interactive element within the radius.
+        // Dense non-YouTube pages (search results, news, video player
+        // controls) have targets far smaller than the ALS gaze noise
+        // floor; this is the generic-page equivalent of the YouTube
+        // card snap. Rollback: window.gcConfig.probeSnapEnabled = false
+        probeSnapEnabled: true,
+        probeSnapRadiusPx: 36,
+        // v17.19 — dwell progress arc on the in-page ring (visual only).
+        // Rollback: window.gcConfig.progressArcEnabled = false
+        progressArcEnabled: true,
+        // v17.19 — CSS interpolation between gaze frames. The tracker
+        // delivers ~33Hz; without this the cursor steps ~30ms apart.
+        // A short linear left/top transition lets the compositor fill
+        // the gaps (OptiKey-like glide). 0 disables (old stepping).
+        cursorSmoothingMs: 60,
+        // v17.19 — focus is now applied at click commit, not on every
+        // resolved frame (the old per-frame focus() flipped keyboard
+        // focus between elements as gaze moved: focus-ring flicker,
+        // suggestion dropdowns opening from a glance, focus stolen
+        // from text fields). Rollback to old: focusOnResolve = true
+        focusOnResolve: false
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
       if (!cursor) {
         cursor = document.createElement('div');
         cursor.id = 'gazeconnect-cursor';
-        document.body.appendChild(cursor);
+        // v17.19 — body-safe attach. Injection now also succeeds when it
+        // runs at navigation commit (did-navigate), BEFORE the parser has
+        // created <body> — previously document.body.appendChild threw,
+        // the whole IIFE rejected, and the page had NO cursor and NO
+        // dwell from commit until the dom-ready re-injection (the
+        // "cursor freezes during page load" report). position:fixed
+        // renders identically under <html>.
+        (document.body || document.documentElement).appendChild(cursor);
       }
+
+      // v17.19 — YouTube-machinery host gate (transparent perf change).
+      // The skip-ad scan, Bayesian card posterior and nearest-card snap
+      // can only ever match YouTube DOM, yet their document-wide
+      // querySelectorAll + getComputedStyle sweeps ran on EVERY gaze
+      // frame on EVERY site (~33Hz of wasted page main-thread time on
+      // search/news/wiki pages — competing with the very dwell loop
+      // that needs to stay responsive). Off-YouTube the selectors are
+      // a guaranteed no-match, so gating them cannot change behavior.
+      // Recomputed on route change (covers SPA navigation).
+      const computeIsYoutubeHost = () => {
+        try {
+          return /(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(location.hostname);
+        } catch (_) { return false; }
+      };
+      let isYoutubeHost = computeIsYoutubeHost();
+
+      // v17.19 — skip-ad button scan cache. The full findYoutubeSkipButton
+      // sweep (3 document-wide querySelectorAll passes incl. case-
+      // insensitive attribute matchers) used to run on every gaze frame.
+      // Now: the cached node is revalidated every frame (stale / hidden
+      // nodes drop instantly), and the full sweep re-runs at most every
+      // 300ms (or immediately after a hard epoch — DOM re-flow).
+      // Worst case: a brand-new skip button becomes snap-eligible up to
+      // 300ms after it renders; skip buttons persist for seconds.
+      let skipBtnCacheEl = null;
+      let skipBtnScanAt = 0;
 
       const interactiveSelector = [
         'a[href]',
@@ -338,6 +412,8 @@ export function buildBrowserCursorInjectionScript(): string {
           state.cardPosteriors = {};
           state.winnerStableId = '';
           state.winnerStableCount = 0;
+          // v17.19 — force a fresh skip-button sweep after a DOM re-flow.
+          skipBtnScanAt = 0;
         } else {
           const p = state.cardPosteriors;
           for (const k in p) {
@@ -614,7 +690,16 @@ export function buildBrowserCursorInjectionScript(): string {
         const point = preferCenter ? centerOf(target) : { x: Math.round(x), y: Math.round(y) };
         const href = target.href || target.getAttribute?.('href') || '';
         const label = labelOf(target).slice(0, 80);
-        try { target.focus?.({ preventScroll: true }); } catch (_) {}
+        // v17.19 — focus moved to click-commit time. clickRequestFor runs
+        // on EVERY frame during resolution, so this focus() used to
+        // re-focus the hovered element ~33x/s and flip focus between
+        // candidates as gaze moved: visible focus-ring flicker, search
+        // boxes popping suggestion dropdowns from a mere glance, and
+        // focus stolen from the field the patient was typing in.
+        // Rollback to the old behavior: window.gcConfig.focusOnResolve = true
+        if (window.gcConfig?.focusOnResolve === true) {
+          try { target.focus?.({ preventScroll: true }); } catch (_) {}
+        }
         return {
           x: point.x,
           y: point.y,
@@ -696,6 +781,69 @@ export function buildBrowserCursorInjectionScript(): string {
           return candidate;
         }
         return null;
+      };
+
+      // v17.19 — cached wrapper around findYoutubeSkipButton (see the
+      // cache declaration above for rationale + staleness bounds).
+      const findYoutubeSkipButtonCached = () => {
+        if (skipBtnCacheEl) {
+          try {
+            if (skipBtnCacheEl.isConnected &&
+                isLikelySkipAdNode(skipBtnCacheEl) &&
+                looksLikeSkipButtonRect(safeRect(skipBtnCacheEl))) {
+              return skipBtnCacheEl;
+            }
+          } catch (_) { /* fall through to drop the cache */ }
+          skipBtnCacheEl = null;
+        }
+        const nowMs = performance.now();
+        if (nowMs - skipBtnScanAt < 300) return null;
+        skipBtnScanAt = nowMs;
+        skipBtnCacheEl = findYoutubeSkipButton();
+        return skipBtnCacheEl;
+      };
+
+      // v17.19 — small-target probe snap (gcConfig.probeSnapEnabled).
+      // When the gaze point itself resolves to nothing interactive,
+      // hit-test a ring of offsets (8 directions x 2 radii) around the
+      // point and snap to the nearest interactive element whose rect is
+      // within probeSnapRadiusPx of the gaze. Constant cost (<=16 cheap
+      // elementFromPoint calls, getComputedStyle only on the few unique
+      // candidates) — no document-wide scans. This is the generic-page
+      // counterpart of the YouTube card snap, aimed at links/buttons/
+      // video controls far smaller than the ALS gaze noise floor.
+      const PROBE_OFFSETS = [
+        [1, 0], [-1, 0], [0, 1], [0, -1],
+        [0.707, 0.707], [-0.707, 0.707], [0.707, -0.707], [-0.707, -0.707]
+      ];
+      const probeSnapTarget = (x, y) => {
+        const cfg = window.gcConfig || {};
+        if (cfg.probeSnapEnabled === false) return null;
+        const radius = Math.max(8, Math.min(80, Number(cfg.probeSnapRadiusPx || 36)));
+        let best = null;
+        let bestDist = Infinity;
+        const seen = new Set();
+        for (let ring = 0; ring < 2 && !best; ring++) {
+          const r = radius * (ring === 0 ? 0.5 : 1);
+          for (let i = 0; i < PROBE_OFFSETS.length; i++) {
+            const px = x + PROBE_OFFSETS[i][0] * r;
+            const py = y + PROBE_OFFSETS[i][1] * r;
+            if (px < 0 || py < 0 || px >= window.innerWidth || py >= window.innerHeight) continue;
+            let el = null;
+            try { el = document.elementFromPoint(px, py); } catch (_) {}
+            const target = el && el.closest ? el.closest(interactiveSelector) : null;
+            if (!target || seen.has(target)) continue;
+            seen.add(target);
+            if (!isVisible(target)) continue;
+            const rect = safeRect(target);
+            const d = distanceToRect(x, y, rect);
+            if (d <= radius && d < bestDist) {
+              bestDist = d;
+              best = target;
+            }
+          }
+        }
+        return best ? clickRequestFor(best, x, y, 'probe_snap', true) : null;
       };
 
       const youtubeTargetFromElement = (el, x, y) => {
@@ -993,43 +1141,49 @@ export function buildBrowserCursorInjectionScript(): string {
       const resolveClickRequest = (x, y) => {
         const el = document.elementFromPoint(x, y);
 
-        // Skip-ad button gets priority. Asymmetric hysteresis: snap in
-        // at skipSnapInRadius, hold at the wider skipUnsnapRadius once
-        // the dwell has locked. Both prevents flicker at the boundary
-        // and prevents a click from landing on the video underneath.
-        const skipButton = findYoutubeSkipButton();
-        if (skipButton) {
-          const snapIn = skipSnapInRadius();
-          const unsnap = skipUnsnapRadius();
-          const limit = isSkipButtonLocked(skipButton) ? unsnap : snapIn;
-          const skipRect = safeRect(skipButton);
-          const directSkipHit = !!(el && (el === skipButton || skipButton.contains?.(el) || el.closest?.(skipButtonSelector) === skipButton));
-          if (directSkipHit || distanceToRect(x, y, skipRect) <= limit) {
-            return clickRequestFor(skipButton, x, y, 'youtube_skip_ad', true);
+        // v17.19 — the whole YouTube resolution ladder is gated on the
+        // host: off-YouTube these selectors are a guaranteed no-match,
+        // so skipping them is behavior-neutral and saves the per-frame
+        // document sweeps.
+        if (isYoutubeHost) {
+          // Skip-ad button gets priority. Asymmetric hysteresis: snap in
+          // at skipSnapInRadius, hold at the wider skipUnsnapRadius once
+          // the dwell has locked. Both prevents flicker at the boundary
+          // and prevents a click from landing on the video underneath.
+          const skipButton = findYoutubeSkipButtonCached();
+          if (skipButton) {
+            const snapIn = skipSnapInRadius();
+            const unsnap = skipUnsnapRadius();
+            const limit = isSkipButtonLocked(skipButton) ? unsnap : snapIn;
+            const skipRect = safeRect(skipButton);
+            const directSkipHit = !!(el && (el === skipButton || skipButton.contains?.(el) || el.closest?.(skipButtonSelector) === skipButton));
+            if (directSkipHit || distanceToRect(x, y, skipRect) <= limit) {
+              return clickRequestFor(skipButton, x, y, 'youtube_skip_ad', true);
+            }
+            // Don't fall through to a video-surface click when an ad with
+            // a skip button is showing — clicking the video would just
+            // pause playback.
+            if (el && isYoutubeVideoSurface(el)) return null;
           }
-          // Don't fall through to a video-surface click when an ad with
-          // a skip button is showing — clicking the video would just
-          // pause playback.
-          if (el && isYoutubeVideoSurface(el)) return null;
+
+          const ytAtPoint = youtubeTargetFromElement(el, x, y);
+          if (ytAtPoint) return ytAtPoint;
+
+          // R8: Bayesian posterior wins if it has converged on a card.
+          // v17.15 DoD-3: if Bayesian found candidates but the stable-
+          // winner gate has not passed, do NOT fall through to
+          // nearestYoutubeCard — that would bypass the gate via raw
+          // distance and re-introduce the flicker the gate is meant to
+          // prevent. Return null so dwell does not accumulate this
+          // frame. Direct on-element hits via youtubeTargetFromElement
+          // (above) still bypass the gate because they're explicit.
+          const ytBayesian = bayesianYoutubeCard(x, y);
+          if (ytBayesian) return ytBayesian;
+          if (state.bayesianFoundCandidate) return null;
+
+          const ytNearby = nearestYoutubeCard(x, y);
+          if (ytNearby) return ytNearby;
         }
-
-        const ytAtPoint = youtubeTargetFromElement(el, x, y);
-        if (ytAtPoint) return ytAtPoint;
-
-        // R8: Bayesian posterior wins if it has converged on a card.
-        // v17.15 DoD-3: if Bayesian found candidates but the stable-
-        // winner gate has not passed, do NOT fall through to
-        // nearestYoutubeCard — that would bypass the gate via raw
-        // distance and re-introduce the flicker the gate is meant to
-        // prevent. Return null so dwell does not accumulate this
-        // frame. Direct on-element hits via youtubeTargetFromElement
-        // (above) still bypass the gate because they're explicit.
-        const ytBayesian = bayesianYoutubeCard(x, y);
-        if (ytBayesian) return ytBayesian;
-        if (state.bayesianFoundCandidate) return null;
-
-        const ytNearby = nearestYoutubeCard(x, y);
-        if (ytNearby) return ytNearby;
 
         const standard = el?.closest?.(interactiveSelector);
         if (standard && isVisible(standard)) {
@@ -1043,6 +1197,13 @@ export function buildBrowserCursorInjectionScript(): string {
             return clickRequestFor(el, x, y, 'pointer_fallback', false);
           }
         }
+
+        // v17.19 — nothing under the point itself: probe the immediate
+        // neighbourhood for a small interactive target (see
+        // probeSnapTarget). Runs last so it can never override a direct
+        // hit, and only when the frame would otherwise resolve nothing.
+        const probed = probeSnapTarget(x, y);
+        if (probed) return probed;
 
         return null;
       };
@@ -1166,12 +1327,36 @@ export function buildBrowserCursorInjectionScript(): string {
           return null;
         }
 
+        const now = Date.now();
+        const cfg = window.gcConfig || {};
+
+        // v17.19 — inter-frame cursor interpolation. The tracker delivers
+        // ~33Hz, so without this the ring steps ~30ms apart; a short
+        // linear left/top transition lets the compositor glide between
+        // frames (OptiKey-like smoothness, ~one frame of visual lag).
+        // Re-shows after a hide must NOT glide from the stale position:
+        // the position is committed transition-free first, then the
+        // transition is restored on the next frame via lastSmoothMs.
+        const smoothMs = Math.max(0, Math.min(200, Number(cfg.cursorSmoothingMs || 0)));
+        const wasHidden = cursor.style.display !== 'block';
+        if (wasHidden && smoothMs > 0) {
+          cursor.style.transition = 'none';
+          cursor.style.display = 'block';
+          cursor.style.left = x + 'px';
+          cursor.style.top = y + 'px';
+          void cursor.offsetWidth; // commit the jump before re-enabling
+          state.lastSmoothMs = -1;
+        }
+        if (smoothMs !== state.lastSmoothMs) {
+          state.lastSmoothMs = smoothMs;
+          cursor.style.transition =
+            'border-color 120ms, background-color 120ms, transform 120ms' +
+            (smoothMs > 0 ? (', left ' + smoothMs + 'ms linear, top ' + smoothMs + 'ms linear') : '');
+        }
+
         cursor.style.display = 'block';
         cursor.style.left = x + 'px';
         cursor.style.top = y + 'px';
-
-        const now = Date.now();
-        const cfg = window.gcConfig || {};
         const baseStability = Number(cfg.stabilityRadiusPx || 50);
         const cardStability = Number(cfg.youtubeCardStabilityRadiusPx || 110);
         const cardUnsnapPx = Number(cfg.youtubeCardUnsnapPx || 180);
@@ -1200,7 +1385,9 @@ export function buildBrowserCursorInjectionScript(): string {
           if (insideVideo) {
             let skipExempt = false;
             try {
-              const sb = findYoutubeSkipButton();
+              // v17.19 — host-gated + cached (was a full document sweep
+              // per frame whenever gaze rested on any playing video).
+              const sb = isYoutubeHost ? findYoutubeSkipButtonCached() : null;
               if (sb) {
                 const sr = safeRect(sb);
                 if (sr && distanceToRect(x, y, sr) <= skipUnsnapRadius()) skipExempt = true;
@@ -1542,6 +1729,17 @@ export function buildBrowserCursorInjectionScript(): string {
           state.clickSeq += 1;
           state.lastClickKey = clickReq.key || '';
           state.blockedUntil = now + postClickCooldownMs;
+          // v17.19 — commit-time focus (replaces the per-frame focus in
+          // clickRequestFor): give the element keyboard focus right
+          // before the trusted click lands, preserving the old behavior
+          // for widgets that expect focus-then-click — without the
+          // per-frame focus churn. The trusted mouseDown that follows
+          // focuses natively anyway; this only covers exotic widgets.
+          try {
+            const fEl = document.elementFromPoint(clickReq.x, clickReq.y);
+            const focusable = fEl && fEl.closest ? (fEl.closest(interactiveSelector) || fEl) : fEl;
+            focusable?.focus?.({ preventScroll: true });
+          } catch (_) { /* focus is best-effort */ }
           // v17.17 — a committed click consumes any saved progress.
           state.savedProgress = 0;
           state.savedProgressKey = '';
@@ -1628,6 +1826,8 @@ export function buildBrowserCursorInjectionScript(): string {
           bumpEpoch('hard');
           gcEmit('routeChange', { url: location.href });
           state.lastRouteUrl = location.href;
+          // v17.19 — keep the YouTube host gate fresh across SPA routes.
+          isYoutubeHost = computeIsYoutubeHost();
           // v17.18 — navigation invalidates saved dwell progress: the page
           // identity changed, so a key collision must never resume.
           state.savedProgress = 0;
@@ -1698,6 +1898,18 @@ export function buildBrowserCursorInjectionScript(): string {
           }
           if (state.dwellSuppressedFrame) dwellState = 'suppressed';
           state.dwellState = dwellState;
+          // v17.19 — drive the dwell progress arc (CSS var --gc-frac,
+          // rendered by the #gazeconnect-cursor::after conic-gradient).
+          if (cfg.progressArcEnabled !== false) {
+            let frac = 0;
+            if (dwellState === 'dwell' && state.start > 0) {
+              frac = Math.max(0, Math.min(1,
+                ((nowMs - state.start) - onsetMs2) / Math.max(1, dwellMs2 - onsetMs2)));
+            } else if (dwellState === 'commit') {
+              frac = 1;
+            }
+            try { cursor.style.setProperty('--gc-frac', String(Math.round(frac * 100) / 100)); } catch (_) { /* visual only */ }
+          }
           let cursorX = Math.round(x);
           let cursorY = Math.round(y);
           if (cursor && cursor.style) {
@@ -1877,7 +2089,11 @@ export function buildBrowserCursorInjectionScript(): string {
             bumpEpoch(count >= 5 ? 'hard' : 'soft', count);
           });
         });
-        mo.observe(document.body, {
+        // v17.19 — body-safe: at commit-time injection <body> may not
+        // exist yet; observing <html> covers the body subtree once the
+        // parser creates it (previously this threw and the page ran
+        // with NO mutation-epoch detection at all).
+        mo.observe(document.body || document.documentElement, {
           childList: true,
           subtree: true,
           attributes: true,
