@@ -1,0 +1,2644 @@
+{
+ "version": 1,
+ "description": "Smart bigram frequencies for GazeConnect Pro word prediction",
+ "bigrams": {
+  "i": {
+   "want": 432,
+   "need": 316,
+   "feel": 174,
+   "feeling": 145,
+   "not": 65,
+   "have": 62,
+   "hope": 45,
+   "think": 41,
+   "will": 39,
+   "cannot": 37,
+   "know": 31,
+   "was": 29,
+   "said": 27,
+   "love": 27,
+   "miss": 26,
+   "fine": 20,
+   "too": 16,
+   "told": 16,
+   "would": 16,
+   "could": 16,
+   "wish": 16,
+   "worried": 15,
+   "scared": 15,
+   "asked": 15,
+   "just": 13,
+   "believe": 12,
+   "should": 11,
+   "okay": 10,
+   "tired": 10,
+   "hungry": 10
+  },
+  "want": {
+   "some": 72,
+   "drink": 40,
+   "eat": 34,
+   "the": 30,
+   "something": 24,
+   "talk": 22,
+   "that": 20,
+   "sit": 18,
+   "see": 17,
+   "home": 10,
+   "sleep": 10,
+   "watch": 10,
+   "outside": 10,
+   "change": 10,
+   "lie": 10,
+   "read": 10,
+   "listen": 10,
+   "call": 10,
+   "medicine": 10,
+   "phone": 10,
+   "glasses": 10,
+   "pillow": 10,
+   "blanket": 10,
+   "hot": 8,
+   "cold": 8,
+   "back": 8,
+   "know": 3,
+   "make": 3,
+   "thank": 3,
+   "spend": 2
+  },
+  "eat": {
+   "something": 10,
+   "breakfast": 8,
+   "lunch": 8,
+   "dinner": 8
+  },
+  "sleep": {
+   "well": 15,
+   "now": 10
+  },
+  "watch": {
+   "television": 10
+  },
+  "talk": {
+   "you": 10,
+   "someone": 10,
+   "the": 7,
+   "about": 5,
+   "each": 2
+  },
+  "see": {
+   "you": 26,
+   "the": 23,
+   "a": 10,
+   "what": 6
+  },
+  "the": {
+   "doctor": 79,
+   "window": 59,
+   "door": 59,
+   "light": 43,
+   "volume": 36,
+   "children": 34,
+   "bathroom": 28,
+   "family": 27,
+   "best": 24,
+   "hospital": 22,
+   "room": 21,
+   "fan": 20,
+   "weather": 19,
+   "channel": 18,
+   "pain": 18,
+   "air": 16,
+   "heater": 16,
+   "television": 16,
+   "way": 16,
+   "medicine": 15,
+   "same": 15,
+   "truth": 14,
+   "remote": 13,
+   "phone": 13,
+   "whole": 11,
+   "market": 10,
+   "trouble": 10,
+   "road": 9,
+   "right": 9,
+   "wheelchair": 8
+  },
+  "drink": {
+   "water": 10,
+   "tea": 10,
+   "coffee": 10,
+   "juice": 10
+  },
+  "change": {
+   "position": 30,
+   "the": 20,
+   "coming": 3
+  },
+  "lie": {
+   "down": 26
+  },
+  "read": {
+   "this": 15,
+   "something": 10,
+   "the": 5
+  },
+  "listen": {
+   "music": 10,
+   "this": 5
+  },
+  "call": {
+   "the": 40,
+   "family": 30,
+   "someone": 10,
+   "when": 7,
+   "back": 2
+  },
+  "some": {
+   "help": 20,
+   "food": 15,
+   "water": 15,
+   "tea": 10,
+   "soup": 8,
+   "rice": 8,
+   "bread": 8,
+   "fruit": 8,
+   "music": 8,
+   "time": 5,
+   "advice": 3,
+   "rest": 3,
+   "the": 3
+  },
+  "need": {
+   "a": 50,
+   "the": 28,
+   "medicine": 20,
+   "see": 16,
+   "rest": 15,
+   "eat": 15,
+   "talk": 15,
+   "take": 11,
+   "help": 10,
+   "water": 10,
+   "food": 10,
+   "sleep": 10,
+   "drink": 10,
+   "some": 10,
+   "change": 10,
+   "call": 10,
+   "anything": 10,
+   "another": 8,
+   "stretch": 8,
+   "brush": 8,
+   "wash": 8,
+   "use": 8,
+   "clean": 8,
+   "medication": 6,
+   "pain": 6,
+   "physical": 6,
+   "exercises": 6,
+   "something": 6,
+   "find": 3,
+   "think": 3
+  },
+  "a": {
+   "good": 23,
+   "pillow": 20,
+   "blanket": 20,
+   "moment": 15,
+   "message": 15,
+   "minute": 14,
+   "long": 11,
+   "doctor": 10,
+   "great": 10,
+   "few": 10,
+   "little": 9,
+   "bath": 8,
+   "clean": 8,
+   "tissue": 8,
+   "towel": 8,
+   "new": 8,
+   "lot": 8,
+   "hug": 7,
+   "headache": 6,
+   "stomach": 6,
+   "sleeping": 6,
+   "big": 5,
+   "chance": 4,
+   "bad": 3,
+   "small": 3,
+   "nice": 3,
+   "way": 3,
+   "break": 3,
+   "decision": 2,
+   "time": 2
+  },
+  "medicine": {
+   "making": 12,
+   "now": 10,
+   "working": 3
+  },
+  "help": {
+   "please": 25,
+   "sit": 18,
+   "with": 13,
+   "lie": 10,
+   "change": 10,
+   "get": 8,
+   "turn": 8,
+   "you": 3,
+   "everyone": 3,
+   "and": 3
+  },
+  "not": {
+   "right": 25,
+   "worry": 22,
+   "want": 15,
+   "feeling": 10,
+   "okay": 10,
+   "today": 10,
+   "yet": 10,
+   "hungry": 8,
+   "have": 7,
+   "sure": 6,
+   "now": 6,
+   "here": 6,
+   "there": 6,
+   "good": 6,
+   "bad": 6,
+   "wrong": 6,
+   "enough": 6,
+   "matter": 5,
+   "true": 5,
+   "happy": 5,
+   "comfortable": 5,
+   "like": 5,
+   "feel": 5,
+   "give": 5,
+   "only": 3,
+   "think": 2,
+   "make": 2
+  },
+  "feeling": {
+   "well": 10,
+   "better": 10,
+   "worse": 10,
+   "good": 10,
+   "sick": 10,
+   "dizzy": 10,
+   "weak": 10,
+   "strong": 10,
+   "sleepy": 10,
+   "lonely": 5,
+   "anxious": 5,
+   "depressed": 5,
+   "frustrated": 5,
+   "grateful": 5,
+   "hopeful": 5,
+   "proud": 5,
+   "confused": 5,
+   "overwhelmed": 5,
+   "peaceful": 5,
+   "nervous": 5,
+   "excited": 5,
+   "relieved": 5,
+   "about": 3
+  },
+  "good": {
+   "morning": 13,
+   "night": 13,
+   "day": 12,
+   "today": 10,
+   "idea": 8,
+   "afternoon": 6,
+   "evening": 6,
+   "news": 3,
+   "time": 3,
+   "and": 3,
+   "see": 2
+  },
+  "feel": {
+   "pain": 50,
+   "better": 20,
+   "happy": 15,
+   "sad": 15,
+   "good": 10,
+   "bad": 10,
+   "tired": 10,
+   "cold": 10,
+   "hot": 10,
+   "hungry": 10,
+   "thirsty": 10,
+   "nauseous": 6,
+   "dizzy": 6,
+   "weak": 6,
+   "worse": 5,
+   "safe": 5,
+   "like": 2,
+   "about": 2
+  },
+  "better": {
+   "now": 10,
+   "than": 5,
+   "every": 2
+  },
+  "pain": {
+   "getting": 12,
+   "back": 10,
+   "leg": 10,
+   "arm": 10,
+   "chest": 10,
+   "head": 10,
+   "medicine": 6
+  },
+  "can": {
+   "you": 232,
+   "i": 16,
+   "try": 15,
+   "not": 6,
+   "now": 5,
+   "this": 5,
+   "move": 3,
+   "decide": 2
+  },
+  "you": {
+   "turn": 60,
+   "for": 53,
+   "are": 50,
+   "help": 48,
+   "bring": 40,
+   "need": 31,
+   "should": 31,
+   "come": 28,
+   "call": 28,
+   "adjust": 24,
+   "open": 20,
+   "close": 20,
+   "get": 19,
+   "can": 19,
+   "doing": 16,
+   "coming": 16,
+   "that": 16,
+   "want": 14,
+   "think": 14,
+   "have": 14,
+   "know": 14,
+   "change": 10,
+   "please": 10,
+   "very": 10,
+   "much": 10,
+   "feel": 10,
+   "here": 10,
+   "all": 10,
+   "make": 10,
+   "could": 9
+  },
+  "come": {
+   "here": 51,
+   "back": 19,
+   "home": 7,
+   "with": 5,
+   "over": 2
+  },
+  "get": {
+   "water": 20,
+   "better": 10,
+   "some": 8,
+   "there": 7,
+   "through": 7,
+   "out": 6,
+   "back": 6,
+   "phone": 5,
+   "ready": 5,
+   "the": 3,
+   "a": 2
+  },
+  "turn": {
+   "the": 72,
+   "off": 60,
+   "down": 18,
+   "over": 8
+  },
+  "off": {
+   "the": 54
+  },
+  "open": {
+   "the": 43
+  },
+  "close": {
+   "the": 46
+  },
+  "bring": {
+   "food": 20,
+   "water": 20,
+   "a": 20,
+   "the": 12,
+   "phone": 10,
+   "some": 5,
+   "here": 2
+  },
+  "please": {
+   "bring": 30,
+   "come": 20,
+   "help": 20,
+   "call": 20,
+   "turn": 20,
+   "get": 10,
+   "open": 10,
+   "close": 10,
+   "give": 10,
+   "wait": 10,
+   "tell": 10,
+   "not": 10,
+   "careful": 10,
+   "send": 10,
+   "read": 10
+  },
+  "could": {
+   "you": 50,
+   "not": 8,
+   "have": 5,
+   "more": 5,
+   "try": 3
+  },
+  "here": {
+   "please": 15,
+   "tomorrow": 8,
+   "soon": 5,
+   "right": 2,
+   "what": 2,
+   "waiting": 2,
+   "for": 2
+  },
+  "down": {
+   "the": 20
+  },
+  "give": {
+   "a": 12,
+   "medicine": 10,
+   "some": 5,
+   "the": 5,
+   "you": 3,
+   "them": 2,
+   "your": 2
+  },
+  "wait": {
+   "a": 20,
+   "for": 11,
+   "and": 3
+  },
+  "tell": {
+   "the": 12,
+   "them": 10,
+   "mother": 7,
+   "father": 7,
+   "about": 5,
+   "what": 5,
+   "you": 3
+  },
+  "them": {
+   "i": 10,
+   "are": 3,
+   "come": 2,
+   "a": 2
+  },
+  "said": {
+   "hello": 17,
+   "that": 12,
+   "they": 5,
+   "before": 2
+  },
+  "send": {
+   "a": 15,
+   "now": 5
+  },
+  "thank": {
+   "you": 91
+  },
+  "very": {
+   "much": 19,
+   "kind": 13,
+   "important": 11,
+   "good": 6,
+   "well": 6,
+   "nice": 6,
+   "happy": 6,
+   "sad": 6,
+   "tired": 6,
+   "hard": 2,
+   "grateful": 2
+  },
+  "for": {
+   "your": 30,
+   "the": 24,
+   "dinner": 21,
+   "everything": 20,
+   "lunch": 16,
+   "medicine": 14,
+   "helping": 10,
+   "being": 10,
+   "taking": 10,
+   "everyone": 9,
+   "breakfast": 8,
+   "what": 7,
+   "a": 6,
+   "sure": 6,
+   "bed": 5,
+   "them": 3,
+   "example": 3,
+   "you": 2,
+   "all": 2
+  },
+  "being": {
+   "here": 10
+  },
+  "your": {
+   "help": 32,
+   "health": 17,
+   "day": 16,
+   "support": 12,
+   "time": 5,
+   "visit": 5,
+   "mind": 2
+  },
+  "taking": {
+   "care": 10
+  },
+  "thanks": {
+   "for": 20
+  },
+  "sorry": {
+   "for": 17,
+   "bother": 10,
+   "i": 10
+  },
+  "bother": {
+   "you": 10
+  },
+  "cannot": {
+   "move": 12,
+   "that": 10,
+   "breathe": 6,
+   "swallow": 6,
+   "sleep": 3
+  },
+  "yes": {
+   "i": 30,
+   "please": 10,
+   "that": 10
+  },
+  "that": {
+   "right": 15,
+   "not": 15,
+   "would": 7,
+   "was": 6,
+   "wrong": 5,
+   "a": 5,
+   "sounds": 5,
+   "everything": 4,
+   "can": 3,
+   "but": 3,
+   "you": 2
+  },
+  "maybe": {
+   "later": 10,
+   "tomorrow": 10,
+   "can": 10,
+   "next": 4,
+   "another": 4
+  },
+  "what": {
+   "for": 40,
+   "happened": 34,
+   "you": 30,
+   "did": 28,
+   "are": 22,
+   "can": 14,
+   "time": 12,
+   "i": 11,
+   "happens": 9,
+   "day": 8,
+   "the": 8,
+   "happening": 8,
+   "wrong": 8,
+   "television": 8,
+   "should": 8,
+   "show": 8,
+   "was": 6,
+   "will": 6,
+   "expected": 3,
+   "thought": 2
+  },
+  "weather": {
+   "like": 8,
+   "nice": 3
+  },
+  "did": {
+   "you": 59,
+   "the": 14,
+   "this": 8,
+   "not": 6,
+   "great": 2
+  },
+  "doctor": {
+   "say": 14,
+   "coming": 8,
+   "here": 8,
+   "will": 3
+  },
+  "are": {
+   "you": 80,
+   "coming": 13,
+   "the": 12,
+   "right": 10,
+   "doing": 9,
+   "eating": 8,
+   "glasses": 8,
+   "going": 8,
+   "here": 8,
+   "they": 7,
+   "well": 7,
+   "very": 7,
+   "dry": 6,
+   "not": 6,
+   "wrong": 5,
+   "welcome": 5,
+   "many": 5,
+   "people": 5,
+   "running": 4,
+   "playing": 3,
+   "looking": 2,
+   "stronger": 2
+  },
+  "eating": {
+   "today": 8
+  },
+  "should": {
+   "not": 11,
+   "eat": 10,
+   "i": 8,
+   "have": 5,
+   "rest": 5,
+   "talk": 5,
+   "wait": 5,
+   "done": 2
+  },
+  "how": {
+   "are": 37,
+   "your": 16,
+   "much": 16,
+   "the": 15,
+   "was": 14,
+   "you": 10,
+   "everyone": 8,
+   "long": 8,
+   "many": 8,
+   "mother": 7,
+   "father": 7,
+   "did": 6,
+   "can": 6,
+   "about": 2
+  },
+  "was": {
+   "your": 8,
+   "thinking": 8,
+   "not": 6,
+   "going": 5,
+   "trying": 5,
+   "looking": 5,
+   "a": 5,
+   "good": 3,
+   "hard": 3
+  },
+  "long": {
+   "will": 8,
+   "time": 6,
+   "day": 5,
+   "try": 3,
+   "story": 2
+  },
+  "will": {
+   "you": 32,
+   "get": 17,
+   "take": 11,
+   "not": 11,
+   "fine": 10,
+   "back": 10,
+   "there": 8,
+   "okay": 7,
+   "try": 5,
+   "see": 5,
+   "here": 5,
+   "come": 3,
+   "help": 3,
+   "always": 2
+  },
+  "much": {
+   "does": 8,
+   "time": 8,
+   "thankful": 5,
+   "indeed": 3,
+   "i": 3,
+   "better": 2,
+   "handle": 2
+  },
+  "does": {
+   "cost": 8,
+   "not": 7
+  },
+  "time": {
+   "for": 24,
+   "have": 8,
+   "now": 7,
+   "i": 6,
+   "talked": 3,
+   "ago": 3,
+   "ever": 3,
+   "spoke": 2,
+   "there": 2
+  },
+  "many": {
+   "people": 10,
+   "things": 5
+  },
+  "people": {
+   "are": 10,
+   "waiting": 5,
+   "who": 3,
+   "think": 3,
+   "here": 3,
+   "have": 2
+  },
+  "where": {
+   "are": 22,
+   "did": 22,
+   "phone": 8,
+   "medicine": 8,
+   "the": 8,
+   "everyone": 8
+  },
+  "when": {
+   "you": 18,
+   "are": 15,
+   "will": 14,
+   "did": 14,
+   "can": 14,
+   "the": 8,
+   "dinner": 8,
+   "lunch": 8,
+   "next": 6
+  },
+  "coming": {
+   "back": 8,
+   "today": 8,
+   "visit": 7
+  },
+  "this": {
+   "happen": 8,
+   "happening": 8,
+   "pillow": 8,
+   "together": 7,
+   "emergency": 6,
+   "was": 6,
+   "good": 5,
+   "bad": 5,
+   "important": 5,
+   "not": 5,
+   "what": 5,
+   "one": 5,
+   "down": 5,
+   "morning": 4,
+   "afternoon": 4,
+   "evening": 4
+  },
+  "who": {
+   "there": 8,
+   "calling": 8,
+   "coming": 8,
+   "told": 8,
+   "the": 8,
+   "was": 6,
+   "will": 6,
+   "can": 6,
+   "came": 3,
+   "helped": 3,
+   "called": 3
+  },
+  "told": {
+   "you": 13,
+   "that": 7,
+   "them": 5
+  },
+  "why": {
+   "did": 14,
+   "are": 8,
+   "this": 8
+  },
+  "everything": {
+   "okay": 8,
+   "will": 7,
+   "else": 3,
+   "going": 2,
+   "was": 2
+  },
+  "anyone": {
+   "there": 8
+  },
+  "have": {
+   "a": 22,
+   "you": 16,
+   "appointment": 12,
+   "been": 9,
+   "time": 8,
+   "difficulty": 6,
+   "allergic": 6,
+   "wait": 6,
+   "not": 6,
+   "never": 5,
+   "always": 5,
+   "much": 5,
+   "plenty": 4,
+   "now": 3,
+   "careful": 3,
+   "enough": 2,
+   "done": 2,
+   "the": 2
+  },
+  "know": {
+   "what": 13,
+   "when": 7,
+   "that": 5,
+   "how": 5,
+   "you": 5,
+   "the": 3,
+   "more": 3
+  },
+  "seen": {
+   "phone": 8
+  },
+  "love": {
+   "you": 14,
+   "them": 7
+  },
+  "miss": {
+   "you": 7,
+   "everyone": 7,
+   "him": 7,
+   "the": 5
+  },
+  "proud": {
+   "you": 7
+  },
+  "thinking": {
+   "you": 7,
+   "about": 5
+  },
+  "take": {
+   "care": 30,
+   "a": 11,
+   "your": 7,
+   "there": 5
+  },
+  "care": {
+   "yourself": 7,
+   "your": 7,
+   "for": 6
+  },
+  "careful": {
+   "the": 7,
+   "with": 3
+  },
+  "home": {
+   "safely": 7,
+   "now": 6,
+   "right": 3,
+   "but": 3
+  },
+  "children": {
+   "i": 7,
+   "visit": 7,
+   "are": 6
+  },
+  "mother": {
+   "i": 7,
+   "doing": 7
+  },
+  "father": {
+   "i": 7,
+   "doing": 7
+  },
+  "let": {
+   "know": 12,
+   "think": 5,
+   "see": 5,
+   "try": 5,
+   "wait": 5
+  },
+  "they": {
+   "are": 16,
+   "will": 11,
+   "said": 11,
+   "coming": 7,
+   "were": 6,
+   "have": 6,
+   "can": 6,
+   "would": 5,
+   "told": 5,
+   "tried": 2
+  },
+  "hope": {
+   "you": 12,
+   "everyone": 7,
+   "not": 5,
+   "they": 5,
+   "see": 2
+  },
+  "everyone": {
+   "healthy": 7,
+   "the": 3
+  },
+  "god": {
+   "bless": 14
+  },
+  "bless": {
+   "you": 7,
+   "the": 7
+  },
+  "morning": {
+   "everyone": 7,
+   "i": 3,
+   "she": 2
+  },
+  "night": {
+   "everyone": 7,
+   "i": 5,
+   "long": 4
+  },
+  "happy": {
+   "birthday": 7,
+   "anniversary": 7,
+   "about": 5
+  },
+  "worry": {
+   "about": 9
+  },
+  "through": {
+   "this": 7,
+   "the": 2
+  },
+  "doing": {
+   "a": 7,
+   "that": 5,
+   "best": 5,
+   "well": 2
+  },
+  "great": {
+   "job": 7,
+   "deal": 3
+  },
+  "appreciate": {
+   "your": 9
+  },
+  "grateful": {
+   "for": 9
+  },
+  "getting": {
+   "better": 8,
+   "worse": 6,
+   "late": 4
+  },
+  "stomach": {
+   "ache": 6
+  },
+  "difficulty": {
+   "breathing": 6
+  },
+  "breathe": {
+   "properly": 6
+  },
+  "swallow": {
+   "well": 6
+  },
+  "throat": {
+   "dry": 6
+  },
+  "mouth": {
+   "dry": 6
+  },
+  "eyes": {
+   "are": 6
+  },
+  "back": {
+   "bed": 8,
+   "hurts": 6,
+   "soon": 5,
+   "home": 3,
+   "the": 2,
+   "when": 2
+  },
+  "neck": {
+   "hurts": 6
+  },
+  "legs": {
+   "hurt": 6
+  },
+  "arms": {
+   "hurt": 6
+  },
+  "move": {
+   "legs": 6,
+   "arms": 6
+  },
+  "next": {
+   "week": 8,
+   "appointment": 6,
+   "time": 4,
+   "month": 4,
+   "year": 4,
+   "step": 3,
+   "the": 3
+  },
+  "physical": {
+   "therapy": 6
+  },
+  "with": {
+   "this": 10,
+   "the": 8,
+   "exercises": 6,
+   "you": 6,
+   "that": 3,
+   "friend": 3,
+   "all": 3
+  },
+  "suction": {
+   "machine": 6
+  },
+  "breathing": {
+   "machine": 6
+  },
+  "check": {
+   "the": 10,
+   "blood": 6,
+   "temperature": 6,
+   "oxygen": 6
+  },
+  "blood": {
+   "pressure": 6
+  },
+  "oxygen": {
+   "level": 6
+  },
+  "having": {
+   "trouble": 6
+  },
+  "trouble": {
+   "sleeping": 6
+  },
+  "sleeping": {
+   "pill": 6
+  },
+  "something": {
+   "sweet": 8,
+   "drink": 8,
+   "light": 8,
+   "wrong": 7,
+   "for": 6,
+   "new": 3
+  },
+  "making": {
+   "dizzy": 6,
+   "sleepy": 6
+  },
+  "allergic": {
+   "reaction": 6
+  },
+  "appointment": {
+   "today": 6,
+   "tomorrow": 6
+  },
+  "hot": {
+   "water": 8
+  },
+  "cold": {
+   "water": 8
+  },
+  "hungry": {
+   "right": 8
+  },
+  "right": {
+   "now": 33,
+   "away": 10,
+   "here": 8,
+   "thing": 6
+  },
+  "just": {
+   "want": 13,
+   "like": 3,
+   "a": 2
+  },
+  "breakfast": {
+   "today": 8
+  },
+  "lunch": {
+   "today": 8
+  },
+  "dinner": {
+   "today": 8
+  },
+  "too": {
+   "cold": 25,
+   "hot": 22,
+   "bright": 8,
+   "dark": 8,
+   "loud": 8,
+   "quiet": 8,
+   "much": 8,
+   "many": 6,
+   "late": 6,
+   "early": 6,
+   "tired": 6
+  },
+  "air": {
+   "conditioning": 16
+  },
+  "window": {
+   "please": 16,
+   "closed": 3,
+   "there": 3,
+   "i": 2
+  },
+  "another": {
+   "blanket": 8,
+   "day": 4,
+   "chance": 2
+  },
+  "pillow": {
+   "uncomfortable": 8
+  },
+  "adjust": {
+   "bed": 8,
+   "pillow": 8,
+   "chair": 8
+  },
+  "sit": {
+   "down": 14,
+   "the": 8
+  },
+  "position": {
+   "uncomfortable": 8
+  },
+  "room": {
+   "too": 16,
+   "next": 3,
+   "and": 2
+  },
+  "play": {
+   "some": 8
+  },
+  "stop": {
+   "the": 8,
+   "doing": 5,
+   "please": 5
+  },
+  "brush": {
+   "teeth": 8
+  },
+  "wash": {
+   "face": 8
+  },
+  "use": {
+   "the": 8
+  },
+  "clean": {
+   "shirt": 8,
+   "clothes": 8
+  },
+  "comb": {
+   "hair": 8
+  },
+  "think": {
+   "you": 13,
+   "about": 8,
+   "should": 5,
+   "that": 5
+  },
+  "believe": {
+   "that": 7,
+   "can": 5
+  },
+  "remember": {
+   "when": 5,
+   "that": 5,
+   "take": 2
+  },
+  "asked": {
+   "them": 5,
+   "her": 5,
+   "him": 5
+  },
+  "looking": {
+   "for": 7,
+   "now": 2
+  },
+  "would": {
+   "like": 10,
+   "not": 6,
+   "nice": 5,
+   "come": 2,
+   "have": 2
+  },
+  "like": {
+   "some": 5,
+   "this": 5,
+   "the": 3,
+   "what": 3,
+   "giving": 2,
+   "i": 2
+  },
+  "might": {
+   "have": 5,
+   "well": 2
+  },
+  "she": {
+   "said": 11,
+   "will": 11,
+   "was": 6,
+   "has": 6,
+   "can": 6,
+   "coming": 5,
+   "here": 5,
+   "told": 5
+  },
+  "makes": {
+   "feel": 20,
+   "happy": 5,
+   "sad": 5,
+   "think": 2
+  },
+  "sounds": {
+   "good": 5
+  },
+  "there": {
+   "are": 16,
+   "was": 6,
+   "were": 6,
+   "something": 5,
+   "someone": 5,
+   "food": 5,
+   "a": 4,
+   "soon": 4
+  },
+  "someone": {
+   "the": 5
+  },
+  "food": {
+   "the": 5,
+   "ready": 3,
+   "and": 3
+  },
+  "make": {
+   "sure": 16,
+   "stop": 5,
+   "feel": 5,
+   "happy": 5,
+   "work": 3,
+   "any": 2,
+   "a": 2
+  },
+  "sure": {
+   "you": 5,
+   "everything": 3,
+   "that": 3,
+   "about": 2
+  },
+  "show": {
+   "how": 5,
+   "what": 5
+  },
+  "keep": {
+   "going": 5,
+   "trying": 5,
+   "safe": 5,
+   "simple": 3,
+   "posted": 2
+  },
+  "put": {
+   "down": 11,
+   "there": 5,
+   "away": 5,
+   "simply": 3,
+   "your": 2
+  },
+  "and": {
+   "eat": 5,
+   "back": 3,
+   "see": 3,
+   "support": 3,
+   "water": 3,
+   "again": 2,
+   "the": 2,
+   "sat": 2,
+   "over": 2
+  },
+  "look": {
+   "for": 6,
+   "this": 5,
+   "that": 5,
+   "forward": 2
+  },
+  "start": {
+   "the": 5,
+   "again": 5,
+   "all": 3
+  },
+  "try": {
+   "again": 5,
+   "this": 5,
+   "something": 5,
+   "best": 3
+  },
+  "write": {
+   "this": 5
+  },
+  "find": {
+   "the": 8,
+   "phone": 5,
+   "out": 3,
+   "a": 3
+  },
+  "still": {
+   "early": 4,
+   "have": 3,
+   "the": 2
+  },
+  "running": {
+   "late": 4
+  },
+  "plenty": {
+   "time": 4
+  },
+  "little": {
+   "bit": 5,
+   "while": 4,
+   "little": 2,
+   "things": 2
+  },
+  "few": {
+   "minutes": 7,
+   "days": 3
+  },
+  "after": {
+   "lunch": 4,
+   "dinner": 4,
+   "the": 2,
+   "day": 2
+  },
+  "before": {
+   "bed": 4,
+   "lunch": 4,
+   "the": 4,
+   "far": 3,
+   "nothing": 2
+  },
+  "last": {
+   "time": 5,
+   "night": 4,
+   "week": 4,
+   "month": 4
+  },
+  "every": {
+   "day": 9,
+   "morning": 4,
+   "night": 4,
+   "week": 4,
+   "single": 4,
+   "time": 3
+  },
+  "all": {
+   "day": 7,
+   "the": 6,
+   "right": 6,
+   "night": 4,
+   "over": 3,
+   "heart": 3,
+   "that": 3,
+   "thank": 2,
+   "your": 2
+  },
+  "day": {
+   "a": 5,
+   "i": 5,
+   "long": 4,
+   "has": 3,
+   "outside": 3,
+   "after": 2,
+   "wait": 2
+  },
+  "whole": {
+   "day": 4,
+   "week": 4,
+   "family": 3,
+   "thing": 2
+  },
+  "soon": {
+   "possible": 4,
+   "you": 3
+  },
+  "about": {
+   "the": 9,
+   "this": 8,
+   "what": 4,
+   "try": 2
+  },
+  "comfortable": {
+   "with": 5
+  },
+  "worried": {
+   "about": 5
+  },
+  "scared": {
+   "falling": 5
+  },
+  "way": {
+   "things": 5,
+   "this": 3,
+   "know": 3,
+   "you": 3,
+   "home": 3,
+   "did": 3,
+   "think": 2,
+   "doing": 2
+  },
+  "things": {
+   "were": 12,
+   "will": 5,
+   "matter": 3,
+   "improve": 2,
+   "are": 2
+  },
+  "wish": {
+   "i": 5,
+   "things": 5
+  },
+  "were": {
+   "different": 7,
+   "not": 6
+  },
+  "trying": {
+   "best": 5,
+   "understand": 3,
+   "find": 3,
+   "get": 3,
+   "patient": 3
+  },
+  "stronger": {
+   "than": 7
+  },
+  "than": {
+   "this": 5,
+   "what": 5,
+   "before": 5,
+   "enough": 3,
+   "yesterday": 3,
+   "expected": 2,
+   "that": 2
+  },
+  "new": {
+   "day": 8,
+   "one": 3
+  },
+  "thankful": {
+   "for": 5
+  },
+  "visit": {
+   "means": 5
+  },
+  "means": {
+   "a": 5,
+   "everything": 5
+  },
+  "support": {
+   "means": 5
+  },
+  "best": {
+   "way": 3,
+   "result": 3,
+   "possible": 3,
+   "things": 3,
+   "thing": 2
+  },
+  "first": {
+   "thing": 3,
+   "time": 3,
+   "all": 2
+  },
+  "thing": {
+   "need": 3,
+   "happened": 3,
+   "makes": 2
+  },
+  "same": {
+   "thing": 6,
+   "before": 4,
+   "time": 3
+  },
+  "happened": {
+   "before": 3,
+   "today": 3
+  },
+  "other": {
+   "day": 3,
+   "hand": 3,
+   "very": 3,
+   "than": 2,
+   "more": 2
+  },
+  "family": {
+   "here": 3,
+   "today": 3,
+   "the": 2
+  },
+  "most": {
+   "important": 5,
+   "the": 3,
+   "will": 3
+  },
+  "important": {
+   "thing": 3,
+   "than": 2,
+   "take": 2
+  },
+  "only": {
+   "way": 3,
+   "that": 3,
+   "you": 2
+  },
+  "one": {
+   "better": 3,
+   "was": 3,
+   "the": 3,
+   "you": 2
+  },
+  "old": {
+   "one": 3,
+   "times": 3
+  },
+  "big": {
+   "question": 3,
+   "change": 3,
+   "difference": 2
+  },
+  "small": {
+   "things": 3,
+   "step": 3
+  },
+  "bad": {
+   "news": 3,
+   "feeling": 3
+  },
+  "problem": {
+   "that": 3
+  },
+  "answer": {
+   "yes": 3
+  },
+  "truth": {
+   "that": 3
+  },
+  "reason": {
+   "why": 3
+  },
+  "fact": {
+   "that": 3,
+   "i": 3
+  },
+  "place": {
+   "where": 3
+  },
+  "man": {
+   "who": 3
+  },
+  "woman": {
+   "who": 3
+  },
+  "nice": {
+   "today": 3,
+   "day": 3,
+   "meet": 2
+  },
+  "water": {
+   "too": 3
+  },
+  "door": {
+   "open": 3,
+   "someone": 3
+  },
+  "store": {
+   "and": 3
+  },
+  "honest": {
+   "with": 3
+  },
+  "fair": {
+   "about": 3
+  },
+  "out": {
+   "what": 3,
+   "the": 3
+  },
+  "idea": {
+   "for": 3
+  },
+  "has": {
+   "not": 6,
+   "begun": 3,
+   "been": 2
+  },
+  "bit": {
+   "more": 5
+  },
+  "more": {
+   "please": 3,
+   "about": 3,
+   "than": 3,
+   "you": 3,
+   "important": 2,
+   "less": 2,
+   "time": 2
+  },
+  "lot": {
+   "people": 3
+  },
+  "minutes": {
+   "ago": 3
+  },
+  "ago": {
+   "they": 3,
+   "things": 2
+  },
+  "deal": {
+   "work": 3
+  },
+  "step": {
+   "forward": 3
+  },
+  "outside": {
+   "today": 3
+  },
+  "going": {
+   "a": 3,
+   "have": 3,
+   "try": 3,
+   "make": 3,
+   "see": 3
+  },
+  "understand": {
+   "what": 3,
+   "how": 2
+  },
+  "patient": {
+   "here": 3
+  },
+  "now": {
+   "i": 5,
+   "but": 3,
+   "and": 3,
+   "stop": 2,
+   "the": 2
+  },
+  "used": {
+   "much": 3,
+   "live": 3
+  },
+  "live": {
+   "the": 3
+  },
+  "friend": {
+   "the": 3
+  },
+  "heart": {
+   "i": 3
+  },
+  "possible": {
+   "outcome": 3
+  },
+  "afternoon": {
+   "can": 3
+  },
+  "evening": {
+   "i": 3
+  },
+  "kitchen": {
+   "there": 3
+  },
+  "opinion": {
+   "the": 3
+  },
+  "table": {
+   "over": 3
+  },
+  "over": {
+   "there": 3,
+   "and": 2,
+   "again": 2
+  },
+  "mind": {
+   "all": 3,
+   "ease": 2
+  },
+  "phone": {
+   "right": 3
+  },
+  "hospital": {
+   "for": 3
+  },
+  "enough": {
+   "for": 3,
+   "eat": 2,
+   "enough": 2,
+   "now": 2
+  },
+  "less": {
+   "than": 3,
+   "the": 2
+  },
+  "worse": {
+   "than": 3
+  },
+  "yesterday": {
+   "but": 3
+  },
+  "but": {
+   "still": 3,
+   "also": 3,
+   "safe": 3,
+   "i": 2
+  },
+  "even": {
+   "though": 3,
+   "more": 2
+  },
+  "though": {
+   "was": 3
+  },
+  "well": {
+   "the": 3,
+   "today": 2,
+   "try": 2,
+   "done": 2
+  },
+  "both": {
+   "them": 3,
+   "are": 2
+  },
+  "each": {
+   "other": 5
+  },
+  "part": {
+   "the": 3
+  },
+  "kind": {
+   "like": 3,
+   "here": 2
+  },
+  "sort": {
+   "the": 3
+  },
+  "question": {
+   "now": 3
+  },
+  "because": {
+   "what": 3
+  },
+  "instead": {
+   "waiting": 3
+  },
+  "waiting": {
+   "for": 7
+  },
+  "front": {
+   "the": 3
+  },
+  "far": {
+   "from": 3,
+   "good": 3
+  },
+  "from": {
+   "home": 3,
+   "the": 2,
+   "what": 2,
+   "here": 2,
+   "now": 2
+  },
+  "top": {
+   "everything": 3
+  },
+  "spite": {
+   "all": 3
+  },
+  "matter": {
+   "what": 3
+  },
+  "practice": {
+   "the": 3
+  },
+  "course": {
+   "i": 3
+  },
+  "least": {
+   "still": 3
+  },
+  "example": {
+   "you": 3
+  },
+  "such": {
+   "food": 3
+  },
+  "nothing": {
+   "happened": 3,
+   "worry": 2,
+   "changed": 2
+  },
+  "able": {
+   "the": 2
+  },
+  "situation": {
+   "home": 2
+  },
+  "meeting": {
+   "should": 2
+  },
+  "again": {
+   "they": 4,
+   "and": 2,
+   "take": 2
+  },
+  "already": {
+   "have": 2
+  },
+  "always": {
+   "remember": 2,
+   "here": 2
+  },
+  "chance": {
+   "make": 2
+  },
+  "around": {
+   "the": 2
+  },
+  "house": {
+   "looking": 2,
+   "early": 2
+  },
+  "ask": {
+   "for": 6,
+   "them": 2
+  },
+  "away": {
+   "from": 2
+  },
+  "noise": {
+   "and": 2
+  },
+  "beginning": {
+   "again": 2,
+   "the": 2
+  },
+  "end": {
+   "today": 2
+  },
+  "between": {
+   "you": 2
+  },
+  "different": {
+   "from": 2
+  },
+  "any": {
+   "sense": 2
+  },
+  "road": {
+   "from": 2
+  },
+  "during": {
+   "the": 2
+  },
+  "early": {
+   "the": 2,
+   "today": 2
+  },
+  "single": {
+   "day": 4
+  },
+  "giving": {
+   "but": 2
+  },
+  "finally": {
+   "got": 2
+  },
+  "got": {
+   "the": 2
+  },
+  "glad": {
+   "hear": 2
+  },
+  "hear": {
+   "that": 2
+  },
+  "had": {
+   "make": 2
+  },
+  "hard": {
+   "believe": 2
+  },
+  "been": {
+   "a": 2,
+   "very": 2,
+   "nice": 2
+  },
+  "anything": {
+   "call": 2
+  },
+  "into": {
+   "the": 2
+  },
+  "posted": {
+   "the": 2
+  },
+  "spoke": {
+   "about": 2
+  },
+  "left": {
+   "the": 2
+  },
+  "story": {
+   "short": 2
+  },
+  "short": {
+   "the": 2
+  },
+  "forward": {
+   "seeing": 2
+  },
+  "seeing": {
+   "you": 2
+  },
+  "made": {
+   "a": 2
+  },
+  "expected": {
+   "today": 2
+  },
+  "must": {
+   "have": 2
+  },
+  "never": {
+   "give": 2
+  },
+  "meet": {
+   "you": 2,
+   "again": 2
+  },
+  "often": {
+   "think": 2
+  },
+  "once": {
+   "upon": 2
+  },
+  "upon": {
+   "a": 2,
+   "further": 2
+  },
+  "really": {
+   "want": 2,
+   "appreciate": 2
+  },
+  "probably": {
+   "the": 2
+  },
+  "quite": {
+   "a": 2
+  },
+  "while": {
+   "since": 2,
+   "waiting": 2
+  },
+  "ready": {
+   "whenever": 2
+  },
+  "whenever": {
+   "you": 2
+  },
+  "done": {
+   "tomorrow": 2,
+   "you": 2
+  },
+  "since": {
+   "the": 2
+  },
+  "wrong": {
+   "with": 2,
+   "about": 2
+  },
+  "sometimes": {
+   "i": 2
+  },
+  "their": {
+   "own": 2
+  },
+  "own": {
+   "way": 2
+  },
+  "then": {
+   "can": 2
+  },
+  "decide": {
+   "what": 2
+  },
+  "together": {
+   "are": 2,
+   "a": 2
+  },
+  "handle": {
+   "right": 2
+  },
+  "under": {
+   "the": 2
+  },
+  "circumstances": {
+   "i": 2
+  },
+  "until": {
+   "meet": 2
+  },
+  "further": {
+   "thought": 2
+  },
+  "thought": {
+   "i": 2
+  },
+  "spend": {
+   "more": 2
+  },
+  "which": {
+   "one": 2
+  },
+  "without": {
+   "a": 2
+  },
+  "doubt": {
+   "the": 2
+  },
+  "work": {
+   "together": 2
+  },
+  "years": {
+   "ago": 2
+  },
+  "health": {
+   "the": 2
+  }
+ },
+ "unigrams": {
+  "i": 1993,
+  "want": 487,
+  "home": 51,
+  "eat": 74,
+  "something": 62,
+  "sleep": 43,
+  "now": 106,
+  "watch": 10,
+  "television": 34,
+  "talk": 44,
+  "you": 1003,
+  "see": 84,
+  "the": 930,
+  "doctor": 89,
+  "drink": 58,
+  "water": 97,
+  "tea": 20,
+  "coffee": 10,
+  "juice": 10,
+  "outside": 13,
+  "bathroom": 28,
+  "hospital": 22,
+  "market": 10,
+  "change": 53,
+  "position": 38,
+  "sit": 42,
+  "lie": 26,
+  "down": 76,
+  "read": 30,
+  "listen": 20,
+  "music": 26,
+  "call": 91,
+  "someone": 28,
+  "some": 119,
+  "food": 56,
+  "help": 179,
+  "medicine": 83,
+  "phone": 59,
+  "glasses": 18,
+  "pillow": 46,
+  "blanket": 38,
+  "need": 375,
+  "rest": 23,
+  "a": 267,
+  "please": 284,
+  "family": 62,
+  "fine": 35,
+  "okay": 48,
+  "not": 290,
+  "feeling": 166,
+  "well": 59,
+  "tired": 32,
+  "hungry": 28,
+  "thirsty": 20,
+  "cold": 53,
+  "hot": 50,
+  "pain": 84,
+  "comfortable": 15,
+  "uncomfortable": 26,
+  "happy": 60,
+  "sad": 36,
+  "worried": 15,
+  "scared": 15,
+  "bored": 10,
+  "better": 56,
+  "worse": 24,
+  "good": 127,
+  "today": 86,
+  "sick": 10,
+  "dizzy": 22,
+  "weak": 16,
+  "strong": 10,
+  "sleepy": 16,
+  "feel": 216,
+  "bad": 32,
+  "back": 91,
+  "leg": 10,
+  "arm": 10,
+  "chest": 10,
+  "head": 10,
+  "can": 368,
+  "come": 89,
+  "here": 135,
+  "get": 93,
+  "turn": 164,
+  "light": 51,
+  "off": 60,
+  "fan": 20,
+  "open": 46,
+  "window": 59,
+  "close": 46,
+  "door": 59,
+  "bring": 89,
+  "channel": 18,
+  "could": 83,
+  "volume": 36,
+  "give": 44,
+  "wait": 49,
+  "moment": 15,
+  "tell": 49,
+  "them": 37,
+  "said": 65,
+  "hello": 17,
+  "worry": 24,
+  "careful": 26,
+  "send": 20,
+  "message": 20,
+  "this": 157,
+  "thank": 91,
+  "very": 83,
+  "much": 78,
+  "for": 252,
+  "helping": 10,
+  "everything": 52,
+  "being": 10,
+  "your": 95,
+  "taking": 10,
+  "care": 46,
+  "thanks": 20,
+  "sorry": 37,
+  "trouble": 16,
+  "bother": 10,
+  "cannot": 37,
+  "that": 187,
+  "yes": 53,
+  "right": 114,
+  "understand": 23,
+  "maybe": 38,
+  "later": 14,
+  "tomorrow": 30,
+  "try": 59,
+  "what": 299,
+  "time": 122,
+  "day": 87,
+  "weather": 19,
+  "like": 42,
+  "happening": 16,
+  "wrong": 33,
+  "think": 74,
+  "mean": 8,
+  "did": 125,
+  "say": 22,
+  "are": 265,
+  "doing": 51,
+  "eating": 8,
+  "dinner": 41,
+  "lunch": 40,
+  "happened": 40,
+  "should": 91,
+  "how": 182,
+  "everyone": 56,
+  "health": 17,
+  "was": 110,
+  "long": 44,
+  "will": 201,
+  "take": 66,
+  "does": 15,
+  "cost": 8,
+  "have": 182,
+  "many": 27,
+  "people": 26,
+  "coming": 65,
+  "where": 85,
+  "remote": 13,
+  "going": 43,
+  "put": 34,
+  "when": 116,
+  "happen": 8,
+  "who": 73,
+  "there": 107,
+  "calling": 8,
+  "told": 41,
+  "why": 45,
+  "late": 22,
+  "anyone": 8,
+  "sure": 38,
+  "anything": 10,
+  "know": 66,
+  "eaten": 8,
+  "seen": 8,
+  "love": 27,
+  "all": 49,
+  "miss": 26,
+  "proud": 12,
+  "thinking": 15,
+  "yourself": 7,
+  "road": 9,
+  "safely": 7,
+  "hug": 7,
+  "children": 34,
+  "mother": 14,
+  "father": 14,
+  "him": 12,
+  "let": 37,
+  "arrive": 7,
+  "visit": 19,
+  "they": 85,
+  "hope": 47,
+  "healthy": 7,
+  "god": 14,
+  "bless": 14,
+  "morning": 26,
+  "night": 30,
+  "birthday": 7,
+  "anniversary": 7,
+  "congratulations": 7,
+  "about": 63,
+  "through": 9,
+  "together": 11,
+  "great": 12,
+  "job": 7,
+  "appreciate": 9,
+  "grateful": 14,
+  "support": 15,
+  "medication": 6,
+  "getting": 18,
+  "headache": 6,
+  "stomach": 6,
+  "ache": 6,
+  "difficulty": 6,
+  "breathing": 12,
+  "breathe": 6,
+  "properly": 6,
+  "swallow": 6,
+  "throat": 6,
+  "dry": 18,
+  "mouth": 6,
+  "eyes": 6,
+  "hurts": 12,
+  "neck": 6,
+  "legs": 12,
+  "hurt": 12,
+  "arms": 12,
+  "nauseous": 6,
+  "move": 15,
+  "next": 35,
+  "appointment": 18,
+  "physical": 6,
+  "therapy": 6,
+  "exercises": 12,
+  "with": 49,
+  "suction": 6,
+  "machine": 12,
+  "check": 28,
+  "blood": 6,
+  "pressure": 6,
+  "temperature": 6,
+  "oxygen": 6,
+  "level": 6,
+  "having": 6,
+  "sleeping": 12,
+  "pill": 6,
+  "making": 12,
+  "allergic": 6,
+  "reaction": 6,
+  "nurse": 6,
+  "ambulance": 6,
+  "emergency": 6,
+  "breakfast": 16,
+  "soup": 8,
+  "rice": 8,
+  "bread": 8,
+  "fruit": 8,
+  "sweet": 8,
+  "just": 18,
+  "too": 123,
+  "air": 16,
+  "conditioning": 16,
+  "heater": 16,
+  "another": 14,
+  "adjust": 24,
+  "bed": 25,
+  "chair": 8,
+  "wheelchair": 8,
+  "over": 20,
+  "stretch": 8,
+  "bright": 8,
+  "dark": 8,
+  "loud": 8,
+  "quiet": 8,
+  "room": 21,
+  "play": 8,
+  "stop": 25,
+  "show": 18,
+  "brush": 8,
+  "teeth": 8,
+  "wash": 8,
+  "face": 8,
+  "bath": 8,
+  "use": 8,
+  "clean": 16,
+  "shirt": 8,
+  "clothes": 8,
+  "comb": 8,
+  "hair": 8,
+  "tissue": 8,
+  "towel": 8,
+  "believe": 14,
+  "remember": 12,
+  "asked": 15,
+  "her": 5,
+  "trying": 27,
+  "looking": 9,
+  "used": 16,
+  "been": 11,
+  "never": 7,
+  "always": 9,
+  "would": 42,
+  "might": 7,
+  "welcome": 5,
+  "kind": 16,
+  "best": 37,
+  "soon": 33,
+  "she": 63,
+  "important": 25,
+  "matter": 11,
+  "makes": 32,
+  "true": 5,
+  "idea": 8,
+  "sounds": 5,
+  "nice": 21,
+  "kitchen": 8,
+  "things": 32,
+  "waiting": 12,
+  "make": 40,
+  "minute": 14,
+  "truth": 14,
+  "keep": 20,
+  "safe": 13,
+  "away": 28,
+  "ready": 10,
+  "ahead": 5,
+  "and": 33,
+  "look": 29,
+  "start": 13,
+  "car": 5,
+  "again": 22,
+  "one": 16,
+  "write": 5,
+  "find": 19,
+  "newspaper": 5,
+  "still": 12,
+  "early": 14,
+  "running": 4,
+  "plenty": 4,
+  "week": 20,
+  "yet": 10,
+  "little": 13,
+  "while": 8,
+  "few": 10,
+  "minutes": 7,
+  "after": 12,
+  "before": 24,
+  "afternoon": 13,
+  "evening": 13,
+  "tonight": 4,
+  "last": 17,
+  "month": 8,
+  "year": 4,
+  "every": 28,
+  "whole": 13,
+  "possible": 7,
+  "lonely": 5,
+  "anxious": 5,
+  "depressed": 5,
+  "frustrated": 5,
+  "hopeful": 5,
+  "confused": 5,
+  "overwhelmed": 5,
+  "peaceful": 5,
+  "nervous": 5,
+  "excited": 5,
+  "relieved": 5,
+  "future": 5,
+  "falling": 5,
+  "way": 27,
+  "were": 42,
+  "wish": 16,
+  "more": 27,
+  "different": 9,
+  "stronger": 7,
+  "than": 27,
+  "new": 14,
+  "thankful": 5,
+  "means": 10,
+  "lot": 8,
+  "first": 8,
+  "thing": 22,
+  "talked": 3,
+  "step": 6,
+  "same": 17,
+  "other": 13,
+  "most": 13,
+  "only": 8,
+  "old": 6,
+  "big": 8,
+  "question": 6,
+  "small": 6,
+  "news": 6,
+  "problem": 9,
+  "answer": 5,
+  "reason": 6,
+  "fact": 12,
+  "place": 3,
+  "came": 3,
+  "man": 3,
+  "helped": 3,
+  "woman": 3,
+  "called": 3,
+  "playing": 3,
+  "working": 3,
+  "closed": 3,
+  "store": 3,
+  "honest": 3,
+  "fair": 3,
+  "able": 5,
+  "result": 3,
+  "happens": 9,
+  "out": 12,
+  "advice": 3,
+  "simple": 3,
+  "simply": 3,
+  "has": 29,
+  "begun": 3,
+  "ago": 8,
+  "bit": 5,
+  "deal": 3,
+  "work": 16,
+  "forward": 5,
+  "patient": 3,
+  "break": 3,
+  "but": 16,
+  "live": 3,
+  "friend": 3,
+  "heart": 3,
+  "ever": 3,
+  "outcome": 3,
+  "usually": 3,
+  "days": 3,
+  "opinion": 3,
+  "table": 3,
+  "mind": 5,
+  "hand": 3,
+  "enough": 15,
+  "less": 5,
+  "expected": 7,
+  "far": 15,
+  "yesterday": 3,
+  "times": 3,
+  "even": 5,
+  "though": 3,
+  "hard": 7,
+  "others": 3,
+  "also": 3,
+  "both": 5,
+  "each": 5,
+  "indeed": 3,
+  "part": 3,
+  "sort": 3,
+  "because": 3,
+  "instead": 3,
+  "front": 3,
+  "house": 7,
+  "from": 11,
+  "top": 3,
+  "else": 3,
+  "spite": 3,
+  "practice": 3,
+  "course": 15,
+  "least": 9,
+  "example": 3,
+  "such": 3,
+  "nothing": 7,
+  "situation": 2,
+  "meeting": 2,
+  "tried": 2,
+  "already": 2,
+  "chance": 8,
+  "around": 2,
+  "ask": 14,
+  "noise": 2,
+  "beginning": 4,
+  "end": 2,
+  "between": 2,
+  "done": 6,
+  "any": 2,
+  "sense": 2,
+  "during": 2,
+  "woke": 2,
+  "single": 4,
+  "giving": 2,
+  "finally": 2,
+  "got": 2,
+  "glad": 2,
+  "hear": 8,
+  "had": 8,
+  "decision": 2,
+  "into": 2,
+  "sat": 2,
+  "posted": 2,
+  "spoke": 2,
+  "left": 2,
+  "improve": 2,
+  "story": 2,
+  "short": 2,
+  "seeing": 2,
+  "made": 2,
+  "difference": 2,
+  "must": 2,
+  "meet": 4,
+  "often": 2,
+  "once": 2,
+  "upon": 4,
+  "really": 4,
+  "probably": 2,
+  "ease": 2,
+  "quite": 2,
+  "since": 4,
+  "whenever": 2,
+  "changed": 2,
+  "sometimes": 2,
+  "thought": 4,
+  "their": 2,
+  "own": 2,
+  "then": 2,
+  "decide": 2,
+  "handle": 2,
+  "under": 2,
+  "circumstances": 2,
+  "until": 2,
+  "further": 2,
+  "spend": 2,
+  "which": 2,
+  "prefer": 2,
+  "without": 2,
+  "doubt": 2,
+  "team": 2,
+  "years": 2,
+  "stand": 6,
+  "pick": 6,
+  "worries": 6
+ }
+}
