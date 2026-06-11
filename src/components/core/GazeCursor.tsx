@@ -72,7 +72,7 @@ const ALPHA_SLOW = 0.35;         // moderate convergence during fixation
 const ALPHA_NORMAL = 0.55;       // medium transition response
 const ALPHA_FAST = 0.85;         // near-raw for saccades
 
-// === DWELL PAUSE-ON-GAP (flag: gazeFlags.dwellPauseOnGap, default OFF) ===
+// === DWELL PAUSE-ON-GAP (flag: gazeFlags.dwellPauseOnGap, default ON since the 2026-06-11 on-rig A/B) ===
 // When enabled, dwell/onset timers freeze (never reset, never advance) while
 // gaze is stale or the backend reports blink/oob/frozen. 150ms matches the
 // backend's POINT_TTL_SECONDS / FRAME_GAP_HOLD_SECONDS.
@@ -525,7 +525,7 @@ export const GazeCursor: React.FC = () => {
       return;
     }
 
-    // === DWELL PAUSE-ON-GAP (flag: dwellPauseOnGap, default OFF) ==========
+    // === DWELL PAUSE-ON-GAP (flag: dwellPauseOnGap, default ON) ===========
     // While gaze is stale (no fresh frame >150ms) or the backend signal
     // state is blink/oob/frozen, freeze every dwell-related clock by
     // shifting its start/expiry forward by this frame's dt. Progress
@@ -1255,7 +1255,7 @@ export const GazeCursor: React.FC = () => {
       }
 
       if (shouldBreakLock) {
-        // === LOCK-BREAK PROGRESS RETENTION (flag, default OFF) ============
+        // === LOCK-BREAK PROGRESS RETENTION (flag, default ON) =============
         // Mirror the hit-test-miss save path: preserve dwell progress in
         // the fixation-TTL store so re-fixating the same target within
         // FIXATION_TTL_MS resumes instead of restarting from 0. Baseline
