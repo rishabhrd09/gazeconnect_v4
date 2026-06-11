@@ -141,12 +141,44 @@ After the on-rig A/B (results above), plain `.\start-dev.bat` now gets the impro
 
 **New tooling:** `scripts/check-injected-script.js` — `new Function()` parse check for the injected browser script (a template literal tsc cannot validate). Run after any `browserGazeController.ts` edit.
 
+---
+
+## Entry 13 — 2026-06-11 — Adversarial review of Entries 7–12 (7 reviewers, per-finding verification)
+
+A multi-agent adversarial review of the Entry 7–12 range raised 18 findings; every verification vote that completed confirmed its finding. **All confirmed findings are fixed in Entries 14–16.** Highlights of what was confirmed:
+- **Critical:** the double-speak fix silenced Hindi while connected (backend SAPI5 renders Devanagari as a 46-byte silent WAV — empirically reproduced twice), including the Hindi half of the emergency phrase.
+- **Critical:** simulation mode (and the automatic mouse fallback after a 1.5s tracker dropout) could no longer dwell-click in the embedded browser — a stationary mouse fires no events and the gap pause neutralized wall-clock catch-up.
+- **Major:** gap-pause could shift `state.start` past the wall clock (dwell silently dead up to ~2s after click+blink); retention saved off-target wall-clock overrun as 0.99 (glance-back commits faster than human reaction); the sticky-ghost could resume onto stale coordinates after a YouTube re-flow; Voice Settings were dead on the backend path; backend-TTS-dead = total mute behind a green "Connected".
+- **Minor (all fixed):** WMA blended seconds-old samples after gaps; WMA lag raised the effective snap gate 18→~40px; retention keys broke on resolution-path kind flips; gcConfig rollbacks evaporated on page load; the hide-once guard could strand a frozen page cursor after an effect re-run.
+- **Noted, not actioned:** 66Hz forwarding doubles page-side DOM scan cost (bounded by the 80-card slice) — to be measured on-rig via the page frames ring (`dtMs`) before any throttling decision.
+
+## Entry 14 — 2026-06-11 — Speech safety: Hindi routing, TTS-health fallback, settings sync
+
+`src/utils/ttsRouting.ts` (pure, tested) + `App.tsx` + `useWebSocket.tsx` + `main.py`:
+- **One voice per utterance, routed safely:** volume 0 → mute everything and stop in-flight speech (deliberate: this also mutes emergency speech, honoring the panel's "0 = muted"); Hindi/Devanagari → browser speechSynthesis with mixed text split into per-script runs (en-US then hi-IN) so the bilingual emergency phrase is audible in both languages; English → backend only when connected AND `tts_available`, else browser fallback.
+- **TTS health handshake:** `TTSEngine.available` → `tts_available` in the `connected` message → `ws.ttsAvailable`. A connected-but-voiceless backend now falls back to the browser voice instead of leaving the patient mute.
+- **Reconnect overlap:** backend path cancels in-flight browser utterances; `ws.stopSpeaking` cancels BOTH engines.
+- **Settings wired:** ttsRate (WPM) / ttsVolume sync to the backend on connect/change; the browser fallback converts WPM → utterance multiplier (was passing raw WPM = max speed).
+- **Tests:** `node scripts/check-tts-routing.js` (17 checks) + `python\tests\test_tts_available.py` (5 cases).
+- **Known residual:** a mid-session engine wedge (runAndWait hang) is not detectable via the handshake flag; the cross-thread `engine.stop()` remains the most likely wedge trigger (pre-existing).
+
+## Entry 15 — 2026-06-11 — Browser dwell hardening (retention + gap pause)
+
+`browserGazeController.ts`: progress saves count only genuinely on-target time (`lastOnTargetAt`); overrun is discarded, not clamped; resume requires a fresh real hit-test resolution (never the sticky ghost) with a kind-normalized key match; navigation invalidates saves; gap-pause shifts only clocks that predate the gap and never past the wall clock (`dwellingExpiryAt` capped at one fresh 600ms grace window).
+
+## Entry 16 — 2026-06-11 — Forwarding correctness + durable browser-flag rollback
+
+`WebBrowsingScreen.tsx`: 33ms heartbeat ONLY when no real gaze stream exists (restores simulation park-to-click without reintroducing stale-gaze dwell advancement); page-cursor visibility tracked in a ref that survives effect re-runs (kills the stranded frozen cursor); WMA resets after >150ms stream gaps and real↔simulation flips; the 18px snap gate tests unfiltered displacement and restarts the WMA at the new point.
+
+`main.ts` + `gazeFlags.ts`: `progressRetentionEnabled/Ms` + `gapPauseEnabled/Ms` are now part of `browserGazeConfig` (type, defaults, setGazeConfig whitelist, per-page seed) and driven by two new localStorage gazeFlags — `browserProgressRetention`, `browserGapPause` (default ON). A rollback set once now survives page loads AND restarts.
+
 ## Rollback instructions (current state)
 
 Each improvement reverts independently, without code edits:
 - Speech back to old (blocking) behavior: set `GAZECONNECT_TTS_ASYNC=0` before `start-dev.bat`.
 - Dwell behaviors back to old: in DevTools console — `window.__gazeFlags.set('dwellPauseOnGap', false)` and/or `window.__gazeFlags.set('lockBreakProgressRetention', false)` (persists across restarts).
-- Browser-cursor behaviors back to old: in the BrowserView DevTools console — `window.gcConfig.progressRetentionEnabled = false` (Entry 7) and/or `window.gcConfig.gapPauseEnabled = false` (Entry 8). These reset on page reload; for a persistent revert, `git revert` the commit.
+- Browser-cursor behaviors back to old (persistent, survives page loads and restarts): in the MAIN app DevTools — `window.__gazeFlags.set('browserProgressRetention', false)` (Entry 7) and/or `window.__gazeFlags.set('browserGapPause', false)` (Entry 8), then re-enter the web screen. Per-page-only override still works via `window.gcConfig.*` in the BrowserView DevTools.
+- Speech routing back to old behavior: `git revert` the Entry 14 commit (the old behavior — two overlapping voices — is itself the bug, so no runtime flag is provided).
 - Telemetry additions are measurement-only (no behavior); removal = `git revert`.
 - Transport/render changes (Entries 9–12) have no behavioral constants; revert their individual commits if needed.
 - Hard rollback of everything: `git checkout de1aee6` (or revert the commits on top of it).
