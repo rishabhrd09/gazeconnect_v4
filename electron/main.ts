@@ -117,6 +117,9 @@ type BrowserGazeConfig = {
   bayesianStableFrames: number;
   bayesianStableMargin: number;
   edgeScrollPauseDuringDwell: boolean;
+  // v17.21 — page-zoom coordinate compensation (root cause of the
+  // rightward cursor drift; see handleWebviewGazeFrame).
+  zoomCompensationEnabled: boolean;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -166,6 +169,7 @@ let browserGazeConfig: BrowserGazeConfig = {
   bayesianStableFrames: 4,
   bayesianStableMargin: 0.10,
   edgeScrollPauseDuringDwell: true,
+  zoomCompensationEnabled: true,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -186,8 +190,19 @@ function resetEdgeScrollState(notify: boolean = true) {
 function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activeBrowserViewSessionId) {
   const view = activeBrowserView;
   if (!view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
-  const cx = Math.round(x);
-  const cy = Math.round(y);
+  // v17.21 — x,y arrive in PAGE CSS px (both live callers source them from
+  // in-page scripts: the dwell click request and youtubeCommand's
+  // trustedClick). sendInputEvent expects view DIPs, and Blink maps DIPs
+  // back to CSS by dividing by the page zoom — so without this multiply,
+  // a click aimed at an element's CSS center landed at center/zoom
+  // (26% up-left at the 1.35 default): the "plays the wrong thing"
+  // mis-click. Rollback: setGazeConfig({ zoomCompensationEnabled: false })
+  let zf = 1;
+  if (browserGazeConfig.zoomCompensationEnabled) {
+    try { zf = view.webContents.getZoomFactor() || 1; } catch { zf = 1; }
+  }
+  const cx = Math.round(x * zf);
+  const cy = Math.round(y * zf);
   // Suspend the in-page dwell cursor for the duration of the post-click
   // cooldown. Previously we reset the dwell which also zeroed
   // `blockedUntil`, defeating the cooldown — letting the gaze fire a
@@ -1835,6 +1850,8 @@ function setupIpcHandlers(): void {
       bayesianStableMargin: clampNumber(config?.bayesianStableMargin, browserGazeConfig.bayesianStableMargin, 0, 0.5),
       edgeScrollPauseDuringDwell: typeof config?.edgeScrollPauseDuringDwell === 'boolean'
         ? config.edgeScrollPauseDuringDwell : browserGazeConfig.edgeScrollPauseDuringDwell,
+      zoomCompensationEnabled: typeof config?.zoomCompensationEnabled === 'boolean'
+        ? config.zoomCompensationEnabled : browserGazeConfig.zoomCompensationEnabled,
     };
 
     if (activeBrowserView) {
@@ -2025,8 +2042,21 @@ function setupIpcHandlers(): void {
       }
 
       browserDiagnostics.recordIpcTick();
+      // v17.21 — convert view DIPs → page CSS px before hit-testing. The
+      // page runs at zoomFactor (1.35 default), so CSS coords = view/zoom.
+      // Without this, the injected script treated view px as CSS px:
+      // the ring rendered at 1.35× the gaze position (a rightward+downward
+      // drift growing with distance from the top-left — at the watch-page
+      // sidebar, ~150-400px right of where the patient looked), and every
+      // distance/radius compared mixed units. The user-visible symptom was
+      // "the cursor keeps drifting right when I try to select a sidebar
+      // video". Rollback: setGazeConfig({ zoomCompensationEnabled: false })
+      let zf = 1;
+      if (browserGazeConfig.zoomCompensationEnabled) {
+        try { zf = view.webContents.getZoomFactor() || 1; } catch { zf = 1; }
+      }
       view.webContents.executeJavaScript(
-        buildGazeUpdateAndPollScript(x, y, cursorEnabled)
+        buildGazeUpdateAndPollScript(x / zf, y / zf, cursorEnabled)
       ).then((json: string | null) => {
         if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
           try {

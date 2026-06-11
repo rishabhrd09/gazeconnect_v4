@@ -234,6 +234,20 @@ A multi-agent adversarial review of the Entry 7–12 range raised 18 findings; e
 **Measure on-rig:** in the BrowserView DevTools, `__gcTelemetry.events2().filter(e => e.kind === 'targetSwitch').length` per minute of sidebar browsing should drop sharply; `snapshot().medianResidualPx` and dwellToClickMs on `youtube_nearest_card` clicks should improve.
 **Rollback (runtime):** `setGazeConfig({ bayesianStickyMult: 1, edgeScrollPauseDuringDwell: false })`; renderer constants via `git revert`.
 
+## Entry 26 — 2026-06-11 — ROOT CAUSE: page-zoom coordinate mismatch (config, default ON)
+
+**Symptom (on-rig, second report):** cursor "drifts toward the right" when trying to select sidebar videos; screenshot showed the ring at the far right edge (~x1600) while the user was looking at the cards (~x1170). 1600 ≈ 1170 × 1.35 — the page zoom factor.
+
+**Root cause:** the BrowserView runs at `setZoomFactor(1.35)` (AAC readability default), and NOTHING in the gaze path converted coordinate spaces. The injected script received view DIPs but the page operates in CSS px (= view/zoom):
+- The ring was drawn at `gaze × 1.35` physically — a rightward+downward drift growing with distance from the top-left. At the watch-page sidebar it was hundreds of px; the patient had to look UP-LEFT of a card to bring the ring onto it.
+- `elementFromPoint(gaze-as-CSS)` hit whatever was visually at 1.35× — and for gaze x beyond `innerWidth` (the right ~26% of the view!) it returned null: nothing was ever resolvable there.
+- Every radius/distance compared mixed units (gaze in view px vs rects in CSS px) — why card snap zones had to be tuned so wide.
+- Trusted clicks: `sendInputEvent` DIPs are divided by zoom in Blink, so a click aimed at an element's CSS center landed at center/1.35 — 26% up-left, on big grids often inside the NEIGHBOURING card: the long-reported "plays the wrong thing" mis-click.
+
+**Change:** `main.ts` — gaze is divided by `webContents.getZoomFactor()` before the per-frame poll (hit-testing, dwell, and the ring now live in true CSS space, so the ring renders exactly where the patient looks), and `sendTrustedBrowserClick` multiplies page-CSS click coords back into view DIPs (clicks land on the element center). Edge-scroll wheel events and `webview:click` were already in input space — untouched.
+**Consequences:** all in-page radii (stability 60, card zones 130/230) now measure true CSS px while gaze noise in CSS is old-noise/1.35 — effectively ~35% MORE forgiving. If snapping now feels too grabby, the zones can be tuned DOWN via setGazeConfig (a good problem).
+**Rollback:** `setGazeConfig({ zoomCompensationEnabled: false })` restores the old (broken) spaces exactly.
+
 ## Rollback instructions (current state)
 
 Each improvement reverts independently, without code edits:
