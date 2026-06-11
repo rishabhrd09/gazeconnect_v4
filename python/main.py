@@ -1766,6 +1766,12 @@ class GazeConnectBackend:
         # For gaze: store latest, let broadcast loop handle it
         if msg_type == 'gaze':
             self._latest_gaze_msg = message
+            # v17.19 push mode: wake the broadcast loop NOW instead of
+            # letting the frame wait for the next paced tick (0-15.2ms,
+            # mean ~7.6ms of avoidable glass-to-glass latency per frame).
+            ev = getattr(self, '_gaze_push_event', None)
+            if ev is not None:
+                ev.set()
             return
 
         # For non-gaze: send immediately
@@ -1778,37 +1784,58 @@ class GazeConnectBackend:
 
     async def _gaze_broadcast_loop(self):
         """
-        Dedicated loop that sends latest gaze data at ~60Hz.
-        Prevents overwhelming WebSocket with 133 fire-and-forget tasks/sec.
+        Dedicated loop that sends the latest gaze data to clients.
+
+        v17.19 push mode (default): waits on an asyncio.Event that the
+        gaze path sets the moment a frame is stored, so each frame is
+        sent immediately on arrival instead of waiting for the next
+        paced tick. The ET5 delivers ~33Hz, so the old fixed 66Hz pacing
+        added 0-15.2ms (mean ~7.6ms) to every frame for no benefit.
+        Set GAZECONNECT_GAZE_PUSH=0 to revert to the paced loop.
         """
-        logger.info("Gaze broadcast loop started (~66Hz)")
+        push_mode = os.environ.get('GAZECONNECT_GAZE_PUSH', '1').strip().lower() not in ('0', 'false', 'no', 'off')
+        self._gaze_push_event = asyncio.Event() if push_mode else None
+        if push_mode:
+            logger.info("Gaze broadcast loop started (push-on-frame mode; set GAZECONNECT_GAZE_PUSH=0 for the paced loop)")
+        else:
+            logger.info("Gaze broadcast loop started (paced mode, ~66Hz tick / ~33Hz effective; GAZECONNECT_GAZE_PUSH=0)")
         self._latest_gaze_msg = None
         send_count = 0
         last_log = time.time()
 
         while True:
             try:
-                # v9: High-precision broadcast timing
-                # asyncio.sleep(1/66) has 15.6ms resolution on Windows â†’ ~32Hz actual
-                # Hybrid: sleep most of the interval, then yield rapidly for precision
-                target_interval = 1/66
-                if not hasattr(self, '_next_broadcast'):
-                    self._next_broadcast = time.perf_counter()
-                self._next_broadcast += target_interval
-
-                now = time.perf_counter()
-                wait = self._next_broadcast - now
-                if wait < -0.05 or wait > 0.05:
-                    # Timing drifted too far, reset
-                    self._next_broadcast = now + target_interval
-                    await asyncio.sleep(0)
-                elif wait > 0.005:
-                    await asyncio.sleep(wait - 0.003)
-                    # Yield rapidly until target time (sub-ms precision)
-                    while time.perf_counter() < self._next_broadcast:
-                        await asyncio.sleep(0)
+                if push_mode:
+                    # Wake on frame arrival; 50ms timeout keeps the loop
+                    # alive (rate logging, dead-client sweeps) across
+                    # tracker gaps/blinks without busy-waiting.
+                    try:
+                        await asyncio.wait_for(self._gaze_push_event.wait(), timeout=0.05)
+                    except asyncio.TimeoutError:
+                        pass
+                    self._gaze_push_event.clear()
                 else:
-                    await asyncio.sleep(0)
+                    # v9: High-precision broadcast timing
+                    # asyncio.sleep(1/66) has 15.6ms resolution on Windows â†’ ~32Hz actual
+                    # Hybrid: sleep most of the interval, then yield rapidly for precision
+                    target_interval = 1/66
+                    if not hasattr(self, '_next_broadcast'):
+                        self._next_broadcast = time.perf_counter()
+                    self._next_broadcast += target_interval
+
+                    now = time.perf_counter()
+                    wait = self._next_broadcast - now
+                    if wait < -0.05 or wait > 0.05:
+                        # Timing drifted too far, reset
+                        self._next_broadcast = now + target_interval
+                        await asyncio.sleep(0)
+                    elif wait > 0.005:
+                        await asyncio.sleep(wait - 0.003)
+                        # Yield rapidly until target time (sub-ms precision)
+                        while time.perf_counter() < self._next_broadcast:
+                            await asyncio.sleep(0)
+                    else:
+                        await asyncio.sleep(0)
 
                 msg = self._latest_gaze_msg
                 if not msg or not self.connected_clients:
