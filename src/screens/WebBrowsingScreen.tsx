@@ -3761,6 +3761,14 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const wmaPrev2Ref = useRef<{ x: number; y: number } | null>(null);
     const hasRealGazeRef = useRef(hasRealGaze);
     useEffect(() => { hasRealGazeRef.current = hasRealGaze; }, [hasRealGaze]);
+    // v17.18: hide/show bookkeeping that must SURVIVE effect re-runs — the
+    // earlier hide-once guard keyed on smoothedGazeRef, which the effect body
+    // resets, so a dep-change re-run while the page cursor was visible left a
+    // stale frozen cursor over the page (review-confirmed). These refs are
+    // the source of truth for "is the page cursor currently shown".
+    const pageCursorVisibleRef = useRef(false);
+    const lastForwardAtRef = useRef(0);
+    const lastForwardModeRef = useRef<boolean | null>(null);
     useEffect(() => {
         if (!browser.isOpen) return;
         smoothedGazeRef.current = null;
@@ -3772,38 +3780,77 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         const MIN_FORWARD_INTERVAL_MS = 14;
         let lastSentAt = 0;
 
+        // Hide exactly once per transition, no matter how the filter refs
+        // were reset in between; show records visibility for the next hide.
+        const hidePageCursor = () => {
+            smoothedGazeRef.current = null;
+            wmaPrev1Ref.current = null;
+            wmaPrev2Ref.current = null;
+            if (pageCursorVisibleRef.current) {
+                pageCursorVisibleRef.current = false;
+                browser.hideGazeCursor();
+            }
+        };
+        const showPageCursor = (x: number, y: number, opts?: { cursor?: boolean }) => {
+            pageCursorVisibleRef.current = opts?.cursor !== false;
+            browser.updateGazeCursor(x, y, opts);
+        };
+
         const forward = () => {
             const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed' && view !== 'youtube';
             if (!ige || (isBrowserWatchMode && !allowWatchScroll)) {
-                // Hide once per transition — the old poll re-sent the hide IPC
-                // every 33ms for as long as the state lasted.
-                if (smoothedGazeRef.current) {
-                    smoothedGazeRef.current = null;
-                    browser.hideGazeCursor();
-                }
-                wmaPrev1Ref.current = null;
-                wmaPrev2Ref.current = null;
+                hidePageCursor();
                 return;
             }
             const nowMs = Date.now();
             if (nowMs - lastSentAt < MIN_FORWARD_INTERVAL_MS) return;
             lastSentAt = nowMs;
 
+            // v17.18: WMA history is only valid for a continuous same-mode
+            // stream — reset after a stream gap (>150ms, the discontinuity
+            // threshold the page-side gapPause uses) or a real<->simulation
+            // mode flip, so seconds-old samples never blend into the first
+            // post-gap frames (the "ghost mid-point sweep" review finding).
+            if (lastForwardAtRef.current > 0 && nowMs - lastForwardAtRef.current > 150) {
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
+            }
+            if (lastForwardModeRef.current !== hasRealGazeRef.current) {
+                lastForwardModeRef.current = hasRealGazeRef.current;
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
+            }
+            lastForwardAtRef.current = nowMs;
+
             const gazeNow = gpRef.current;
             const prev = smoothedGazeRef.current;
             const activeBounds = browser.boundsRef.current;
 
             if (view === 'youtube' && isYtVideoActive && activeBounds && gazeNow.y < activeBounds.y + 96) {
-                if (prev) {
-                    smoothedGazeRef.current = null;
-                    browser.hideGazeCursor();
-                }
-                wmaPrev1Ref.current = null;
-                wmaPrev2Ref.current = null;
+                hidePageCursor();
                 return;
             }
 
-            // WMA(3) prefilter — weights match the main cursor.
+            // v17.18: the snap decision uses the UNFILTERED displacement so
+            // WMA lag cannot raise the effective 18px gate to ~40px (review:
+            // adjacent-link refixations degraded into EMA crawl, and post-gap
+            // refixations swept through 2-3 ghost mid-points). A snap is a
+            // discontinuity: jump straight to the true gaze point and restart
+            // the WMA history there.
+            if (prev) {
+                const jumpDist = Math.hypot(gazeNow.x - prev.x, gazeNow.y - prev.y);
+                if (jumpDist > 18) {
+                    wmaPrev1Ref.current = { x: gazeNow.x, y: gazeNow.y };
+                    wmaPrev2Ref.current = { x: gazeNow.x, y: gazeNow.y };
+                    smoothedGazeRef.current = { x: gazeNow.x, y: gazeNow.y };
+                    showPageCursor(gazeNow.x, gazeNow.y, allowWatchScroll ? { cursor: false } : undefined);
+                    return;
+                }
+            }
+
+            // WMA(3) prefilter — weights match the main cursor. Only the
+            // sub-snap band (<=18px true displacement) reaches this filter,
+            // so it smooths fixation noise without delaying refixations.
             const w1 = wmaPrev1Ref.current;
             const w2 = wmaPrev2Ref.current;
             const raw = (w1 && w2)
@@ -3817,7 +3864,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
 
             if (!prev) {
                 smoothedGazeRef.current = { x: raw.x, y: raw.y };
-                browser.updateGazeCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
+                showPageCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
@@ -3825,16 +3872,9 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             const dy = raw.y - prev.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Large move: snap to the new point.
-            if (dist > 18) {
-                smoothedGazeRef.current = { x: raw.x, y: raw.y };
-                browser.updateGazeCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
-                return;
-            }
-
             // Tiny jitter: hold the rendered point.
             if (dist < 1.5) {
-                browser.updateGazeCursor(prev.x, prev.y, allowWatchScroll ? { cursor: false } : undefined);
+                showPageCursor(prev.x, prev.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
@@ -3845,7 +3885,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 y: prev.y + dy * alpha,
             };
             smoothedGazeRef.current = next;
-            browser.updateGazeCursor(next.x, next.y, allowWatchScroll ? { cursor: false } : undefined);
+            showPageCursor(next.x, next.y, allowWatchScroll ? { cursor: false } : undefined);
         };
 
         // Real gaze: one forward per backend frame. The gpRef-filling
@@ -3858,15 +3898,26 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             if (!hasRealGazeRef.current) forward();
         };
         window.addEventListener('mousemove', onMouse);
+        // v17.18: a STATIONARY mouse fires no events, so simulation mode
+        // (and the automatic mouse fallback 1.5s after a tracker dropout)
+        // could never complete a dwell — the page dwell only ticks when
+        // frames arrive, and the page-side gap pause neutralizes wall-clock
+        // catch-up. This heartbeat re-sends the held position ONLY when no
+        // real gaze stream exists; with real gaze it is a no-op, so blink
+        // gaps stay gaps and stale-gaze dwell advancement is NOT
+        // reintroduced (review-confirmed critical).
+        const heartbeat = window.setInterval(() => {
+            if (!hasRealGazeRef.current) forward();
+        }, 33);
         // Entering a hidden state (gaze off / watch mode) must hide even
         // if no further frames arrive.
         if (!ige || (isBrowserWatchMode && !(browser.scrollMode === 'armed' && view !== 'youtube'))) {
-            smoothedGazeRef.current = null;
-            browser.hideGazeCursor();
+            hidePageCursor();
         }
         return () => {
             unsub();
             window.removeEventListener('mousemove', onMouse);
+            window.clearInterval(heartbeat);
         };
     }, [ws.subscribeGaze, browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
 
