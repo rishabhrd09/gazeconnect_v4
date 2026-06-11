@@ -116,7 +116,14 @@ export function buildBrowserCursorInjectionScript(): string {
         // brief tremor excursion → full restart.
         savedProgress: 0,
         savedProgressKey: '',
-        savedProgressAt: 0
+        savedProgressAt: 0,
+        // v17.18 — wall-clock time of the last frame on which the tracked
+        // target was REALLY resolved (not via the sticky ghost). The save
+        // path counts progress only up to this moment, so time spent with
+        // gaze parked off-target near the anchor can never inflate a save
+        // (review finding: inflated clocks produced ~0.99 saves that
+        // committed faster than human reaction on glance-back).
+        lastOnTargetAt: 0
       };
 
       window.gcConfig = Object.assign({
@@ -573,6 +580,17 @@ export function buildBrowserCursorInjectionScript(): string {
           state.fsExiting = false;
           if (state.fsExitAttempts >= 3) gcEmit('fullscreenLockoutRisk', { attempts: state.fsExitAttempts });
         }
+      };
+
+      // v17.18 — retention identity ignores the resolution-path 'kind'
+      // prefix: the same card resolves as youtube_anchor (direct hit),
+      // youtube_card, or youtube_nearest_card (snap zone) depending on
+      // where the tremor lands, and a kind flip must not destroy or miss
+      // a save. (isLockedYoutubeCard already normalizes kinds this way.)
+      const retentionKeyOf = (key) => {
+        const s = String(key || '');
+        const i = s.indexOf('|');
+        return i >= 0 ? s.slice(i + 1) : s;
       };
 
       const stableKeyFor = (target, kind, href, label, rect) => [
@@ -1303,19 +1321,25 @@ export function buildBrowserCursorInjectionScript(): string {
             cursor.classList.remove('dwelling');
           }
 
-          // v17.17 — save dwell progress before it is discarded below.
-          // Fraction maps the post-onset portion of the dwell: 0 at
-          // onset completion, 1 at commit. Saved only when meaningful
-          // (>= 5%, mirrors FIXATION_TTL_MIN_PROGRESS in the app).
+          // v17.17/v17.18 — save dwell progress before it is discarded
+          // below. Fraction maps the post-onset portion of the dwell: 0 at
+          // onset completion, 1 at commit. v17.18 (review-confirmed fixes):
+          //   - progress counts only up to lastOnTargetAt, the last frame
+          //     the target REALLY resolved — never wall-clock time spent
+          //     parked off-target near the anchor;
+          //   - overrun (frac >= 1) is DISCARDED, not clamped to 0.99,
+          //     mirroring the app cursor's "currentProgress < 1" rule;
+          //   - the stored key is kind-normalized so a tremor re-entry via
+          //     a different resolution path can still resume.
           if (cfg.progressRetentionEnabled !== false &&
-              !state.clicked && state.start > 0 && state.targetKey) {
-            const elapsedAtBreak = now - state.start;
-            if (elapsedAtBreak > onsetMs) {
-              const frac = Math.min(0.99,
-                (elapsedAtBreak - onsetMs) / Math.max(1, dwellMs - onsetMs));
-              if (frac >= 0.05) {
+              !state.clicked && state.start > 0 && state.targetKey &&
+              state.lastOnTargetAt >= state.start) {
+            const onTargetElapsed = state.lastOnTargetAt - state.start;
+            if (onTargetElapsed > onsetMs) {
+              const frac = (onTargetElapsed - onsetMs) / Math.max(1, dwellMs - onsetMs);
+              if (frac >= 0.05 && frac < 1) {
                 state.savedProgress = frac;
-                state.savedProgressKey = state.targetKey;
+                state.savedProgressKey = retentionKeyOf(state.targetKey);
                 state.savedProgressAt = now;
               }
             }
@@ -1339,10 +1363,15 @@ export function buildBrowserCursorInjectionScript(): string {
           state.clicked = false;
           state.targetKey = newTargetKey;
           state.targetRect = clickReq?.rect || null;
+          // v17.18 — the on-target clock starts only if this acquisition is
+          // a REAL resolution; a sticky-ghost acquisition contributes zero
+          // saveable progress.
+          state.lastOnTargetAt = (clickReq && clickReq.kind !== 'sticky_resume') ? now : 0;
           // v17.17 — a dwell starting on a DIFFERENT target invalidates
           // the save (mirror of the app's fresh-onset clear). Same-key
-          // re-acquisition keeps it for the resume path.
-          if (newTargetKey && state.savedProgressKey && newTargetKey !== state.savedProgressKey) {
+          // re-acquisition keeps it for the resume path (kind-normalized).
+          if (newTargetKey && state.savedProgressKey &&
+              retentionKeyOf(newTargetKey) !== state.savedProgressKey) {
             state.savedProgress = 0;
             state.savedProgressKey = '';
             state.savedProgressAt = 0;
@@ -1372,16 +1401,24 @@ export function buildBrowserCursorInjectionScript(): string {
         // the ring class as normal.
         state.dwellingExpiryAt = 0;
 
-        // v17.17 — resume saved dwell progress. Stability is held on the
-        // same targetKey the save belongs to and the TTL hasn't expired:
-        // reconstruct state.start so elapsed maps back to the saved
-        // fraction. Onset is skipped (the target was already validated),
-        // matching the app cursor's resume semantics.
-        if (state.savedProgressKey && state.savedProgressKey === state.targetKey &&
-            !state.clicked && cfg.progressRetentionEnabled !== false) {
+        // v17.17/v17.18 — resume saved dwell progress. Requirements
+        // (review-confirmed): THIS frame's clickReq must be a FRESH real
+        // hit-test resolution (never the sticky ghost, which fabricates
+        // the old key from a stale rect — after a YouTube re-flow that
+        // committed clicks onto whatever now occupies the old space), its
+        // kind-normalized key must match the save, and the TTL must be
+        // live. Then reconstruct state.start so elapsed maps back to the
+        // saved fraction; onset is skipped (the target was already
+        // validated), matching the app cursor's resume semantics — the
+        // app, too, resumes only on a freshly hit-tested element.
+        if (state.savedProgressKey && cfg.progressRetentionEnabled !== false &&
+            !state.clicked &&
+            clickReq && clickReq.kind !== 'sticky_resume' &&
+            retentionKeyOf(clickReq.key || '') === state.savedProgressKey) {
           if ((now - state.savedProgressAt) < Number(cfg.progressRetentionMs || 1000)) {
             const resumeElapsed = state.savedProgress * Math.max(1, dwellMs - onsetMs) + onsetMs;
             state.start = now - resumeElapsed;
+            state.lastOnTargetAt = now;
             gcEmit('dwellResumed', {
               candId: state.targetKey,
               frac: Math.round(state.savedProgress * 100) / 100
@@ -1390,6 +1427,13 @@ export function buildBrowserCursorInjectionScript(): string {
           state.savedProgress = 0;
           state.savedProgressKey = '';
           state.savedProgressAt = 0;
+        }
+
+        // v17.18 — refresh the on-target clock whenever the tracked target
+        // is REALLY resolved this frame (the save path counts only up to
+        // this timestamp).
+        if (sameTarget && clickReq && clickReq.kind !== 'sticky_resume') {
+          state.lastOnTargetAt = now;
         }
 
         // v17.15 DoD-4 — cancel onset if the active target's centre has
@@ -1584,6 +1628,11 @@ export function buildBrowserCursorInjectionScript(): string {
           bumpEpoch('hard');
           gcEmit('routeChange', { url: location.href });
           state.lastRouteUrl = location.href;
+          // v17.18 — navigation invalidates saved dwell progress: the page
+          // identity changed, so a key collision must never resume.
+          state.savedProgress = 0;
+          state.savedProgressKey = '';
+          state.savedProgressAt = 0;
         }
         // v17.16 — keep the active-video reference and rect fresh so the
         // in-video suppression test below uses this frame's geometry, not
@@ -1608,9 +1657,26 @@ export function buildBrowserCursorInjectionScript(): string {
         const cfgGap = window.gcConfig || {};
         if (cfgGap.gapPauseEnabled !== false && lastFrameTs > 0 &&
             dtMs > Number(cfgGap.gapPauseMs || 150)) {
-          if (state.start > 0) state.start += dtMs;
-          if (state.savedProgressAt > 0) state.savedProgressAt += dtMs;
-          if (state.dwellingExpiryAt > 0) state.dwellingExpiryAt += dtMs;
+          // v17.18 — shift only clocks that PREdate the gap, and never past
+          // the wall clock. gcResetDwell / gcBlockDwell / the post-click
+          // timer all write start = Date.now() BETWEEN frames (navigation
+          // events and the 900ms cooldown timer routinely fire mid-blink);
+          // blindly adding dtMs pushed such a start up to ~2s into the
+          // future, silently deadening dwell after click+blink with zero
+          // visual feedback (review-confirmed). dwellingExpiryAt is
+          // future-dated by design (visual grace) — extend it across the
+          // gap but cap at one fresh grace window.
+          const nowWall = Date.now();
+          const gapStartWall = nowWall - dtMs;
+          if (state.start > 0 && state.start <= gapStartWall) {
+            state.start = Math.min(state.start + dtMs, nowWall);
+          }
+          if (state.savedProgressAt > 0 && state.savedProgressAt <= gapStartWall) {
+            state.savedProgressAt = Math.min(state.savedProgressAt + dtMs, nowWall);
+          }
+          if (state.dwellingExpiryAt > 0) {
+            state.dwellingExpiryAt = Math.min(state.dwellingExpiryAt + dtMs, nowWall + 600);
+          }
         }
         let result = null;
         try {
