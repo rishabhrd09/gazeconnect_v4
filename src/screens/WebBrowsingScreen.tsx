@@ -3887,13 +3887,18 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             // Tiny jitter: hold the rendered point.
-            if (dist < 1.5) {
+            // v17.20: 1.5 → 2.5px hold, on-rig feedback "cursor not stable
+            // during fixation". Refixations are unaffected (the >18px snap
+            // gate is upstream and tests unfiltered displacement). Old: 1.5.
+            if (dist < 2.5) {
                 showPageCursor(prev.x, prev.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
             // Medium move: follow quickly without a hard browser-side lock.
-            const alpha = dist > 8 ? 0.9 : 0.74;
+            // v17.20: sub-8px follow 0.74 → 0.65 (calmer fixation wander,
+            // ~1 extra frame to settle on micro-adjustments). Old: 0.74.
+            const alpha = dist > 8 ? 0.9 : 0.65;
             const next = {
                 x: prev.x + dx * alpha,
                 y: prev.y + dy * alpha,

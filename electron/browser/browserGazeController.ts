@@ -181,6 +181,11 @@ export function buildBrowserCursorInjectionScript(): string {
         bayesianCommitThreshold: 0.45,       // keep at 0.45 — easier commits help dwell
         bayesianOutOfZoneDecay: 0.35,        // keep aggressive — clears stale beliefs
         bayesianExpandedZoneMult: 1.55,      // 1.6 → 1.55, slight trim
+        // v17.20 — incumbent stickiness + tunable stable-winner gate
+        // (sidebar card flip fix; see bayesianYoutubeCard). 1 = off.
+        bayesianStickyMult: 1.35,
+        bayesianStableFrames: 4,
+        bayesianStableMargin: 0.10,
         // v17.17 — dwell progress retention on stability loss. Same
         // semantics as the main app (FIXATION_TTL_MS=1000, min 5%).
         // Rollback without code edits:
@@ -1090,8 +1095,35 @@ export function buildBrowserCursorInjectionScript(): string {
           return null;
         }
 
+        // v17.20 — incumbent stickiness (on-rig finding 2026-06-11: on the
+        // watch-page sidebar, vertically-stacked compact cards sit ~120px
+        // apart and gaze noise keeps two posteriors near-equal; pure
+        // argmax flips winner A->B->A, each flip restarting the dwell and
+        // yanking the visual anchor to the other card's centre — felt as
+        // "the cursor keeps drifting, can't stop it on a card"). While a
+        // card is the tracked dwell target, a challenger must beat its
+        // posterior by bayesianStickyMult (1.35x) to take the win.
+        // Rollback: window.gcConfig.bayesianStickyMult = 1
+        const stickyMult = Number(window.gcConfig?.bayesianStickyMult || 1);
+        if (stickyMult > 1 && state.targetKey && !isLockedYoutubeCard(bestCandidate.anchor)) {
+          let incumbent = null;
+          for (const c of candidates) {
+            if (c !== bestCandidate && isLockedYoutubeCard(c.anchor)) { incumbent = c; break; }
+          }
+          if (incumbent) {
+            const incP = posteriors[incumbent.key] || 0;
+            if (incP > 0 && bestP < incP * stickyMult) {
+              secondP = bestP;
+              bestP = incP;
+              bestCandidate = incumbent;
+            }
+          }
+        }
+
         // v17.15 DoD-3 — stable-winner tracking. Onset is gated on the
-        // same winner holding for 4 frames AND margin >= 0.10.
+        // same winner holding for bayesianStableFrames frames AND margin
+        // >= bayesianStableMargin (v17.20: both configurable for on-rig
+        // tuning; defaults unchanged at 4 / 0.10).
         const winnerId = bestCandidate.key;
         if (state.winnerStableId === winnerId) {
           state.winnerStableCount += 1;
@@ -1119,8 +1151,10 @@ export function buildBrowserCursorInjectionScript(): string {
         // winning). For unlocked, require stable winner + margin +
         // commit threshold.
         if (!lockedWin) {
-          if (state.winnerStableCount < 4) return null;
-          if (margin < 0.10) return null;
+          const stableFrames = Math.max(1, Number(window.gcConfig?.bayesianStableFrames || 4));
+          const stableMargin = Math.max(0, Number(window.gcConfig?.bayesianStableMargin ?? 0.10));
+          if (state.winnerStableCount < stableFrames) return null;
+          if (margin < stableMargin) return null;
           if (bestP < commitThreshold) return null;
         }
 
@@ -1236,6 +1270,7 @@ export function buildBrowserCursorInjectionScript(): string {
         cursor.style.display = 'none';
         cursor.classList.remove('dwelling');
         cursor.classList.remove('clicking');
+        state.dwellState = 'idle'; // v17.20 — main reads this for edge-scroll pause
         state.x = 0;
         state.y = 0;
         state.start = 0;
@@ -2107,11 +2142,18 @@ export function buildBrowserCursorInjectionScript(): string {
 }
 
 export function buildGazeUpdateAndPollScript(x: number, y: number, cursorEnabled: boolean): string {
+  // v17.20 — the poll now ALWAYS returns a JSON envelope:
+  //   { c: <click request | null>, s: <dwellState string> }
+  // The main process uses `s` to pause edge-scrolling while a dwell is in
+  // progress (the page scrolling mid-dwell moved the card under the gaze
+  // and read as "the cursor keeps drifting"). The click contract is
+  // unchanged apart from the envelope.
   return `
     (function() {
       if (!window.gcUpdateAndPoll) return null;
       var r = window.gcUpdateAndPoll(${Math.round(x)}, ${Math.round(y)}, ${cursorEnabled ? 'true' : 'false'});
-      return r ? JSON.stringify(r) : null;
+      var s = (window.gcState && window.gcState.dwellState) || 'idle';
+      return JSON.stringify({ c: r || null, s: s });
     })();
   `;
 }

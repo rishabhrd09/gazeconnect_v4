@@ -219,6 +219,21 @@ A multi-agent adversarial review of the Entry 7–12 range raised 18 findings; e
 **Measured:** offline replay byte-identical to baseline (tremor 9.636px/94.36%, pursuit 57.569px/71.8%); pipeline 9/9, edge stability 4/4, TTS 5/5 pass. Latency delta needs on-rig confirmation (expect `Gaze broadcast` rate unchanged at ~33 msgs/s, but frame-to-send delay ≈0).
 **Rollback:** `GAZECONNECT_GAZE_PUSH=0` before starting the backend.
 
+## Entry 25 — 2026-06-11 — Sidebar card drift fixes (on-rig feedback, config, default ON)
+
+**Symptom (patient/developer on-rig, watch page):** "cursor keeps drifting when I try to stop it on a sidebar suggested video; very difficult to control." Three mechanisms found:
+1. The Bayesian winner was a pure per-frame argmax — on the sidebar's vertically-stacked compact cards (~120px apart) gaze noise keeps two posteriors near-equal, so the winner flipped A→B→A; every flip restarted the dwell and yanked the cursor's visual anchor to the other card's center. The flip ping-pong IS the perceived drift.
+2. With Scroll armed, edge-zone auto-scroll engaged 650ms into a dwell on any card in the top/bottom 20% bands — the page scrolled mid-dwell, the card moved under the gaze, onset-cancel fired, and the cursor appeared to slide off the target.
+3. Renderer-side fixation follow was twitchy (1.5px jitter hold, 0.74 follow alpha).
+
+**Changes:**
+- `browserGazeController.ts` — **incumbent stickiness**: while a card is the tracked dwell target, a challenger must beat its posterior by `bayesianStickyMult` (1.35×) to take the win; argmax otherwise unchanged. Stable-winner gate constants are now tunable (`bayesianStableFrames`=4, `bayesianStableMargin`=0.10) for on-rig tuning via setGazeConfig.
+- Poll envelope: the per-frame script now returns `{c: click|null, s: dwellState}`; `main.ts` caches `s` and **pauses edge scrolling while dwellState ∈ {onset, dwell, commit}** (`edgeScrollPauseDuringDwell`, default ON; the 650ms edge hold restarts after the dwell ends).
+- `WebBrowsingScreen.tsx` — jitter hold 1.5→2.5px; sub-8px follow alpha 0.74→0.65. Refixations unaffected (>18px snap gate is upstream, unfiltered).
+
+**Measure on-rig:** in the BrowserView DevTools, `__gcTelemetry.events2().filter(e => e.kind === 'targetSwitch').length` per minute of sidebar browsing should drop sharply; `snapshot().medianResidualPx` and dwellToClickMs on `youtube_nearest_card` clicks should improve.
+**Rollback (runtime):** `setGazeConfig({ bayesianStickyMult: 1, edgeScrollPauseDuringDwell: false })`; renderer constants via `git revert`.
+
 ## Rollback instructions (current state)
 
 Each improvement reverts independently, without code edits:

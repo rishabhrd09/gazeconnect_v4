@@ -71,6 +71,10 @@ let edgeScrollCandidate: 'up' | 'down' | 'none' = 'none';
 let edgeScrollEnteredAt = 0;
 let edgeScrollActiveDirection: 'up' | 'down' | 'none' = 'none';
 let edgeScrollStartedAt = 0;
+// v17.20 — page dwell state from the previous gaze frame's poll envelope
+// (~30ms stale at most). Used to pause edge scrolling while a dwell is
+// acquiring/committing so the page can't slide out from under the target.
+let lastBrowserDwellState = 'idle';
 let highContrastEnabled = false;
 let rendererBootReady = false;
 let splashTransitionStarted = false;
@@ -108,6 +112,11 @@ type BrowserGazeConfig = {
   progressArcEnabled: boolean;
   cursorSmoothingMs: number;
   focusOnResolve: boolean;
+  // v17.20 sidebar-drift fixes (on-rig feedback 2026-06-11).
+  bayesianStickyMult: number;
+  bayesianStableFrames: number;
+  bayesianStableMargin: number;
+  edgeScrollPauseDuringDwell: boolean;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -151,6 +160,12 @@ let browserGazeConfig: BrowserGazeConfig = {
   progressArcEnabled: true,
   cursorSmoothingMs: 60,
   focusOnResolve: false,
+  // v17.20 — incumbent stickiness + tunable winner gate (sidebar card
+  // flip fix) and edge-scroll pause while a dwell is in progress.
+  bayesianStickyMult: 1.35,
+  bayesianStableFrames: 4,
+  bayesianStableMargin: 0.10,
+  edgeScrollPauseDuringDwell: true,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -219,6 +234,7 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
   await disposeBrowserView(mainWindow, view, reason);
   lastNavState = null;
   lastPlaybackState = null;
+  lastBrowserDwellState = 'idle';
   resetEdgeScrollState();
   mainWindow?.webContents.send('webview:links', { links: [] });
   mainWindow?.webContents.send('webview:closed', { reason });
@@ -1296,6 +1312,7 @@ function setupIpcHandlers(): void {
       }
       lastNavState = null;
       lastPlaybackState = null;
+      lastBrowserDwellState = 'idle';
       resetEdgeScrollState();
       mainWindow.webContents.send('webview:links', { links: [] });
       highContrastEnabled = false;
@@ -1365,6 +1382,9 @@ function setupIpcHandlers(): void {
           progressArcEnabled: browserGazeConfig.progressArcEnabled,
           cursorSmoothingMs: browserGazeConfig.cursorSmoothingMs,
           focusOnResolve: browserGazeConfig.focusOnResolve,
+          bayesianStickyMult: browserGazeConfig.bayesianStickyMult,
+          bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
+          bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1810,6 +1830,11 @@ function setupIpcHandlers(): void {
       cursorSmoothingMs: clampNumber(config?.cursorSmoothingMs, browserGazeConfig.cursorSmoothingMs, 0, 200),
       focusOnResolve: typeof config?.focusOnResolve === 'boolean'
         ? config.focusOnResolve : browserGazeConfig.focusOnResolve,
+      bayesianStickyMult: clampNumber(config?.bayesianStickyMult, browserGazeConfig.bayesianStickyMult, 1, 3),
+      bayesianStableFrames: clampNumber(config?.bayesianStableFrames, browserGazeConfig.bayesianStableFrames, 1, 10),
+      bayesianStableMargin: clampNumber(config?.bayesianStableMargin, browserGazeConfig.bayesianStableMargin, 0, 0.5),
+      edgeScrollPauseDuringDwell: typeof config?.edgeScrollPauseDuringDwell === 'boolean'
+        ? config.edgeScrollPauseDuringDwell : browserGazeConfig.edgeScrollPauseDuringDwell,
     };
 
     if (activeBrowserView) {
@@ -1833,6 +1858,9 @@ function setupIpcHandlers(): void {
         progressArcEnabled: browserGazeConfig.progressArcEnabled,
         cursorSmoothingMs: browserGazeConfig.cursorSmoothingMs,
         focusOnResolve: browserGazeConfig.focusOnResolve,
+        bayesianStickyMult: browserGazeConfig.bayesianStickyMult,
+        bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
+        bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(
@@ -1946,7 +1974,15 @@ function setupIpcHandlers(): void {
       }
 
       const now = Date.now();
-      if (!browserGazeConfig.edgeScrollEnabled || direction === 'none') {
+      // v17.20 — while the page dwell is acquiring or committing a target,
+      // edge scrolling is paused (and its 650ms hold restarts after). The
+      // sidebar spans the edge zones, and a scroll burst 650ms into a dwell
+      // moved the card under the gaze — onset-cancel fired and the patient
+      // saw "the cursor keeps drifting off the card".
+      // Rollback: setGazeConfig({ edgeScrollPauseDuringDwell: false })
+      const dwellHold = browserGazeConfig.edgeScrollPauseDuringDwell &&
+        (lastBrowserDwellState === 'onset' || lastBrowserDwellState === 'dwell' || lastBrowserDwellState === 'commit');
+      if (!browserGazeConfig.edgeScrollEnabled || direction === 'none' || dwellHold) {
         resetEdgeScrollState();
       } else if (direction !== edgeScrollCandidate) {
         edgeScrollCandidate = direction;
@@ -1994,17 +2030,22 @@ function setupIpcHandlers(): void {
       ).then((json: string | null) => {
         if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
           try {
-            const clickReq = JSON.parse(json);
-            const cx = Math.round(clickReq.x);
-            const cy = Math.round(clickReq.y);
-            // v17.19: info (always-on, 1s-throttled) — dwell clicks were
-            // invisible in on-rig console captures without DEBUG_BROWSER_GAZE.
-            browserDiagnostics.info(
-              'gaze-dwell-click',
-              `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
-              1000
-            );
-            sendTrustedBrowserClick(cx, cy, sessionId);
+            // v17.20 envelope: { c: clickRequest|null, s: dwellState }.
+            const res = JSON.parse(json);
+            if (res && typeof res.s === 'string') lastBrowserDwellState = res.s;
+            const clickReq = res?.c;
+            if (clickReq && Number.isFinite(clickReq.x) && Number.isFinite(clickReq.y)) {
+              const cx = Math.round(clickReq.x);
+              const cy = Math.round(clickReq.y);
+              // v17.19: info (always-on, 1s-throttled) — dwell clicks were
+              // invisible in on-rig console captures without DEBUG_BROWSER_GAZE.
+              browserDiagnostics.info(
+                'gaze-dwell-click',
+                `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
+                1000
+              );
+              sendTrustedBrowserClick(cx, cy, sessionId);
+            }
           } catch { /* ignore parse errors */ }
         }
       }).catch(() => { });
