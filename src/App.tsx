@@ -11,6 +11,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { darkColors, lightColors } from './utils/design';
+import { browserRateFromWpm, chooseSpeechRoute, splitSpeechSegments } from './utils/ttsRouting';
 import { WebSocketProvider, useWS } from './hooks/useWebSocket';
 import { GazeControlProvider, useGazeControl } from './components/core/GazeControlToggle';
 import { RealGazeProvider } from './contexts/RealGazeContext';
@@ -142,18 +143,20 @@ const PersistentEmergencyButton: React.FC<{
 
 function speakText(text: string, rate = 1.0, volume = 1.0, language = 'english'): void {
   if (volume <= 0) return;
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = rate; u.volume = volume;
-    // Determine language: 'auto' uses regex to detect Hindi (Devanagari script)
-    if (language === 'hindi') {
-      u.lang = 'hi-IN';
-    } else if (language === 'auto') {
-      u.lang = /[\u0900-\u097F]/.test(text) ? 'hi-IN' : 'en-US';
-    } else {
-      u.lang = 'en-US';
-    }
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  // Settings store rate as WPM; the utterance wants a 0.1-10 multiplier.
+  // (Previously raw WPM was assigned to u.rate, pinning the fallback voice
+  // at maximum speed once the slider was ever touched.)
+  const utterRate = browserRateFromWpm(rate);
+  // v17.18: mixed EN+HI text (the bilingual emergency phrase) is split into
+  // script runs so each half gets a voice that can actually speak it.
+  // speechSynthesis queues utterances, so the runs play in order.
+  for (const seg of splitSpeechSegments(text)) {
+    const u = new SpeechSynthesisUtterance(seg.text);
+    u.rate = utterRate;
+    u.volume = volume;
+    u.lang = language === 'hindi' ? 'hi-IN' : seg.lang;
     window.speechSynthesis.speak(u);
   }
 }
@@ -237,18 +240,54 @@ const InnerApp: React.FC = () => {
   }, [disableGaze, signalNavigation, ws, isFocusMode, currentScreen, settings]);
 
   const handleSpeak = useCallback((text: string) => {
-    if (text.trim()) {
-      // v17.18: one voice, not two. Backend pyttsx3 (async worker, SAPI5)
-      // is the primary path; browser speechSynthesis is the offline
-      // fallback only. Both used to fire together, so the patient heard
-      // two overlapping voices on every SPEAK.
-      if (ws.isConnected && ws.speak) {
-        ws.speak(text);
-      } else {
-        speakText(text, ttsRate, ttsVolume, ttsLanguage || 'english');
-      }
+    // v17.18: exactly ONE voice per utterance (fixes double-speak) routed so
+    // that Hindi and emergency speech can never be silenced:
+    //   - volume 0  -> mute everything, stop in-flight speech
+    //   - Hindi/Devanagari text -> browser speechSynthesis (the only path
+    //     that can select a hi-IN voice; backend SAPI5 renders Devanagari
+    //     as silence — empirically verified in the 2026-06-11 review)
+    //   - English -> backend pyttsx3 when connected AND its TTS engine
+    //     reports healthy (tts_available handshake); browser fallback
+    //     otherwise, so a dead backend voice never means a mute patient.
+    const route = chooseSpeechRoute({
+      text,
+      ttsLanguage,
+      volume: ttsVolume ?? 1,
+      backendConnected: !!(ws.isConnected && ws.speak),
+      backendTtsAvailable: ws.ttsAvailable !== false,
+    });
+    if (route === 'mute') {
+      try { window.speechSynthesis?.cancel(); } catch { /* no-op */ }
+      if (ws.isConnected && ws.stopSpeaking) ws.stopSpeaking();
+      return;
     }
+    if (route === 'backend') {
+      // Kill any in-flight browser utterance (e.g. one started while the
+      // backend was briefly down) so a reconnect can't overlap two voices.
+      try { window.speechSynthesis?.cancel(); } catch { /* no-op */ }
+      ws.speak(text);
+      return;
+    }
+    speakText(text, ttsRate, ttsVolume ?? 1, ttsLanguage || 'english');
   }, [ttsRate, ttsVolume, ttsLanguage, ws]);
+
+  // v17.18: the backend voice must honor the Voice Settings panel — these
+  // were never wired, so the backend always spoke at its init defaults
+  // (rate=150 WPM, volume=1.0) no matter what the sliders said. ttsRate is
+  // WPM (80-250), which is exactly what pyttsx3 setProperty('rate') takes.
+  // NOTE: volume 0 also mutes the backend voice (incl. emergency speech) —
+  // deliberate, matching the panel's "0 = muted" promise.
+  useEffect(() => {
+    if (!ws.isConnected) return;
+    if (ws.setTTSRate && Number.isFinite(ttsRate)) {
+      const wpm = ttsRate >= 40 ? ttsRate : ttsRate * 150;
+      ws.setTTSRate(Math.max(80, Math.min(400, Math.round(wpm))));
+    }
+    if (ws.setTTSVolume && Number.isFinite(ttsVolume)) {
+      ws.setTTSVolume(Math.max(0, Math.min(1, ttsVolume)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.isConnected, ttsRate, ttsVolume]);
 
   const handleAlertModeHome = useCallback(() => {
     setQuickWordsReturnScreen(null);

@@ -699,10 +699,31 @@ class TTSEngine:
                         self.engine.setProperty('voice', voice.id)
                         break
 
+            self.init_failed = False
             logger.info("TTS engine initialized")
         except Exception as e:
             logger.error(f"TTS initialization error: {e}")
             self.engine = None
+            self.init_failed = True
+
+    @property
+    def available(self) -> bool:
+        """True when speaking can plausibly produce audio.
+
+        Reported to clients in the 'connected' handshake so the frontend can
+        fall back to browser speechSynthesis instead of going silently mute
+        when the socket is healthy but TTS is not (pyttsx3 missing,
+        tts_enabled=False, or engine init failure). A mid-session engine
+        wedge is not detectable here — that residual risk is documented in
+        docs/EYE_TRACKING_CHANGES.md.
+        """
+        if not self.enabled or not TTS_AVAILABLE:
+            return False
+        if getattr(self, 'init_failed', False):
+            return False
+        if self.async_mode:
+            return self._queue is not None
+        return self.engine is not None
 
     def _worker_loop(self):
         """Async mode: own the engine and process commands off the event loop."""
@@ -3234,7 +3255,11 @@ class GazeConnectBackend:
         self._send(websocket, 'connected', {
             'gaze_enabled': self.gaze_enabled,
             'current_screen': self.current_screen,
-            'tobii_connected': self.tobii.is_connected
+            'tobii_connected': self.tobii.is_connected,
+            # Lets the frontend route speech to browser speechSynthesis when
+            # the backend voice cannot produce audio (otherwise the patient
+            # would be silently mute while the connection shows healthy).
+            'tts_available': self.tts.available
         })
 
         try:
