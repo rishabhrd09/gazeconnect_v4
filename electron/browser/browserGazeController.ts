@@ -140,7 +140,11 @@ export function buildBrowserCursorInjectionScript(): string {
         lastOnTargetAt: 0,
         // v17.19 — last applied cursorSmoothingMs (so the transition
         // string is only rewritten when the config value changes).
-        lastSmoothMs: -1
+        lastSmoothMs: -1,
+        // v17.21 — live page zoom factor, pushed in from the main process
+        // each frame (see buildGazeUpdateAndPollScript). Used by
+        // radiusScale() so snap/hold radii keep a constant screen size.
+        pageZoom: 1
       };
 
       window.gcConfig = Object.assign({
@@ -220,7 +224,10 @@ export function buildBrowserCursorInjectionScript(): string {
         // focus between elements as gaze moved: focus-ring flicker,
         // suggestion dropdowns opening from a glance, focus stolen
         // from text fields). Rollback to old: focusOnResolve = true
-        focusOnResolve: false
+        focusOnResolve: false,
+        // v17.21 — keep snap/hold/probe radii a constant on-screen size
+        // regardless of page zoom (see radiusScale). Rollback: false.
+        zoomScaleRadii: true
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -263,6 +270,26 @@ export function buildBrowserCursorInjectionScript(): string {
       // 300ms after it renders; skip buttons persist for seconds.
       let skipBtnCacheEl = null;
       let skipBtnScanAt = 0;
+
+      // v17.21 — zoom-aware radius scaling. After the Entry-26 coordinate
+      // fix the gaze fed to this script is in page CSS px (= view px /
+      // zoom). The snap/hold/probe radii and the Bayesian sigma below are
+      // all distances in that same CSS space, but their default values
+      // were tuned as ON-SCREEN (view-px) footprints. Without scaling, a
+      // 130px snap zone at zoom 1.35 spans ~176 view px of screen — ~35%
+      // grabbier than intended, and on the dense YouTube sidebar the halo
+      // blankets neighbouring cards' centres (a drift/ambiguity source on
+      // the exact screen the patient struggles with). Dividing every CSS
+      // distance by the live page zoom keeps a constant on-screen
+      // footprint at ANY zoom (covers per-domain 0.75–2.5× too), and
+      // because gaze, rects, radii AND sigma all scale by the same factor
+      // the dwell + Bayesian geometry is provably identical to the zoom=1
+      // case — no posterior-dynamics change, only a corrected footprint.
+      // Rollback: window.gcConfig.zoomScaleRadii = false
+      const radiusScale = () =>
+        (window.gcConfig && window.gcConfig.zoomScaleRadii === false)
+          ? 1
+          : (state.pageZoom || 1);
 
       const interactiveSelector = [
         'a[href]',
@@ -824,7 +851,7 @@ export function buildBrowserCursorInjectionScript(): string {
       const probeSnapTarget = (x, y) => {
         const cfg = window.gcConfig || {};
         if (cfg.probeSnapEnabled === false) return null;
-        const radius = Math.max(8, Math.min(80, Number(cfg.probeSnapRadiusPx || 36)));
+        const radius = Math.max(8, Math.min(80, Number(cfg.probeSnapRadiusPx || 36))) / radiusScale();
         let best = null;
         let bestDist = Infinity;
         const seen = new Set();
@@ -867,15 +894,17 @@ export function buildBrowserCursorInjectionScript(): string {
       // a locked target uses a wider hold radius than the initial snap
       // distance so small gaze drift doesn't break the lock — but a
       // FRESH gaze must still be close to qualify.
-      const cardSnapInRadius = () => Number(window.gcConfig?.youtubeCardHitZonePx || 120);
+      // v17.21 — all four accessors divide by radiusScale() so the snap/
+      // hold zones keep a constant on-screen size at any page zoom.
+      const cardSnapInRadius = () => Number(window.gcConfig?.youtubeCardHitZonePx || 120) / radiusScale();
       const cardUnsnapRadius = () => Math.max(
         cardSnapInRadius(),
-        Number(window.gcConfig?.youtubeCardUnsnapPx || 180)
+        Number(window.gcConfig?.youtubeCardUnsnapPx || 180) / radiusScale()
       );
-      const skipSnapInRadius = () => Number(window.gcConfig?.youtubeSkipSnapPx || 130);
+      const skipSnapInRadius = () => Number(window.gcConfig?.youtubeSkipSnapPx || 130) / radiusScale();
       const skipUnsnapRadius = () => Math.max(
         skipSnapInRadius(),
-        Number(window.gcConfig?.youtubeSkipUnsnapPx || 200)
+        Number(window.gcConfig?.youtubeSkipUnsnapPx || 200) / radiusScale()
       );
 
       const isLockedYoutubeCard = (anchor) => {
@@ -951,10 +980,14 @@ export function buildBrowserCursorInjectionScript(): string {
           state.bayesianSecondP = 0;
           return null;
         }
-        const snapIn = cardSnapInRadius();
-        const unsnap = cardUnsnapRadius();
+        const snapIn = cardSnapInRadius();          // already /radiusScale
+        const unsnap = cardUnsnapRadius();          // already /radiusScale
+        // expandedZone derives from the already-scaled snapIn, so it
+        // inherits the scaling. sigma is an independent CSS distance and
+        // must be scaled too, so the Gaussian likelihood stays
+        // zoom-invariant (d_css and sigma_css scale by the same factor).
         const expandedZone = snapIn * Number(window.gcConfig?.bayesianExpandedZoneMult || 1.5);
-        const sigma = Number(window.gcConfig?.bayesianSigmaPx || 42);
+        const sigma = Number(window.gcConfig?.bayesianSigmaPx || 42) / radiusScale();
         const sigma2 = sigma * sigma;
         const alpha = Number(window.gcConfig?.bayesianAlpha || 0.30);
         const commitThreshold = Number(window.gcConfig?.bayesianCommitThreshold || 0.55);
@@ -1392,15 +1425,19 @@ export function buildBrowserCursorInjectionScript(): string {
         cursor.style.display = 'block';
         cursor.style.left = x + 'px';
         cursor.style.top = y + 'px';
-        const baseStability = Number(cfg.stabilityRadiusPx || 50);
-        const cardStability = Number(cfg.youtubeCardStabilityRadiusPx || 110);
-        const cardUnsnapPx = Number(cfg.youtubeCardUnsnapPx || 180);
-        const skipSnapPx = Number(cfg.youtubeSkipSnapPx || 130);
-        const skipUnsnapPx = Number(cfg.youtubeSkipUnsnapPx || 200);
+        // v17.21 — _rs scales all PIXEL distances below by 1/pageZoom so
+        // their on-screen footprint is constant (see radiusScale). Time
+        // constants (dwellMs/onsetMs/postClickCooldownMs) are NOT scaled.
+        const _rs = radiusScale();
+        const baseStability = Number(cfg.stabilityRadiusPx || 50) / _rs;
+        const cardStability = Number(cfg.youtubeCardStabilityRadiusPx || 110) / _rs;
+        const cardUnsnapPx = Number(cfg.youtubeCardUnsnapPx || 180) / _rs;
+        const skipSnapPx = Number(cfg.youtubeSkipSnapPx || 130) / _rs;
+        const skipUnsnapPx = Number(cfg.youtubeSkipUnsnapPx || 200) / _rs;
         const dwellMs = Number(cfg.dwellMs || 1200);
         const onsetMs = Number(cfg.onsetMs || 300);
         const postClickCooldownMs = Number(cfg.postClickCooldownMs || 900);
-        const targetRegionSlackPx = Number(cfg.targetRegionSlackPx || 24);
+        const targetRegionSlackPx = Number(cfg.targetRegionSlackPx || 24) / _rs;
 
         // === v17.16 DoD-2: IN-VIDEO DWELL SUPPRESSION ==================
         // While a video is playing and gaze is inside the video rect,
@@ -1481,7 +1518,7 @@ export function buildBrowserCursorInjectionScript(): string {
         // restart point.
         if (!clickReq && state.targetKey && state.targetRect) {
           const sRect = state.targetRect;
-          const STICKY_TOLERANCE_BROWSER = 80; // px beyond rect
+          const STICKY_TOLERANCE_BROWSER = 80 / radiusScale(); // px beyond rect (zoom-scaled)
           if (
             x >= sRect.left - STICKY_TOLERANCE_BROWSER
             && x <= sRect.right + STICKY_TOLERANCE_BROWSER
@@ -1856,7 +1893,10 @@ export function buildBrowserCursorInjectionScript(): string {
       // wrapper captures dtMs, dwellState, snap distance, and posts a
       // frame entry to __gcTelemetry.frames each call. Also handles
       // routeChange detection and trackingLost events.
-      window.gcUpdateAndPoll = (x, y, cursorEnabled) => {
+      window.gcUpdateAndPoll = (x, y, cursorEnabled, pageZoom) => {
+        // v17.21 — stash the live page zoom (passed from the main process
+        // alongside the already-zoom-divided gaze) for radiusScale().
+        if (typeof pageZoom === 'number' && pageZoom > 0) state.pageZoom = pageZoom;
         if (location.href !== state.lastRouteUrl) {
           bumpEpoch('hard');
           gcEmit('routeChange', { url: location.href });
@@ -2141,17 +2181,26 @@ export function buildBrowserCursorInjectionScript(): string {
   `;
 }
 
-export function buildGazeUpdateAndPollScript(x: number, y: number, cursorEnabled: boolean): string {
+export function buildGazeUpdateAndPollScript(
+  x: number,
+  y: number,
+  cursorEnabled: boolean,
+  pageZoom = 1
+): string {
   // v17.20 — the poll now ALWAYS returns a JSON envelope:
   //   { c: <click request | null>, s: <dwellState string> }
   // The main process uses `s` to pause edge-scrolling while a dwell is in
   // progress (the page scrolling mid-dwell moved the card under the gaze
   // and read as "the cursor keeps drifting"). The click contract is
   // unchanged apart from the envelope.
+  // v17.21 — x,y are page CSS px (already divided by zoom in main); the
+  // raw pageZoom is passed too so the script can keep snap/hold radii a
+  // constant on-screen size (radiusScale). Guarded to a finite positive.
+  const z = Number.isFinite(pageZoom) && pageZoom > 0 ? pageZoom : 1;
   return `
     (function() {
       if (!window.gcUpdateAndPoll) return null;
-      var r = window.gcUpdateAndPoll(${Math.round(x)}, ${Math.round(y)}, ${cursorEnabled ? 'true' : 'false'});
+      var r = window.gcUpdateAndPoll(${Math.round(x)}, ${Math.round(y)}, ${cursorEnabled ? 'true' : 'false'}, ${z});
       var s = (window.gcState && window.gcState.dwellState) || 'idle';
       return JSON.stringify({ c: r || null, s: s });
     })();

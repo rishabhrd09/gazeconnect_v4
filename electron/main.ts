@@ -120,6 +120,9 @@ type BrowserGazeConfig = {
   // v17.21 — page-zoom coordinate compensation (root cause of the
   // rightward cursor drift; see handleWebviewGazeFrame).
   zoomCompensationEnabled: boolean;
+  // v17.21 — keep in-page snap/hold/probe radii a constant on-screen size
+  // across page zoom (read by the injected script via radiusScale).
+  zoomScaleRadii: boolean;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -170,6 +173,7 @@ let browserGazeConfig: BrowserGazeConfig = {
   bayesianStableMargin: 0.10,
   edgeScrollPauseDuringDwell: true,
   zoomCompensationEnabled: true,
+  zoomScaleRadii: true,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -1400,6 +1404,7 @@ function setupIpcHandlers(): void {
           bayesianStickyMult: browserGazeConfig.bayesianStickyMult,
           bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
           bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
+          zoomScaleRadii: browserGazeConfig.zoomScaleRadii,
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1852,6 +1857,8 @@ function setupIpcHandlers(): void {
         ? config.edgeScrollPauseDuringDwell : browserGazeConfig.edgeScrollPauseDuringDwell,
       zoomCompensationEnabled: typeof config?.zoomCompensationEnabled === 'boolean'
         ? config.zoomCompensationEnabled : browserGazeConfig.zoomCompensationEnabled,
+      zoomScaleRadii: typeof config?.zoomScaleRadii === 'boolean'
+        ? config.zoomScaleRadii : browserGazeConfig.zoomScaleRadii,
     };
 
     if (activeBrowserView) {
@@ -1878,6 +1885,7 @@ function setupIpcHandlers(): void {
         bayesianStickyMult: browserGazeConfig.bayesianStickyMult,
         bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
         bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
+        zoomScaleRadii: browserGazeConfig.zoomScaleRadii,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(
@@ -2056,7 +2064,7 @@ function setupIpcHandlers(): void {
         try { zf = view.webContents.getZoomFactor() || 1; } catch { zf = 1; }
       }
       view.webContents.executeJavaScript(
-        buildGazeUpdateAndPollScript(x / zf, y / zf, cursorEnabled)
+        buildGazeUpdateAndPollScript(x / zf, y / zf, cursorEnabled, zf)
       ).then((json: string | null) => {
         if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
           try {

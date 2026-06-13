@@ -248,6 +248,21 @@ A multi-agent adversarial review of the Entry 7–12 range raised 18 findings; e
 **Consequences:** all in-page radii (stability 60, card zones 130/230) now measure true CSS px while gaze noise in CSS is old-noise/1.35 — effectively ~35% MORE forgiving. If snapping now feels too grabby, the zones can be tuned DOWN via setGazeConfig (a good problem).
 **Rollback:** `setGazeConfig({ zoomCompensationEnabled: false })` restores the old (broken) spaces exactly.
 
+## Entry 27 — 2026-06-11 — Zoom-aware radius scaling (config, default ON) — closes the Entry-26 grabbiness shift
+
+**Why:** the Entry-26 coordinate fix made the gaze the injected script receives correct (page CSS px = view px / zoom). But the snap/hold/probe radii and the Bayesian sigma were tuned as ON-SCREEN (view-px) footprints, so at the 1.35 default zoom every zone silently spanned ~35% more screen than intended — and on the dense YouTube sidebar the 130px card-snap halo blanketed neighbouring cards' centres, an ambiguity/drift source on the exact screen the patient struggles with. (Found by the Entry 17-26 adversarial verification, comfort skeptic, rated MAJOR.)
+
+**Change:** `browserGazeController.ts` — a `radiusScale()` helper divides every in-page PIXEL DISTANCE by the live page zoom (pushed in per frame as the 4th arg to `gcUpdateAndPoll`, the same zoom factor used to divide the gaze): the four card/skip snap+unsnap accessors, `stabilityRadiusPx`, `youtubeCardStabilityRadiusPx`, `youtubeCardUnsnapPx`, `youtubeSkipSnapPx`, `youtubeSkipUnsnapPx`, `targetRegionSlackPx`, `probeSnapRadiusPx`, `bayesianSigmaPx`, and the 80px sticky tolerance. Time constants (dwell/onset/cooldown) and the renderer-side >18px view-px snap gate are NOT scaled. `main.ts` passes `zf` into `buildGazeUpdateAndPollScript`.
+
+**Why it's safe (provable):** gaze, rect coordinates, every radius, sigma, and slack are now all CSS px divided by the same factor, so each distance comparison (`distanceToRect` vs radius; `hypot(gaze−centre)` vs sigma) scales identically on both sides — the dwell and Bayesian outcomes are mathematically identical to the zoom=1 case. The net effect is purely a corrected on-screen footprint, no posterior-dynamics change. Independently re-verified (6/6 checks pass, no scaled-vs-unscaled mismatch, no double-scale, no time constant scaled). Also fixes the latent per-domain-zoom case (adjustZoom remembers 0.75–2.5× per domain) where the un-scaled error would have been far larger than 1.35.
+**Consequence:** the config numbers now mean "on-screen px at 100% zoom" — the intuitive unit for on-rig tuning. If the sidebar still feels too grabby or too tight after this, trim/raise `youtubeCardHitZonePx` (snap-IN) via setGazeConfig and the change is now in stable screen-px units.
+**Rollback:** `setGazeConfig({ zoomScaleRadii: false })` (or `window.gcConfig.zoomScaleRadii = false`) → `radiusScale()` returns 1 everywhere → exact pre-change footprints. Survives page load (in both seed lists).
+
+## Known not-yet-done (honest status vs OptiKey/Dynavox)
+
+- **Overlay-window cursor (deferred, flagship):** the cursor visuals still live INSIDE the page (an injected `position:fixed` div), not in a separate transparent always-on-top window like OptiKey's gaze mouse. Body-safe injection (Entry 21) closes the page-load gap, but a busy page main thread can still briefly stutter the in-page ring. The true never-stutters architecture (visuals in a click-through child `BrowserWindow`, dwell logic staying in-page for hit-testing) is scoped in a separate task, not in this branch.
+- **On-rig validation pending:** Entries 17-27 are statically verified (parse, typecheck, 18 unit tests, replay baseline-identical) but NOT yet felt on the Tobii. Radius footprints especially need one on-rig pass — the pre-fix values were tuned in the mixed-unit regime, so the clean-unit feel may want a tweak.
+
 ## Rollback instructions (current state)
 
 Each improvement reverts independently, without code edits:
