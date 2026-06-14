@@ -878,49 +878,70 @@ const YT_MAXIMIZE_SCRIPT = `
     }
   } catch (_) {}
 
+  // v17.22 — ROBUST in-app maximize. The previous version forced
+  // 100vw/100vh + display:block onto YouTube's NESTED watch-flexy
+  // container IDs (#player-container-outer, #primary-inner, …). Those
+  // IDs drift as YouTube updates its DOM, and — critically — YouTube's
+  // player only recomputes its <video> render size on a 'resize' event,
+  // which the old script never fired. The result was an unsized/unpainted
+  // player: a blank WHITE screen with no video. This version instead pins
+  // #movie_player (a stable, long-lived selector that contains BOTH the
+  // <video> and the native play/skip controls) as a fixed full-viewport
+  // overlay and dispatches resize so the player repaints to fill. No
+  // dependence on the fragile nested IDs. Still NOT true browser
+  // fullscreen (the gaze-accessible app toolbar lives outside the
+  // BrowserView and stays visible; the injected gaze cursor sits at a
+  // higher z-index so it remains on top).
   var styleId = 'gazeconnect-youtube-inapp-maximize-style';
-  if (!document.getElementById(styleId)) {
-    var style = document.createElement('style');
+  var style = document.getElementById(styleId);
+  if (!style) {
+    style = document.createElement('style');
     style.id = styleId;
-    style.textContent = [
-      'html.gazeconnect-youtube-inapp-maximize,',
-      'html.gazeconnect-youtube-inapp-maximize body { overflow: hidden !important; }',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #masthead-container,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #secondary,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #comments,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #meta,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #ticket-shelf,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #merch-shelf,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy ytd-watch-next-secondary-results-renderer { display: none !important; }',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #columns,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary-inner {',
-      '  display: block !important; width: 100vw !important; max-width: none !important;',
-      '  margin: 0 !important; padding: 0 !important;',
-      '}',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-outer,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-inner,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #movie_player {',
-      '  width: 100vw !important; max-width: none !important;',
-      '  height: 100vh !important; max-height: none !important;',
-      '  margin: 0 !important; padding: 0 !important;',
-      '}',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy video {',
-      '  width: 100% !important; height: 100% !important; object-fit: contain !important;',
-      '}'
-    ].join('\\n');
-    document.head.appendChild(style);
+    (document.head || document.documentElement).appendChild(style);
   }
+  style.textContent = [
+    'html.gazeconnect-youtube-inapp-maximize,',
+    'html.gazeconnect-youtube-inapp-maximize body {',
+    '  overflow: hidden !important; background: #000 !important;',
+    '}',
+    // Pin the whole player (video + controls) to the viewport. inset:0 +
+    // an explicit size, then the resize dispatch below makes YouTube fill
+    // it. z-index is below the gaze cursor (2147483647) so the cursor
+    // stays visible over the video.
+    'html.gazeconnect-youtube-inapp-maximize #movie_player {',
+    '  position: fixed !important; inset: 0 !important;',
+    '  width: 100vw !important; height: 100vh !important;',
+    '  max-width: none !important; max-height: none !important;',
+    '  margin: 0 !important; padding: 0 !important;',
+    '  z-index: 2147483646 !important; background: #000 !important;',
+    '}',
+    'html.gazeconnect-youtube-inapp-maximize #movie_player video {',
+    '  width: 100% !important; height: 100% !important;',
+    '  object-fit: contain !important; background: #000 !important;',
+    '}'
+  ].join('\\n');
 
   document.documentElement.classList.add('gazeconnect-youtube-inapp-maximize');
+
   var player = document.querySelector('#movie_player');
   if (player) {
-    try {
-      player.classList.add('ytp-big-mode');
-      player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 }));
-    } catch (_) {}
+    try { player.classList.add('ytp-big-mode'); } catch (_) {}
+    // The YouTube player API exposes setSize(); calling it (and firing a
+    // window resize) is what forces the <video>/canvas to recompute to the
+    // new container size — the actual fix for the blank player.
+    try { if (typeof player.setSize === 'function') player.setSize(); } catch (_) {}
+    try { player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 })); } catch (_) {}
   }
+
+  var fireResize = function () { try { window.dispatchEvent(new Event('resize')); } catch (_) {} };
+  fireResize();
+  // Re-fire across the next frames so the recompute lands AFTER the
+  // fixed-layout reflow settles (a single immediate resize can race it).
+  try {
+    requestAnimationFrame(function () { fireResize(); requestAnimationFrame(fireResize); });
+    setTimeout(fireResize, 120);
+  } catch (_) {}
+
   try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch (_) { window.scrollTo(0, 0); }
   return 'in-app-video-maximized';
 })();
