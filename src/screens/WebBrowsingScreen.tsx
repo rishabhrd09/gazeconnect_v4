@@ -878,20 +878,35 @@ const YT_MAXIMIZE_SCRIPT = `
     }
   } catch (_) {}
 
-  // v17.22 — ROBUST in-app maximize. The previous version forced
-  // 100vw/100vh + display:block onto YouTube's NESTED watch-flexy
-  // container IDs (#player-container-outer, #primary-inner, …). Those
-  // IDs drift as YouTube updates its DOM, and — critically — YouTube's
-  // player only recomputes its <video> render size on a 'resize' event,
-  // which the old script never fired. The result was an unsized/unpainted
-  // player: a blank WHITE screen with no video. This version instead pins
-  // #movie_player (a stable, long-lived selector that contains BOTH the
-  // <video> and the native play/skip controls) as a fixed full-viewport
-  // overlay and dispatches resize so the player repaints to fill. No
-  // dependence on the fragile nested IDs. Still NOT true browser
-  // fullscreen (the gaze-accessible app toolbar lives outside the
-  // BrowserView and stays visible; the injected gaze cursor sits at a
-  // higher z-index so it remains on top).
+  // v17.23 — use YouTube's OWN theater mode instead of CSS-forcing the
+  // player size. Two earlier approaches both broke the player:
+  //   (1) forcing 100vw/100vh on YouTube's nested container IDs never
+  //       fired the player's resize-repaint -> blank WHITE player;
+  //   (2) pinning #movie_player position:fixed got trapped by an ancestor
+  //       transform (so it filled only its column -> black/mis-sized video
+  //       while the sidebar stayed visible and the page hung).
+  // Both share one root cause: manually sizing the player without letting
+  // YouTube's own code lay it out. Theater mode sidesteps it entirely —
+  // YouTube sizes AND repaints the player itself (no white, no black, no
+  // stuck), and we only HIDE the chrome around it (hiding can never blank
+  // the player). Robust to DOM drift: if a selector is missing the page
+  // simply stays normal (a safe no-op) instead of breaking. This is still
+  // NOT true browser fullscreen — the gaze-accessible app toolbar lives
+  // outside the BrowserView and stays visible.
+  var flexy = document.querySelector('ytd-watch-flexy');
+  if (flexy && !flexy.hasAttribute('theater')) {
+    var sizeBtn = document.querySelector('.ytp-size-button');
+    if (sizeBtn) {
+      try { sizeBtn.click(); } catch (_) {}
+    } else {
+      // Fallback: 't' is YouTube's theater-mode hotkey.
+      var pl = document.querySelector('#movie_player') || document.body;
+      try {
+        pl.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', keyCode: 84, which: 84, bubbles: true }));
+      } catch (_) {}
+    }
+  }
+
   var styleId = 'gazeconnect-youtube-inapp-maximize-style';
   var style = document.getElementById(styleId);
   if (!style) {
@@ -899,51 +914,32 @@ const YT_MAXIMIZE_SCRIPT = `
     style.id = styleId;
     (document.head || document.documentElement).appendChild(style);
   }
+  // CSS only HIDES surrounding chrome — it never sizes or positions the
+  // player, so it cannot blank it. The #columns hide is scoped to
+  // [theater] because only in theater mode does the player live in
+  // #full-bleed-container ABOVE #columns; in normal mode the player is
+  // INSIDE #columns, so an unscoped hide would remove the video.
   style.textContent = [
-    'html.gazeconnect-youtube-inapp-maximize,',
-    'html.gazeconnect-youtube-inapp-maximize body {',
+    'html.gazeconnect-youtube-inapp-maximize, html.gazeconnect-youtube-inapp-maximize body {',
     '  overflow: hidden !important; background: #000 !important;',
     '}',
-    // Pin the whole player (video + controls) to the viewport. inset:0 +
-    // an explicit size, then the resize dispatch below makes YouTube fill
-    // it. z-index is below the gaze cursor (2147483647) so the cursor
-    // stays visible over the video.
-    'html.gazeconnect-youtube-inapp-maximize #movie_player {',
-    '  position: fixed !important; inset: 0 !important;',
-    '  width: 100vw !important; height: 100vh !important;',
-    '  max-width: none !important; max-height: none !important;',
-    '  margin: 0 !important; padding: 0 !important;',
-    '  z-index: 2147483646 !important; background: #000 !important;',
-    '}',
-    'html.gazeconnect-youtube-inapp-maximize #movie_player video {',
-    '  width: 100% !important; height: 100% !important;',
-    '  object-fit: contain !important; background: #000 !important;',
-    '}'
+    'html.gazeconnect-youtube-inapp-maximize #masthead-container { display: none !important; }',
+    'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy[theater] #columns { display: none !important; }'
   ].join('\\n');
 
   document.documentElement.classList.add('gazeconnect-youtube-inapp-maximize');
 
   var player = document.querySelector('#movie_player');
   if (player) {
-    try { player.classList.add('ytp-big-mode'); } catch (_) {}
-    // The YouTube player API exposes setSize(); calling it (and firing a
-    // window resize) is what forces the <video>/canvas to recompute to the
-    // new container size — the actual fix for the blank player.
-    try { if (typeof player.setSize === 'function') player.setSize(); } catch (_) {}
     try { player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 })); } catch (_) {}
   }
-
-  var fireResize = function () { try { window.dispatchEvent(new Event('resize')); } catch (_) {} };
-  fireResize();
-  // Re-fire across the next frames so the recompute lands AFTER the
-  // fixed-layout reflow settles (a single immediate resize can race it).
-  try {
-    requestAnimationFrame(function () { fireResize(); requestAnimationFrame(fireResize); });
-    setTimeout(fireResize, 120);
-  } catch (_) {}
-
   try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch (_) { window.scrollTo(0, 0); }
-  return 'in-app-video-maximized';
+  // Theater mode already repaints the player; this single resize just lets
+  // it settle after the masthead hide changes the available height. No
+  // resize storm (the prior version's 4× resize + fixed reflow caused the
+  // lag/"delayed response").
+  try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+  return 'in-app-video-theater';
 })();
 `;
 
@@ -2020,76 +2016,13 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     }, [browser]);
 
     const skipYouTubeAd = useCallback(async () => {
+        // Skip is handled entirely in the main process via youtubeCommand, which
+        // locates the skip button in-page and dispatches a zoom-compensated trusted
+        // click. Do NOT add a renderer-side getBoundingClientRect -> clickAtViewPoint
+        // fallback here: those page-CSS coords would bypass the zoom compensation in
+        // sendTrustedBrowserClick and mis-click under the default 1.35 page zoom
+        // (see Entry 26).
         await browser.youtubeCommand('skip_ad');
-        return;
-        const findSkipButtonScript = `
-          (function() {
-            const player = document.querySelector('#movie_player') || document;
-            const roots = [player, document];
-            const selectors = [
-              '.ytp-ad-skip-button',
-              '.ytp-ad-skip-button-modern',
-              '.ytp-skip-ad-button',
-              '.ytp-ad-skip-button-container button',
-              '.ytp-ad-preview-container button',
-              '.videoAdUiSkipButton',
-              'button[class*="skip" i]',
-              '[role="button"][class*="skip" i]',
-              'button[aria-label*="Skip" i]',
-              '[role="button"][aria-label*="Skip" i]',
-              '[title*="Skip" i]',
-              '[data-title-no-tooltip*="Skip" i]'
-            ];
-            const seen = new Set();
-            const isVisible = (el) => {
-              if (!el || seen.has(el)) return false;
-              seen.add(el);
-              const rect = el.getBoundingClientRect();
-              const style = window.getComputedStyle(el);
-              return rect.width >= 12 && rect.height >= 12 &&
-                style.visibility !== 'hidden' &&
-                style.display !== 'none' &&
-                style.pointerEvents !== 'none' &&
-                !el.disabled &&
-                el.getAttribute('aria-disabled') !== 'true';
-            };
-            const normalizeTarget = (el) =>
-              el && (el.closest('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button') || el);
-            const candidates = [];
-            for (const root of roots) {
-              for (const selector of selectors) {
-                try {
-                  root.querySelectorAll(selector).forEach((el) => candidates.push(normalizeTarget(el)));
-                } catch (_) {}
-              }
-            }
-            document.querySelectorAll('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button')
-              .forEach((el) => {
-                const text = [
-                  el.textContent || '',
-                  el.getAttribute('aria-label') || '',
-                  el.getAttribute('title') || ''
-                ].join(' ').trim();
-                if (/skip|छोड़|छोड|छोड़/i.test(text)) candidates.push(normalizeTarget(el));
-              });
-            for (const candidate of candidates) {
-              if (!isVisible(candidate)) continue;
-              const rect = candidate.getBoundingClientRect();
-              return {
-                found: true,
-                x: Math.round(rect.left + rect.width / 2),
-                y: Math.round(rect.top + rect.height / 2),
-                label: (candidate.textContent || candidate.getAttribute('aria-label') || candidate.className || '').toString().slice(0, 80)
-              };
-            }
-            return { found: false };
-          })();
-        `;
-        const result = await browser.executeJs(findSkipButtonScript);
-        const point = result?.result;
-        if (point?.found && typeof point.x === 'number' && typeof point.y === 'number') {
-            await browser.clickAtViewPoint(point.x, point.y);
-        }
     }, [browser]);
 
     const playPauseYouTube = useCallback(async () => {
