@@ -1499,6 +1499,14 @@ function setupIpcHandlers(): void {
     return { success: true };
   });
 
+  // DIP-SPACE handler: x,y are passed straight to sendInputEvent with NO zoom
+  // compensation, so callers MUST supply view-local DIP coordinates. The only
+  // live caller (clickAtGaze) derives them from window CSS px, which equals
+  // DIPs because the main window zoom is never changed. Do NOT feed page-CSS
+  // coordinates (e.g. from getBoundingClientRect) here — under the default 1.35
+  // page zoom they would mis-click. Page-CSS clicks must go through
+  // sendTrustedBrowserClick instead, which multiplies by the page zoom factor
+  // (see Entry 26).
   ipcMain.handle('webview:click', (_event: any, x: number, y: number) => {
     if (!activeBrowserView) return;
     try {

@@ -227,16 +227,6 @@ export function useGazeBrowser() {
         }
     }, []);
 
-    const clickAtViewPoint = useCallback(async (localX: number, localY: number) => {
-        const api = getElectronAPI();
-        if (!api?.webview?.click) return;
-        try {
-            await api.webview.click(Math.round(localX), Math.round(localY));
-        } catch (err) {
-            console.error('clickAtViewPoint error:', err);
-        }
-    }, []);
-
     const scrollDown = useCallback(async () => {
         const api = getElectronAPI();
         if (!api?.webview) return;
@@ -442,7 +432,6 @@ export function useGazeBrowser() {
         openPage,
         closePage,
         clickAtGaze,
-        clickAtViewPoint,
         scrollDown,
         scrollUp,
         goBack,
