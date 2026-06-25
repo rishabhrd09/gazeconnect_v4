@@ -12,6 +12,7 @@ import { useRealGaze } from '../contexts/RealGazeContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useDwellTime } from '../contexts/DwellTimeContext';
+import { gazeFlags } from '../utils/gazeFlags';
 import {
     BackIcon,
     BrainIcon,
@@ -877,51 +878,68 @@ const YT_MAXIMIZE_SCRIPT = `
     }
   } catch (_) {}
 
-  var styleId = 'gazeconnect-youtube-inapp-maximize-style';
-  if (!document.getElementById(styleId)) {
-    var style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = [
-      'html.gazeconnect-youtube-inapp-maximize,',
-      'html.gazeconnect-youtube-inapp-maximize body { overflow: hidden !important; }',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #masthead-container,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #secondary,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #comments,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #meta,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #ticket-shelf,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #merch-shelf,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy ytd-watch-next-secondary-results-renderer { display: none !important; }',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #columns,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #primary-inner {',
-      '  display: block !important; width: 100vw !important; max-width: none !important;',
-      '  margin: 0 !important; padding: 0 !important;',
-      '}',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-outer,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #player-container-inner,',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy #movie_player {',
-      '  width: 100vw !important; max-width: none !important;',
-      '  height: 100vh !important; max-height: none !important;',
-      '  margin: 0 !important; padding: 0 !important;',
-      '}',
-      'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy video {',
-      '  width: 100% !important; height: 100% !important; object-fit: contain !important;',
-      '}'
-    ].join('\\n');
-    document.head.appendChild(style);
+  // v17.23 — use YouTube's OWN theater mode instead of CSS-forcing the
+  // player size. Two earlier approaches both broke the player:
+  //   (1) forcing 100vw/100vh on YouTube's nested container IDs never
+  //       fired the player's resize-repaint -> blank WHITE player;
+  //   (2) pinning #movie_player position:fixed got trapped by an ancestor
+  //       transform (so it filled only its column -> black/mis-sized video
+  //       while the sidebar stayed visible and the page hung).
+  // Both share one root cause: manually sizing the player without letting
+  // YouTube's own code lay it out. Theater mode sidesteps it entirely —
+  // YouTube sizes AND repaints the player itself (no white, no black, no
+  // stuck), and we only HIDE the chrome around it (hiding can never blank
+  // the player). Robust to DOM drift: if a selector is missing the page
+  // simply stays normal (a safe no-op) instead of breaking. This is still
+  // NOT true browser fullscreen — the gaze-accessible app toolbar lives
+  // outside the BrowserView and stays visible.
+  var flexy = document.querySelector('ytd-watch-flexy');
+  if (flexy && !flexy.hasAttribute('theater')) {
+    var sizeBtn = document.querySelector('.ytp-size-button');
+    if (sizeBtn) {
+      try { sizeBtn.click(); } catch (_) {}
+    } else {
+      // Fallback: 't' is YouTube's theater-mode hotkey.
+      var pl = document.querySelector('#movie_player') || document.body;
+      try {
+        pl.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', keyCode: 84, which: 84, bubbles: true }));
+      } catch (_) {}
+    }
   }
 
+  var styleId = 'gazeconnect-youtube-inapp-maximize-style';
+  var style = document.getElementById(styleId);
+  if (!style) {
+    style = document.createElement('style');
+    style.id = styleId;
+    (document.head || document.documentElement).appendChild(style);
+  }
+  // CSS only HIDES surrounding chrome — it never sizes or positions the
+  // player, so it cannot blank it. The #columns hide is scoped to
+  // [theater] because only in theater mode does the player live in
+  // #full-bleed-container ABOVE #columns; in normal mode the player is
+  // INSIDE #columns, so an unscoped hide would remove the video.
+  style.textContent = [
+    'html.gazeconnect-youtube-inapp-maximize, html.gazeconnect-youtube-inapp-maximize body {',
+    '  overflow: hidden !important; background: #000 !important;',
+    '}',
+    'html.gazeconnect-youtube-inapp-maximize #masthead-container { display: none !important; }',
+    'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy[theater] #columns { display: none !important; }'
+  ].join('\\n');
+
   document.documentElement.classList.add('gazeconnect-youtube-inapp-maximize');
+
   var player = document.querySelector('#movie_player');
   if (player) {
-    try {
-      player.classList.add('ytp-big-mode');
-      player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 }));
-    } catch (_) {}
+    try { player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 })); } catch (_) {}
   }
   try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch (_) { window.scrollTo(0, 0); }
-  return 'in-app-video-maximized';
+  // Theater mode already repaints the player; this single resize just lets
+  // it settle after the masthead hide changes the available height. No
+  // resize storm (the prior version's 4× resize + fixed reflow caused the
+  // lag/"delayed response").
+  try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+  return 'in-app-video-theater';
 })();
 `;
 
@@ -1998,76 +2016,13 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     }, [browser]);
 
     const skipYouTubeAd = useCallback(async () => {
+        // Skip is handled entirely in the main process via youtubeCommand, which
+        // locates the skip button in-page and dispatches a zoom-compensated trusted
+        // click. Do NOT add a renderer-side getBoundingClientRect -> clickAtViewPoint
+        // fallback here: those page-CSS coords would bypass the zoom compensation in
+        // sendTrustedBrowserClick and mis-click under the default 1.35 page zoom
+        // (see Entry 26).
         await browser.youtubeCommand('skip_ad');
-        return;
-        const findSkipButtonScript = `
-          (function() {
-            const player = document.querySelector('#movie_player') || document;
-            const roots = [player, document];
-            const selectors = [
-              '.ytp-ad-skip-button',
-              '.ytp-ad-skip-button-modern',
-              '.ytp-skip-ad-button',
-              '.ytp-ad-skip-button-container button',
-              '.ytp-ad-preview-container button',
-              '.videoAdUiSkipButton',
-              'button[class*="skip" i]',
-              '[role="button"][class*="skip" i]',
-              'button[aria-label*="Skip" i]',
-              '[role="button"][aria-label*="Skip" i]',
-              '[title*="Skip" i]',
-              '[data-title-no-tooltip*="Skip" i]'
-            ];
-            const seen = new Set();
-            const isVisible = (el) => {
-              if (!el || seen.has(el)) return false;
-              seen.add(el);
-              const rect = el.getBoundingClientRect();
-              const style = window.getComputedStyle(el);
-              return rect.width >= 12 && rect.height >= 12 &&
-                style.visibility !== 'hidden' &&
-                style.display !== 'none' &&
-                style.pointerEvents !== 'none' &&
-                !el.disabled &&
-                el.getAttribute('aria-disabled') !== 'true';
-            };
-            const normalizeTarget = (el) =>
-              el && (el.closest('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button') || el);
-            const candidates = [];
-            for (const root of roots) {
-              for (const selector of selectors) {
-                try {
-                  root.querySelectorAll(selector).forEach((el) => candidates.push(normalizeTarget(el)));
-                } catch (_) {}
-              }
-            }
-            document.querySelectorAll('button, [role="button"], .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button')
-              .forEach((el) => {
-                const text = [
-                  el.textContent || '',
-                  el.getAttribute('aria-label') || '',
-                  el.getAttribute('title') || ''
-                ].join(' ').trim();
-                if (/skip|छोड़|छोड|छोड़/i.test(text)) candidates.push(normalizeTarget(el));
-              });
-            for (const candidate of candidates) {
-              if (!isVisible(candidate)) continue;
-              const rect = candidate.getBoundingClientRect();
-              return {
-                found: true,
-                x: Math.round(rect.left + rect.width / 2),
-                y: Math.round(rect.top + rect.height / 2),
-                label: (candidate.textContent || candidate.getAttribute('aria-label') || candidate.className || '').toString().slice(0, 80)
-              };
-            }
-            return { found: false };
-          })();
-        `;
-        const result = await browser.executeJs(findSkipButtonScript);
-        const point = result?.result;
-        if (point?.found && typeof point.x === 'number' && typeof point.y === 'number') {
-            await browser.clickAtViewPoint(point.x, point.y);
-        }
     }, [browser]);
 
     const playPauseYouTube = useCallback(async () => {
@@ -2604,7 +2559,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
 };
 
 // ── QUICK SEARCH PANEL (with gaze cursor forwarding) ──
-const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onEmergency }: {
+const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onEmergency, onSpeak }: {
     ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>; gpRef: React.MutableRefObject<{ x: number; y: number }>;
     goBack: () => void;
     disableGaze: () => void;
@@ -2615,6 +2570,9 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     onTopicActive?: (active: boolean) => void;
     onNavHiddenToggle?: (hidden: boolean) => void;
     onEmergency: () => void;
+    // v17.18: ALL speech must flow through App.handleSpeak so the routing
+    // rules apply (volume-0 mute, TTS-health fallback, overlap cancel).
+    onSpeak: (t: string) => void;
 }) => {
     const ws = useWS();
     const { isLight, isMix, isWarm } = useTheme();
@@ -2720,17 +2678,20 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
     const speakCardSummary = useCallback(() => {
         if (!topic || !ws.quickSnapshot) return;
+        // v17.18: routed through App.handleSpeak (was a raw ws.speak that
+        // bypassed volume-0 mute, the TTS-health fallback, and the
+        // pre-speak browser-utterance cancel).
         if (topic.id === 'local_weather') {
             const d = ws.quickSnapshot.weather;
-            ws.speak(d?.ok ? `Weather in ${d.city}. Temperature ${d.temp_c} degrees. ${d.condition || ''}` : 'Weather data is unavailable right now.');
+            onSpeak(d?.ok ? `Weather in ${d.city}. Temperature ${d.temp_c} degrees. ${d.condition || ''}` : 'Weather data is unavailable right now.');
             return;
         }
         if (topic.id === 'cricket_score') {
             const d = ws.quickSnapshot.cricket;
-            ws.speak(d?.ok ? `${d.match}. ${d.summary}. ${d.status}.` : 'Cricket score is unavailable right now.');
+            onSpeak(d?.ok ? `${d.match}. ${d.summary}. ${d.status}.` : 'Cricket score is unavailable right now.');
             return;
         }
-    }, [topic, ws.quickSnapshot, ws.speak]);
+    }, [topic, ws.quickSnapshot, onSpeak]);
 
     const linksPerPage = largeLinkTargets ? 4 : 6;
     const totalLinkPages = Math.max(1, Math.ceil(browser.pageLinks.length / linksPerPage));
@@ -3588,7 +3549,10 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const ws = useWS();
     const { settings: dwellSettings, currentStage } = useDwellTime();
     const { hasRealGaze } = useRealGaze();
-    const [gp, setGp] = useState({ x: 0, y: 0 });
+    // v17.17: gaze position lives in a ref ONLY. It used to be mirrored into
+    // useState on every frame, which re-rendered this entire ~3800-line
+    // component at 66Hz (plus every mousemove) — and nothing ever read the
+    // state. Consumers all use gpRef.
     const gpRef = useRef({ x: 0, y: 0 });
     const [windowBounds, setWindowBounds] = useState<{ x: number; y: number; width: number; height: number; screenWidth: number; screenHeight: number; scaleFactor: number; isFullScreen: boolean; isMaximized: boolean; } | null>(null);
     const windowBoundsRef = useRef<typeof windowBounds>(null);
@@ -3612,6 +3576,13 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             edgeMaxDeltaPx: currentStage === 'caregiver' ? 42 : currentStage === 'late_als' ? 28 : 36,
             edgeThrottleMs: currentStage === 'caregiver' ? 100 : 130,
             edgeMaxBurstMs: currentStage === 'late_als' ? 5200 : 6000,
+            // v17.18 dwell-safety toggles, driven by the same localStorage
+            // gazeFlags system as the app cursor so a rollback set in the
+            // MAIN app DevTools (window.__gazeFlags.set('browserProgressRetention', false))
+            // persists across restarts AND page loads. Read at effect time;
+            // re-applied whenever this screen reconfigures the browser.
+            progressRetentionEnabled: gazeFlags.browserProgressRetention,
+            gapPauseEnabled: gazeFlags.browserGapPause,
         });
     }, [browser.setGazeConfig, currentStage, dwellSettings.cooldownAfterActivation, dwellSettings.onsetDelay, dwellSettings.standardButton]);
 
@@ -3718,7 +3689,6 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             rawY = Math.max(0, Math.min(window.innerHeight, rawY));
 
             gpRef.current = { x: rawX, y: rawY };
-            setGp({ x: rawX, y: rawY });
         });
         return unsub;
     }, [ws.subscribeGaze]);
@@ -3729,7 +3699,6 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             // Only use mouse position when no real gaze data is present
             if (!hasRealGaze) {
                 gpRef.current = { x: e.clientX, y: e.clientY };
-                setGp({ x: e.clientX, y: e.clientY });
             }
         };
         window.addEventListener('mousemove', h);
@@ -3742,30 +3711,128 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     // can make the page cursor appear offset from the user's actual gaze.
     // Keep only a tiny 1.5px jitter gate, snap large moves (>18px), and otherwise
     // use high-alpha EWMA so dense web and YouTube controls track promptly.
+    //
+    // v17.17: forwarding is event-driven (per gaze frame, ~66Hz) instead of a
+    // 33ms poll. The poll added up to 33ms of lag, dropped roughly every other
+    // frame the page-side dwell could have ticked on, and kept re-sending the
+    // last held position through blinks (so the page dwell advanced on stale
+    // gaze — see gapPause on the page side for the matching fix). A mousemove
+    // path keeps simulation mode working: with no eye tracker there are no WS
+    // gaze frames at all, so mouse-as-gaze must forward on its own events.
     const smoothedGazeRef = useRef<{ x: number; y: number } | null>(null);
+    // v17.17: 3-sample weighted moving average over the raw input, the same
+    // 0.45/0.30/0.25 pre-smoothing the main-app cursor applies before its EMA
+    // (GazeCursor "SmoothWhenChangingGazeTarget"). Causal, ~zero added lag at
+    // 66Hz; takes the sample-to-sample sawtooth out of the page cursor before
+    // the EMA and the page-side stability radius see it.
+    const wmaPrev1Ref = useRef<{ x: number; y: number } | null>(null);
+    const wmaPrev2Ref = useRef<{ x: number; y: number } | null>(null);
+    const hasRealGazeRef = useRef(hasRealGaze);
+    useEffect(() => { hasRealGazeRef.current = hasRealGaze; }, [hasRealGaze]);
+    // v17.18: hide/show bookkeeping that must SURVIVE effect re-runs — the
+    // earlier hide-once guard keyed on smoothedGazeRef, which the effect body
+    // resets, so a dep-change re-run while the page cursor was visible left a
+    // stale frozen cursor over the page (review-confirmed). These refs are
+    // the source of truth for "is the page cursor currently shown".
+    const pageCursorVisibleRef = useRef(false);
+    const lastForwardAtRef = useRef(0);
+    const lastForwardModeRef = useRef<boolean | null>(null);
     useEffect(() => {
         if (!browser.isOpen) return;
         smoothedGazeRef.current = null;
-        const interval = setInterval(() => {
+        wmaPrev1Ref.current = null;
+        wmaPrev2Ref.current = null;
+        // Min spacing between IPC sends. ET5 frames arrive every ~15.2ms so
+        // real gaze always passes; this only caps high-rate mousemove bursts
+        // (and any future 133Hz tracker mode) at ~70Hz.
+        const MIN_FORWARD_INTERVAL_MS = 14;
+        let lastSentAt = 0;
+
+        // Hide exactly once per transition, no matter how the filter refs
+        // were reset in between; show records visibility for the next hide.
+        const hidePageCursor = () => {
+            smoothedGazeRef.current = null;
+            wmaPrev1Ref.current = null;
+            wmaPrev2Ref.current = null;
+            if (pageCursorVisibleRef.current) {
+                pageCursorVisibleRef.current = false;
+                browser.hideGazeCursor();
+            }
+        };
+        const showPageCursor = (x: number, y: number, opts?: { cursor?: boolean }) => {
+            pageCursorVisibleRef.current = opts?.cursor !== false;
+            browser.updateGazeCursor(x, y, opts);
+        };
+
+        const forward = () => {
             const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed' && view !== 'youtube';
             if (!ige || (isBrowserWatchMode && !allowWatchScroll)) {
-                smoothedGazeRef.current = null;
-                browser.hideGazeCursor();
+                hidePageCursor();
                 return;
             }
-            const raw = gpRef.current;
+            const nowMs = Date.now();
+            if (nowMs - lastSentAt < MIN_FORWARD_INTERVAL_MS) return;
+            lastSentAt = nowMs;
+
+            // v17.18: WMA history is only valid for a continuous same-mode
+            // stream — reset after a stream gap (>150ms, the discontinuity
+            // threshold the page-side gapPause uses) or a real<->simulation
+            // mode flip, so seconds-old samples never blend into the first
+            // post-gap frames (the "ghost mid-point sweep" review finding).
+            if (lastForwardAtRef.current > 0 && nowMs - lastForwardAtRef.current > 150) {
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
+            }
+            if (lastForwardModeRef.current !== hasRealGazeRef.current) {
+                lastForwardModeRef.current = hasRealGazeRef.current;
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
+            }
+            lastForwardAtRef.current = nowMs;
+
+            const gazeNow = gpRef.current;
             const prev = smoothedGazeRef.current;
             const activeBounds = browser.boundsRef.current;
 
-            if (view === 'youtube' && isYtVideoActive && activeBounds && raw.y < activeBounds.y + 96) {
-                smoothedGazeRef.current = null;
-                browser.hideGazeCursor();
+            if (view === 'youtube' && isYtVideoActive && activeBounds && gazeNow.y < activeBounds.y + 96) {
+                hidePageCursor();
                 return;
             }
 
+            // v17.18: the snap decision uses the UNFILTERED displacement so
+            // WMA lag cannot raise the effective 18px gate to ~40px (review:
+            // adjacent-link refixations degraded into EMA crawl, and post-gap
+            // refixations swept through 2-3 ghost mid-points). A snap is a
+            // discontinuity: jump straight to the true gaze point and restart
+            // the WMA history there.
+            if (prev) {
+                const jumpDist = Math.hypot(gazeNow.x - prev.x, gazeNow.y - prev.y);
+                if (jumpDist > 18) {
+                    wmaPrev1Ref.current = { x: gazeNow.x, y: gazeNow.y };
+                    wmaPrev2Ref.current = { x: gazeNow.x, y: gazeNow.y };
+                    smoothedGazeRef.current = { x: gazeNow.x, y: gazeNow.y };
+                    showPageCursor(gazeNow.x, gazeNow.y, allowWatchScroll ? { cursor: false } : undefined);
+                    return;
+                }
+            }
+
+            // WMA(3) prefilter — weights match the main cursor. Only the
+            // sub-snap band (<=18px true displacement) reaches this filter,
+            // so it smooths fixation noise without delaying refixations.
+            const w1 = wmaPrev1Ref.current;
+            const w2 = wmaPrev2Ref.current;
+            const raw = (w1 && w2)
+                ? {
+                    x: gazeNow.x * 0.45 + w1.x * 0.30 + w2.x * 0.25,
+                    y: gazeNow.y * 0.45 + w1.y * 0.30 + w2.y * 0.25,
+                }
+                : { x: gazeNow.x, y: gazeNow.y };
+            wmaPrev2Ref.current = w1 ? { x: w1.x, y: w1.y } : { x: gazeNow.x, y: gazeNow.y };
+            wmaPrev1Ref.current = { x: gazeNow.x, y: gazeNow.y };
+
             if (!prev) {
                 smoothedGazeRef.current = { x: raw.x, y: raw.y };
-                browser.updateGazeCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
+                showPageCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
@@ -3773,30 +3840,59 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             const dy = raw.y - prev.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Large move: snap to the new point.
-            if (dist > 18) {
-                smoothedGazeRef.current = { x: raw.x, y: raw.y };
-                browser.updateGazeCursor(raw.x, raw.y, allowWatchScroll ? { cursor: false } : undefined);
-                return;
-            }
-
             // Tiny jitter: hold the rendered point.
-            if (dist < 1.5) {
-                browser.updateGazeCursor(prev.x, prev.y, allowWatchScroll ? { cursor: false } : undefined);
+            // v17.20: 1.5 → 2.5px hold, on-rig feedback "cursor not stable
+            // during fixation". Refixations are unaffected (the >18px snap
+            // gate is upstream and tests unfiltered displacement). Old: 1.5.
+            if (dist < 2.5) {
+                showPageCursor(prev.x, prev.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
             // Medium move: follow quickly without a hard browser-side lock.
-            const alpha = dist > 8 ? 0.9 : 0.74;
+            // v17.20: sub-8px follow 0.74 → 0.65 (calmer fixation wander,
+            // ~1 extra frame to settle on micro-adjustments). Old: 0.74.
+            const alpha = dist > 8 ? 0.9 : 0.65;
             const next = {
                 x: prev.x + dx * alpha,
                 y: prev.y + dy * alpha,
             };
             smoothedGazeRef.current = next;
-            browser.updateGazeCursor(next.x, next.y, allowWatchScroll ? { cursor: false } : undefined);
+            showPageCursor(next.x, next.y, allowWatchScroll ? { cursor: false } : undefined);
+        };
+
+        // Real gaze: one forward per backend frame. The gpRef-filling
+        // subscription above is registered first (earlier effect), so
+        // gpRef already holds this frame's transformed position.
+        const unsub = ws.subscribeGaze(() => forward());
+        // Simulation fallback: forward on mouse movement when no real
+        // gaze stream exists.
+        const onMouse = () => {
+            if (!hasRealGazeRef.current) forward();
+        };
+        window.addEventListener('mousemove', onMouse);
+        // v17.18: a STATIONARY mouse fires no events, so simulation mode
+        // (and the automatic mouse fallback 1.5s after a tracker dropout)
+        // could never complete a dwell — the page dwell only ticks when
+        // frames arrive, and the page-side gap pause neutralizes wall-clock
+        // catch-up. This heartbeat re-sends the held position ONLY when no
+        // real gaze stream exists; with real gaze it is a no-op, so blink
+        // gaps stay gaps and stale-gaze dwell advancement is NOT
+        // reintroduced (review-confirmed critical).
+        const heartbeat = window.setInterval(() => {
+            if (!hasRealGazeRef.current) forward();
         }, 33);
-        return () => clearInterval(interval);
-    }, [browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
+        // Entering a hidden state (gaze off / watch mode) must hide even
+        // if no further frames arrive.
+        if (!ige || (isBrowserWatchMode && !(browser.scrollMode === 'armed' && view !== 'youtube'))) {
+            hidePageCursor();
+        }
+        return () => {
+            unsub();
+            window.removeEventListener('mousemove', onMouse);
+            window.clearInterval(heartbeat);
+        };
+    }, [ws.subscribeGaze, browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
 
     const goBack = useCallback(() => {
         browser.closePage();
@@ -3832,7 +3928,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 {view === 'news' && <NewsPanel ige={ige} ts={ts} onSpeak={onSpeak} goBack={goBack} disableGaze={disableGaze} browser={browser} gpRef={gpRef} isNavHidden={isNavHidden} />}
                 {view === 'youtube' && <YouTubePanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onVideoActive={setIsYtVideoActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} />}
                 {view === 'knowledge' && <KnowledgePanel ige={ige} ts={ts} onSpeak={onSpeak} isNavHidden={isNavHidden} />}
-                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} />}
+                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} onSpeak={onSpeak} />}
                 {view === 'whatsapp' && <WhatsAppPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} isNavHidden={isNavHidden} />}
                 {view === 'social' && <SocialPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} isNavHidden={isNavHidden} setView={setView} />}
             </div>

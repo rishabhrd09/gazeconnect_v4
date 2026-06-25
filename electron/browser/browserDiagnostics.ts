@@ -74,6 +74,15 @@ class BrowserDiagnosticsTracker {
     this.logThrottled(this.lastDebugAt, key, message, minIntervalMs, 'debug');
   }
 
+  // v17.19 — always-on (still throttled) info line. The 2026-06-11 on-rig
+  // console captures contained ZERO browser-path lines because everything
+  // routed through debug(), which is dark without DEBUG_BROWSER_GAZE=1 —
+  // making dwell-click behavior unverifiable after the fact. Use this for
+  // low-rate, high-diagnostic-value events only (clicks, open/close).
+  info(key: string, message: string, minIntervalMs = 1000): void {
+    this.logThrottled(this.lastDebugAt, key, message, minIntervalMs, 'debug');
+  }
+
   warn(key: string, message: string, minIntervalMs = 15000): void {
     this.logThrottled(this.lastWarningAt, key, message, minIntervalMs, 'warn');
   }

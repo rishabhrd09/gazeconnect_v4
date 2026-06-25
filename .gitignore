@@ -23,6 +23,9 @@ python/.venv/
 python/data/*.log
 python/data/*.txt
 python/data/*.json
+# smart_bigrams.json is a pre-computed static asset (see python/scripts/generate_smart_bigrams.py),
+# not runtime patient data — keep it tracked.
+!python/data/smart_bigrams.json
 *.spec
 
 # --- .NET build artifacts ---

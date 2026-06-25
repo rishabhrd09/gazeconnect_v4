@@ -62,6 +62,12 @@ type BrowserGazeConfig = {
     edgeMaxDeltaPx?: number;
     edgeThrottleMs?: number;
     edgeMaxBurstMs?: number;
+    // v17.18 dwell-safety toggles (seeded into every new page by the main
+    // process, so a rollback survives page loads — unlike window.gcConfig).
+    progressRetentionEnabled?: boolean;
+    progressRetentionMs?: number;
+    gapPauseEnabled?: boolean;
+    gapPauseMs?: number;
 };
 
 const getElectronAPI = () => (window as any).electronAPI;
@@ -218,16 +224,6 @@ export function useGazeBrowser() {
             await api.webview.click(localX, localY);
         } catch (err) {
             console.error('clickAtGaze error:', err);
-        }
-    }, []);
-
-    const clickAtViewPoint = useCallback(async (localX: number, localY: number) => {
-        const api = getElectronAPI();
-        if (!api?.webview?.click) return;
-        try {
-            await api.webview.click(Math.round(localX), Math.round(localY));
-        } catch (err) {
-            console.error('clickAtViewPoint error:', err);
         }
     }, []);
 
@@ -436,7 +432,6 @@ export function useGazeBrowser() {
         openPage,
         closePage,
         clickAtGaze,
-        clickAtViewPoint,
         scrollDown,
         scrollUp,
         goBack,

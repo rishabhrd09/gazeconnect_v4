@@ -91,6 +91,8 @@ from prediction_guardrails import (
     tokenize_prediction_text,
 )
 import threading
+import os
+import queue
 from services.fatigue_monitor import (
     FatigueDetector, BreakReminderManager, DryEyeMonitor, FatigueLevel
 )
@@ -641,38 +643,118 @@ class TobiiReceiver:
 # ============================================
 
 class TTSEngine:
-    """Text-to-speech engine."""
+    """Text-to-speech engine.
+
+    All pyttsx3 work runs on a dedicated worker thread so runAndWait() no
+    longer blocks the asyncio event loop — the verified #1 gaze-freeze
+    source (cursor froze for the full utterance; see
+    docs/EYE_TRACKING_COMPARISON.md §4.1). Verified on the real rig
+    2026-06-11: pipeline ticked through a live utterance uninterrupted,
+    zero stale-sample drops (docs/EYE_TRACKING_CHANGES.md, A/B results).
+    The worker owns the engine (SAPI5/COM thread affinity).
+
+    Rollback to the old synchronous behavior without a code edit:
+    set GAZECONNECT_TTS_ASYNC=0 before starting the backend.
+    """
 
     def __init__(self, enabled: bool = True):
         self.engine = None
         self.is_speaking = False
         self.enabled = enabled
+        # Default ON since the 2026-06-11 on-rig A/B; '0'/'false'/'no'/'off' reverts to sync.
+        self.async_mode = os.environ.get('GAZECONNECT_TTS_ASYNC', '1').strip().lower() not in ('0', 'false', 'no', 'off')
+        self._queue: Optional['queue.Queue'] = None
+        self._worker: Optional[threading.Thread] = None
 
         if not self.enabled:
             return
 
-        if TTS_AVAILABLE:
+        if not TTS_AVAILABLE:
+            return
+
+        if self.async_mode:
+            self._queue = queue.Queue()
+            self._worker = threading.Thread(target=self._worker_loop, name='tts-worker', daemon=True)
+            self._worker.start()
+            logger.info("TTS engine: async worker mode (default; set GAZECONNECT_TTS_ASYNC=0 to revert to sync)")
+            return
+
+        logger.info("TTS engine: synchronous mode (GAZECONNECT_TTS_ASYNC=0)")
+
+        self._init_engine()
+
+    def _init_engine(self):
+        """Initialize pyttsx3 on the calling thread (engine has thread affinity)."""
+        try:
+            self.engine = pyttsx3.init()
+            self.engine.setProperty('rate', 150)
+            self.engine.setProperty('volume', 1.0)
+
+            # Get available voices
+            voices = self.engine.getProperty('voices')
+            if voices:
+                # Prefer female voice if available
+                for voice in voices:
+                    if 'female' in voice.name.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        break
+
+            self.init_failed = False
+            logger.info("TTS engine initialized")
+        except Exception as e:
+            logger.error(f"TTS initialization error: {e}")
+            self.engine = None
+            self.init_failed = True
+
+    @property
+    def available(self) -> bool:
+        """True when speaking can plausibly produce audio.
+
+        Reported to clients in the 'connected' handshake so the frontend can
+        fall back to browser speechSynthesis instead of going silently mute
+        when the socket is healthy but TTS is not (pyttsx3 missing,
+        tts_enabled=False, or engine init failure). A mid-session engine
+        wedge is not detectable here — that residual risk is documented in
+        docs/EYE_TRACKING_CHANGES.md.
+        """
+        if not self.enabled or not TTS_AVAILABLE:
+            return False
+        if getattr(self, 'init_failed', False):
+            return False
+        if self.async_mode:
+            return self._queue is not None
+        return self.engine is not None
+
+    def _worker_loop(self):
+        """Async mode: own the engine and process commands off the event loop."""
+        self._init_engine()
+        while True:
+            cmd, value = self._queue.get()
             try:
-                self.engine = pyttsx3.init()
-                self.engine.setProperty('rate', 150)
-                self.engine.setProperty('volume', 1.0)
-
-                # Get available voices
-                voices = self.engine.getProperty('voices')
-                if voices:
-                    # Prefer female voice if available
-                    for voice in voices:
-                        if 'female' in voice.name.lower():
-                            self.engine.setProperty('voice', voice.id)
-                            break
-
-                logger.info("TTS engine initialized")
+                if cmd == 'speak':
+                    if self.engine:
+                        self.is_speaking = True
+                        self.engine.say(value)
+                        self.engine.runAndWait()
+                    else:
+                        logger.warning(f"TTS not available. Would speak: {value}")
+                elif cmd == 'rate':
+                    if self.engine:
+                        self.engine.setProperty('rate', value)
+                elif cmd == 'volume':
+                    if self.engine:
+                        self.engine.setProperty('volume', max(0.0, min(1.0, value)))
             except Exception as e:
-                logger.error(f"TTS initialization error: {e}")
-                self.engine = None
+                logger.error(f"TTS error: {e}")
+            finally:
+                self.is_speaking = False
 
     def speak(self, text: str):
         """Speak text."""
+        if self.async_mode and self._queue is not None:
+            self._queue.put(('speak', text))
+            return
+
         if not self.engine:
             logger.warning(f"TTS not available. Would speak: {text}")
             return
@@ -688,6 +770,13 @@ class TTSEngine:
 
     def stop(self):
         """Stop speaking."""
+        if self.async_mode and self._queue is not None:
+            # Drop queued utterances, then interrupt the current one.
+            try:
+                while not self._queue.empty():
+                    self._queue.get_nowait()
+            except Exception:
+                pass
         if self.engine:
             try:
                 self.engine.stop()
@@ -697,11 +786,17 @@ class TTSEngine:
 
     def set_rate(self, rate: int):
         """Set speech rate (words per minute)."""
+        if self.async_mode and self._queue is not None:
+            self._queue.put(('rate', rate))
+            return
         if self.engine:
             self.engine.setProperty('rate', rate)
 
     def set_volume(self, volume: float):
         """Set volume (0.0 to 1.0)."""
+        if self.async_mode and self._queue is not None:
+            self._queue.put(('volume', max(0.0, min(1.0, volume))))
+            return
         if self.engine:
             self.engine.setProperty('volume', max(0.0, min(1.0, volume)))
 
@@ -1671,6 +1766,12 @@ class GazeConnectBackend:
         # For gaze: store latest, let broadcast loop handle it
         if msg_type == 'gaze':
             self._latest_gaze_msg = message
+            # v17.19 push mode: wake the broadcast loop NOW instead of
+            # letting the frame wait for the next paced tick (0-15.2ms,
+            # mean ~7.6ms of avoidable glass-to-glass latency per frame).
+            ev = getattr(self, '_gaze_push_event', None)
+            if ev is not None:
+                ev.set()
             return
 
         # For non-gaze: send immediately
@@ -1683,37 +1784,58 @@ class GazeConnectBackend:
 
     async def _gaze_broadcast_loop(self):
         """
-        Dedicated loop that sends latest gaze data at ~60Hz.
-        Prevents overwhelming WebSocket with 133 fire-and-forget tasks/sec.
+        Dedicated loop that sends the latest gaze data to clients.
+
+        v17.19 push mode (default): waits on an asyncio.Event that the
+        gaze path sets the moment a frame is stored, so each frame is
+        sent immediately on arrival instead of waiting for the next
+        paced tick. The ET5 delivers ~33Hz, so the old fixed 66Hz pacing
+        added 0-15.2ms (mean ~7.6ms) to every frame for no benefit.
+        Set GAZECONNECT_GAZE_PUSH=0 to revert to the paced loop.
         """
-        logger.info("Gaze broadcast loop started (~66Hz)")
+        push_mode = os.environ.get('GAZECONNECT_GAZE_PUSH', '1').strip().lower() not in ('0', 'false', 'no', 'off')
+        self._gaze_push_event = asyncio.Event() if push_mode else None
+        if push_mode:
+            logger.info("Gaze broadcast loop started (push-on-frame mode; set GAZECONNECT_GAZE_PUSH=0 for the paced loop)")
+        else:
+            logger.info("Gaze broadcast loop started (paced mode, ~66Hz tick / ~33Hz effective; GAZECONNECT_GAZE_PUSH=0)")
         self._latest_gaze_msg = None
         send_count = 0
         last_log = time.time()
 
         while True:
             try:
-                # v9: High-precision broadcast timing
-                # asyncio.sleep(1/66) has 15.6ms resolution on Windows â†’ ~32Hz actual
-                # Hybrid: sleep most of the interval, then yield rapidly for precision
-                target_interval = 1/66
-                if not hasattr(self, '_next_broadcast'):
-                    self._next_broadcast = time.perf_counter()
-                self._next_broadcast += target_interval
-
-                now = time.perf_counter()
-                wait = self._next_broadcast - now
-                if wait < -0.05 or wait > 0.05:
-                    # Timing drifted too far, reset
-                    self._next_broadcast = now + target_interval
-                    await asyncio.sleep(0)
-                elif wait > 0.005:
-                    await asyncio.sleep(wait - 0.003)
-                    # Yield rapidly until target time (sub-ms precision)
-                    while time.perf_counter() < self._next_broadcast:
-                        await asyncio.sleep(0)
+                if push_mode:
+                    # Wake on frame arrival; 50ms timeout keeps the loop
+                    # alive (rate logging, dead-client sweeps) across
+                    # tracker gaps/blinks without busy-waiting.
+                    try:
+                        await asyncio.wait_for(self._gaze_push_event.wait(), timeout=0.05)
+                    except asyncio.TimeoutError:
+                        pass
+                    self._gaze_push_event.clear()
                 else:
-                    await asyncio.sleep(0)
+                    # v9: High-precision broadcast timing
+                    # asyncio.sleep(1/66) has 15.6ms resolution on Windows â†’ ~32Hz actual
+                    # Hybrid: sleep most of the interval, then yield rapidly for precision
+                    target_interval = 1/66
+                    if not hasattr(self, '_next_broadcast'):
+                        self._next_broadcast = time.perf_counter()
+                    self._next_broadcast += target_interval
+
+                    now = time.perf_counter()
+                    wait = self._next_broadcast - now
+                    if wait < -0.05 or wait > 0.05:
+                        # Timing drifted too far, reset
+                        self._next_broadcast = now + target_interval
+                        await asyncio.sleep(0)
+                    elif wait > 0.005:
+                        await asyncio.sleep(wait - 0.003)
+                        # Yield rapidly until target time (sub-ms precision)
+                        while time.perf_counter() < self._next_broadcast:
+                            await asyncio.sleep(0)
+                    else:
+                        await asyncio.sleep(0)
 
                 msg = self._latest_gaze_msg
                 if not msg or not self.connected_clients:
@@ -3160,7 +3282,11 @@ class GazeConnectBackend:
         self._send(websocket, 'connected', {
             'gaze_enabled': self.gaze_enabled,
             'current_screen': self.current_screen,
-            'tobii_connected': self.tobii.is_connected
+            'tobii_connected': self.tobii.is_connected,
+            # Lets the frontend route speech to browser speechSynthesis when
+            # the backend voice cannot produce audio (otherwise the patient
+            # would be silently mute while the connection shows healthy).
+            'tts_available': self.tts.available
         })
 
         try:

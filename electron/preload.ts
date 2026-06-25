@@ -119,8 +119,13 @@ const api = {
       ipcRenderer.invoke('webview:resetBrowserSession', reason),
     setBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
       ipcRenderer.invoke('webview:setBounds', bounds),
-    updateGaze: (x: number, y: number, options?: { cursor?: boolean }) =>
-      ipcRenderer.invoke('webview:updateGaze', x, y, options),
+    // v17.19: one-way send (was invoke) — this fires per gaze frame
+    // (~33Hz); the handler returns nothing, so the invoke reply message
+    // was pure per-frame overhead on the main-process loop.
+    updateGaze: (x: number, y: number, options?: { cursor?: boolean }) => {
+      ipcRenderer.send('webview:updateGaze', x, y, options);
+      return Promise.resolve();
+    },
     navigate: (url: string) => ipcRenderer.invoke('webview:navigate', url),
     refreshLinks: () => ipcRenderer.invoke('webview:refreshLinks'),
     adjustZoom: (delta: number) => ipcRenderer.invoke('webview:adjustZoom', delta),

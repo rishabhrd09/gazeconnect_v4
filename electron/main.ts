@@ -71,6 +71,10 @@ let edgeScrollCandidate: 'up' | 'down' | 'none' = 'none';
 let edgeScrollEnteredAt = 0;
 let edgeScrollActiveDirection: 'up' | 'down' | 'none' = 'none';
 let edgeScrollStartedAt = 0;
+// v17.20 — page dwell state from the previous gaze frame's poll envelope
+// (~30ms stale at most). Used to pause edge scrolling while a dwell is
+// acquiring/committing so the page can't slide out from under the target.
+let lastBrowserDwellState = 'idle';
 let highContrastEnabled = false;
 let rendererBootReady = false;
 let splashTransitionStarted = false;
@@ -95,6 +99,30 @@ type BrowserGazeConfig = {
   edgeMaxDeltaPx: number;
   edgeThrottleMs: number;
   edgeMaxBurstMs: number;
+  // v17.18 dwell-safety toggles. Living here (and in the per-page seed)
+  // means a rollback set once persists across page loads — a value set only
+  // on window.gcConfig dies with the document.
+  progressRetentionEnabled: boolean;
+  progressRetentionMs: number;
+  gapPauseEnabled: boolean;
+  gapPauseMs: number;
+  // v17.19 web-cursor precision/comfort toggles (same persistence rationale).
+  probeSnapEnabled: boolean;
+  probeSnapRadiusPx: number;
+  progressArcEnabled: boolean;
+  cursorSmoothingMs: number;
+  focusOnResolve: boolean;
+  // v17.20 sidebar-drift fixes (on-rig feedback 2026-06-11).
+  bayesianStickyMult: number;
+  bayesianStableFrames: number;
+  bayesianStableMargin: number;
+  edgeScrollPauseDuringDwell: boolean;
+  // v17.21 — page-zoom coordinate compensation (root cause of the
+  // rightward cursor drift; see handleWebviewGazeFrame).
+  zoomCompensationEnabled: boolean;
+  // v17.21 — keep in-page snap/hold/probe radii a constant on-screen size
+  // across page zoom (read by the injected script via radiusScale).
+  zoomScaleRadii: boolean;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -119,10 +147,33 @@ let browserGazeConfig: BrowserGazeConfig = {
   edgeHoldMs: 650,
   edgeZonePct: 0.20,
   edgeDeadZonePct: 0.02,
-  edgeMinDeltaPx: 18,
-  edgeMaxDeltaPx: 36,
-  edgeThrottleMs: 120,
+  // v17.19 — smoother edge scroll: ~same speed (150–300 px/s) in smaller,
+  // more frequent steps (was 18–36px every 120ms ≈ 8Hz chunks; now 9–18px
+  // at a 45ms throttle ≈ every other 33Hz gaze frame). Old feel is one
+  // setGazeConfig away: { edgeMinDeltaPx: 18, edgeMaxDeltaPx: 36,
+  // edgeThrottleMs: 120 }.
+  edgeMinDeltaPx: 9,
+  edgeMaxDeltaPx: 18,
+  edgeThrottleMs: 45,
   edgeMaxBurstMs: 6000,
+  progressRetentionEnabled: true,
+  progressRetentionMs: 1000,
+  gapPauseEnabled: true,
+  gapPauseMs: 150,
+  // v17.19 — see browserGazeController.ts gcConfig defaults for rationale.
+  probeSnapEnabled: true,
+  probeSnapRadiusPx: 36,
+  progressArcEnabled: true,
+  cursorSmoothingMs: 60,
+  focusOnResolve: false,
+  // v17.20 — incumbent stickiness + tunable winner gate (sidebar card
+  // flip fix) and edge-scroll pause while a dwell is in progress.
+  bayesianStickyMult: 1.35,
+  bayesianStableFrames: 4,
+  bayesianStableMargin: 0.10,
+  edgeScrollPauseDuringDwell: true,
+  zoomCompensationEnabled: true,
+  zoomScaleRadii: true,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -143,8 +194,19 @@ function resetEdgeScrollState(notify: boolean = true) {
 function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activeBrowserViewSessionId) {
   const view = activeBrowserView;
   if (!view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
-  const cx = Math.round(x);
-  const cy = Math.round(y);
+  // v17.21 — x,y arrive in PAGE CSS px (both live callers source them from
+  // in-page scripts: the dwell click request and youtubeCommand's
+  // trustedClick). sendInputEvent expects view DIPs, and Blink maps DIPs
+  // back to CSS by dividing by the page zoom — so without this multiply,
+  // a click aimed at an element's CSS center landed at center/zoom
+  // (26% up-left at the 1.35 default): the "plays the wrong thing"
+  // mis-click. Rollback: setGazeConfig({ zoomCompensationEnabled: false })
+  let zf = 1;
+  if (browserGazeConfig.zoomCompensationEnabled) {
+    try { zf = view.webContents.getZoomFactor() || 1; } catch { zf = 1; }
+  }
+  const cx = Math.round(x * zf);
+  const cy = Math.round(y * zf);
   // Suspend the in-page dwell cursor for the duration of the post-click
   // cooldown. Previously we reset the dwell which also zeroed
   // `blockedUntil`, defeating the cooldown — letting the gaze fire a
@@ -191,6 +253,7 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
   await disposeBrowserView(mainWindow, view, reason);
   lastNavState = null;
   lastPlaybackState = null;
+  lastBrowserDwellState = 'idle';
   resetEdgeScrollState();
   mainWindow?.webContents.send('webview:links', { links: [] });
   mainWindow?.webContents.send('webview:closed', { reason });
@@ -1268,6 +1331,7 @@ function setupIpcHandlers(): void {
       }
       lastNavState = null;
       lastPlaybackState = null;
+      lastBrowserDwellState = 'idle';
       resetEdgeScrollState();
       mainWindow.webContents.send('webview:links', { links: [] });
       highContrastEnabled = false;
@@ -1328,6 +1392,19 @@ function setupIpcHandlers(): void {
           youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
           youtubeSkipUnsnapPx: browserGazeConfig.youtubeSkipUnsnapPx,
           youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
+          progressRetentionEnabled: browserGazeConfig.progressRetentionEnabled,
+          progressRetentionMs: browserGazeConfig.progressRetentionMs,
+          gapPauseEnabled: browserGazeConfig.gapPauseEnabled,
+          gapPauseMs: browserGazeConfig.gapPauseMs,
+          probeSnapEnabled: browserGazeConfig.probeSnapEnabled,
+          probeSnapRadiusPx: browserGazeConfig.probeSnapRadiusPx,
+          progressArcEnabled: browserGazeConfig.progressArcEnabled,
+          cursorSmoothingMs: browserGazeConfig.cursorSmoothingMs,
+          focusOnResolve: browserGazeConfig.focusOnResolve,
+          bayesianStickyMult: browserGazeConfig.bayesianStickyMult,
+          bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
+          bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
+          zoomScaleRadii: browserGazeConfig.zoomScaleRadii,
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1422,6 +1499,14 @@ function setupIpcHandlers(): void {
     return { success: true };
   });
 
+  // DIP-SPACE handler: x,y are passed straight to sendInputEvent with NO zoom
+  // compensation, so callers MUST supply view-local DIP coordinates. The only
+  // live caller (clickAtGaze) derives them from window CSS px, which equals
+  // DIPs because the main window zoom is never changed. Do NOT feed page-CSS
+  // coordinates (e.g. from getBoundingClientRect) here — under the default 1.35
+  // page zoom they would mis-click. Page-CSS clicks must go through
+  // sendTrustedBrowserClick instead, which multiplies by the page zoom factor
+  // (see Entry 26).
   ipcMain.handle('webview:click', (_event: any, x: number, y: number) => {
     if (!activeBrowserView) return;
     try {
@@ -1755,10 +1840,33 @@ function setupIpcHandlers(): void {
       edgeHoldMs: clampNumber(config?.edgeHoldMs, browserGazeConfig.edgeHoldMs, 300, 1600),
       edgeZonePct: clampNumber(config?.edgeZonePct, browserGazeConfig.edgeZonePct, 0.06, 0.22),
       edgeDeadZonePct: clampNumber(config?.edgeDeadZonePct, browserGazeConfig.edgeDeadZonePct, 0.01, 0.04),
-      edgeMinDeltaPx: clampNumber(config?.edgeMinDeltaPx, browserGazeConfig.edgeMinDeltaPx, 12, 70),
-      edgeMaxDeltaPx: clampNumber(config?.edgeMaxDeltaPx, browserGazeConfig.edgeMaxDeltaPx, 18, 90),
-      edgeThrottleMs: clampNumber(config?.edgeThrottleMs, browserGazeConfig.edgeThrottleMs, 80, 220),
+      edgeMinDeltaPx: clampNumber(config?.edgeMinDeltaPx, browserGazeConfig.edgeMinDeltaPx, 4, 70),
+      edgeMaxDeltaPx: clampNumber(config?.edgeMaxDeltaPx, browserGazeConfig.edgeMaxDeltaPx, 8, 90),
+      edgeThrottleMs: clampNumber(config?.edgeThrottleMs, browserGazeConfig.edgeThrottleMs, 30, 220),
       edgeMaxBurstMs: clampNumber(config?.edgeMaxBurstMs, browserGazeConfig.edgeMaxBurstMs, 2000, 10000),
+      progressRetentionEnabled: typeof config?.progressRetentionEnabled === 'boolean'
+        ? config.progressRetentionEnabled : browserGazeConfig.progressRetentionEnabled,
+      progressRetentionMs: clampNumber(config?.progressRetentionMs, browserGazeConfig.progressRetentionMs, 300, 3000),
+      gapPauseEnabled: typeof config?.gapPauseEnabled === 'boolean'
+        ? config.gapPauseEnabled : browserGazeConfig.gapPauseEnabled,
+      gapPauseMs: clampNumber(config?.gapPauseMs, browserGazeConfig.gapPauseMs, 100, 600),
+      probeSnapEnabled: typeof config?.probeSnapEnabled === 'boolean'
+        ? config.probeSnapEnabled : browserGazeConfig.probeSnapEnabled,
+      probeSnapRadiusPx: clampNumber(config?.probeSnapRadiusPx, browserGazeConfig.probeSnapRadiusPx, 8, 80),
+      progressArcEnabled: typeof config?.progressArcEnabled === 'boolean'
+        ? config.progressArcEnabled : browserGazeConfig.progressArcEnabled,
+      cursorSmoothingMs: clampNumber(config?.cursorSmoothingMs, browserGazeConfig.cursorSmoothingMs, 0, 200),
+      focusOnResolve: typeof config?.focusOnResolve === 'boolean'
+        ? config.focusOnResolve : browserGazeConfig.focusOnResolve,
+      bayesianStickyMult: clampNumber(config?.bayesianStickyMult, browserGazeConfig.bayesianStickyMult, 1, 3),
+      bayesianStableFrames: clampNumber(config?.bayesianStableFrames, browserGazeConfig.bayesianStableFrames, 1, 10),
+      bayesianStableMargin: clampNumber(config?.bayesianStableMargin, browserGazeConfig.bayesianStableMargin, 0, 0.5),
+      edgeScrollPauseDuringDwell: typeof config?.edgeScrollPauseDuringDwell === 'boolean'
+        ? config.edgeScrollPauseDuringDwell : browserGazeConfig.edgeScrollPauseDuringDwell,
+      zoomCompensationEnabled: typeof config?.zoomCompensationEnabled === 'boolean'
+        ? config.zoomCompensationEnabled : browserGazeConfig.zoomCompensationEnabled,
+      zoomScaleRadii: typeof config?.zoomScaleRadii === 'boolean'
+        ? config.zoomScaleRadii : browserGazeConfig.zoomScaleRadii,
     };
 
     if (activeBrowserView) {
@@ -1773,6 +1881,19 @@ function setupIpcHandlers(): void {
         youtubeSkipSnapPx: browserGazeConfig.youtubeSkipSnapPx,
         youtubeSkipUnsnapPx: browserGazeConfig.youtubeSkipUnsnapPx,
         youtubeCardStabilityRadiusPx: browserGazeConfig.youtubeCardStabilityRadiusPx,
+        progressRetentionEnabled: browserGazeConfig.progressRetentionEnabled,
+        progressRetentionMs: browserGazeConfig.progressRetentionMs,
+        gapPauseEnabled: browserGazeConfig.gapPauseEnabled,
+        gapPauseMs: browserGazeConfig.gapPauseMs,
+        probeSnapEnabled: browserGazeConfig.probeSnapEnabled,
+        probeSnapRadiusPx: browserGazeConfig.probeSnapRadiusPx,
+        progressArcEnabled: browserGazeConfig.progressArcEnabled,
+        cursorSmoothingMs: browserGazeConfig.cursorSmoothingMs,
+        focusOnResolve: browserGazeConfig.focusOnResolve,
+        bayesianStickyMult: browserGazeConfig.bayesianStickyMult,
+        bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
+        bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
+        zoomScaleRadii: browserGazeConfig.zoomScaleRadii,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(
@@ -1849,9 +1970,11 @@ function setupIpcHandlers(): void {
 
   // Inject visible gaze cursor into BrowserView so user can see where they're looking
   // Inject visible gaze cursor into BrowserView with AUTOMATIC DWELL CLICKING
-  // Inject visible gaze cursor into BrowserView with AUTOMATIC DWELL CLICKING
   // v2: OPTIMIZED - cursor update is fire-and-forget, click check runs separately
-  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) => {
+  // v17.19: registered on BOTH ipcMain.handle (legacy invoke) and ipcMain.on
+  // (one-way send — no reply message per frame). The preload now uses send;
+  // the handle registration keeps older renderer code working.
+  const handleWebviewGazeFrame = (x: number, y: number, options?: { cursor?: boolean }) => {
     const view = activeBrowserView;
     const sessionId = activeBrowserViewSessionId;
     if (!view || view.webContents.isDestroyed()) return;
@@ -1884,7 +2007,15 @@ function setupIpcHandlers(): void {
       }
 
       const now = Date.now();
-      if (!browserGazeConfig.edgeScrollEnabled || direction === 'none') {
+      // v17.20 — while the page dwell is acquiring or committing a target,
+      // edge scrolling is paused (and its 650ms hold restarts after). The
+      // sidebar spans the edge zones, and a scroll burst 650ms into a dwell
+      // moved the card under the gaze — onset-cancel fired and the patient
+      // saw "the cursor keeps drifting off the card".
+      // Rollback: setGazeConfig({ edgeScrollPauseDuringDwell: false })
+      const dwellHold = browserGazeConfig.edgeScrollPauseDuringDwell &&
+        (lastBrowserDwellState === 'onset' || lastBrowserDwellState === 'dwell' || lastBrowserDwellState === 'commit');
+      if (!browserGazeConfig.edgeScrollEnabled || direction === 'none' || dwellHold) {
         resetEdgeScrollState();
       } else if (direction !== edgeScrollCandidate) {
         edgeScrollCandidate = direction;
@@ -1927,25 +2058,49 @@ function setupIpcHandlers(): void {
       }
 
       browserDiagnostics.recordIpcTick();
+      // v17.21 — convert view DIPs → page CSS px before hit-testing. The
+      // page runs at zoomFactor (1.35 default), so CSS coords = view/zoom.
+      // Without this, the injected script treated view px as CSS px:
+      // the ring rendered at 1.35× the gaze position (a rightward+downward
+      // drift growing with distance from the top-left — at the watch-page
+      // sidebar, ~150-400px right of where the patient looked), and every
+      // distance/radius compared mixed units. The user-visible symptom was
+      // "the cursor keeps drifting right when I try to select a sidebar
+      // video". Rollback: setGazeConfig({ zoomCompensationEnabled: false })
+      let zf = 1;
+      if (browserGazeConfig.zoomCompensationEnabled) {
+        try { zf = view.webContents.getZoomFactor() || 1; } catch { zf = 1; }
+      }
       view.webContents.executeJavaScript(
-        buildGazeUpdateAndPollScript(x, y, cursorEnabled)
+        buildGazeUpdateAndPollScript(x / zf, y / zf, cursorEnabled, zf)
       ).then((json: string | null) => {
         if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
           try {
-            const clickReq = JSON.parse(json);
-            const cx = Math.round(clickReq.x);
-            const cy = Math.round(clickReq.y);
-            browserDiagnostics.debug(
-              'gaze-dwell-click',
-              `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
-              1000
-            );
-            sendTrustedBrowserClick(cx, cy, sessionId);
+            // v17.20 envelope: { c: clickRequest|null, s: dwellState }.
+            const res = JSON.parse(json);
+            if (res && typeof res.s === 'string') lastBrowserDwellState = res.s;
+            const clickReq = res?.c;
+            if (clickReq && Number.isFinite(clickReq.x) && Number.isFinite(clickReq.y)) {
+              const cx = Math.round(clickReq.x);
+              const cy = Math.round(clickReq.y);
+              // v17.19: info (always-on, 1s-throttled) — dwell clicks were
+              // invisible in on-rig console captures without DEBUG_BROWSER_GAZE.
+              browserDiagnostics.info(
+                'gaze-dwell-click',
+                `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
+                1000
+              );
+              sendTrustedBrowserClick(cx, cy, sessionId);
+            }
           } catch { /* ignore parse errors */ }
         }
       }).catch(() => { });
     } catch { /* ignore */ }
-  });
+  };
+  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) =>
+    handleWebviewGazeFrame(x, y, options));
+  ipcMain.on('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) =>
+    handleWebviewGazeFrame(x, y, options));
 
   // Mouse Only Mode: renderer can query current state
   ipcMain.handle('mouse-only-mode:get', () => isMouseOnlyMode);

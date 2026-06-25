@@ -85,6 +85,35 @@ def generate_trace(path: Path, hz: float = 133.0, seed: int = 7):
         for ts in _sample_times(4.0, hz, t):
             p = min(1.0, max(0.0, (ts - t) / 4.0))
             _write_row(writer, ts, 0.38 + pursuit_px * p, 0.62, "slow_pursuit")
+        t += 4.0
+
+        # Corner fixations — corner/edge flicker baseline. Same 2px sigma as
+        # stable_fixation so any RMS/lock difference isolates the filter's
+        # edge-zone behavior, not the input noise. Transitions get their own
+        # label so they don't pollute the fixation stats.
+        corners = [
+            ("corner_tl", 60 / 1920, 60 / 1080),
+            ("corner_tr", 1860 / 1920, 60 / 1080),
+            ("corner_bl", 60 / 1920, 1020 / 1080),
+            ("corner_br", 1860 / 1920, 1020 / 1080),
+        ]
+        prev = (0.38 + pursuit_px, 0.62)
+        for label, corner_x, corner_y in corners:
+            for ts in _sample_times(0.120, hz, t):
+                p = min(1.0, max(0.0, (ts - t) / 0.120))
+                eased = 0.5 - 0.5 * math.cos(math.pi * p)
+                _write_row(writer, ts,
+                           prev[0] + (corner_x - prev[0]) * eased,
+                           prev[1] + (corner_y - prev[1]) * eased,
+                           "corner_move")
+            t += 0.120
+            for ts in _sample_times(1.5, hz, t):
+                _write_row(writer, ts,
+                           corner_x + rng.gauss(0, px_sigma_norm),
+                           corner_y + rng.gauss(0, px_sigma_norm),
+                           label)
+            t += 1.5
+            prev = (corner_x, corner_y)
 
 
 def main():

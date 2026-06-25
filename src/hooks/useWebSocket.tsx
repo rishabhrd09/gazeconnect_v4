@@ -87,6 +87,11 @@ export interface WebSocketContextValue {
   isConnected: boolean;
   isGazeEnabled: boolean;
   tobiiConnected: boolean;
+  // v17.18: backend TTS health from the 'connected' handshake. When false,
+  // speech must keep using browser speechSynthesis even though the socket is
+  // up — otherwise a healthy connection with a dead pyttsx3 leaves the
+  // patient silently mute (emergency included).
+  ttsAvailable: boolean;
   currentScreen: string;
 
   // Connection/State Methods
@@ -218,6 +223,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const [isGazeEnabled, setIsGazeEnabled] = useState(false);
   const [currentScreen, setCurrentScreen] = useState('home');
   const [tobiiConnected, setTobiiConnected] = useState(false);
+  // Default true: an older backend that doesn't send tts_available must not
+  // demote speech to the browser fallback.
+  const [ttsAvailable, setTtsAvailable] = useState(true);
 
   // Data state
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -348,6 +356,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           setIsGazeEnabled(data.gaze_enabled || false);
           setCurrentScreen(data.current_screen || 'home');
           setTobiiConnected(data.tobii_connected || false);
+          // Absent field (older backend) => assume available.
+          setTtsAvailable(data.tts_available !== false);
           break;
 
         case 'gaze_enabled':
@@ -576,6 +586,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     isGazeEnabled,
     currentScreen,
     tobiiConnected,
+    ttsAvailable,
     setGazeEnabled: (enabled) => send('set_gaze_enabled', { enabled }),
     setScreen: (screen) => send('set_screen', { screen }),
     setScreenSize: (width, height) => send('set_screen_size', {
@@ -606,7 +617,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     addSentenceTemplate: (sentence) => send('add_sentence_template', { sentence }),
     getSentenceHistory: () => send('get_sentence_history'),
     speak: (text) => send('speak', { text }),
-    stopSpeaking: () => send('stop_speaking'),
+    // STOP must silence every voice path: backend pyttsx3 AND any in-flight
+    // browser speechSynthesis utterance (e.g. one started while the backend
+    // was briefly down — previously it played to completion, unstoppable).
+    stopSpeaking: () => {
+      try { window.speechSynthesis?.cancel(); } catch { /* no-op */ }
+      send('stop_speaking');
+    },
     setTTSRate: (rate) => send('set_tts_rate', { rate }),
     setTTSVolume: (volume) => send('set_tts_volume', { volume }),
     getFatigue: () => send('get_fatigue'),
