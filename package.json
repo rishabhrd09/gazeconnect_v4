@@ -19,7 +19,8 @@
     "floorplan": "python tools/gazeconnect_floorplan_v5.py",
     "floorplan:sample": "python tools/gazeconnect_floorplan_v5.py --sample --all-styles -o ./output",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:browser-cursor": "node scripts/check-injected-script.js && node scripts/browser-cursor-replay.js"
   },
   "dependencies": {
     "react": "^18.2.0",

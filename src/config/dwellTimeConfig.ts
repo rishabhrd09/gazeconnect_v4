@@ -3,6 +3,13 @@
  * ======================================================
  * All dwell timings in one place. Values based on audit of existing codebase.
  * Each category maps to a specific UI context for fine-grained control.
+ *
+ * THIS IS THE AUTHORITATIVE DWELL TABLE. Two other tables exist and must
+ * not be tuned: design.ts `dwellTiming` (deprecated GazeButton fallback for
+ * elements with no dwellCategory) and any timing numbers quoted in docs —
+ * when they disagree, this file wins. Per-element `data-gaze-dwell-ms`
+ * attributes override these values for a single element (e.g. the gaze
+ * toggle at 1150/850ms in GlobalNavBar).
  */
 
 export interface DwellTimeSettings {

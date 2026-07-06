@@ -726,6 +726,12 @@ export const buttonSizes = {
   xxl: { width: 160, height: 160, fontSize: typography.fontSize['3xl'], padding: spacing[8] },
 };
 
+// DEPRECATED TABLE — kept only as GazeButton's last-resort fallback for
+// elements with no dwellCategory. The AUTHORITATIVE dwell configuration is
+// src/config/dwellTimeConfig.ts (user-adjustable, ALS-stage-aware); the real
+// gaze path (GazeCursor) never reads this table. Do NOT tune timings here —
+// these values are known to disagree with dwellTimeConfig (e.g. emergency
+// 1500 here vs 2000 shipped) and only survive for legacy fallback safety.
 export const dwellTiming = {
   bySize: { xs: 1500, sm: 1350, md: 1200, lg: 1050, xl: 975, xxl: 900 },
   contexts: {

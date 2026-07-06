@@ -68,6 +68,15 @@ export interface TelemetrySnapshot {
     maxMs: number;
     byKind: Record<string, number>;
   };
+  /** Transport latency percentiles (helper -> renderer; see GazeLatencySample). */
+  latency: {
+    count: number;
+    ingest: { p50: number; p95: number; max: number };
+    pipeline: { p50: number; p95: number; max: number };
+    ws: { p50: number; p95: number; max: number };
+    e2e: { p50: number; p95: number; max: number };
+    paint: { p50: number; p95: number; max: number; sampled: number };
+  };
 }
 
 /**
@@ -97,12 +106,35 @@ export interface FreezeEvent {
   durationMs: number;
 }
 
+/**
+ * One gaze frame's transport latency breakdown (all Unix-ms deltas on the
+ * same machine clock — helper stamps UtcNow, Python stamps time.time(),
+ * renderer stamps Date.now()).
+ *   ingestMs   — helper receive -> Python ingest (backend sample_age_ms)
+ *   pipelineMs — Python ingest -> broadcast enqueue
+ *   wsMs       — broadcast enqueue -> renderer WS receive
+ *   e2eMs      — helper receive -> renderer WS receive
+ *   paintMs    — WS receive -> first rAF after the cursor transform write
+ *                (sampled ~every 8th frame; -1 = not sampled)
+ * UtcNow granularity can be ~15.6ms — interpret percentiles over >=500
+ * frames, never single samples.
+ */
+export interface GazeLatencySample {
+  ingestMs: number;
+  pipelineMs: number;
+  wsMs: number;
+  e2eMs: number;
+  paintMs: number;
+}
+
 const RING_SIZE = 250;
 const INTERRUPT_RING_SIZE = 400;
 const FREEZE_RING_SIZE = 200;
+const LATENCY_RING_SIZE = 500;
 const events: DwellTelemetryEvent[] = [];
 const interruptEvents: DwellInterruptEvent[] = [];
 const freezeEvents: FreezeEvent[] = [];
+const latencySamples: GazeLatencySample[] = [];
 let sequence = 0;
 let interruptSequence = 0;
 let freezeSequence = 0;
@@ -125,6 +157,17 @@ export function recordFreeze(kind: string, durationMs: number): void {
   const ev: FreezeEvent = { seq: ++freezeSequence, ts: Date.now(), kind, durationMs };
   if (freezeEvents.length >= FREEZE_RING_SIZE) freezeEvents.shift();
   freezeEvents.push(ev);
+}
+
+/**
+ * Record one gaze frame's latency breakdown. The caller keeps the returned
+ * reference and may fill paintMs asynchronously (one rAF later) — the ring
+ * stores the live object, so the late write is visible in snapshots.
+ */
+export function recordGazeLatency(sample: GazeLatencySample): GazeLatencySample {
+  if (latencySamples.length >= LATENCY_RING_SIZE) latencySamples.shift();
+  latencySamples.push(sample);
+  return sample;
 }
 
 /** Record a dwell-completion event. Called from the dwell-click firing path. */
@@ -162,6 +205,41 @@ export function recordDwellEvent(
       );
     }
   }
+}
+
+function latencyPercentiles(values: number[]): { p50: number; p95: number; max: number } {
+  if (values.length === 0) return { p50: 0, p95: 0, max: 0 };
+  const s = values.slice().sort((a, b) => a - b);
+  const at = (p: number) => s[Math.min(s.length - 1, Math.floor(s.length * p))];
+  return {
+    p50: Math.round(at(0.5) * 10) / 10,
+    p95: Math.round(at(0.95) * 10) / 10,
+    max: Math.round(s[s.length - 1] * 10) / 10,
+  };
+}
+
+/** Aggregate the latency ring (percentiles only — single samples are noise). */
+function getLatencyAggregate(): TelemetrySnapshot['latency'] {
+  const ingest: number[] = [];
+  const pipeline: number[] = [];
+  const ws: number[] = [];
+  const e2e: number[] = [];
+  const paint: number[] = [];
+  for (const s of latencySamples) {
+    if (s.ingestMs >= 0) ingest.push(s.ingestMs);
+    if (s.pipelineMs >= 0) pipeline.push(s.pipelineMs);
+    if (s.wsMs >= 0) ws.push(s.wsMs);
+    if (s.e2eMs >= 0) e2e.push(s.e2eMs);
+    if (s.paintMs >= 0) paint.push(s.paintMs);
+  }
+  return {
+    count: latencySamples.length,
+    ingest: latencyPercentiles(ingest),
+    pipeline: latencyPercentiles(pipeline),
+    ws: latencyPercentiles(ws),
+    e2e: latencyPercentiles(e2e),
+    paint: { ...latencyPercentiles(paint), sampled: paint.length },
+  };
 }
 
 /** Aggregate the interruption + freeze rings (always computable). */
@@ -203,8 +281,8 @@ function getAuxAggregates(): Pick<TelemetrySnapshot, 'interrupts' | 'freezes'> {
 /** Compute aggregate stats over the current event ring. */
 export function getSnapshot(): TelemetrySnapshot | null {
   if (events.length === 0) {
-    // No clicks yet — still surface interruption/freeze data if any exists.
-    if (interruptEvents.length === 0 && freezeEvents.length === 0) return null;
+    // No clicks yet — still surface interruption/freeze/latency data if any.
+    if (interruptEvents.length === 0 && freezeEvents.length === 0 && latencySamples.length === 0) return null;
     return {
       count: 0,
       medianResidualPx: 0,
@@ -217,6 +295,7 @@ export function getSnapshot(): TelemetrySnapshot | null {
       perContextCount: {},
       perContextMedianResidual: {},
       ...getAuxAggregates(),
+      latency: getLatencyAggregate(),
     };
   }
 
@@ -264,7 +343,13 @@ export function getSnapshot(): TelemetrySnapshot | null {
     perContextCount,
     perContextMedianResidual,
     ...getAuxAggregates(),
+    latency: getLatencyAggregate(),
   };
+}
+
+/** Return a copy of the latency ring (raw per-frame samples). */
+export function getLatencySamples(): GazeLatencySample[] {
+  return latencySamples.slice();
 }
 
 /** Return a copy of the interruption ring. */
@@ -287,6 +372,7 @@ export function clearTelemetry(): void {
   events.length = 0;
   interruptEvents.length = 0;
   freezeEvents.length = 0;
+  latencySamples.length = 0;
   sequence = 0;
   interruptSequence = 0;
   freezeSequence = 0;
@@ -303,6 +389,7 @@ if (typeof window !== 'undefined') {
     events: getEvents,
     interruptions: getInterruptEvents,
     freezes: getFreezeEvents,
+    latency: getLatencySamples,
     clear: clearTelemetry,
   };
 }

@@ -484,12 +484,15 @@ type ScrollDockProps = {
     onToggleAutoScroll?: () => void;
     autoScrollEnabled?: boolean;
     onMaximize?: () => void;
+    /** Toggle state for the maximize button: true = the video is currently
+     * maximized, so the button reads "Exit Full" and restores the page. */
+    maximized?: boolean;
     onDown: () => void;
     gazeEnabled: boolean;
     gazeTimestamp: number;
 };
 
-const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll, autoScrollEnabled = false, onMaximize, onDown, gazeEnabled, gazeTimestamp }) => {
+const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll, autoScrollEnabled = false, onMaximize, maximized = false, onDown, gazeEnabled, gazeTimestamp }) => {
     const hasMax = !!onMaximize;
     const hasAutoScroll = !!onToggleAutoScroll;
     const buttonStyle: React.CSSProperties = {
@@ -549,14 +552,32 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
                 <GazeButton id="content-maximize" onClick={onMaximize}
                     gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                     dwellCategory="navigationButton"
-                    style={{ ...buttonStyle, color: '#9DB7CC', borderColor: 'rgba(157, 183, 204, 0.36)' }}>
-                    <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M4 9V4h5" />
-                        <path d="M20 9V4h-5" />
-                        <path d="M4 15v5h5" />
-                        <path d="M20 15v5h-5" />
-                    </svg>
-                    <span>Full Screen</span>
+                    style={maximized ? {
+                        // Active state mirrors the Scroll On pattern so the
+                        // patient can see the button will now EXIT full screen.
+                        ...buttonStyle,
+                        color: '#86F0D3',
+                        borderColor: 'rgba(134, 240, 211, 0.46)',
+                        background: 'rgba(22, 96, 78, 0.36)',
+                    } : { ...buttonStyle, color: '#9DB7CC', borderColor: 'rgba(157, 183, 204, 0.36)' }}>
+                    {maximized ? (
+                        // Contract glyph — arrows point inward (exit full screen).
+                        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M9 4v5H4" />
+                            <path d="M15 4v5h5" />
+                            <path d="M9 20v-5H4" />
+                            <path d="M15 20v-5h5" />
+                        </svg>
+                    ) : (
+                        // Expand glyph — arrows point outward (enter full screen).
+                        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M4 9V4h5" />
+                            <path d="M20 9V4h-5" />
+                            <path d="M4 15v5h5" />
+                            <path d="M20 15v5h-5" />
+                        </svg>
+                    )}
+                    <span>{maximized ? 'Exit Full' : 'Full Screen'}</span>
                 </GazeButton>
             )}
             <GazeButton id="content-scroll-down" onClick={onDown}
@@ -942,6 +963,53 @@ const YT_MAXIMIZE_SCRIPT = `
   return 'in-app-video-theater';
 })();
 `;
+
+// Exact reverse of YT_MAXIMIZE_SCRIPT — restore chrome, page scrolling and
+// the normal player size. Idempotent (every step is guarded), so running it
+// when nothing is maximized is a safe no-op: the toggle button self-heals if
+// its label ever drifts from the page's real state.
+const YT_MINIMIZE_SCRIPT = `
+(function () {
+  // Un-hide the chrome and restore scrolling: removing the class disables
+  // every rule in the injected stylesheet (incl. overflow:hidden on
+  // html/body — the reason Up/Down scrolling was dead while maximized).
+  try { document.documentElement.classList.remove('gazeconnect-youtube-inapp-maximize'); } catch (_) {}
+  var style = document.getElementById('gazeconnect-youtube-inapp-maximize-style');
+  if (style && style.parentNode) {
+    try { style.parentNode.removeChild(style); } catch (_) {}
+  }
+
+  // Leave YouTube's theater mode (mirror of the enter path: size button,
+  // 't' hotkey fallback). Guarded on [theater] so it never toggles INTO
+  // theater by mistake.
+  var flexy = document.querySelector('ytd-watch-flexy');
+  if (flexy && flexy.hasAttribute('theater')) {
+    var sizeBtn = document.querySelector('.ytp-size-button');
+    if (sizeBtn) {
+      try { sizeBtn.click(); } catch (_) {}
+    } else {
+      var pl = document.querySelector('#movie_player') || document.body;
+      try {
+        pl.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', keyCode: 84, which: 84, bubbles: true }));
+      } catch (_) {}
+    }
+  }
+
+  var player = document.querySelector('#movie_player');
+  if (player) {
+    try { player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 })); } catch (_) {}
+  }
+  // Same single settle-resize as the maximize path — lets YouTube relay the
+  // player out after the masthead/columns reappear.
+  try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+  return 'in-app-video-restored';
+})();
+`;
+
+// One-line truth probe: is the in-app maximize currently applied to this
+// document? Used to re-sync the toggle-button label after navigations
+// (Back swaps documents and drops the class; SPA sidebar-nav keeps it).
+const YT_PROBE_MAXIMIZED_SCRIPT = `document.documentElement.classList.contains('gazeconnect-youtube-inapp-maximize');`;
 
 const isValidYouTubeId = (id?: string) => !!id && /^[A-Za-z0-9_-]{11}$/.test(id);
 // Use the YouTube WATCH URL (not embed). Embed URLs fail with Error 153 for many
@@ -1890,6 +1958,11 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     const [catId, setCatId] = useState('old_songs');
     const [playing, setPlaying] = useState<any>(null);
     const [youtubeState, setYoutubeState] = useState<string>('idle');
+    // In-app video maximize (theater) toggle state — drives the rail button's
+    // Full Screen / Exit Full label. The page is the source of truth (the
+    // scripts are guarded + idempotent); this state is re-synced from the
+    // document on every navigation via YT_PROBE_MAXIMIZED_SCRIPT.
+    const [isVideoMaximized, setIsVideoMaximized] = useState(false);
     const viewRef = useRef<HTMLDivElement>(null);
     const autoPlayUrlRef = useRef('');
     const cat = YT_CATS.find(c => c.id === catId) || YT_CATS[0];
@@ -2012,8 +2085,40 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     // Maximizes the YouTube player inside the BrowserView while app controls
     // remain visible. This deliberately does not enter true browser fullscreen.
     const maximizeVideo = useCallback(async () => {
-        await browser.executeJs(YT_MAXIMIZE_SCRIPT);
+        const r: any = await browser.executeJs(YT_MAXIMIZE_SCRIPT);
+        if (r?.success && r.result === 'in-app-video-theater') {
+            setIsVideoMaximized(true);
+        }
     }, [browser]);
+
+    // Reverse of maximizeVideo: restore chrome, page scrolling and normal
+    // player size (the patient reported being trapped in the enlarged view
+    // with scrolling dead). State goes false unconditionally — the script is
+    // idempotent and false is the right label even if the page navigated.
+    const minimizeVideo = useCallback(async () => {
+        await browser.executeJs(YT_MINIMIZE_SCRIPT);
+        setIsVideoMaximized(false);
+    }, [browser]);
+
+    // A newly selected video always starts un-maximized (a fresh loadURL is
+    // a fresh document — the maximize class/style don't survive it).
+    useEffect(() => {
+        setIsVideoMaximized(false);
+    }, [playing]);
+
+    // Re-sync the toggle label with the document's real state after every
+    // navigation: Back swaps documents (class gone), while YouTube SPA
+    // sidebar-navigation keeps the same document (class persists). One cheap
+    // probe per navigation keeps the patient from dwelling a button whose
+    // label lies about what it will do.
+    useEffect(() => {
+        if (!playing || !browser.isOpen) return;
+        let cancelled = false;
+        void browser.executeJs(YT_PROBE_MAXIMIZED_SCRIPT).then((r: any) => {
+            if (!cancelled && r?.success) setIsVideoMaximized(r.result === true);
+        }).catch(() => { /* page navigating — next navigation re-probes */ });
+        return () => { cancelled = true; };
+    }, [browser.executeJs, browser.currentUrl, browser.isOpen, playing]);
 
     const skipYouTubeAd = useCallback(async () => {
         // Skip is handled entirely in the main process via youtubeCommand, which
@@ -2142,6 +2247,15 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Pause / Play</span>
                     </GazeButton>
+                    {/* Next is available in BOTH toolbars (watch + control) so the
+                        patient can advance videos from any panel, including while
+                        the video is maximized. Mirrors the watch-mode yt-next. */}
+                    <GazeButton id="yt-next-c" onClick={nextYouTubeVideo}
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
+                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+                        <NextIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                        <span>Next</span>
+                    </GazeButton>
                     <GazeButton id="yt-skip-ad" onClick={skipYouTubeAdReliable}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
@@ -2215,7 +2329,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         onUp={() => browser.scrollUp()}
                         onToggleAutoScroll={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
                         autoScrollEnabled={browser.scrollMode === 'armed'}
-                        onMaximize={isYouTubeWatchPage ? maximizeVideo : undefined}
+                        onMaximize={isYouTubeWatchPage ? (isVideoMaximized ? minimizeVideo : maximizeVideo) : undefined}
+                        maximized={isVideoMaximized}
                         onDown={() => browser.scrollDown()}
                         gazeEnabled={toolbarGazeEnabled}
                         gazeTimestamp={toolbarGazeTimestamp}
@@ -2722,15 +2837,19 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                 <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Emergency</span>
                             </GazeButton>}
-                            <GazeButton id="bv-playpause-r" onClick={() => browser.typeText('k')}
+                            {/* 'k' is the YOUTUBE play/pause hotkey; on Google/News
+                                pages typeText('k') just typed the letter k into
+                                whatever had focus. Show the button only on YouTube. */}
+                            {/(?:youtube\.com|youtu\.be)/i.test(browser.currentUrl || '') && <GazeButton id="bv-playpause-r" onClick={() => browser.typeText('k')}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected('secondary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
                                 <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Pause / Play</span>
-                            </GazeButton>
+                            </GazeButton>}
                             <GazeButton id="bv-scroll-r" onClick={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                                style={toolbarBtnConnected(browser.scrollMode === 'armed' ? 'secondary' : 'primary', !!isNavHidden, 'middle')}>
+                                style={toolbarBtnConnected(browser.scrollMode === 'armed' ? 'secondary' : 'primary', !!isNavHidden,
+                                    (!isNavHidden && !/(?:youtube\.com|youtu\.be)/i.test(browser.currentUrl || '')) ? 'first' : 'middle')}>
                                 <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
                                 <span>{browser.scrollMode === 'armed' ? 'Scroll On' : 'Scroll'}</span>
                             </GazeButton>
@@ -3583,6 +3702,9 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             // re-applied whenever this screen reconfigures the browser.
             progressRetentionEnabled: gazeFlags.browserProgressRetention,
             gapPauseEnabled: gazeFlags.browserGapPause,
+            // B3 prototype (default OFF) — per-target progress bank for
+            // dense pages; same persistence path as the toggles above.
+            progressBankEnabled: gazeFlags.browserProgressBank,
         });
     }, [browser.setGazeConfig, currentStage, dwellSettings.cooldownAfterActivation, dwellSettings.onsetDelay, dwellSettings.standardButton]);
 

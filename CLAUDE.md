@@ -15,7 +15,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - Must support 13" to 27" screens (use clamp() and viewport units, NOT fixed px)
 - Dark mode is primary (reduces eye strain for ALS patients)
 - Bilingual: English + Hindi
-- Emergency buttons must ALWAYS be accessible (400ms dwell time)
+- Emergency buttons must ALWAYS be accessible (always-active: they respond even with gaze toggled off and during navigation cooldowns; shipped dwell is 2000ms — deliberately long to prevent accidental activation, user-adjustable 1400–4000ms in `src/config/dwellTimeConfig.ts`, the single authoritative dwell table)
 - No scrolling on main screens (everything must fit within viewport)
 - overflow:hidden is intentional — content must fit, not scroll
 

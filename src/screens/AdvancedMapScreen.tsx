@@ -935,9 +935,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           <GazeButton id="adv-save" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={handleSave}
             style={{
-              height: 60, width: '100%', borderRadius: 8,
+              // 80px gaze-target floor on normal displays; clamp (not fixed)
+              // so the fixed-height sidebar cannot overflow at 768p.
+              minHeight: 'clamp(64px, 9vh, 84px)', width: '100%', borderRadius: 8,
               background: T_subSurface, border: `1px solid ${T_panelBorder}`,
-              color: T_textMain, fontSize: 13, fontWeight: 700,
+              color: T_textMain, fontSize: 14, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
             SAVE
@@ -945,9 +947,9 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           <GazeButton id="adv-refine" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={switchToRefinement}
             style={{
-              height: 60, width: '100%', borderRadius: 8,
+              minHeight: 'clamp(64px, 9vh, 84px)', width: '100%', borderRadius: 8,
               background: T_refineMapBg, border: `1.5px solid ${T_refineMapBorder}`,
-              color: T_refineMapText, fontSize: 13, fontWeight: 700,
+              color: T_refineMapText, fontSize: 14, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
             REFINE

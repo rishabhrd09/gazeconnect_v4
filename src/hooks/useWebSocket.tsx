@@ -275,6 +275,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     }
   }, []);
 
+  // DevTools tuning hook — the on-rig A/B protocols (B1-BE etc.) need a way
+  // to send backend messages like set_magnet_params without a rebuild:
+  //   window.__gazeWs.send('set_magnet_params', { context: 'gazetoggle',
+  //     radius: 90, pull: 0.22, release: 110, capture_full: false })
+  //   window.__gazeWs.send('set_filter_preset', { preset: 'balanced' })
+  // Debug/tuning surface only; app code must keep using the typed methods.
+  useEffect(() => {
+    (window as unknown as { __gazeWs: unknown }).__gazeWs = {
+      send: (type: string, data?: object) => {
+        if (typeof type !== 'string' || !type) {
+          console.warn('[GazeWs] usage: __gazeWs.send(type, dataObject?)');
+          return false;
+        }
+        if (wsRef.current?.readyState !== WebSocket.OPEN) {
+          console.warn('[GazeWs] not connected — message not sent');
+          return false;
+        }
+        wsRef.current.send(JSON.stringify({ type, ...(data || {}) }));
+        console.log(`[GazeWs] sent ${type}`, data || {});
+        return true;
+      },
+    };
+  }, []);
+
   // FIX v4.7: Store handleMessage in a ref so it never causes reconnection
   const handleMessageRef = useRef<(event: MessageEvent) => void>(() => { });
 

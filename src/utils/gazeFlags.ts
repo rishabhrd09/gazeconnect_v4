@@ -50,6 +50,42 @@ export interface GazeFlags {
    * browserGazeConfig.gapPauseEnabled (persists across page loads).
    */
   browserGapPause: boolean;
+  /**
+   * B1-FE (on-rig A/B prototype, default OFF): calm the gaze toggle.
+   * Pull layers: snap radius 220→150, snap strength 0.36→0.28, priority
+   * score bonus capped at 0.3 (was up to 0.6), gaze-ON assist pull
+   * 0.12/112px→0.08/90px.
+   * Capture sequence (2026-07-06 on-rig video: "once it moves very near,
+   * it magnetically takes the cursor to the toggle centre; dwell is very
+   * fast"): with gaze ON, the toggle additionally loses its 100ms fast
+   * onset (standard 250ms instead), the teleport-to-centre on onset
+   * completion (replaced by a gradual 25%/frame settle), the ±64px
+   * extended hit points, and the +30px nearest-centre acquisition
+   * margin; its dwell lengthens 1150→1450ms.
+   * EVERY gaze-OFF path is deliberately untouched (assist 0.18/140px,
+   * 100ms onset, 850ms dwell, full reach) — that is the bootstrap for
+   * re-enabling gaze. Emergency is untouched in all states. Backend
+   * magnetism is tuned separately (set_magnet_params WS message).
+   */
+  toggleCalmFrontend: boolean;
+  /**
+   * B2 (on-rig A/B prototype, default OFF): calmer snapping for home
+   * screen tiles — radius 140→120, strength 0.30→0.22, and the ×1.45
+   * near-center proximity boost OFF (the exact keyboard/prediction
+   * precedent for the "over-responsive" complaint). Addresses "cursor
+   * rushing on the home screen".
+   */
+  homeSnapCalm: boolean;
+  /**
+   * B3 (on-rig A/B prototype, default OFF): in-page BROWSER cursor —
+   * bank dwell progress PER TARGET (OptiKey-style concurrent bank)
+   * instead of the single save slot, so ping-ponging between adjacent
+   * links on dense pages (Google results) accumulates each link's
+   * progress instead of discarding it on every flip. Forwarded as
+   * browserGazeConfig.progressBankEnabled (persists across page loads).
+   * Validated offline by replay scenario S13 before any rig session.
+   */
+  browserProgressBank: boolean;
 }
 
 const STORAGE_KEY = 'gazeconnect_gaze_flags';
@@ -59,6 +95,13 @@ const DEFAULTS: GazeFlags = {
   lockBreakProgressRetention: true,
   browserProgressRetention: true,
   browserGapPause: true,
+  // A/B prototypes — OFF until validated on the rig (see the plan's B1/B2
+  // protocols). Turn on for a session with:
+  //   window.__gazeFlags.set('toggleCalmFrontend', true)
+  //   window.__gazeFlags.set('homeSnapCalm', true)
+  toggleCalmFrontend: false,
+  homeSnapCalm: false,
+  browserProgressBank: false,
 };
 
 function loadStored(): Partial<GazeFlags> {
