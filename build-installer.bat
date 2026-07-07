@@ -117,6 +117,23 @@ REM   --specpath      : Spec file location
 REM   --add-data      : Include services/ folder (+ optional static knowledge JSON if present)
 REM   --hidden-import : Ensure all imports are found
 REM   --noconfirm     : Overwrite without asking
+
+REM ---- Bundle the neural word model + its runtime so it SHIPS to end users ----
+REM  Without these, the packaged .exe cannot find the ONNX model / onnxruntime and
+REM  silently falls back to n-gram only. The model is trained ONCE by the developer
+REM  (retrain-model.bat, or: cd python ^&^& python -m ml.train); end users never train.
+REM  ml.inference/fusion/vocabulary are torch-free; ml.model/ml.train are NOT bundled.
+if not exist "ml\trained_models\gazeconnect_lm_quantized.onnx" (
+    echo   [ABORT] Neural model not found: python\ml\trained_models\gazeconnect_lm_quantized.onnx
+    echo           Train it first ^(retrain-model.bat, or: cd python ^&^& python -m ml.train^),
+    echo           then re-run this installer build.
+    popd
+    call deactivate
+    pause
+    exit /b 1
+)
+set ML_FLAGS=--add-data "ml\trained_models\gazeconnect_lm_quantized.onnx;ml\trained_models" --add-data "ml\trained_models\vocabulary.json;ml\trained_models" --add-data "data\smart_bigrams.json;data" --hidden-import ml.inference --hidden-import ml.fusion --hidden-import ml.vocabulary --collect-all onnxruntime
+
 if exist "..\data\als_knowledge.json" (
     echo   Including optional static knowledge file: ..\data\als_knowledge.json
     pyinstaller ^
@@ -135,6 +152,7 @@ if exist "..\data\als_knowledge.json" (
         --hidden-import pyttsx3.drivers.sapi5 ^
         --hidden-import comtypes ^
         --hidden-import pyautogui ^
+        %ML_FLAGS% ^
         --noconfirm ^
         --clean ^
         main.py
@@ -155,6 +173,7 @@ if exist "..\data\als_knowledge.json" (
         --hidden-import pyttsx3.drivers.sapi5 ^
         --hidden-import comtypes ^
         --hidden-import pyautogui ^
+        %ML_FLAGS% ^
         --noconfirm ^
         --clean ^
         main.py
