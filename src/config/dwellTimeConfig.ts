@@ -181,3 +181,46 @@ export const ALS_STAGE_PRESETS = {
 } as const;
 
 export const DWELL_SETTINGS_KEY = 'gazeconnect_dwell_settings';
+
+// ============================================================================
+// KEYBOARD CADENCE (flag: keyboardCadence, DEFAULT ON since 2026-07-07) —
+// cuts the DEAD TIME before the dwell ring appears. Consumed ONLY by
+// GazeCursor for keyboard/prediction targets; it never mutates the global
+// dwell settings, so every other surface (nav, home, emergency) is untouched.
+// With the flag OFF, typing timing is byte-for-byte as before this change.
+//
+// IMPORTANT: this override touches ONLY onset + cooldown — the accuracy-
+// critical letter DWELL is deliberately NOT overridden (patient request
+// 2026-07-07: "don't touch dwell/smoothing"). The dwell stays whatever
+// dwellSettings.keyboardKey resolves to.
+//
+// Why: after each keypress the dwell loop is blocked for the full post-click
+// cooldown (looking at the next key shows NO ring), then the onset (still no
+// ring), THEN the ring appears. At Mid that dead wait was ~1420 + 250 ≈ 1.67s
+// — dominated by the hidden +1000ms cooldown hardcode. These values cut it to
+// ~0.85s with ZERO accuracy cost (dwell + Kalman smoothing unchanged).
+//
+//   Stage      onset  cooldown   (was onset 250 / cooldown ~1240-1600)
+//   caregiver   120     450
+//   early       150     600
+//   mid         150     700
+//   late        200     850
+//
+// Onset grows slightly with stage (fixation stability drops); the cooldown
+// still leaves a real refractory period, backed by the repeatGuard continuity
+// guard. Emergency timings are never sourced from here.
+export interface KeyboardCadence {
+  onset: number;
+  cooldown: number;
+}
+
+export const KEYBOARD_CADENCE_BY_STAGE: Record<keyof typeof ALS_STAGE_PRESETS, KeyboardCadence> = {
+  caregiver: { onset: 120, cooldown: 450 },
+  early_als: { onset: 150, cooldown: 600 },
+  mid_als: { onset: 150, cooldown: 700 },
+  late_als: { onset: 200, cooldown: 850 },
+};
+
+// Fallback when the ALS stage has not been explicitly chosen yet — matches the
+// mid_als row (the app's DEFAULT_ALS_STAGE) so behaviour is consistent.
+export const KEYBOARD_CADENCE_DEFAULT: KeyboardCadence = KEYBOARD_CADENCE_BY_STAGE.mid_als;

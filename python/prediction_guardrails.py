@@ -62,11 +62,36 @@ BLOCKED_PREDICTION_WORDS = {
     "jealous",
     "embarrassed", "embarrassing", "humiliated", "humiliating",
     "overwhelmed",
+
+    # --- Hindi (Devanagari): violent / self-harm / poison ---
+    # Mirrors the English violent+self-harm set for the bilingual patient.
+    # Token equality (not substring), so e.g. मार blocks only the exact token
+    # मार, not मारना — the common inflected forms are listed explicitly.
+    # Ambiguous emotion words (उदास "sad", निराश "disappointed") are
+    # deliberately NOT blocked, matching the English policy of preserving the
+    # patient's ability to express feelings.
+    "मरना", "मरो", "मर", "मरा", "मौत", "मारना", "मार", "मारो",
+    "हत्या", "आत्महत्या", "आत्मह‍त्या", "खुदकुशी", "ख़ुदकुशी",
+    "जहर", "ज़हर", "जहरीला",
+    "बंदूक", "हथियार", "गोली",
+    # --- Hindi (Devanagari): mental-health-harmful (mirror English) ---
+    "बेकार", "बोझ", "लाचार", "निकम्मा", "नाकाम",
+
+    # --- Hinglish (Latin-script Hindi): same categories ---
+    "marna", "maarna", "maro", "maaro", "maut", "maar",
+    "hatya", "aatmahatya", "atmahatya", "aatmhatya", "khudkushi",
+    "zeher", "zahar", "jahar", "zaher",
+    "bandook", "hathiyar", "hathiyaar",
+    "bekaar", "bekar", "bojh", "laachaar", "lachaar", "nikamma",
 }
 
 BLOCKED_PREDICTION_PHRASES = {
     "rishabh more",
     "rishabh more supplies",
+    # Multi-word harm expressions (matched against the whole normalized text;
+    # single-token forms live in BLOCKED_PREDICTION_WORDS above).
+    "maar dalo", "maar daalo", "मार डालो", "जान से मार",
+    "khudkushi kar", "aatmahatya kar",
 }
 
 

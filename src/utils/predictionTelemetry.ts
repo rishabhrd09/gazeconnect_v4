@@ -1,11 +1,24 @@
 export type PredictionTelemetryKind = 'word' | 'sentence' | 'ghost' | 'starter';
 
+/** Optional context about an accepted suggestion (all fields optional so
+ *  existing call sites keep compiling). */
+export interface PredictionAcceptMeta {
+  /** 0-based slot index of the accepted suggestion (0 = top-1). */
+  rank?: number;
+  /** Language of the accepted suggestion: 'en' | 'hi'. */
+  lang?: string;
+}
+
 export interface PredictionTelemetrySnapshot {
   charsSaved: number;
   wordAccepts: number;
   sentenceAccepts: number;
   ghostAccepts: number;
   starterAccepts: number;
+  /** Accepted-slot histogram (rank as string key) — reveals top-1 vs top-4 value. */
+  acceptByRank: Record<string, number>;
+  /** Accepts by language ('en' | 'hi') — bilingual usefulness split. */
+  perLangAccepts: Record<string, number>;
   lastUpdatedAt: number;
 }
 
@@ -18,6 +31,8 @@ export const DEFAULT_PREDICTION_TELEMETRY: PredictionTelemetrySnapshot = {
   sentenceAccepts: 0,
   ghostAccepts: 0,
   starterAccepts: 0,
+  acceptByRank: {},
+  perLangAccepts: {},
   lastUpdatedAt: 0,
 };
 
@@ -53,10 +68,14 @@ export function applyPredictionTelemetry(
   previous: PredictionTelemetrySnapshot,
   kind: PredictionTelemetryKind,
   charsSaved: number,
+  meta?: PredictionAcceptMeta,
 ): PredictionTelemetrySnapshot {
   const saved = normalizeCharsSaved(charsSaved);
   const next: PredictionTelemetrySnapshot = {
     ...previous,
+    // clone the record maps so we never mutate the previous snapshot
+    acceptByRank: { ...previous.acceptByRank },
+    perLangAccepts: { ...previous.perLangAccepts },
     charsSaved: previous.charsSaved + saved,
     lastUpdatedAt: Date.now(),
   };
@@ -65,6 +84,14 @@ export function applyPredictionTelemetry(
   if (kind === 'sentence') next.sentenceAccepts += 1;
   if (kind === 'ghost') next.ghostAccepts += 1;
   if (kind === 'starter') next.starterAccepts += 1;
+
+  if (meta && typeof meta.rank === 'number' && meta.rank >= 0) {
+    const key = String(meta.rank);
+    next.acceptByRank[key] = (next.acceptByRank[key] || 0) + 1;
+  }
+  if (meta && meta.lang) {
+    next.perLangAccepts[meta.lang] = (next.perLangAccepts[meta.lang] || 0) + 1;
+  }
 
   return next;
 }

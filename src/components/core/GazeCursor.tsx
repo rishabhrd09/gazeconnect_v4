@@ -25,6 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { collectKeyboardKeys, findBestKeyboardKey, type KeyRect } from '../../utils/hitZoneExpansion';
 import { recordDwellEvent, recordDwellInterrupt, recordFreeze, recordGazeLatency, type GazeLatencySample } from '../../utils/gazeTelemetry';
 import { gazeFlags } from '../../utils/gazeFlags';
+import { KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT, type KeyboardCadence } from '../../config/dwellTimeConfig';
 
 // === TUNING PARAMETERS ===
 const CURSOR_SIZES: Record<string, number> = { small: 50, medium: 70, large: 90 };
@@ -104,9 +105,19 @@ export const GazeCursor: React.FC = () => {
   const gazeControl = useGazeControl();
   const { hasRealGaze, reportGazeReceived } = useRealGaze();
   const { settings } = useCustomization();
-  const { settings: dwellSettings } = useDwellTime();
+  const { settings: dwellSettings, currentStage } = useDwellTime();
   const dwellSettingsRef = useRef(dwellSettings);
   useEffect(() => { dwellSettingsRef.current = dwellSettings; }, [dwellSettings]);
+  // Current ALS stage, read live in the frame loop for the keyboardCadence flag.
+  const currentStageRef = useRef(currentStage);
+  useEffect(() => { currentStageRef.current = currentStage; }, [currentStage]);
+  // Keyboard cadence row for the active stage, or null when the flag is OFF
+  // (in which case every keyboard timing stays exactly as today).
+  const getKeyboardCadence = useCallback((): KeyboardCadence | null => {
+    if (!gazeFlags.keyboardCadence) return null;
+    const st = currentStageRef.current;
+    return (st && KEYBOARD_CADENCE_BY_STAGE[st]) || KEYBOARD_CADENCE_DEFAULT;
+  }, []);
   const lastNavigationTimestampRef = useRef(gazeControl.lastNavigationTimestamp);
   useEffect(() => {
     lastNavigationTimestampRef.current = gazeControl.lastNavigationTimestamp;
@@ -216,6 +227,13 @@ export const GazeCursor: React.FC = () => {
   const repeatLastIdRef = useRef<string>('');
   const repeatLastTimeRef = useRef<number>(0);
   const repeatIndexRef = useRef<number>(0);
+  // B2 repeatGuard: set true when the gaze acquires a DIFFERENT onset target
+  // after the last click; reset to false at each click. Used to suppress the
+  // fast-repeat accelerator on an unintended look-away-and-return.
+  const sawDifferentTargetSinceClickRef = useRef<boolean>(false);
+  // B1 keyboardCadence: whether the previous click was a keyboard-context
+  // target — gates the keyboard cooldown base for the next click's cooldown.
+  const lastClickWasKeyboardRef = useRef<boolean>(false);
 
   // === KEYBOARD HIT ZONE REFS ===
   const keyboardKeysRef = useRef<KeyRect[]>([]);
@@ -471,6 +489,11 @@ export const GazeCursor: React.FC = () => {
         : contextKey === 'navigation' || contextKey === 'navigationbutton' ? s.navigationButton
           : contextKey === 'quickfire' ? s.quickfire
             : contextKey === 'keyboard' || contextKey === 'keyboardkey' ? s.keyboardKey
+              // Prediction strip: today it falls through to keyboardKey on the
+              // keyboard screen (isKeyboard=true). Made explicit here so the
+              // suggestion timing can be tuned independently of letter keys
+              // later without changing today's value (still keyboardKey).
+              : contextKey === 'prediction' ? s.keyboardKey
               : contextKey === 'surveyoption' ? s.surveyOption
                 : contextKey === 'phrasebutton' || contextKey === 'phrases' ? s.phraseButton
                   : contextKey === 'homescreentile' ? s.homeScreenTile
@@ -490,12 +513,21 @@ export const GazeCursor: React.FC = () => {
         : isNavOnCompass ? Math.max(s.navigationButton, 1400)
           : contextDwell ?? (isKeyboard ? s.keyboardKey : s.standardButton);
 
+    // NOTE: keyboardCadence (default ON) intentionally does NOT override the
+    // letter DWELL — only onset + cooldown (the dead time) are cut, elsewhere
+    // in the loop. The dwell stays accuracy-critical and untouched here
+    // (patient request 2026-07-07).
+
     // v17: Variable repeat dwell — faster for repeated presses of same key
     const isKeyboardContext = contextKey === 'keyboard' || contextKey === 'keyboardkey';
     if (s.repeatDwellEnabled && isKeyboardContext) {
       const elId = el.id || '';
       const now = Date.now();
-      if (elId && elId === repeatLastIdRef.current && (now - repeatLastTimeRef.current) < (s.repeatWindowMs || 2000)) {
+      // repeatGuard flag (default OFF): suppress the accelerator if the gaze
+      // acquired a DIFFERENT target since the last click on this key (an
+      // unintended look-away-and-return, not a deliberate repeat).
+      const continuityOk = !gazeFlags.repeatGuard || !sawDifferentTargetSinceClickRef.current;
+      if (continuityOk && elId && elId === repeatLastIdRef.current && (now - repeatLastTimeRef.current) < (s.repeatWindowMs || 2000)) {
         const times = s.repeatDwellTimes || [0, 250, 350];
         const idx = Math.min(repeatIndexRef.current, times.length - 1);
         const repeatTime = times[idx];
@@ -554,7 +586,16 @@ export const GazeCursor: React.FC = () => {
 
     // Cooldown check — uses configurable cooldown from DwellTimeContext
     const s = dwellSettingsRef.current;
-    const effectiveCooldown = s.cooldownAfterActivation + 1000; // base 1000ms + configurable
+    // B1 keyboardCadence (default OFF): when the previous click was a keyboard
+    // target, use the stage's keyboard cooldown base INSTEAD of the hidden
+    // +1000ms floor — this is where most of the typing dead time hides. Only
+    // applies to keyboard-after-keyboard clicks; every other cooldown (nav,
+    // home, emergency, and the first click after leaving the keyboard) keeps
+    // the +1000ms floor. With the flag OFF this is exactly today's value.
+    const cadenceForCooldown = getKeyboardCadence();
+    const effectiveCooldown = (cadenceForCooldown && lastClickWasKeyboardRef.current)
+      ? cadenceForCooldown.cooldown
+      : s.cooldownAfterActivation + 1000; // base 1000ms + configurable
     const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
 
     // === v17.9: UNIFIED HIT-TEST POSITION (cursor render == hit test) ====
@@ -916,6 +957,14 @@ export const GazeCursor: React.FC = () => {
       onsetStartTimeRef.current = now;
       onsetCompletedRef.current = false;
 
+      // B2 repeatGuard: acquiring an onset target that isn't the last-clicked
+      // key means the gaze moved elsewhere — flag it so the fast-repeat
+      // accelerator is suppressed on a look-away-and-return to the same key.
+      // Re-acquiring the SAME key (deliberate repeat) does not set this.
+      if ((clickable.id || '') !== repeatLastIdRef.current) {
+        sawDifferentTargetSinceClickRef.current = true;
+      }
+
       // Check if this is a saved target that can be resumed (fixation TTL)
       if (savedDwellRef.current
         && savedDwellRef.current.element === clickable
@@ -982,7 +1031,17 @@ export const GazeCursor: React.FC = () => {
       // gaze-OFF bootstrap and for Emergency (always-active, not a toggle).
       const useFastOnset = isAlwaysActive &&
         !(gazeFlags.toggleCalmFrontend && isToggle && enabled);
-      const onsetDuration = useFastOnset ? ONSET_DELAY_ALWAYS_ACTIVE_MS : ONSET_DELAY_MS;
+      let onsetDuration = useFastOnset ? ONSET_DELAY_ALWAYS_ACTIVE_MS : ONSET_DELAY_MS;
+      // B1 keyboardCadence (default OFF): use the stage's honest onset for
+      // keyboard/prediction targets. Emergency/always-active keeps its fast
+      // onset. The attr read only happens when the flag is on.
+      const kbOnsetCadence = getKeyboardCadence();
+      if (kbOnsetCadence && !useFastOnset) {
+        const ctxHere = (getTargetAttr(clickable, 'data-gaze-context') || '').toLowerCase();
+        if (ctxHere === 'keyboard' || ctxHere === 'keyboardkey' || ctxHere === 'prediction') {
+          onsetDuration = kbOnsetCadence.onset;
+        }
+      }
       const onsetElapsed = now - onsetStartTimeRef.current;
       if (onsetElapsed < onsetDuration) {
         // Still in onset phase — no visual feedback, no dwell timer
@@ -1076,6 +1135,12 @@ export const GazeCursor: React.FC = () => {
       }
       repeatLastIdRef.current = elId;
       repeatLastTimeRef.current = now;
+      // B2 repeatGuard: this key is now the "last clicked" key; clear the
+      // look-away flag so a deliberate immediate repeat can accelerate.
+      sawDifferentTargetSinceClickRef.current = false;
+      // B1 keyboardCadence: remember whether this click was a keyboard-context
+      // target so the NEXT click's cooldown can use the keyboard cooldown base.
+      lastClickWasKeyboardRef.current = contextKey === 'keyboard' || contextKey === 'keyboardkey' || contextKey === 'prediction';
 
       // === R1: TELEMETRY ===========================================
       // Record this click's residual (raw gaze vs target center),
@@ -1090,9 +1155,29 @@ export const GazeCursor: React.FC = () => {
         };
         const gaze = lastRawPointRef.current;
         const contextAttr = (getTargetAttr(target, 'data-gaze-context') || '').trim();
+        const actionAttr = (getTargetAttr(target, 'data-action') || '').trim();
         const targetLabel = target.id
           || (target.textContent || '').trim().slice(0, 40)
           || target.tagName.toLowerCase();
+        // Runner-up key: nearest OTHER keyboard-key center to the gaze sample.
+        // A small distance => the intended key was ambiguous (confusion fuel).
+        let nearestAlt: { id: string; dist: number } | null = null;
+        if (contextAttr === 'keyboard' && keyboardKeysRef.current.length > 1) {
+          let best = Infinity;
+          for (const k of keyboardKeysRef.current) {
+            if (k.element === target) continue;
+            const ddx = gaze.x - k.centerX;
+            const ddy = gaze.y - k.centerY;
+            const d = Math.sqrt(ddx * ddx + ddy * ddy);
+            if (d < best) {
+              best = d;
+              nearestAlt = {
+                id: k.element.id || (k.element.textContent || '').trim().slice(0, 8) || '?',
+                dist: Math.round(d),
+              };
+            }
+          }
+        }
         recordDwellEvent({
           targetId: targetLabel,
           context: contextAttr,
@@ -1102,6 +1187,8 @@ export const GazeCursor: React.FC = () => {
           gaze: { x: gaze.x, y: gaze.y },
           onsetToClickMs: onsetStartTimeRef.current > 0 ? now - onsetStartTimeRef.current : 0,
           dwellToClickMs: dwellStartTimeRef.current > 0 ? now - dwellStartTimeRef.current : 0,
+          action: actionAttr || undefined,
+          nearestAlt,
         });
       } catch { /* never let telemetry block the click */ }
 
@@ -1120,7 +1207,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr]);
+  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {

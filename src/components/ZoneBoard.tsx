@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import GazeButton from './core/GazeButton';
 import { useDwellTime } from '../contexts/DwellTimeContext';
+import { gazeFlags } from '../utils/gazeFlags';
 import { useTheme } from '../contexts/ThemeContext';
 import { screenThemes, typography } from '../utils/design';
 
@@ -103,7 +104,14 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
     if (activeZone) {
       setInteractionEnabled(false);
       // Moderate buffer: prevents accidental clicks without feeling too slow.
-      const bufferTime = Math.max(1300, Math.round(settings.standardButton * 1.5));
+      // B3 zoneBoardV2 (default OFF): shrink the buffer from ×1.5 to ×0.45 of
+      // the standard dwell, floored at 650ms. The floor keeps the invariant
+      // buffer ≥ letterOnset+250 (time to notice the zoom-in and saccade off
+      // the just-appeared letter), so pass-through mis-selects are still
+      // prevented while per-letter cost drops sharply. OFF = today's ×1.5.
+      const bufferTime = gazeFlags.zoneBoardV2
+        ? Math.max(650, Math.round(settings.standardButton * 0.45))
+        : Math.max(1300, Math.round(settings.standardButton * 1.5));
       const timer = setTimeout(() => {
         setInteractionEnabled(true);
       }, bufferTime);
@@ -355,6 +363,11 @@ const ZoneBoard: React.FC<ZoneBoardProps> = ({
             gazeEnabled={gazeEnabled && interactionEnabled}
             gazeEnabledTimestamp={gazeEnabledTimestamp}
             onClick={() => handleLetterClick(char)}
+            // B3 zoneBoardV2 (default OFF): letters use the keyboardKey dwell
+            // (≈1485ms Mid) instead of the heavier standardButton fall-through
+            // (≈1755ms). Emits data-gaze-context="keyboard" so the real gaze
+            // path honors it. OFF = no category (today's behavior).
+            dwellCategory={gazeFlags.zoneBoardV2 ? 'keyboardKey' : undefined}
             style={{
               backgroundColor: T_CELL_BG,
               border: `1px solid ${T_BORDER}`,

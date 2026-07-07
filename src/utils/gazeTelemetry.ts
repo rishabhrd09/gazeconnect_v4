@@ -40,6 +40,15 @@ export interface DwellTelemetryEvent {
   onsetToClickMs: number;
   /** Time from dwell start to click fire (ms) */
   dwellToClickMs: number;
+  /** data-action attribute (letter | backspace | deleteWord | space | ...) when present */
+  action?: string;
+  /**
+   * The runner-up keyboard key: the nearest OTHER key center to the gaze
+   * sample at click time, and its distance in px. Only populated for
+   * keyboard-context clicks with >=2 keys collected. A small distance means
+   * the intended key was ambiguous — the raw material for confusion analysis.
+   */
+  nearestAlt?: { id: string; dist: number } | null;
 }
 
 export interface TelemetrySnapshot {
@@ -67,6 +76,22 @@ export interface TelemetrySnapshot {
     over200Count: number;
     maxMs: number;
     byKind: Record<string, number>;
+  };
+  /**
+   * Keyboard-typing accuracy aggregates (derived from the click ring).
+   *   letterClicks           — completed letter selections
+   *   backspaceAfterSelect   — backspace/deleteWord within 3s of a letter
+   *   backspaceAfterSelectRate — the above / letterClicks (wrong-key proxy)
+   *   medianNearestAltDistPx — median runner-up-key distance (ambiguity)
+   *   perKeyConfusion        — per-letter count of a backspace-within-3s
+   *                            following it (which keys get mistyped most)
+   */
+  keyboard: {
+    letterClicks: number;
+    backspaceAfterSelect: number;
+    backspaceAfterSelectRate: number;
+    medianNearestAltDistPx: number;
+    perKeyConfusion: Record<string, number>;
   };
   /** Transport latency percentiles (helper -> renderer; see GazeLatencySample). */
   latency: {
@@ -278,6 +303,56 @@ function getAuxAggregates(): Pick<TelemetrySnapshot, 'interrupts' | 'freezes'> {
   };
 }
 
+/**
+ * Keyboard-typing accuracy aggregate. Scans the click ring in time order:
+ * a backspace/deleteWord within 3s of the immediately-preceding letter is
+ * counted as a likely correction and attributed to that letter. Pure
+ * measurement — the ring already holds action + nearestAlt per the record
+ * site. Empty when no keyboard clicks are present.
+ */
+const CORRECTION_WINDOW_MS = 3000;
+const BACKSPACE_ACTIONS = new Set(['backspace', 'deleteword']);
+function getKeyboardAggregate(): TelemetrySnapshot['keyboard'] {
+  const chrono = events.slice().sort((a, b) => a.ts - b.ts);
+  const perKeyConfusion: Record<string, number> = {};
+  const altDists: number[] = [];
+  let letterClicks = 0;
+  let backspaceAfterSelect = 0;
+  let lastLetter: { id: string; ts: number } | null = null;
+
+  for (const e of chrono) {
+    const action = (e.action || '').toLowerCase();
+    const isKeyboardCtx = e.context === 'keyboard' || e.context === 'prediction';
+    if (typeof e.nearestAlt?.dist === 'number') altDists.push(e.nearestAlt.dist);
+
+    if (BACKSPACE_ACTIONS.has(action)) {
+      if (lastLetter && e.ts - lastLetter.ts <= CORRECTION_WINDOW_MS) {
+        backspaceAfterSelect++;
+        perKeyConfusion[lastLetter.id] = (perKeyConfusion[lastLetter.id] || 0) + 1;
+      }
+      lastLetter = null; // a deletion consumes the pending letter
+      continue;
+    }
+    // A "letter" is any keyboard click that isn't an editing/navigation action.
+    if (isKeyboardCtx && (action === '' || action === 'letter')) {
+      letterClicks++;
+      lastLetter = { id: e.targetId, ts: e.ts };
+    } else if (isKeyboardCtx) {
+      // space/enter/toggle etc. break the letter->backspace adjacency
+      lastLetter = null;
+    }
+  }
+
+  const sortedAlt = altDists.slice().sort((a, b) => a - b);
+  return {
+    letterClicks,
+    backspaceAfterSelect,
+    backspaceAfterSelectRate: letterClicks > 0 ? backspaceAfterSelect / letterClicks : 0,
+    medianNearestAltDistPx: sortedAlt.length ? sortedAlt[Math.floor(sortedAlt.length / 2)] : 0,
+    perKeyConfusion,
+  };
+}
+
 /** Compute aggregate stats over the current event ring. */
 export function getSnapshot(): TelemetrySnapshot | null {
   if (events.length === 0) {
@@ -295,6 +370,7 @@ export function getSnapshot(): TelemetrySnapshot | null {
       perContextCount: {},
       perContextMedianResidual: {},
       ...getAuxAggregates(),
+      keyboard: getKeyboardAggregate(),
       latency: getLatencyAggregate(),
     };
   }
@@ -343,6 +419,7 @@ export function getSnapshot(): TelemetrySnapshot | null {
     perContextCount,
     perContextMedianResidual,
     ...getAuxAggregates(),
+    keyboard: getKeyboardAggregate(),
     latency: getLatencyAggregate(),
   };
 }

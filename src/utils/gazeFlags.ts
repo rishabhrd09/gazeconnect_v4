@@ -86,6 +86,40 @@ export interface GazeFlags {
    * Validated offline by replay scenario S13 before any rig session.
    */
   browserProgressBank: boolean;
+  /**
+   * KEYBOARD plan B1 (on-rig A/B prototype, default OFF): stage-specific
+   * keyboard cadence. For keyboard-context targets ONLY, replaces the
+   * hardcoded 250ms onset with the stage's honest onset, the letter dwell
+   * with the stage's tuned dwell, and the hidden +1000ms cooldown floor
+   * with the stage's configurable cooldown base — all from
+   * KEYBOARD_CADENCE_BY_STAGE. Faster at every ALS stage, driven mostly by
+   * the cooldown. Never touches nav/home/emergency or non-keyboard screens.
+   * With the flag OFF the table is never read and typing is byte-identical
+   * to today. Ships WITH repeatGuard (below).
+   */
+  keyboardCadence: boolean;
+  /**
+   * KEYBOARD plan B2 (on-rig A/B prototype, default OFF): continuity guard on
+   * the fast-repeat dwell. The repeat accelerator ([0,250,350]) is already
+   * same-key gated; this adds that it only applies if the gaze did NOT
+   * acquire a DIFFERENT target since the last click on this key — so an
+   * unintended look-away-and-return to the same letter no longer triggers a
+   * 250ms fast repeat (it falls back to the full dwell). Only ever LENGTHENS
+   * a repeat; with the flag OFF the accelerator behaves as today.
+   */
+  repeatGuard: boolean;
+  /**
+   * KEYBOARD plan B3 (on-rig A/B prototype, default OFF): ZoneBoard cost
+   * restructure. (1) Spatial-keyboard LETTERS get the keyboardKey dwell
+   * category (≈1485ms at Mid) instead of falling through to standardButton
+   * (≈1755ms). (2) The zone-entry buffer shrinks from max(1300,
+   * standardButton×1.5)=2633ms at Mid to max(650, standardButton×0.45)≈790ms
+   * — still ≥ letterOnset+250 (the invariant that keeps the buffer's
+   * pass-through protection intact). Together these cut Mid per-letter cost
+   * ~6.5s→~4.3s. With the flag OFF the ZoneBoard behaves byte-for-byte as
+   * today. Requires rig validation + the buffer-pass-through replay scenario.
+   */
+  zoneBoardV2: boolean;
 }
 
 const STORAGE_KEY = 'gazeconnect_gaze_flags';
@@ -95,13 +129,32 @@ const DEFAULTS: GazeFlags = {
   lockBreakProgressRetention: true,
   browserProgressRetention: true,
   browserGapPause: true,
-  // A/B prototypes — OFF until validated on the rig (see the plan's B1/B2
-  // protocols). Turn on for a session with:
-  //   window.__gazeFlags.set('toggleCalmFrontend', true)
+  // toggleCalmFrontend: DEFAULT ON since 2026-07-07. The patient reported the
+  // gaze toggle "magnetism is very very strong" across multiple sessions and
+  // that the keys ABOVE the toggle get mistakenly selected when reaching for
+  // it — both are the 220px/0.36 capture halo overlapping the top-row keys.
+  // The calm (150px/0.28, no teleport, standard onset, 1450ms dwell) shrinks
+  // that halo and softens the capture. SAFE for gaze-OFF recovery: every calm
+  // change in GazeCursor is gated on `&& enabled` (gaze ON) and the gaze-OFF
+  // toggle assist stays 140px/0.18 regardless of this flag. Revert instantly:
+  //   window.__gazeFlags.set('toggleCalmFrontend', false)
+  toggleCalmFrontend: true,
+  // homeSnapCalm: still OFF until validated on the rig. Turn on with:
   //   window.__gazeFlags.set('homeSnapCalm', true)
-  toggleCalmFrontend: false,
   homeSnapCalm: false,
   browserProgressBank: false,
+  // keyboardCadence + repeatGuard: DEFAULT ON since 2026-07-07. The patient
+  // reported the wait before the dwell ring appears on the next key felt
+  // sluggish — it was ~1.4s post-click cooldown + 250ms onset of pure dead
+  // time. These cut that dead time (per-stage onset+cooldown, dwell UNCHANGED)
+  // so typing feels snappy at zero accuracy cost; repeatGuard ships with it to
+  // keep the faster cooldown from enabling accidental repeats. Revert with:
+  //   window.__gazeFlags.set('keyboardCadence', false)  // restores today's timing
+  keyboardCadence: true,
+  repeatGuard: true,
+  // Keyboard plan B3 — OFF until validated on the rig:
+  //   window.__gazeFlags.set('zoneBoardV2', true)
+  zoneBoardV2: false,
 };
 
 function loadStored(): Partial<GazeFlags> {

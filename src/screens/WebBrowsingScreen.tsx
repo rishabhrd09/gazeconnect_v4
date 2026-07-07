@@ -1974,9 +1974,13 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     const isYouTubeWatchPage = /(?:youtube\.com\/(?:watch|shorts)|youtu\.be\/)/i.test(currentBrowserUrl);
     const isPlayableYouTubePage = isYouTubeWatchPage && ['playing', 'paused', 'ready', 'ad_waiting'].includes(youtubeState);
     const toggleBrowserInteractionMode = useCallback(() => {
-        if (!isWatchMode && !isPlayableYouTubePage) return;
+        // The controls toggle now works on ANY YouTube page (incl. search /
+        // listing pages), not just a playing video — so the Show/Hide Controls
+        // button is never a dead end (patient request 2026-07-07). The
+        // playing-video auto-mode effect below only fires while playing, so a
+        // manual toggle on an idle page sticks.
         onBrowserInteractionModeChange(isWatchMode ? 'control' : 'watch');
-    }, [isPlayableYouTubePage, isWatchMode, onBrowserInteractionModeChange]);
+    }, [isWatchMode, onBrowserInteractionModeChange]);
     const browserStateRef = useRef({ isOpen: false, currentUrl: '' });
 
     useEffect(() => {
@@ -2261,14 +2265,15 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                         <span>Skip Ad</span>
                     </GazeButton>
-                    {isYouTubeWatchPage && isPlayableYouTubePage && <>
-                        <GazeButton id="yt-hide-controls" onClick={toggleBrowserInteractionMode}
-                            gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
-                            style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
-                            <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                            <span>Hide Controls</span>
-                        </GazeButton>
-                    </>}
+                    {/* Controls toggle — ALWAYS shown in control mode (patient
+                        request 2026-07-07); previously gated to a playing video
+                        so it vanished on search/listing pages. */}
+                    <GazeButton id="yt-hide-controls" onClick={toggleBrowserInteractionMode}
+                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
+                        <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
+                        <span>Hide Controls</span>
+                    </GazeButton>
                     {isNavHidden && <GazeButton id="yt-toggle-nav" onClick={() => onNavHiddenToggle?.(!isNavHidden)}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
