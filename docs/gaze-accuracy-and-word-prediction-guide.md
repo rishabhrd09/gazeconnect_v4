@@ -231,7 +231,7 @@ User types "I want wa"
       |
       v
 +------------------------------+
-|  3. Blocked Words Filter (v3)|  110 harmful/inappropriate words
+|  3. Guardrail Filter (v3)    |  158 blocked word tokens + 8 phrases
 |     (prediction_guardrails)  |  never appear as suggestions
 +------------------------------+
       |
@@ -287,7 +287,7 @@ User types "I want wa"
 |------|----------|------|
 | `word_prediction.py` | `python/services/` | Core engine: vocabulary, n-gram model, smart bigrams, neural fusion, scoring, RecencyTracker, PatientBigramTracker, time boost |
 | `sentence_prediction.py` | `python/services/` | Sentence completion: template bank (180 templates), patient history, fuzzy matching |
-| `prediction_guardrails.py` | `python/` | Blocked words filter (110 words): violent, harmful, inappropriate words never surface as predictions |
+| `prediction_guardrails.py` | `python/` | Guardrail filter: 158 blocked word tokens + 8 phrases; violent, harmful, inappropriate suggestions never surface |
 | `smart_bigrams.json` | `python/data/` | Pre-computed 1,339 word-pair frequencies from curated AAC corpus (36KB) |
 | `generate_smart_bigrams.py` | `python/scripts/` | Generator script for smart_bigrams.json (run once to rebuild) |
 | `gazeconnect_lm_quantized.onnx` | `python/ml/trained_models/` | CIFG-LSTM neural model (1.9MB, 661 vocab, 512 hidden) for semantic reranking |
@@ -361,9 +361,9 @@ The n-gram model is trained on five sources:
 
 **CIFG-LSTM Neural Language Model** — A custom-built 1.9MB quantized ONNX model (Coupled Input-Forget Gate LSTM, 512 hidden units, 661 vocab). Trained on 5,623 AAC sentences. Fused with n-gram results via PredictionFusion with dynamic weighting (n-gram 30-70%, neural 30-70% depending on n-gram confidence). Adds ~10-15% prediction quality improvement by semantic reranking. Hard 30ms timeout — never blocks UI.
 
-**Datamuse API Integration** — When WiFi is available, fetches smart next-word suggestions from the free Datamuse API (no API key, 100K requests/day). Local predictions are sent instantly, Datamuse results arrive 100-300ms later as a non-blocking background enhancement. If offline, zero degradation. Results cached in-memory (500 entries, 1hr TTL). API words get low score (0.02) so patient-learned words always rank higher.
+**Datamuse API Integration** — Optional online enrichment exists in `python/main.py`, but is disabled by default with `ServerConfig.enable_datamuse = False`. When explicitly enabled and WiFi is available, local predictions are sent instantly and Datamuse results arrive later as a non-blocking background enhancement. If offline or disabled, there is zero degradation. Results are cached in-memory, guardrail filtered, and scored below patient-learned words.
 
-**Blocked Words Filter** — 110 violent, harmful, and inappropriate words are permanently blocked from ever appearing as suggestions. Includes: profanity, violent actions (dead, death, die, kill, shoot, weapon), harmful mental health words for ALS patients (helpless, hopeless, worthless, burden, lazy), body-shaming terms, and other inappropriate content. Enforced via `prediction_guardrails.py` at 20+ filter points across the entire codebase. Words like pain, sad, worried, scared, tired, hate, fight, guilty, nervous, stressed, suspicious, upset, troubled remain available — patients need these to express real feelings.
+**Guardrail Filter** — 158 blocked word tokens and 8 blocked phrases are permanently blocked from ever appearing as suggestions. Includes profanity, violent actions, harmful mental-health phrases, body-shaming terms, and other inappropriate content. Enforced via `prediction_guardrails.py` across prediction paths. Words like pain, sad, worried, scared, tired, hate, fight, guilty, nervous, stressed, suspicious, upset, and troubled remain available — patients need these to express real feelings.
 
 **Performance (v3 measured):**
 
@@ -375,7 +375,7 @@ The n-gram model is trained on five sources:
 | Process memory | ~50 MB |
 | Neural model timeout | 30ms hard cap |
 | Datamuse API timeout | 300ms (background, non-blocking) |
-| Blocked words | 110 words, zero violations in testing |
+| Blocked suggestions | 158 word tokens + 8 phrases, zero violations expected |
 | Gaze pipeline impact | Zero — prediction runs in WebSocket message handler, completely isolated from 66Hz gaze broadcast loop |
 
 ### Data Persistence (Prediction System)

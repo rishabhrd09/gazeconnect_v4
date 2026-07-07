@@ -129,7 +129,7 @@ This launches all three processes. Use `--simulate` to use mouse cursor as gaze 
 | `python/services/one_euro_filter.py` | One Euro filter + OptiKey 4-zone stabilizer + GravityWell magnetism. |
 | `python/services/gaze_classifier.py` | I-VT fixation/saccade/glissade classifier (65 / 150 °/s thresholds with 2-of-N / 4-of-N hysteresis). |
 | `python/services/word_prediction.py` | Word prediction engine: n-gram model, smart bigrams (1,339 pairs), CIFG-LSTM neural fusion (1.9MB), vocabulary boosting, RecencyTracker, PatientBigramTracker, time-of-day boost. |
-| `python/prediction_guardrails.py` | Blocked words filter: 110 harmful/inappropriate words permanently filtered from predictions. |
+| `python/prediction_guardrails.py` | Blocked prediction guardrails: 158 harmful/inappropriate word tokens + 8 blocked phrases permanently filtered from predictions. |
 | `python/services/sentence_prediction.py` | Sentence completion engine: patient history, 180 templates, fuzzy matching. |
 | `python/data/smart_bigrams.json` | Pre-computed word-pair frequencies (36KB, loaded at startup). |
 | `python/ml/inference.py` | CIFG-LSTM neural predictor (ONNX Runtime, 30ms timeout). |
@@ -144,8 +144,9 @@ For understanding the eye-tracking pipeline (the system's heart), read in this o
 1. `docs/eye-tracking-pipeline-textbook.html` — **comprehensive technical reference** (v17.10). Open in a browser. Covers Tobii hardware → C# bridge → Python pipeline → WebSocket transport → Electron main → React renderer → dwell state machine → BrowserView pipeline → telemetry. Includes Mermaid flow diagrams and end-to-end frame trace.
 2. `docs/eye-gaze-pipeline-learning-guide.md` — narrative learning material covering the design choices, with a v17.x supplement.
 3. `docs/gaze-accuracy-and-word-prediction-guide.md` — joins gaze accuracy with word prediction. Part 4 has the full v17.x change history.
-4. `docs/technical-architecture-guide.md` — concise architecture overview with the 5-layer process model.
-5. `CLAUDE.md` — non-negotiable design constraints for any change to the gaze pipeline.
+4. `docs/gazeconnect-complete-architecture-and-career-textbook.html` — current-code textbook covering architecture, screens, backend algorithms, scripts, career alignment, and interview guidance.
+5. `docs/technical-architecture-guide.md` — concise architecture overview with the local process model.
+6. `CLAUDE.md` — non-negotiable design constraints for any change to the gaze pipeline.
 
 ## Floor Plan Docs Map
 
@@ -178,7 +179,7 @@ These constraints are critical for ALS accessibility. Violating them breaks the 
 3. **Responsive: 13" to 27" screens**. Use `clamp(min, preferred, max)` and viewport units. Never use fixed `px` for layout dimensions.
 4. **No scrolling on main screens**. Everything must fit within the viewport. `overflow: hidden` is intentional.
 5. **Dark mode is primary**. Background: `#0D1117`, accent: `#2DD4BF`.
-6. **Emergency buttons must always be accessible** with 400ms dwell time.
+6. **Emergency buttons must always be accessible**. Current dwell timing is configured in `src/config/dwellTimeConfig.ts`: `medicalUrgent` defaults to 900ms and `emergencyButton` defaults to 2000ms.
 7. **Never break the tested 23" (1920x1080) layout**. Only add support for smaller screens.
 
 ---
@@ -238,7 +239,7 @@ Only change them for a verified high-severity bug, and smoke-test keyboard typin
 
 - [ ] All screens load without errors
 - [ ] GazeButton dwell activation works (hover for dwell duration)
-- [ ] Emergency buttons respond at 400ms
+- [ ] Emergency buttons respond according to `medicalUrgent` / `emergencyButton` dwell categories
 - [ ] Word prediction returns suggestions on the keyboard screen
 - [ ] Sentence predictions appear in the bottom row when typing common phrases (e.g., "I want")
 - [ ] Selecting a sentence prediction fills the text area and learns the sentence

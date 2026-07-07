@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GazeConnect Pro Complete Architecture and Backend Career Textbook</title>
+  <style>
+    :root {
+      --bg: #f5efe4;
+      --bg-2: #fbf6ec;
+      --panel: #fffaf1;
+      --panel-2: #f2e5d1;
+      --ink: #261610;
+      --text: #4f362b;
+      --muted: #7d685b;
+      --line: rgba(92, 56, 38, 0.18);
+      --accent: #8b2f2a;
+      --accent-2: #a15d2c;
+      --danger: #9f2d2c;
+      --olive: #667447;
+      --teal: #356d64;
+      --code: #fff6e6;
+      --shadow: rgba(82, 52, 30, 0.14);
+      --shadow-soft: rgba(82, 52, 30, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(180deg, #fcf6eb 0%, #f5ecde 46%, #efe0cc 100%),
+        repeating-linear-gradient(90deg, rgba(92, 56, 38, 0.018) 0 1px, transparent 1px 4px);
+      color: var(--text);
+      font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.72;
+    }
+
+    a { color: #873029; text-decoration: none; font-weight: 650; }
+    a:hover { text-decoration: underline; }
+    code, pre {
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: #6f2c23;
+    }
+    p code, td code, li code, .node code {
+      background: rgba(139, 47, 42, 0.08);
+      border: 1px solid rgba(139, 47, 42, 0.12);
+      border-radius: 5px;
+      padding: 0.05rem 0.28rem;
+    }
+    pre {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.15rem;
+      overflow: auto;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 10px 28px var(--shadow-soft);
+    }
+
+    .page {
+      width: min(1160px, calc(100vw - 40px));
+      margin: 0 auto;
+      padding: 2.75rem 0 5.5rem;
+    }
+
+    .hero {
+      min-height: 66vh;
+      display: grid;
+      align-content: center;
+      gap: 1.35rem;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 1.4rem;
+      padding-bottom: 2rem;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    h1, h2, h3, h4 {
+      color: var(--ink);
+      line-height: 1.15;
+      margin: 0 0 0.75rem;
+      letter-spacing: 0;
+    }
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 5.4rem);
+      max-width: 980px;
+    }
+    h2 {
+      font-size: clamp(1.75rem, 3vw, 2.8rem);
+      margin-top: 0;
+      padding-top: 0;
+    }
+    h3 {
+      font-size: clamp(1.25rem, 2vw, 1.7rem);
+      margin-top: 2.4rem;
+    }
+    h4 { font-size: 1.05rem; margin-top: 1.3rem; }
+
+    section:not(.hero) {
+      padding: 2.7rem 0 2.2rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    section:last-child { border-bottom: none; }
+
+    .lead {
+      max-width: 890px;
+      font-size: clamp(1.05rem, 2vw, 1.35rem);
+      color: #5d4032;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.2rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: 2.2rem;
+      padding: 0.42rem 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 250, 241, 0.72);
+      color: var(--ink);
+      font-size: 0.92rem;
+      box-shadow: 0 8px 20px var(--shadow-soft);
+    }
+
+    .note {
+      background: linear-gradient(135deg, rgba(255, 250, 241, 0.94), rgba(240, 223, 198, 0.72));
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--teal);
+      border-radius: 8px;
+      padding: 1.05rem 1.2rem;
+      color: #4f362b;
+      box-shadow: 0 14px 34px var(--shadow-soft);
+    }
+
+    .warning {
+      border-left-color: var(--danger);
+      background: linear-gradient(135deg, rgba(157, 45, 44, 0.08), rgba(255, 250, 241, 0.92));
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 0.75rem;
+      margin: 1.25rem 0 2rem;
+    }
+    .toc a {
+      display: block;
+      padding: 0.85rem 0.95rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 250, 241, 0.78);
+      color: var(--text);
+      box-shadow: 0 8px 22px var(--shadow-soft);
+    }
+    .toc a:hover {
+      background: #fffaf1;
+      border-color: rgba(139, 47, 42, 0.26);
+      text-decoration: none;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(247, 235, 216, 0.96) 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.1rem;
+      box-shadow: 0 16px 34px var(--shadow-soft);
+    }
+    .card strong { color: var(--ink); }
+    .card .kicker {
+      display: block;
+      color: var(--accent-2);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.4rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.6rem;
+      background: rgba(255, 250, 241, 0.88);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 14px 32px var(--shadow-soft);
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 0.72rem 0.75rem;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: rgba(150, 89, 48, 0.11);
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+    tbody tr:nth-child(even) td { background: rgba(92, 56, 38, 0.035); }
+    tr:last-child td { border-bottom: none; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.7rem;
+      margin: 1rem 0 1.6rem;
+    }
+    .node {
+      min-height: 7.2rem;
+      padding: 0.9rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 250, 241, 0.82);
+      position: relative;
+      box-shadow: 0 10px 24px var(--shadow-soft);
+    }
+    .node:after {
+      content: "->";
+      position: absolute;
+      right: -0.55rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent-2);
+      font-weight: 900;
+    }
+    .node:last-child:after { content: ""; }
+    .node b { display: block; color: var(--ink); margin-bottom: 0.35rem; }
+
+    .diagram {
+      background: linear-gradient(180deg, rgba(255, 250, 241, 0.96), rgba(246, 232, 209, 0.92));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.1rem;
+      margin: 1rem 0 1.6rem;
+      overflow: auto;
+      box-shadow: 0 16px 38px var(--shadow-soft);
+    }
+    .diagram svg { width: 100%; min-width: 760px; height: auto; display: block; }
+    .svg-box { fill: #fff6e8; stroke: rgba(92, 56, 38, 0.28); stroke-width: 1.4; rx: 8; }
+    .svg-box-alt { fill: #edf4ee; stroke: rgba(53, 109, 100, 0.42); stroke-width: 1.4; rx: 8; }
+    .svg-box-warn { fill: #f8e5de; stroke: rgba(157, 45, 44, 0.42); stroke-width: 1.4; rx: 8; }
+    .svg-title { fill: #261610; font-weight: 800; font-size: 15px; }
+    .svg-small { fill: #655044; font-size: 12px; }
+    .svg-line { stroke: var(--accent-2); stroke-width: 2; marker-end: url(#arrow); fill: none; }
+
+    .chapter-num {
+      color: var(--accent-2);
+      font-weight: 900;
+      margin-right: 0.4rem;
+    }
+
+    .filetree {
+      white-space: pre;
+      overflow: auto;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem;
+      color: #5b3d30;
+      font-size: 0.92rem;
+      box-shadow: 0 12px 28px var(--shadow-soft);
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 760px) {
+      .page { width: min(100vw - 24px, 1180px); padding-top: 1.3rem; }
+      .hero { min-height: auto; padding: 3rem 0; }
+      .two-col { grid-template-columns: 1fr; }
+      table { font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">GazeConnect Pro textbook reference</div>
+      <h1>Complete Architecture, Code Logic, Backend Algorithms, and Career Readiness Guide</h1>
+      <p class="lead">
+        This document is the current-code-aligned one-stop book for understanding GazeConnect Pro:
+        what every major subsystem does, how a gaze sample becomes a safe click, how speech and
+        prediction work, how the scripts run the app, and how this project maps to backend,
+        real-time systems, ML inference, accessibility, and eye-tracking job profiles.
+      </p>
+      <div class="meta">
+        <span class="pill">Audited against repo state: 2026-07-07</span>
+        <span class="pill">App version: 4.8.0</span>
+        <span class="pill">Primary user: ALS/MND AAC patient</span>
+        <span class="pill">Core stack: Electron + React + Python + .NET Tobii bridge</span>
+      </div>
+    </section>
+
+    <section id="toc">
+      <h2><span class="chapter-num">0</span>Table of Contents</h2>
+      <nav class="toc">
+        <a href="#executive-summary">1. Executive Summary</a>
+        <a href="#current-status">2. Current Code Status</a>
+        <a href="#architecture">3. Architecture Diagrams</a>
+        <a href="#end-to-end-flow">4. End-to-End User Flow</a>
+        <a href="#frontend">5. Frontend and Screens</a>
+        <a href="#electron">6. Electron Main Process</a>
+        <a href="#backend">7. Python Backend</a>
+        <a href="#tobii">8. Tobii Hardware Bridge</a>
+        <a href="#prediction">9. Prediction and Neural Model</a>
+        <a href="#floorplan">10. Floor Plan System</a>
+        <a href="#scripts">11. Scripts and Builds</a>
+        <a href="#docs-audit">12. Documentation Audit</a>
+        <a href="#career">13. Backend Career Fit</a>
+        <a href="#interview">14. Interview Playbook</a>
+        <a href="#onboarding">15. Developer Onboarding</a>
+      </nav>
+    </section>
+
+    <section id="executive-summary">
+      <h2><span class="chapter-num">1</span>Executive Summary</h2>
+      <p>
+        GazeConnect Pro is a Windows desktop AAC application for users who communicate through
+        eye gaze. It is not a normal CRUD app. It is a real-time human-computer interaction system
+        with a safety-critical UI, a hardware bridge, an async Python stream processor, a dwell
+        state machine, local TTS, offline-first word prediction, and a separate home planning
+        module. The codebase proves that the developer can build across product, backend,
+        algorithms, local hardware, packaging, and accessibility.
+      </p>
+
+      <div class="note">
+        <strong>Most important implementation truth:</strong> selection is intentionally dwell-based.
+        The user does not drag, right-click, or depend on hover-only menus. The frontend owns the
+        user-visible dwell state machine; the backend owns gaze conditioning, classification,
+        filtering, calibration, magnetism hints, prediction, TTS, and data services.
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <span class="kicker">Clinical product</span>
+          <strong>Accessibility-first UI</strong>
+          <p>Large targets, dark mode, Hindi + English labels, no main-screen scrolling, and emergency access from every important context.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Realtime backend</span>
+          <strong>Python asyncio WebSocket server</strong>
+          <p>Receives gaze from a local TCP hardware bridge, processes it frame-by-frame, and broadcasts normalized gaze to React over port 8765.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Algorithms</span>
+          <strong>Signal processing + ML inference</strong>
+          <p>Signal conditioning, I-VT fixation/saccade classification, One Euro/Kalman/OptiKey filtering, neural ONNX prediction, and safety guardrails.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Career story</span>
+          <strong>Backend/ML/HCI alignment</strong>
+          <p>The strongest job fit is backend systems for accessibility, real-time data, ML inference, computer vision tooling, and human-computer interaction.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="current-status">
+      <h2><span class="chapter-num">2</span>Current Code Status</h2>
+      <p>
+        The following facts were verified directly from the current repository, not copied from older prose.
+        When older docs disagree with this section, this section should be treated as current.
+      </p>
+
+      <table>
+        <thead><tr><th>Area</th><th>Current status</th><th>Source files</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Frontend</td>
+            <td>React 18, TypeScript 5.3, Vite 5. UI is custom-built with no external UI kit.</td>
+            <td><code>package.json</code>, <code>src/</code></td>
+          </tr>
+          <tr>
+            <td>Desktop shell</td>
+            <td>Electron 28. Owns window lifecycle, BrowserView, IPC, splash, settings persistence, Python process, floorplan process, Tobii helper process.</td>
+            <td><code>electron/main.ts</code>, <code>electron/preload.ts</code></td>
+          </tr>
+          <tr>
+            <td>Backend</td>
+            <td>Python 3.10+ asyncio WebSocket server on port 8765 with gaze processing, TTS, prediction, survey, news, knowledge, and automation handlers.</td>
+            <td><code>python/main.py</code>, <code>python/services/</code></td>
+          </tr>
+          <tr>
+            <td>Eye tracker bridge</td>
+            <td>.NET 6.0 Windows helper using Tobii Interaction SDK, streaming JSON lines over TCP 5555 to Python.</td>
+            <td><code>tobii-helper/TobiiGazeHelper/Program.cs</code></td>
+          </tr>
+          <tr>
+            <td>Screen inventory</td>
+            <td>19 screen files exist. The active <code>App.tsx</code> route union has 17 normal routes; Alert Mode renders out-of-band; CalibrationScreen exists but is not currently routed by <code>App.tsx</code>.</td>
+            <td><code>src/screens/</code>, <code>src/App.tsx</code></td>
+          </tr>
+          <tr>
+            <td>Dwell timing</td>
+            <td><code>src/config/dwellTimeConfig.ts</code> is authoritative. <code>src/utils/design.ts</code> has a deprecated fallback table.</td>
+            <td><code>src/config/dwellTimeConfig.ts</code></td>
+          </tr>
+          <tr>
+            <td>Emergency timing</td>
+            <td>Emergency access is always-active in key contexts, but default dwell is not universally 400ms. Current defaults include <code>medicalUrgent: 900</code> and <code>emergencyButton: 2000</code> to reduce accidental activation.</td>
+            <td><code>dwellTimeConfig.ts</code>, <code>App.tsx</code>, <code>GlobalNavBar.tsx</code></td>
+          </tr>
+          <tr>
+            <td>Prediction guardrails</td>
+            <td>Current code has 158 blocked word tokens and 8 blocked phrases, including English and Hindi/Hinglish forms.</td>
+            <td><code>python/prediction_guardrails.py</code></td>
+          </tr>
+          <tr>
+            <td>Datamuse</td>
+            <td>Implemented but off by default. <code>ServerConfig.enable_datamuse = False</code>. If enabled and <code>aiohttp</code> is available, it sends local predictions first and only then background-enriches with a 300ms online request.</td>
+            <td><code>python/main.py</code></td>
+          </tr>
+          <tr>
+            <td>Browser gaze cursor</td>
+            <td>Embedded browser cursor has latest v17.18-v17.23 work: saved progress, progress bank, zoom-scaled radii, cached YouTube scans, empty-dwell guard, telemetry, and Bayesian card posterior.</td>
+            <td><code>electron/browser/browserGazeController.ts</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="architecture">
+      <h2><span class="chapter-num">3</span>Architecture Diagrams</h2>
+
+      <h3>3.1 Process Topology</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 1100 560" role="img" aria-label="GazeConnect process topology">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#a15d2c"></path>
+            </marker>
+          </defs>
+          <rect x="25" y="55" width="210" height="105" class="svg-box-warn"></rect>
+          <text x="45" y="88" class="svg-title">Tobii Eye Tracker 5</text>
+          <text x="45" y="115" class="svg-small">USB device</text>
+          <text x="45" y="137" class="svg-small">Physical gaze source</text>
+
+          <rect x="300" y="55" width="225" height="105" class="svg-box"></rect>
+          <text x="320" y="88" class="svg-title">TobiiGazeHelper.exe</text>
+          <text x="320" y="115" class="svg-small">.NET 6 + Tobii SDK</text>
+          <text x="320" y="137" class="svg-small">JSON lines over TCP 5555</text>
+
+          <rect x="590" y="55" width="235" height="105" class="svg-box-alt"></rect>
+          <text x="610" y="88" class="svg-title">Python Backend</text>
+          <text x="610" y="115" class="svg-small">asyncio WebSocket 8765</text>
+          <text x="610" y="137" class="svg-small">filters, prediction, TTS</text>
+
+          <rect x="865" y="55" width="210" height="105" class="svg-box"></rect>
+          <text x="885" y="88" class="svg-title">React Renderer</text>
+          <text x="885" y="115" class="svg-small">screens + GazeCursor</text>
+          <text x="885" y="137" class="svg-small">dwell click state</text>
+
+          <path d="M235 108 L300 108" class="svg-line"></path>
+          <path d="M525 108 L590 108" class="svg-line"></path>
+          <path d="M825 108 L865 108" class="svg-line"></path>
+
+          <rect x="300" y="260" width="235" height="105" class="svg-box"></rect>
+          <text x="320" y="293" class="svg-title">Electron Main</text>
+          <text x="320" y="320" class="svg-small">window, IPC, child processes</text>
+          <text x="320" y="342" class="svg-small">settings, splash, tray</text>
+
+          <rect x="590" y="260" width="235" height="105" class="svg-box"></rect>
+          <text x="610" y="293" class="svg-title">BrowserView</text>
+          <text x="610" y="320" class="svg-small">embedded browsing</text>
+          <text x="610" y="342" class="svg-small">trusted native input</text>
+
+          <rect x="865" y="260" width="210" height="105" class="svg-box-alt"></rect>
+          <text x="885" y="293" class="svg-title">Injected Browser Cursor</text>
+          <text x="885" y="320" class="svg-small">dwell, snap, telemetry</text>
+          <text x="885" y="342" class="svg-small">YouTube posterior</text>
+
+          <path d="M970 160 L970 260" class="svg-line"></path>
+          <path d="M535 312 L590 312" class="svg-line"></path>
+          <path d="M825 312 L865 312" class="svg-line"></path>
+          <path d="M865 145 C720 210 585 230 535 285" class="svg-line"></path>
+
+          <rect x="25" y="405" width="235" height="105" class="svg-box"></rect>
+          <text x="45" y="438" class="svg-title">Floorplan Flask Server</text>
+          <text x="45" y="465" class="svg-small">port 5050, lazy started</text>
+          <text x="45" y="487" class="svg-small">PNG/PDF/SVG plans</text>
+
+          <path d="M418 365 C355 430 320 455 260 455" class="svg-line"></path>
+        </svg>
+      </div>
+
+      <h3>3.2 Core Gaze Pipeline</h3>
+      <div class="flow">
+        <div class="node"><b>Hardware sample</b>Tobii reports screen-space gaze through the Interaction SDK.</div>
+        <div class="node"><b>.NET bridge</b>Normalizes pixels to 0..1 and sends JSON over TCP 5555.</div>
+        <div class="node"><b>Signal conditioner</b>Rejects stale, frozen, out-of-bounds, blink, and tracking-loss frames.</div>
+        <div class="node"><b>Classifier</b>I-VT velocity classifier labels fixation, saccade, or glissade.</div>
+        <div class="node"><b>Filters</b>OptiKey zones, Kalman, One Euro, magnetism, calibration correction.</div>
+        <div class="node"><b>Renderer dwell</b>React cursor snaps, anchors, fills progress, and fires click.</div>
+      </div>
+
+      <h3>3.3 Data Boundaries</h3>
+      <table>
+        <thead><tr><th>Boundary</th><th>Protocol</th><th>Direction</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>Tobii helper -> Python</td><td>TCP 5555, JSON line stream</td><td>Localhost</td><td>Hardware gaze samples.</td></tr>
+          <tr><td>Python -> React</td><td>WebSocket 8765</td><td>Localhost</td><td>Gaze frames, predictions, TTS state, survey status, web hub data.</td></tr>
+          <tr><td>React -> Electron</td><td>IPC through preload</td><td>Renderer to main</td><td>Window controls, BrowserView actions, settings, floorplan server, mouse-only mode.</td></tr>
+          <tr><td>React -> Floorplan server</td><td>HTTP 5050</td><td>Localhost</td><td>Generate PNG/PDF/SVG floor plan artifacts.</td></tr>
+          <tr><td>Python -> Datamuse</td><td>HTTPS</td><td>Optional online</td><td>Off-by-default prediction enrichment after local predictions.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="end-to-end-flow">
+      <h2><span class="chapter-num">4</span>End-to-End User Flow</h2>
+
+      <h3>4.1 From Eye Fixation to Button Click</h3>
+      <ol>
+        <li>The Tobii ET5 observes the user's eyes and reports a gaze point through Tobii software.</li>
+        <li><code>TobiiGazeHelper.exe</code> receives <code>GazePointDataMode.LightlyFiltered</code> samples.</li>
+        <li>The helper normalizes pixel coordinates and sends JSON lines to Python on TCP 5555.</li>
+        <li><code>TobiiReceiver</code> reads the TCP stream, converts timestamps, and emits <code>GazePoint</code> objects.</li>
+        <li><code>SignalConditioner</code> handles blink hold, tracking loss, out-of-bounds tolerance, and frozen data.</li>
+        <li><code>GazeClassifier</code> uses velocity thresholds and hysteresis to decide fixation/saccade/glissade.</li>
+        <li>The backend applies calibration, OptiKey key zones, adaptive Kalman filtering, optional One Euro filtering, and target magnetism.</li>
+        <li>The backend broadcasts the gaze payload over WebSocket.</li>
+        <li><code>useWebSocket.tsx</code> dispatches the gaze frame to <code>GazeCursor.tsx</code>.</li>
+        <li><code>GazeCursor.tsx</code> updates the cursor directly on the DOM hot path, finds a gaze target, starts onset, fills dwell progress, locks after 10%, and clicks when dwell completes.</li>
+      </ol>
+
+      <h3>4.2 From Button Click to Speech</h3>
+      <div class="flow">
+        <div class="node"><b>GazeButton fires</b>The selected AAC tile invokes <code>onClick</code>.</div>
+        <div class="node"><b>Screen handler</b>The screen calls <code>onSpeak(text)</code> or <code>onNavigate(route)</code>.</div>
+        <div class="node"><b>TTS router</b><code>chooseSpeechRoute</code> chooses mute, backend, or browser speech.</div>
+        <div class="node"><b>Backend path</b>English text can go to Python <code>pyttsx3</code> through WebSocket.</div>
+        <div class="node"><b>Browser path</b>Hindi or mixed Devanagari speech uses browser <code>SpeechSynthesis</code>.</div>
+      </div>
+
+      <div class="note">
+        <strong>Double-speech fix:</strong> <code>src/utils/ttsRouting.ts</code> deliberately selects exactly one voice path per utterance. Hindi and Devanagari text are routed to browser speech because Windows SAPI5 may not speak Hindi reliably through <code>pyttsx3</code>.
+      </div>
+
+      <h3>4.3 From Typed Text to Predictions</h3>
+      <ol>
+        <li><code>KeyboardScreen.tsx</code> or <code>SpatialKeyboardScreen.tsx</code> sends <code>get_predictions</code> through <code>useWebSocket</code>.</li>
+        <li><code>python/main.py</code> calls <code>WordPredictionEngine.predict()</code>.</li>
+        <li>The engine builds candidates from prefix trie, n-grams, smart bigrams, core vocabulary, recency, patient bigrams, Hindi vocabulary, context topics, and neural fusion.</li>
+        <li>Guardrails filter blocked words and phrases repeatedly before output.</li>
+        <li>Sentence prediction and neural sentence continuation may add short suggestions.</li>
+        <li>Local predictions return immediately. If Datamuse is enabled, a later background message may append low-score online suggestions.</li>
+      </ol>
+    </section>
+
+    <section id="frontend">
+      <h2><span class="chapter-num">5</span>Frontend and Screens</h2>
+      <p>
+        The frontend is optimized for gaze rather than mouse ergonomics. The most important files are
+        <code>App.tsx</code>, <code>GazeCursor.tsx</code>, <code>GazeButton.tsx</code>,
+        <code>GazeControlToggle.tsx</code>, <code>GlobalNavBar.tsx</code>, the screen files, and the
+        dwell/configuration contexts.
+      </p>
+
+      <h3>5.1 Active Routing Model</h3>
+      <p>
+        <code>App.tsx</code> defines the normal route union:
+        <code>home</code>, <code>keyboard</code>, <code>phrases</code>, <code>feelings</code>,
+        <code>needs</code>, <code>people</code>, <code>medical</code>, <code>settings</code>,
+        <code>activities</code>, <code>spatial</code>, <code>web</code>, <code>floor-plan</code>,
+        <code>floor-plan-survey</code>, <code>compass-map</code>, <code>customize</code>,
+        <code>advanced-map</code>, and <code>quickwords</code>. Alert Mode is controlled by
+        <code>AlertModeContext</code> and renders outside the normal switch. <code>CalibrationScreen.tsx</code>
+        exists in the folder but is not imported into the current app router.
+      </p>
+
+      <table>
+        <thead><tr><th>Screen file</th><th>Role</th><th>Backend/Electron interaction</th></tr></thead>
+        <tbody>
+          <tr><td><code>HomeScreen.tsx</code></td><td>Main AAC navigation hub with emergency and quick phrase entry points.</td><td>Navigation and speech callbacks through <code>App.tsx</code>.</td></tr>
+          <tr><td><code>KeyboardScreen.tsx</code></td><td>Full keyboard, predictions, sentence suggestions, QuickWords injection, text persistence.</td><td>Prediction, learning, TTS, Electron session storage.</td></tr>
+          <tr><td><code>SpatialKeyboardScreen.tsx</code></td><td>Large-zone typing mode for users needing fewer targets.</td><td>Same prediction/learning backend as keyboard.</td></tr>
+          <tr><td><code>PhrasesScreen.tsx</code></td><td>Phrase categories for common communication.</td><td>Speech only.</td></tr>
+          <tr><td><code>MedicalScreen.tsx</code></td><td>Urgent medical and daily-care requests.</td><td>Uses faster <code>medicalUrgent</code> dwell category for urgent items.</td></tr>
+          <tr><td><code>BasicNeedsScreen.tsx</code></td><td>Core daily needs such as water, bathroom, position, comfort.</td><td>Speech only.</td></tr>
+          <tr><td><code>FeelingScreen.tsx</code></td><td>Emotion and comfort state expression.</td><td>Speech only.</td></tr>
+          <tr><td><code>PeopleScreen.tsx</code></td><td>Family/contact communication.</td><td>Speech only.</td></tr>
+          <tr><td><code>ActivitiesScreen.tsx</code></td><td>Entertainment and activity requests.</td><td>Speech only.</td></tr>
+          <tr><td><code>QuickWordsScreen.tsx</code></td><td>Standalone or injection-mode quick words.</td><td>Can append words into keyboard state.</td></tr>
+          <tr><td><code>WebBrowsingScreen.tsx</code></td><td>News, knowledge, quick search, YouTube/social/browser mode.</td><td>Heavy Electron BrowserView IPC plus backend news/knowledge services.</td></tr>
+          <tr><td><code>DesignHomeLandingScreen.tsx</code></td><td>Entry point for home planning.</td><td>Navigation into survey/compass/floorplan paths.</td></tr>
+          <tr><td><code>FloorPlanSurveyScreen.tsx</code></td><td>Room-by-room questionnaire.</td><td>WebSocket survey save/load/compile and floorplan modal.</td></tr>
+          <tr><td><code>CompassMapScreen.tsx</code></td><td>Gaze-driven plot/room placement system.</td><td>Compiles payload for local floorplan Flask server.</td></tr>
+          <tr><td><code>AdvancedMapScreen.tsx</code></td><td>Detailed refinement of compass/home layout.</td><td>Electron refinement events and floorplan integration.</td></tr>
+          <tr><td><code>CustomizeScreen.tsx</code></td><td>User-facing customization of labels and settings.</td><td>Electron customization persistence.</td></tr>
+          <tr><td><code>SettingsScreen.tsx</code></td><td>Settings, dictionary, people, phrases, medical, home, quickwords, activities, alert mode.</td><td>Electron settings persistence and backend config messages.</td></tr>
+          <tr><td><code>AlertModeScreen.tsx</code></td><td>High-priority caregiver alert board.</td><td>Auto-enables gaze, uses urgent dwell categories.</td></tr>
+          <tr><td><code>CalibrationScreen.tsx</code></td><td>Calibration UI exists but is not currently routed by <code>App.tsx</code>.</td><td>Would pair with backend calibration messages if routed.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.2 GazeCursor: The Frontend Dwell Engine</h3>
+      <p>
+        <code>GazeCursor.tsx</code> is the central user-perceived selection engine. It subscribes to
+        backend gaze frames, maps them into window coordinates, finds the best target, shows the cursor
+        and progress ring, and finally triggers a click. It uses direct DOM writes on the hot path to
+        avoid React render pressure at gaze frequency.
+      </p>
+
+      <table>
+        <thead><tr><th>Mechanism</th><th>Current behavior</th></tr></thead>
+        <tbody>
+          <tr><td>Target discovery</td><td>Collects <code>data-gaze</code> targets, refreshes snap targets, and registers targets back to the backend for magnetism.</td></tr>
+          <tr><td>Onset delay</td><td>Starts only after a short stable acquisition window. Default authoritative onset is 250ms; browser cursor uses its own 280ms default.</td></tr>
+          <tr><td>Dwell progress</td><td>Category-based dwell from <code>DwellTimeContext</code>, plus repeat-dwell cadence on keyboard keys.</td></tr>
+          <tr><td>Lock</td><td>Locks at 10% progress. Lock-break requires enough movement and target-rect escape, reducing false aborts from ET5 noise.</td></tr>
+          <tr><td>Saved dwell</td><td>Brief gaze loss can preserve progress only when the same DOM element is reacquired within the retention window.</td></tr>
+          <tr><td>Telemetry</td><td>Records dwell events, interrupts, latency, freeze events, and target geometry in <code>gazeTelemetry.ts</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.3 GazeButton: Accessible Target Wrapper</h3>
+      <p>
+        <code>GazeButton.tsx</code> standardizes large gaze-friendly buttons. It supplies
+        <code>data-gaze</code>, context, custom dwell attributes, visual progress states, repeat behavior,
+        always-active flags, and minimum accessible sizing. It does not replace <code>GazeCursor</code>;
+        instead it gives <code>GazeCursor</code> reliable semantic targets.
+      </p>
+
+      <h3>5.4 Dwell Timing Authority</h3>
+      <p>
+        The single authoritative dwell table is <code>src/config/dwellTimeConfig.ts</code>. Current default
+        examples include:
+      </p>
+      <ul>
+        <li><code>standardButton: 1300</code></li>
+        <li><code>navigationButton: 1400</code></li>
+        <li><code>keyboardKey: 1100</code></li>
+        <li><code>quickfire: 1000</code></li>
+        <li><code>medicalUrgent: 900</code></li>
+        <li><code>emergencyButton: 2000</code></li>
+      </ul>
+      <p>
+        This reflects a deliberate safety trade-off: emergency controls remain visually prominent and
+        always accessible, but are not all hardcoded to 400ms because false emergency activation is a real
+        clinical risk.
+      </p>
+    </section>
+
+    <section id="electron">
+      <h2><span class="chapter-num">6</span>Electron Main Process</h2>
+      <p>
+        Electron is the native orchestrator. It is responsible for launching child processes, exposing
+        a safe preload API, owning BrowserView, synthesizing trusted native input, persisting local JSON
+        settings, and shutting everything down cleanly.
+      </p>
+
+      <table>
+        <thead><tr><th>File</th><th>Responsibility</th></tr></thead>
+        <tbody>
+          <tr><td><code>electron/main.ts</code></td><td>BrowserWindow, splash, tray, Python backend, Tobii helper, floorplan server, BrowserView, IPC handlers, alert/mouse-only mode.</td></tr>
+          <tr><td><code>electron/preload.ts</code></td><td>Safe <code>window.electronAPI</code> context bridge for renderer access to IPC.</td></tr>
+          <tr><td><code>electron/browser/browserGazeController.ts</code></td><td>Injects browser-side gaze cursor, dwell engine, snap logic, YouTube card posterior, and telemetry.</td></tr>
+          <tr><td><code>electron/browser/youtubeController.ts</code></td><td>Runs YouTube commands such as play/pause, skip ad, next, and playback state checks.</td></tr>
+          <tr><td><code>electron/browser/browserViewController.ts</code></td><td>BrowserView lifecycle helpers.</td></tr>
+          <tr><td><code>electron/browser/browserDiagnostics.ts</code></td><td>Diagnostics and health snapshots for BrowserView.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>6.1 BrowserView Gaze Mode</h3>
+      <p>
+        Web browsing cannot rely on ordinary React buttons because the web page is a native Chromium
+        BrowserView. The renderer forwards gaze to Electron, Electron converts window coordinates into
+        BrowserView-local coordinates, and an injected script inside the BrowserView resolves clickable
+        page elements. On dwell completion, Electron sends trusted mouse events to the BrowserView.
+      </p>
+
+      <div class="flow">
+        <div class="node"><b>React WebBrowsingScreen</b>Calculates BrowserView bounds and forwards gaze.</div>
+        <div class="node"><b>Electron main</b>Zoom-corrects coordinates and executes poll scripts.</div>
+        <div class="node"><b>Injected controller</b>Finds links/buttons/cards, runs dwell, reports click request.</div>
+        <div class="node"><b>Trusted click</b>Electron sends native mouse move/down/up into BrowserView.</div>
+      </div>
+
+      <h3>6.2 Browser Cursor Algorithms</h3>
+      <p>
+        The browser cursor has its own advanced logic because pages reflow, YouTube cards are dense,
+        and page zoom changes geometry. Current code includes host-gated YouTube logic, cached skip-ad
+        scans, Bayesian card posterior, stable-winner gates, progress retention, per-target progress bank,
+        empty-dwell guard, and zoom-scaled radii.
+      </p>
+    </section>
+
+    <section id="backend">
+      <h2><span class="chapter-num">7</span>Python Backend</h2>
+      <p>
+        <code>python/main.py</code> is the backend orchestrator. It starts the WebSocket server,
+        receives gaze from Tobii or simulation, coordinates filters and calibration, handles client
+        messages, runs prediction, speaks through <code>pyttsx3</code>, saves local state, and supports
+        survey/web-hub services.
+      </p>
+
+      <h3>7.1 Main Backend Message Surface</h3>
+      <table>
+        <thead><tr><th>Message group</th><th>Representative messages</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>Connection</td><td><code>ping</code>, <code>connected</code></td><td>Health and handshake, including <code>tts_available</code> and <code>tobii_connected</code>.</td></tr>
+          <tr><td>Gaze control</td><td><code>set_gaze_enabled</code>, <code>set_screen</code>, <code>set_screen_size</code>, <code>set_gaze_offset</code></td><td>Synchronize frontend state and coordinate transforms.</td></tr>
+          <tr><td>Targets</td><td><code>register_targets</code></td><td>Frontend sends current hit targets to backend for magnetism.</td></tr>
+          <tr><td>Prediction</td><td><code>get_predictions</code>, <code>learn_word</code>, <code>learn_sentence</code>, <code>expand_abbreviation</code></td><td>Word/sentence prediction and personalization.</td></tr>
+          <tr><td>TTS</td><td><code>speak</code>, <code>stop_speaking</code>, <code>set_tts_rate</code>, <code>set_tts_volume</code></td><td>Python speech engine control.</td></tr>
+          <tr><td>Fatigue</td><td><code>get_fatigue</code>, <code>take_break</code>, <code>snooze_break</code></td><td>Eye fatigue and break reminders.</td></tr>
+          <tr><td>Filters</td><td><code>set_filter_preset</code>, <code>set_filter_params</code>, <code>set_magnet_params</code></td><td>Runtime tuning for gaze filters and magnetism.</td></tr>
+          <tr><td>Survey</td><td><code>save_survey</code>, <code>load_survey</code>, <code>compile_survey</code>, <code>snapshot_survey</code></td><td>Home planning data persistence.</td></tr>
+          <tr><td>Web hub</td><td><code>get_news</code>, <code>search_knowledge</code>, <code>fetch_article</code>, <code>get_quick_snapshot</code></td><td>News, ALS knowledge, articles, and quick data.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>7.2 Backend Services</h3>
+      <table>
+        <thead><tr><th>Service file</th><th>What it does</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          <tr><td><code>signal_conditioner.py</code></td><td>Classifies raw validity, blink, tracking loss, frozen frames, and out-of-bounds behavior.</td><td>Protects the UI from garbage samples before smoothing.</td></tr>
+          <tr><td><code>gaze_classifier.py</code></td><td>I-VT velocity classifier with hysteresis for fixation/saccade/glissade.</td><td>Lets filters adapt to whether the user is fixating or moving.</td></tr>
+          <tr><td><code>one_euro_filter.py</code></td><td>One Euro filter, 2D gaze filter, fixation stabilizer, gravity well, anti-recoil, adaptive Kalman, OptiKey filter.</td><td>The main algorithm library for stable but responsive gaze.</td></tr>
+          <tr><td><code>calibration.py</code></td><td>9-point calibration and polynomial correction.</td><td>Corrects systematic screen-space bias.</td></tr>
+          <tr><td><code>dwell_detector.py</code></td><td>Backend dwell manager and dwell target model.</td><td>Auxiliary/legacy backend side support; frontend remains the visible dwell authority.</td></tr>
+          <tr><td><code>word_prediction.py</code></td><td>N-gram, smart bigrams, patient personalization, Hindi vocabulary, neural fusion.</td><td>Reduces typing effort, improves communication speed.</td></tr>
+          <tr><td><code>sentence_prediction.py</code></td><td>Sentence-level templates and continuations.</td><td>Speeds up full phrase composition.</td></tr>
+          <tr><td><code>fatigue_monitor.py</code></td><td>Break reminders and fatigue metrics.</td><td>Supports long-duration eye-gaze usage.</td></tr>
+          <tr><td><code>news_service.py</code>, <code>knowledge_service.py</code>, <code>article_service.py</code>, <code>quick_data_service.py</code></td><td>Web Hub content services.</td><td>Lets the app provide readable knowledge/news without tiny webpage targets.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>7.3 Gaze Algorithms in Plain English</h3>
+      <div class="grid">
+        <article class="card">
+          <span class="kicker">Signal conditioning</span>
+          <strong>Decide whether a sample is usable</strong>
+          <p>A blink or temporary invalid frame should not instantly reset the cursor. The conditioner holds recent valid data briefly but rejects stale or frozen input.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">I-VT classifier</span>
+          <strong>Velocity tells intent</strong>
+          <p>Slow gaze movement is treated like fixation; fast movement is treated like saccade. Hysteresis prevents rapid state flipping.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">One Euro</span>
+          <strong>Smooth when slow, responsive when fast</strong>
+          <p>The filter changes cutoff based on motion, so fixation is stable and quick eye movements are not overly delayed.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Kalman</span>
+          <strong>Estimate position despite noise</strong>
+          <p>The adaptive Kalman filter balances predicted motion and measurement noise. The code uses different noise assumptions for fixation, saccade, and glissade.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">OptiKey zones</span>
+          <strong>Make keyboard dwell forgiving</strong>
+          <p>Key-aware damping and lock radii reduce accidental jumps between adjacent keyboard keys.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Magnetism</span>
+          <strong>Assist target acquisition</strong>
+          <p>Registered targets let the backend gently pull toward intended controls without hiding the user's actual gaze telemetry.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="tobii">
+      <h2><span class="chapter-num">8</span>Tobii Hardware Bridge</h2>
+      <p>
+        The Tobii Eye Tracker 5 is accessed through a .NET bridge because the Tobii SDK is more reliable
+        from the Windows/.NET side than directly from Python. This bridge keeps hardware concerns out of
+        React and gives Python a simple local JSON stream.
+      </p>
+
+      <table>
+        <thead><tr><th>Implementation detail</th><th>Current code behavior</th></tr></thead>
+        <tbody>
+          <tr><td>SDK mode</td><td><code>GazePointDataMode.LightlyFiltered</code> through <code>Tobii.Interaction</code>.</td></tr>
+          <tr><td>DPI handling</td><td>Calls <code>SetProcessDPIAware()</code> before stream creation.</td></tr>
+          <tr><td>TCP server</td><td><code>TcpListener</code> on loopback port 5555; Python connects as client.</td></tr>
+          <tr><td>Payload</td><td>JSON line with normalized <code>x/y</code>, raw <code>screen_x/screen_y</code>, wall-clock timestamp, Tobii timestamp, confidence, validity, and frame number.</td></tr>
+          <tr><td>Frozen frame protection</td><td>Suppresses long runs of identical coordinates.</td></tr>
+          <tr><td>Simulation</td><td>When hardware is unavailable, Python can simulate gaze from mouse position.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warning note">
+        <strong>Logging safety:</strong> live gaze logs are high frequency. The project instructions explicitly say not to run the live gaze app in Codex with continuous stdout. Runtime checks should redirect logs to a file and inspect tail/grep output only.
+      </div>
+    </section>
+
+    <section id="prediction">
+      <h2><span class="chapter-num">9</span>Word Prediction and Neural Model</h2>
+      <p>
+        The prediction system is a local-first AAC prediction engine with multiple layers. It is important
+        for career storytelling because it combines classic language modeling, personalization, safety
+        filtering, low-latency inference, and clinical product judgment.
+      </p>
+
+      <h3>9.1 Prediction Layers</h3>
+      <table>
+        <thead><tr><th>Layer</th><th>Implementation</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Prefix trie</td><td><code>PrefixTrie</code></td><td>Fast prefix completion for the current partial word.</td></tr>
+          <tr><td>N-gram model</td><td><code>NGramModel</code></td><td>Unigram, bigram, trigram scoring with smoothing.</td></tr>
+          <tr><td>Smart bigrams</td><td><code>smart_bigrams.json</code></td><td>1,339 curated/precomputed word-pair frequencies.</td></tr>
+          <tr><td>Recency</td><td><code>RecencyTracker</code></td><td>Recently used patient language becomes more accessible.</td></tr>
+          <tr><td>Patient bigrams</td><td><code>PatientBigramTracker</code></td><td>Learns personal phrase transitions.</td></tr>
+          <tr><td>Hindi vocabulary</td><td>Hindi/Hinglish and Devanagari-aware vocabulary paths.</td><td>Maintains bilingual communication.</td></tr>
+          <tr><td>Neural fusion</td><td>CIFG-LSTM through ONNX Runtime.</td><td>Reranks and enriches local candidates under a hard latency budget.</td></tr>
+          <tr><td>Guardrails</td><td><code>prediction_guardrails.py</code></td><td>158 blocked word tokens + 8 blocked phrases, enforced across paths.</td></tr>
+          <tr><td>Optional online enrichment</td><td>Datamuse background task.</td><td>Off by default; local results are sent first.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>9.2 Neural Model</h3>
+      <p>
+        The neural model is a CIFG-LSTM exported to ONNX. CIFG means the input gate is coupled to the
+        forget gate (<code>input = 1 - forget</code>), reducing parameters while retaining LSTM-style sequence
+        memory. The current training log reports 661 vocabulary items, 512 hidden size, and 1,792,917
+        parameters. Runtime inference uses CPU ONNX Runtime and hard timeouts: around 30ms for next-word
+        prediction and 40ms for short sentence continuation.
+      </p>
+
+      <h3>9.3 Safety Guardrails</h3>
+      <p>
+        AAC prediction must never make the patient fight the system for dignity. Harmful, violent,
+        inappropriate, or mentally harmful suggestions are filtered before display. The blocklist is exact
+        token based, with separate phrase checks, so ordinary emotional words that the patient may need
+        for expression are intentionally preserved.
+      </p>
+    </section>
+
+    <section id="floorplan">
+      <h2><span class="chapter-num">10</span>Home Planning and Floor Plan System</h2>
+      <p>
+        The home planning module is a second major feature inside the AAC app. It lets a gaze user answer
+        survey questions, place rooms through a compass/grid interface, refine relationships, and generate
+        downloadable floor plans.
+      </p>
+
+      <div class="flow">
+        <div class="node"><b>Survey</b><code>FloorPlanSurveyScreen</code> gathers structured answers.</div>
+        <div class="node"><b>Compass map</b><code>CompassMapScreen</code> places rooms and directions.</div>
+        <div class="node"><b>Fusion</b><code>floorplan_fusion_v1.py</code> merges survey and compass context.</div>
+        <div class="node"><b>Render</b><code>gazeconnect_floorplan_v5.py</code> draws floor plans.</div>
+        <div class="node"><b>Viewer</b><code>FloorPlanViewerModal</code> previews/downloads PNG/PDF/SVG.</div>
+      </div>
+
+      <table>
+        <thead><tr><th>File</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/utils/floorplanApi.ts</code></td><td>Frontend HTTP client for health, generate, generate-all, preview, and payload compilation.</td></tr>
+          <tr><td><code>tools/floorplan_server.py</code></td><td>Flask wrapper on port 5050, lazy-started by Electron, returns images/files.</td></tr>
+          <tr><td><code>tools/floorplan_fusion_v1.py</code></td><td>Explainable fusion of survey answers and compass payload.</td></tr>
+          <tr><td><code>tools/gazeconnect_floorplan_v5.py</code></td><td>Renderer and CLI for floor plan generation in multiple styles/formats.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="scripts">
+      <h2><span class="chapter-num">11</span>Scripts, Dev Runs, and Build Pipeline</h2>
+
+      <h3>11.1 NPM Scripts</h3>
+      <table>
+        <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>npm run dev</code></td><td>Starts only Vite UI dev server.</td></tr>
+          <tr><td><code>npm run dev:electron</code></td><td>Runs Vite and Electron dev process in parallel.</td></tr>
+          <tr><td><code>npm run build</code></td><td>Runs TypeScript compile and Vite production build.</td></tr>
+          <tr><td><code>npm run build:electron</code></td><td>Compiles Electron TypeScript.</td></tr>
+          <tr><td><code>npm run typecheck</code></td><td>TypeScript no-emit check.</td></tr>
+          <tr><td><code>npm run check:browser-cursor</code></td><td>Runs browser cursor injection and replay checks.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>11.2 Windows Batch Scripts</h3>
+      <table>
+        <thead><tr><th>Script</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>setup.bat</code></td><td>First-time setup: dependencies, Python venv, Tobii DLL checks/build.</td></tr>
+          <tr><td><code>start-dev.bat</code></td><td>Cleans stale processes/ports, builds helper if needed, then starts Electron + React + Python. <code>--simulate</code> uses mouse-as-gaze.</td></tr>
+          <tr><td><code>build-installer.bat</code></td><td>Builds PyInstaller backend, publishes Tobii helper, builds React/Electron, then runs electron-builder.</td></tr>
+          <tr><td><code>copy-tobii-dlls.bat</code></td><td>Copies Tobii SDK DLLs from local Tobii installation into the helper's local lib folder.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warning note">
+        <strong>Installer packaging caveat to verify before release:</strong> the current PyInstaller command explicitly includes <code>services</code> and optional <code>data/als_knowledge.json</code>. Because the current backend also imports <code>ml</code>, <code>prediction_guardrails.py</code>, and <code>python/data/smart_bigrams.json</code>, a release build should be smoke-tested to confirm those assets are bundled. This document records the risk; it does not claim the installer is broken without a build test.
+      </div>
+    </section>
+
+    <section id="docs-audit">
+      <h2><span class="chapter-num">12</span>Documentation Audit and Alignment</h2>
+      <p>
+        Existing docs were reviewed as current-context inputs. The main mismatch pattern was that some
+        docs describe a previous screen count, an older guardrail count, or an older browser-cursor
+        version. Historical review JSONs and version-specific specs remain snapshots; they should not be
+        rewritten as if they were current docs.
+      </p>
+
+      <table>
+        <thead><tr><th>Document family</th><th>Status after this audit</th></tr></thead>
+        <tbody>
+          <tr><td><code>AGENTS.md</code>, <code>CLAUDE.md</code></td><td>Should state 19 screen files, current dwell authority, 158+8 guardrails, and Datamuse as implemented but disabled by default.</td></tr>
+          <tr><td><code>README.md</code></td><td>Useful high-level architecture; should point to this book as the current canonical reference and clarify current browser cursor has v17.23 notes.</td></tr>
+          <tr><td><code>docs/technical-architecture-guide.md</code></td><td>Strong concise guide; stale guardrail count should be updated.</td></tr>
+          <tr><td><code>docs/gazeconnect-codebase-textbook.html</code></td><td>Useful earlier textbook; should be treated as prior reference where it conflicts with this current audit.</td></tr>
+          <tr><td><code>docs/eye-tracking-pipeline-textbook.html</code></td><td>Deep v17.10 gaze reference; current browser-specific code has later v17.18-v17.23 refinements.</td></tr>
+          <tr><td><code>docs/reviews/</code></td><td>Keep unchanged as adversarial/historical review artifacts.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="career">
+      <h2><span class="chapter-num">13</span>Backend Career Fit and Current Market Research</h2>
+      <p>
+        This project is strongest for backend, algorithms, real-time systems, ML inference, accessibility,
+        and human-computer interaction roles. It is less useful as a pure frontend portfolio unless framed
+        around gaze accessibility, state machines, and safety-critical UI. The career strategy should lead
+        with Python async systems, signal processing, device integration, ONNX inference, and clinical
+        product constraints; React/Electron should be presented as supporting evidence that you can ship
+        the full product.
+      </p>
+
+      <div class="note">
+        <strong>Market reality as of 2026-07-07:</strong> direct eye-tracking/AAC companies exist, but many
+        open engineering roles are onsite or region-restricted. Remote-from-India fit is better in backend
+        AI/ML platforms, computer-vision tooling, data/inference infrastructure, DevTools, and accessibility
+        technology companies that accept global or APAC remote candidates.
+      </div>
+
+      <h3>13.1 Roles This Project Supports</h3>
+      <table>
+        <thead><tr><th>Role target</th><th>Project proof</th><th>Gap to close</th></tr></thead>
+        <tbody>
+          <tr><td>Python Backend Engineer</td><td>asyncio WebSocket server, TCP hardware client, TTS worker, local persistence, service orchestration.</td><td>Add FastAPI/cloud deployment examples and tests.</td></tr>
+          <tr><td>Realtime Systems Engineer</td><td>66Hz-ish gaze path, latency budgets, frame filtering, BrowserView hot path, telemetry.</td><td>Add benchmark reports and profiling screenshots.</td></tr>
+          <tr><td>Computer Vision / Eye Tracking Engineer</td><td>Gaze classification, filtering, calibration, hardware bridge, target magnetism.</td><td>Add OpenCV/deep gaze model experiments or public notebooks.</td></tr>
+          <tr><td>ML Inference Engineer</td><td>ONNX Runtime CIFG-LSTM with hard timeouts and guardrails.</td><td>Add model evaluation metrics, quantization notes, and reproducible training.</td></tr>
+          <tr><td>Accessibility / Assistive Tech Engineer</td><td>AAC product, ALS constraints, bilingual speech, emergency pathways.</td><td>Add user-study style validation and accessibility test checklist.</td></tr>
+          <tr><td>DevTools / Platform Engineer</td><td>Electron process orchestration, local services, packaging, diagnostics.</td><td>Add CI, installer smoke tests, logs/observability.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>13.2 Companies and Openings Checked</h3>
+      <table>
+        <thead><tr><th>Company/source</th><th>Current finding</th><th>Fit for you</th><th>Remote-from-India note</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="https://careers.tobii.com/jobs">Tobii careers</a></td>
+            <td>Official page showed R&amp;D openings such as System Engineer and Platform Engineer - Cloud, Automation &amp; AI, mostly Sweden/Japan locations.</td>
+            <td>Very high technical fit for eye tracking and attention computing.</td>
+            <td>Low immediate India-remote fit; monitor and use as domain benchmark.</td>
+          </tr>
+          <tr>
+            <td><a href="https://pupil-labs.com/careers">Pupil Labs careers</a></td>
+            <td>Open positions included Senior Python Developer, explicitly onsite in Berlin.</td>
+            <td>Excellent Python + eye-tracking + open-source fit.</td>
+            <td>Not remote India for the checked role, but worth networking due domain match.</td>
+          </tr>
+          <tr>
+            <td><a href="https://eyeware.tech/careers/">Eyeware careers</a></td>
+            <td>Eye-tracking SDK company; states remote is an option for some positions and links to open positions.</td>
+            <td>High fit for webcam/SDK eye tracking, computer vision, and product integration.</td>
+            <td>Remote possible, India eligibility must be verified per role.</td>
+          </tr>
+          <tr>
+            <td><a href="https://thinksmartbox.com/careers/">Smartbox careers</a></td>
+            <td>AAC company with current Software Team Lead and Senior Electronics Engineer roles shown.</td>
+            <td>High product mission fit; software role aligns with assistive communication.</td>
+            <td>Mostly UK/US/Germany/International application paths; remote India not guaranteed.</td>
+          </tr>
+          <tr>
+            <td><a href="https://roboflow.com/careers">Roboflow careers</a></td>
+            <td>Computer vision platform, distributed company, remote-supported culture, healthcare/robotics/manufacturing use cases.</td>
+            <td>Strong CV/tooling/platform fit; project maps to real-time vision + inference.</td>
+            <td>Likely more US-timezone weighted; verify role-by-role for India.</td>
+          </tr>
+          <tr>
+            <td><a href="https://posthog.com/careers">PostHog careers</a></td>
+            <td>Live backend and AI research/open roles visible; remote roles listed with timezone requirements.</td>
+            <td>Good backend/platform fit; less eye-tracking-specific.</td>
+            <td>Some roles exclude IST by timezone; still useful for backend startup interview practice.</td>
+          </tr>
+          <tr>
+            <td><a href="https://supabase.com/careers">Supabase careers</a></td>
+            <td>States globally distributed and fully remote; current open positions include Postgres, Edge Functions, CLI, SRE, APAC support/success, and engineering roles.</td>
+            <td>Good backend/platform fit, especially realtime, Postgres, edge functions, and distributed systems.</td>
+            <td>Stronger India/APAC remote signal than many others.</td>
+          </tr>
+          <tr>
+            <td><a href="https://www.turing.com/jobs">Turing jobs</a></td>
+            <td>Remote AI/application engineering platform for global talent, independent contractor model.</td>
+            <td>Good for Python/AI/backend contract opportunities.</td>
+            <td>Remote/global friendly; verify client, pay, contract terms, and taxes.</td>
+          </tr>
+          <tr>
+            <td><a href="https://www.crossover.com/jobs">Crossover jobs</a></td>
+            <td>Full-time remote USD roles, worldwide listings, strong assessment process.</td>
+            <td>Potentially high-paying backend/AI roles; less domain-specific.</td>
+            <td>Global remote-friendly, but role quality and monitoring expectations should be reviewed carefully.</td>
+          </tr>
+          <tr>
+            <td><a href="https://encord.com/careers/">Encord careers</a></td>
+            <td>Computer-vision data/AI infrastructure company; page showed 0 active roles at the time checked.</td>
+            <td>High conceptual fit for vision data and AI production workflows.</td>
+            <td>No active role found in this check; monitor.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>13.3 How Far This Project Stands From Job Market Expectations</h3>
+      <p>
+        The project is already unusually strong for a personal portfolio because it is end-to-end,
+        hardware-aware, clinically motivated, and algorithmically non-trivial. A hiring manager can see
+        more than tutorial work: device streams, latency budgets, prediction safety, packaging, and
+        real user constraints.
+      </p>
+      <p>
+        To convert it into a high-paying backend job asset, add evidence: reproducible benchmarks, a short
+        demo video, test reports, a technical blog post, an architecture README, and at least one public
+        notebook or markdown note explaining the gaze filtering math. The missing market signals are not
+        product depth; they are verification, deployment discipline, and easy recruiter comprehension.
+      </p>
+    </section>
+
+    <section id="interview">
+      <h2><span class="chapter-num">14</span>Interview Playbook</h2>
+
+      <h3>14.1 One-Minute Pitch</h3>
+      <div class="note">
+        I built a Windows eye-gaze AAC app for ALS users using Electron/React, a Python asyncio backend,
+        and a .NET Tobii bridge. The hardest part was turning noisy eye-tracker samples into safe, low-latency
+        dwell selections. I implemented a pipeline with signal conditioning, I-VT classification, adaptive
+        filtering, keyboard-aware magnetism, and a frontend dwell state machine. I also built an offline-first
+        prediction engine using n-grams, patient personalization, guardrails, and an ONNX CIFG-LSTM model.
+      </div>
+
+      <h3>14.2 Resume Bullets</h3>
+      <ul>
+        <li>Built a real-time AAC system processing Tobii eye-tracker gaze through a .NET TCP bridge, Python asyncio backend, and React dwell-selection UI.</li>
+        <li>Implemented gaze stabilization pipeline with blink/tracking-loss handling, I-VT fixation classification, adaptive Kalman/One Euro filters, keyboard zones, target magnetism, and telemetry.</li>
+        <li>Designed offline-first word prediction engine combining n-grams, smart bigrams, patient personalization, Hindi/Hinglish support, ONNX CIFG-LSTM reranking, and safety guardrails.</li>
+        <li>Shipped bilingual TTS routing that prevents double-speech and reliably handles Hindi/Devanagari through browser SpeechSynthesis fallback.</li>
+        <li>Packaged a multi-process Windows app with Electron, PyInstaller, .NET publish, and electron-builder installer flow.</li>
+      </ul>
+
+      <h3>14.3 Backend Interview Questions You Can Expect</h3>
+      <table>
+        <thead><tr><th>Question</th><th>How to answer from this project</th></tr></thead>
+        <tbody>
+          <tr><td>How did you handle real-time latency?</td><td>Explain local-only loopback protocols, direct DOM writes for cursor, local predictions first, hard ONNX timeout, no blocking Datamuse, TTS worker thread.</td></tr>
+          <tr><td>Why use Python for real-time gaze?</td><td>Python was enough for 33-66Hz local processing, with C# used where SDK/hardware integration demanded it. The system isolates hot paths and keeps expensive operations out of frame loops.</td></tr>
+          <tr><td>What does the Kalman filter do?</td><td>It estimates true gaze position by combining prediction and measurement; measurement noise changes by gaze state so fixation is stable and saccade response remains fast.</td></tr>
+          <tr><td>What is I-VT?</td><td>Velocity-threshold identification: classify eye movement based on angular velocity, with thresholds and hysteresis to avoid jitter between states.</td></tr>
+          <tr><td>How do you prevent unsafe predictions?</td><td>Guardrail filters run across n-gram, neural, sentence, patient, and optional online paths; blocked words and phrases are removed before UI output.</td></tr>
+          <tr><td>How would you scale this architecture?</td><td>For this product, local-first is a privacy and latency feature. For cloud scaling, separate telemetry ingestion, model training, settings sync, and crash reporting, while keeping runtime gaze local.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="onboarding">
+      <h2><span class="chapter-num">15</span>Developer Onboarding Map</h2>
+      <p>
+        A new developer should read the code in this order:
+      </p>
+      <ol>
+        <li><code>README.md</code> and this document for architecture and commands.</li>
+        <li><code>src/App.tsx</code> to understand providers, routing, speech, and global emergency behavior.</li>
+        <li><code>src/components/core/GazeCursor.tsx</code>, <code>GazeButton.tsx</code>, and <code>dwellTimeConfig.ts</code> for gaze selection.</li>
+        <li><code>src/hooks/useWebSocket.tsx</code> for frontend/backend protocol.</li>
+        <li><code>python/main.py</code> for backend orchestration and message handlers.</li>
+        <li><code>python/services/signal_conditioner.py</code>, <code>gaze_classifier.py</code>, and <code>one_euro_filter.py</code> for gaze algorithms.</li>
+        <li><code>python/services/word_prediction.py</code>, <code>python/ml/inference.py</code>, and <code>python/ml/fusion.py</code> for prediction.</li>
+        <li><code>electron/main.ts</code>, <code>preload.ts</code>, and <code>browserGazeController.ts</code> for native shell and web browsing.</li>
+        <li><code>tobii-helper/TobiiGazeHelper/Program.cs</code> for hardware streaming.</li>
+        <li><code>start-dev.bat</code> and <code>build-installer.bat</code> before changing runtime/build behavior.</li>
+      </ol>
+
+      <h3>15.1 Project Structure</h3>
+      <div class="filetree">gazeconnect_v4/
+  src/
+    App.tsx                       Providers, routes, speech routing, persistent emergency
+    screens/                      19 screen files
+    components/core/              GazeCursor, GazeButton, GazeControlToggle
+    components/GlobalNavBar.tsx   App-wide nav and emergency controls
+    hooks/useWebSocket.tsx        WebSocket protocol and gaze subscription
+    contexts/                     Theme, customization, dwell, alert, focus
+    utils/                        Design, TTS routing, gaze snapping, floorplan API, telemetry
+    config/dwellTimeConfig.ts     Authoritative dwell timing table
+  electron/
+    main.ts                       Native orchestration and IPC
+    preload.ts                    Safe renderer API
+    browser/                      BrowserView cursor and YouTube controllers
+  python/
+    main.py                       Backend entry point
+    services/                     Gaze, prediction, fatigue, web hub services
+    ml/                           ONNX neural predictor and fusion
+    data/                         smart bigrams and local data assets
+  tobii-helper/
+    TobiiGazeHelper/              .NET 6 Tobii TCP bridge
+  tools/
+    floorplan_server.py           Flask local floorplan API
+    floorplan_fusion_v1.py        Survey + compass fusion
+    gazeconnect_floorplan_v5.py   Renderer/CLI
+  docs/                           Technical references and audit docs
+  start-dev.bat                   Dev launcher
+  build-installer.bat             Production installer build</div>
+
+      <h3>15.2 Sources Used for Career Research</h3>
+      <p>
+        Career market links checked on 2026-07-07:
+        <a href="https://careers.tobii.com/jobs">Tobii Jobs</a>,
+        <a href="https://pupil-labs.com/careers">Pupil Labs Careers</a>,
+        <a href="https://pupil-labs.com/careers/senior-python-developer">Pupil Labs Senior Python Developer</a>,
+        <a href="https://eyeware.tech/careers/">Eyeware Careers</a>,
+        <a href="https://thinksmartbox.com/careers/">Smartbox Careers</a>,
+        <a href="https://roboflow.com/careers">Roboflow Careers</a>,
+        <a href="https://posthog.com/careers">PostHog Careers</a>,
+        <a href="https://supabase.com/careers">Supabase Careers</a>,
+        <a href="https://www.turing.com/jobs">Turing Jobs</a>,
+        <a href="https://www.crossover.com/jobs">Crossover Jobs</a>,
+        <a href="https://encord.com/careers/">Encord Careers</a>,
+        <a href="https://about.gitlab.com/jobs/">GitLab Jobs</a>,
+        and <a href="https://canonical.com/careers/all">Canonical Careers</a>.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

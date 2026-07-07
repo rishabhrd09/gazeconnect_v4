@@ -2,7 +2,7 @@
 
 Eye-gaze controlled Augmentative and Alternative Communication (AAC) application for ALS / MND patients, built around the Tobii Eye Tracker 5. Provides dwell-based communication through an AAC board, full-screen keyboard with word prediction, phrase library, web browsing, home-design surveys, and emergency alerts. English and Hindi labels on every interactive element.
 
-The project is open source under the MIT licence. The current build is `v4.8.0` with gaze pipeline `v17.10`.
+The project is open source under the MIT licence. The current build is `v4.8.0`. The main gaze pipeline has the v17.x stability work, and the embedded browser cursor includes later v17.18-v17.23 refinements. For the latest full-code audit, see [`docs/gazeconnect-complete-architecture-and-career-textbook.html`](docs/gazeconnect-complete-architecture-and-career-textbook.html).
 
 ---
 
@@ -131,7 +131,7 @@ gazeconnect_v4/
 |
 +- python/                             Python backend
 |  +- main.py                          asyncio entry point, WebSocket server, orchestration
-|  +- prediction_guardrails.py         110-word blocklist for predictions
+|  +- prediction_guardrails.py         158 blocked word tokens + 8 blocked phrases for predictions
 |  +- services/
 |  |  +- signal_conditioner.py         validity, blink hold, tracking-loss, frozen detect
 |  |  +- one_euro_filter.py            One Euro + GravityWell + OptiKey filter + Kalman
@@ -169,27 +169,27 @@ gazeconnect_v4/
 
 ### Screens
 
-| Screen | Purpose | Default dwell |
+| Screen | Purpose | Current dwell authority |
 |---|---|---|
-| Home | Navigation hub plus side actions | 600 ms |
-| Keyboard | Full-screen QWERTY with word prediction | 500 ms |
-| Spatial Keyboard | Larger targets for users with limited control | 700 ms |
-| Phrases | Categorised phrase library | 550 ms |
-| Medical | Emergency, bed / position, daily care | 400 ms (emergency) |
-| Feelings | Emotion grid | 550 ms |
-| Basic Needs | Water, bathroom, position, temperature | 550 ms |
-| People | Family and contacts | 550 ms |
-| Activities | TV, YouTube, Alexa commands | 600 ms |
-| Quick Words | Quick-fire phrase overlay | 500 ms |
-| Web Browsing | Embedded browser with gaze cursor and YouTube controls | 600 ms |
-| Alert Mode | High-contrast caregiver alert board (auto-enables gaze on entry) | 400 ms |
+| Home | Navigation hub plus side actions | `homeScreenTile` / `navigationButton` |
+| Keyboard | Full-screen QWERTY with word prediction | `keyboardKey` plus keyboard repeat cadence |
+| Spatial Keyboard | Larger targets for users with limited control | `spatialZone` / `keyboardKey` |
+| Phrases | Categorised phrase library | `phraseButton` |
+| Medical | Emergency, bed / position, daily care | `medicalUrgent` for urgent items, `phraseButton` otherwise |
+| Feelings | Emotion grid | `phraseButton` |
+| Basic Needs | Water, bathroom, position, temperature | `phraseButton` |
+| People | Family and contacts | `phraseButton` |
+| Activities | TV, YouTube, Alexa commands | `phraseButton` / `standardButton` |
+| Quick Words | Quick-fire phrase overlay | `quickWord`; emergency category uses `medicalUrgent` |
+| Web Browsing | Embedded browser with gaze cursor and YouTube controls | BrowserView injected cursor config |
+| Alert Mode | High-contrast caregiver alert board (auto-enables gaze on entry) | SOS uses `medicalUrgent`; other cards use `quickWord` |
 | Calibration | Tobii calibration helper | n/a |
-| Design Home | Home survey landing | 600 ms |
-| Floor Plan Survey | Room-by-room survey | 600 ms |
-| Compass Map | Direction and adjacency | 700 ms |
-| Advanced Map | Compass with detailed sidebar | 700 ms |
-| Customize | UI customisation | 600 ms |
-| Settings | Filter presets, TTS, dwell timings | 600 ms |
+| Design Home | Home survey landing | `homeScreenTile` / `navigationButton` |
+| Floor Plan Survey | Room-by-room survey | `surveyOption` |
+| Compass Map | Direction and adjacency | `compassMapAction` |
+| Advanced Map | Compass with detailed sidebar | `compassMapAction` |
+| Customize | UI customisation | `settingsButton` / `standardButton` |
+| Settings | Filter presets, TTS, dwell timings | `settingsButton` |
 
 ---
 
@@ -232,7 +232,7 @@ These are non-negotiable for ALS accessibility. Anything that violates them brea
 4. No scrolling on primary screens. `overflow: hidden` is intentional.
 5. Dark theme is primary (`#0D1117` background, `#2DD4BF` accent). Reduces eye strain in long sessions.
 6. WCAG 2.1 AA contrast (4.5:1 for text, 3:1 for UI surfaces).
-7. Emergency surfaces are always accessible. Alert Mode and SOS targets use a 400 ms dwell.
+7. Emergency surfaces are always accessible. Current dwell timing is category-driven by `src/config/dwellTimeConfig.ts`; urgent items generally use `medicalUrgent` (900 ms default), while the dedicated emergency category is deliberately longer (2000 ms default) to reduce accidental activation.
 8. Bilingual: every interactive label exists in English and Hindi.
 
 ---
@@ -241,6 +241,7 @@ These are non-negotiable for ALS accessibility. Anything that violates them brea
 
 | Document | What it covers |
 |---|---|
+| [`docs/gazeconnect-complete-architecture-and-career-textbook.html`](docs/gazeconnect-complete-architecture-and-career-textbook.html) | Current-code textbook: architecture, screens, backend algorithms, scripts, docs audit, career alignment, and interview guidance. |
 | [`docs/eye-tracking-pipeline-textbook.html`](docs/eye-tracking-pipeline-textbook.html) | End-to-end gaze pipeline reference (v17.10) with Mermaid diagrams. The technical canon for the eye-tracking subsystem. |
 | [`docs/gazeconnect-codebase-textbook.html`](docs/gazeconnect-codebase-textbook.html) | Full-stack codebase tour: frontend, backend, devops, data layer. |
 | [`docs/developer-onboarding-guide.md`](docs/developer-onboarding-guide.md) | Environment setup, workflow, batch scripts, troubleshooting. |

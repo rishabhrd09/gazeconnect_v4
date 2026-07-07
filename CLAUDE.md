@@ -26,7 +26,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `.\build-installer.bat` — Build production .exe installer
 
 ## File Structure
-- `src/screens/` — All 13 app screens
+- `src/screens/` — 19 screen files. Active routes are defined in `src/App.tsx`; `AlertModeScreen` renders out-of-band and `CalibrationScreen` exists but is not currently routed.
 - `src/components/core/` — GazeButton, GazeCursor, GazeControlToggle
 - `src/components/GlobalNavBar.tsx` — Top nav bar on every screen
 - `src/utils/design.ts` — Design tokens, colors, typography, spacing
@@ -39,11 +39,11 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `tobii-helper/` — .NET 6.0 eye tracker bridge (C#)
 
 ## Word Prediction System (v3)
-- **4-layer pipeline**: N-gram + Smart Bigrams + Neural Fusion + Patient Personalization
+- **Core offline pipeline**: N-gram + Smart Bigrams + Neural Fusion + Patient Personalization
 - **Safety**: blocked-word guardrails (violent, harmful, inappropriate) in English AND Hindi/Hinglish — never surface as predictions (`python/prediction_guardrails.py`)
 - **Performance**: 13.5ms mean latency, 30ms neural timeout, zero impact on 66Hz gaze pipeline
 - **Neural model**: CIFG-LSTM, 1.9MB, 661 vocab — adds ~10-15% quality via semantic reranking
-- **Datamuse API**: NOT implemented (was documented but never built; keep out of the pipeline unless actually added)
+- **Datamuse API**: Implemented but OFF by default (`enable_datamuse=False`); if explicitly enabled, it is optional online enrichment after local predictions, with a 300ms background timeout
 - **Patient priority**: Patient-learned words always rank highest (3x bigram boost, 2x vocab boost)
 
 ## When Making Changes
