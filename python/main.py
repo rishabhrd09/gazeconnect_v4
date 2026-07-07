@@ -865,6 +865,15 @@ class GazeConnectBackend:
     """
     POINT_TTL_SECONDS = 0.150
     FRAME_GAP_HOLD_SECONDS = 0.150
+    # Gap-hold rebroadcast used to re-send the previous payload VERBATIM —
+    # including signal_state:'valid' — which defeated the frontend's
+    # dwellPauseOnGap (it pauses on staleness OR signal_state != 'valid',
+    # but a rebroadcast is a fresh WS message carrying a 'valid' state).
+    # With this flag on, held frames are re-sent as a copy marked
+    # signal_state:'gap_hold' (is_valid stays true so the cursor remains
+    # visible; only dwell pauses). Default OFF until on-rig verified;
+    # enable with GAZECONNECT_GAP_HOLD_MARK=1 before start-dev.bat.
+    ENABLE_GAP_HOLD_STALE_MARK = os.environ.get('GAZECONNECT_GAP_HOLD_MARK', '0') == '1'
     BACKEND_DWELL_ENABLED = False
     ENABLE_STALE_BLINK_DWELL_GUARD = True
     DWELL_GUARD_ALLOWED_STATES = (GazeValidity.VALID,)
@@ -1220,6 +1229,23 @@ class GazeConnectBackend:
         out_y = max(0.0, min(1.0, out_y))
         return out_x, out_y
 
+    @staticmethod
+    def _gap_hold_payload(last_payload: dict, mark_stale: bool) -> dict:
+        """Payload to re-send while holding through a tracking gap.
+
+        mark_stale=False: the previous payload verbatim (legacy — carries
+        its original signal_state, which for a pre-blink frame is 'valid'
+        and lets frontend dwell advance on the held coordinates).
+        mark_stale=True (ENABLE_GAP_HOLD_STALE_MARK): a COPY marked
+        signal_state='gap_hold' — is_valid untouched so the cursor stays
+        visible, but dwellPauseOnGap freezes dwell clocks.
+        """
+        if not mark_stale:
+            return last_payload
+        held = dict(last_payload)
+        held['signal_state'] = 'gap_hold'
+        return held
+
     def _on_gaze_data(self, point: GazePoint):
         """Primary gaze pipeline: conditioning -> calibration -> classify/filter -> magnetism."""
         t_start = time.perf_counter()
@@ -1266,7 +1292,8 @@ class GazeConnectBackend:
             # v17: Notify classifier and frontend of tracking gap (likely blink)
             self.gaze_classifier.mark_tracking_lost()
             self._broadcast('gaze_lost', {'reason': 'gap', 'gap_ms': round(gap * 1000, 1)})
-            self._broadcast('gaze', self._last_gaze_payload)
+            self._broadcast('gaze', self._gap_hold_payload(
+                self._last_gaze_payload, self.ENABLE_GAP_HOLD_STALE_MARK))
             if self._pipeline_log_count % 120 == 0:
                 logger.info(f"[GAP-HOLD] gap={gap*1000:.1f}ms, holding last gaze frame")
             return
@@ -1443,10 +1470,20 @@ class GazeConnectBackend:
             'backend_zone': zone,
             'calibration_applied': calibration_applied,
             'validity_source': conditioned.validity_source,
+            # Latency instrumentation (measurement only): t_helper_ms is the
+            # C# helper's wall-clock receive stamp for THIS sample; the
+            # renderer compares both stamps against Date.now() (same machine,
+            # same Unix-ms clock) to derive ingest/pipeline/ws/e2e latency
+            # percentiles in window.__gazeTelemetry.snapshot().latency.
+            't_helper_ms': round(conditioned.t * 1000.0, 1),
         }
         if self.ENABLE_DUAL_PULL_COORDINATION_SIGNAL:
             payload['backend_on_key'] = bool(current_on_key)
             payload['backend_magnet_px'] = round(backend_magnet_px, 3)
+        # Stamped as late as possible before the broadcast queue so
+        # (t_sent_wall_ms - t_helper_ms - sample_age_ms) isolates pipeline
+        # cost and (Date.now() - t_sent_wall_ms) isolates WS transport.
+        payload['t_sent_wall_ms'] = round(time.time() * 1000.0, 1)
         self._last_gaze_payload = payload
         self._broadcast('gaze', payload)
         t_sent = time.perf_counter()
@@ -1599,6 +1636,67 @@ class GazeConnectBackend:
             self._on_key_target_id = None
             return False
 
+    # Shipped magnetism defaults (v15 tuning + audited gazetoggle values).
+    # Keep context-aware behavior from compass, but use stronger keyboard
+    # values from the accuracy branch. v15: keyboard reduced to prevent
+    # wrong-key lock amplifying rightward drift (was radius=96, pull=0.56,
+    # release=92 — release < capture made escape hard).
+    MAGNET_CONTEXT_DEFAULTS = {
+        'keyboard':   {'radius': 72.0,  'pull': 0.32, 'release': 88.0,  'capture_full': False},
+        'prediction': {'radius': 112.0, 'pull': 0.48, 'release': 100.0, 'capture_full': False},
+        'navigation': {'radius': 44.0,  'pull': 0.16, 'release': 64.0,  'capture_full': False},
+        'gazetoggle': {'radius': 165.0, 'pull': 0.34, 'release': 185.0, 'capture_full': True},
+    }
+    MAGNET_DEFAULT_PARAMS = {'radius': 62.0, 'pull': 0.22, 'release': 82.0, 'capture_full': False}
+
+    def _get_magnet_params(self):
+        """Live (runtime-tunable) magnetism tables, lazily seeded from the
+        shipped class defaults. Mutated only by _set_magnet_params."""
+        if not hasattr(self, '_magnet_context_params'):
+            self._magnet_context_params = {k: dict(v) for k, v in self.MAGNET_CONTEXT_DEFAULTS.items()}
+            self._magnet_default_params = dict(self.MAGNET_DEFAULT_PARAMS)
+        return self._magnet_context_params, self._magnet_default_params
+
+    def _set_magnet_params(self, data: Dict):
+        """B1-BE — runtime magnetism tuning for on-rig A/B sessions.
+
+        WS message: {type:'set_magnet_params', context:'gazetoggle',
+                     radius: 90, pull: 0.22, release: 110, capture_full: false}
+        Only the NAMED context changes; omitted fields keep their current
+        values; clamps keep every combination escapable (release >= radius).
+        context 'default' tunes the fallback used by unlisted contexts.
+        A backend restart restores the shipped defaults.
+        """
+        params_map, default_params = self._get_magnet_params()
+        ctx = str(data.get('context', '')).strip().lower()
+        if ctx in params_map:
+            entry = params_map[ctx]
+        elif ctx == 'default':
+            entry = default_params
+        else:
+            logger.warning(f"[MAGNET] set_magnet_params: unknown context '{ctx}' "
+                           f"(known: {sorted(params_map)} + 'default')")
+            return
+
+        def _clampf(value, lo, hi, current):
+            try:
+                f = float(value)
+            except (TypeError, ValueError):
+                return current
+            return max(lo, min(hi, f))
+
+        if 'radius' in data:
+            entry['radius'] = _clampf(data['radius'], 20.0, 300.0, entry['radius'])
+        if 'pull' in data:
+            entry['pull'] = _clampf(data['pull'], 0.05, 0.60, entry['pull'])
+        if 'release' in data:
+            entry['release'] = _clampf(data['release'], 20.0, 400.0, entry['release'])
+        # Escape must always be possible: release never below the radius.
+        entry['release'] = max(entry['release'], entry['radius'])
+        if 'capture_full' in data:
+            entry['capture_full'] = bool(data['capture_full'])
+        logger.info(f"[MAGNET] {ctx} params now: {entry}")
+
     def _apply_magnetism(self, screen_x: float, screen_y: float) -> tuple:
         """
         v12: Sticky-target cursor magnetism â€” prevents oscillation between adjacent targets.
@@ -1610,18 +1708,12 @@ class GazeConnectBackend:
         Also adds APPROACH BIAS: when the cursor is moving toward a target, increase pull.
         When moving away, decrease pull (user is intentionally leaving).
         """
-        # Per-target-context magnetism params
-        # Keep context-aware behavior from compass, but use stronger keyboard values from accuracy branch.
-        # v15: Reduced keyboard magnetism to prevent wrong-key lock amplifying rightward drift.
-        # Previous: radius=96, pull=0.56, release=92 — too aggressive, release < capture made escape hard.
-        # Now: radius=72, pull=0.32, release=88 — weaker capture, release > capture for easier escape.
-        CONTEXT_PARAMS = {
-            'keyboard':   {'radius': 72, 'pull': 0.32, 'release': 88},
-            'prediction': {'radius': 112, 'pull': 0.48, 'release': 100},
-            'navigation': {'radius': 44, 'pull': 0.16, 'release': 64},
-            'gazetoggle': {'radius': 165, 'pull': 0.34, 'release': 185},
-        }
-        DEFAULT_PARAMS = {'radius': 62, 'pull': 0.22, 'release': 82}
+        # Per-target-context magnetism params — shipped defaults live in
+        # MAGNET_CONTEXT_DEFAULTS / MAGNET_DEFAULT_PARAMS (class constants);
+        # the live copies are runtime-tunable via the set_magnet_params WS
+        # message (B1-BE) for on-rig A/B without a restart. A restart
+        # always restores the shipped values.
+        CONTEXT_PARAMS, DEFAULT_PARAMS = self._get_magnet_params()
 
         try:
             detector = self.dwell_manager.detectors.get(self.current_screen)
@@ -1714,7 +1806,12 @@ class GazeConnectBackend:
             params = CONTEXT_PARAMS.get(ctx, DEFAULT_PARAMS)
             MAGNET_RADIUS = params['radius']
             MAX_PULL = params['pull']
-            CAPTURE_RADIUS = MAGNET_RADIUS if ctx == 'gazetoggle' else MAGNET_RADIUS * 0.82
+            # capture_full=True (shipped only for gazetoggle) captures at the
+            # FULL radius instead of 0.82x — one of the audited contributors
+            # to "strong magnetism near the toggle"; set_magnet_params can
+            # turn it off live: {context:'gazetoggle', capture_full: false}.
+            capture_full = bool(params.get('capture_full', ctx == 'gazetoggle'))
+            CAPTURE_RADIUS = MAGNET_RADIUS if capture_full else MAGNET_RADIUS * 0.82
 
             if nearest_dist > CAPTURE_RADIUS:
                 return screen_x, screen_y
@@ -1915,6 +2012,9 @@ class GazeConnectBackend:
                 'skip_break': lambda: self.breaks.skip_break(),
                 'set_filter_preset': lambda: self._set_filter_preset(data.get('preset', 'balanced')),
                 'set_filter_params': lambda: self._set_filter_params(data),
+                # B1-BE — live magnetism tuning for on-rig A/B sessions
+                # (shipped defaults are code constants; restart restores them).
+                'set_magnet_params': lambda: self._set_magnet_params(data),
                 'automation_execute': lambda: self._handle_automation_execute(websocket, data),
                 'update_text': lambda: self._update_text(data.get('text', '')),
                 'save_survey': lambda: self._save_survey(data.get('survey_data', {})),

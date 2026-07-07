@@ -106,6 +106,14 @@ type BrowserGazeConfig = {
   progressRetentionMs: number;
   gapPauseEnabled: boolean;
   gapPauseMs: number;
+  // v17.23 — per-target progress bank (B3 prototype, default OFF): dwell
+  // progress banked per element identity so dense-page ping-pong between
+  // adjacent links accumulates instead of resetting. Driven by the
+  // 'browserProgressBank' gazeFlag.
+  progressBankEnabled: boolean;
+  // v17.23 — probe-snap incumbent hysteresis in screen px (B4 knob,
+  // 0 = legacy strict-nearest winner).
+  probeSnapHysteresisPx: number;
   // v17.19 web-cursor precision/comfort toggles (same persistence rationale).
   probeSnapEnabled: boolean;
   probeSnapRadiusPx: number;
@@ -123,6 +131,15 @@ type BrowserGazeConfig = {
   // v17.21 — keep in-page snap/hold/probe radii a constant on-screen size
   // across page zoom (read by the injected script via radiusScale).
   zoomScaleRadii: boolean;
+  // v17.22 — empty-dwell guard: gaze on non-interactive space must not run
+  // the dwell clock (no blank-space ring, no stuck edge-scroll pause, no
+  // zero-dwell click on a drifted-onto element). See browserGazeController.
+  emptyDwellGuardEnabled: boolean;
+  // v17.22 — YouTube card-scan cache TTL (ms); 0 = legacy scan every frame.
+  cardScanCacheMs: number;
+  // v17.23 — links-sidebar extraction v2 (visible labels, visibility +
+  // viewport checks, ranked before cap). false = legacy v1 extraction.
+  linksExtractionV2: boolean;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -160,6 +177,8 @@ let browserGazeConfig: BrowserGazeConfig = {
   progressRetentionMs: 1000,
   gapPauseEnabled: true,
   gapPauseMs: 150,
+  progressBankEnabled: false,
+  probeSnapHysteresisPx: 0,
   // v17.19 — see browserGazeController.ts gcConfig defaults for rationale.
   probeSnapEnabled: true,
   probeSnapRadiusPx: 36,
@@ -174,6 +193,9 @@ let browserGazeConfig: BrowserGazeConfig = {
   edgeScrollPauseDuringDwell: true,
   zoomCompensationEnabled: true,
   zoomScaleRadii: true,
+  emptyDwellGuardEnabled: true,
+  cardScanCacheMs: 250,
+  linksExtractionV2: true,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -232,9 +254,13 @@ function startBrowserDiagnosticsSampling(): void {
   browserDiagnosticsInterval = setInterval(() => {
     const snapshot = browserDiagnostics.snapshot(activeBrowserView);
     if (!snapshot.isOpen) return;
+    let stopLoadingListeners: number | string = 'n/a';
+    try {
+      stopLoadingListeners = activeBrowserView?.webContents.listenerCount('did-stop-loading') ?? 'n/a';
+    } catch { /* view may be tearing down */ }
     browserDiagnostics.debug(
       'browser-memory',
-      `[BrowserView] url=${snapshot.url || 'about:blank'} memory=${snapshot.memoryMb ?? 'n/a'}MB ipc=${snapshot.ipcPerSecond ?? 0}/s state=${snapshot.youtubeState || 'n/a'}`,
+      `[BrowserView] url=${snapshot.url || 'about:blank'} memory=${snapshot.memoryMb ?? 'n/a'}MB ipc=${snapshot.ipcPerSecond ?? 0}/s state=${snapshot.youtubeState || 'n/a'} stopLoadListeners=${stopLoadingListeners}`,
       60000
     );
   }, 60000);
@@ -289,36 +315,102 @@ function sendEdgeScrollState(direction: 'up' | 'down' | 'none'): void {
   mainWindow.webContents.send('webview:edge-scroll', { direction });
 }
 
+// Legacy (v1) extraction — kept verbatim as the linksExtractionV2:false
+// rollback path. Known defects (why v2 exists): textContent concatenates
+// <style>/<script> blocks inside anchors (raw-CSS labels on Google
+// properties), only display:none is excluded (hidden/offscreen links pass),
+// and the first-25-in-DOM-order cap surfaces header chrome over content.
+const LINKS_EXTRACT_V1_SCRIPT = `
+  (function() {
+    try {
+      var links = Array.from(document.querySelectorAll('a[href]'))
+        .filter(function(a) {
+          var text = (a.textContent || '').trim();
+          var rect = a.getBoundingClientRect();
+          return text.length > 2 && text.length < 100 && rect.width > 0 && rect.height > 0;
+        })
+        .map(function(a) {
+          return { text: (a.textContent || '').trim().slice(0, 60), href: a.href };
+        })
+        .slice(0, 25);
+      return JSON.stringify(links);
+    } catch (e) {
+      return '[]';
+    }
+  })();
+`;
+
+// v2 extraction — visible-label, visibility-checked, ranked-before-cap.
+// Label: innerText (layout-aware — excludes <style>/<script>/hidden
+// subtrees) -> aria-label -> title -> img[alt]. Filters: computed
+// visibility/opacity, >=8px rect, javascript:/same-page-fragment hrefs
+// dropped. Ranking: in-viewport links first (below-fold demoted, NOT
+// dropped — armed scrolling can still reach them), then larger and
+// higher-on-page. The page returns up to 60 ranked candidates; the main
+// process dedupes by href AND label, then caps at 15 for the sidebar.
+const LINKS_EXTRACT_V2_SCRIPT = `
+  (function() {
+    try {
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      var anchors = document.querySelectorAll('a[href]');
+      var out = [];
+      var n = Math.min(anchors.length, 400);
+      for (var i = 0; i < n && out.length < 120; i++) {
+        var a = anchors[i];
+        var href = a.href || '';
+        if (!href || /^javascript:/i.test(href)) continue;
+        if (href.indexOf('#') !== -1 &&
+            href.split('#')[0] === location.href.split('#')[0]) continue;
+        var rect = a.getBoundingClientRect();
+        if (rect.width < 8 || rect.height < 8) continue;
+        var style = null;
+        try { style = window.getComputedStyle(a); } catch (e) {}
+        if (style && (style.display === 'none' || style.visibility === 'hidden' ||
+            Number(style.opacity || 1) < 0.05)) continue;
+        var label = (a.innerText || '').replace(/\\s+/g, ' ').trim();
+        if (!label) label = (a.getAttribute('aria-label') || '').trim();
+        if (!label) label = (a.getAttribute('title') || '').trim();
+        if (!label) {
+          var img = a.querySelector('img[alt]');
+          if (img) label = (img.getAttribute('alt') || '').trim();
+        }
+        label = label.replace(/\\s+/g, ' ').trim();
+        if (label.length < 3 || label.length > 120) continue;
+        if (/[{}]|;\\s*[a-zA-Z-]+\\s*:/.test(label)) continue;
+        var inViewport = rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw;
+        var area = Math.min(rect.width * rect.height, 40000);
+        var score = (inViewport ? 2000 : 0) + area / 40 - Math.max(0, rect.top) / 20;
+        out.push({ text: label.slice(0, 60), href: href, score: Math.round(score) });
+      }
+      out.sort(function(x, y) { return y.score - x.score; });
+      return JSON.stringify(out.slice(0, 60));
+    } catch (e) {
+      return '[]';
+    }
+  })();
+`;
+
 async function extractAndSendPageLinks(): Promise<void> {
   if (!activeBrowserView || !mainWindow) return;
+  const useV2 = browserGazeConfig.linksExtractionV2;
   try {
-    const raw = await activeBrowserView.webContents.executeJavaScript(`
-      (function() {
-        try {
-          var links = Array.from(document.querySelectorAll('a[href]'))
-            .filter(function(a) {
-              var text = (a.textContent || '').trim();
-              var rect = a.getBoundingClientRect();
-              return text.length > 2 && text.length < 100 && rect.width > 0 && rect.height > 0;
-            })
-            .map(function(a) {
-              return { text: (a.textContent || '').trim().slice(0, 60), href: a.href };
-            })
-            .slice(0, 25);
-          return JSON.stringify(links);
-        } catch (e) {
-          return '[]';
-        }
-      })();
-    `);
+    const raw = await activeBrowserView.webContents.executeJavaScript(
+      useV2 ? LINKS_EXTRACT_V2_SCRIPT : LINKS_EXTRACT_V1_SCRIPT
+    );
     const parsed = JSON.parse(raw || '[]');
     const deduped: Array<{ text: string; href: string }> = [];
     const seen = new Set<string>();
     for (const item of parsed) {
       const href = typeof item?.href === 'string' ? item.href : '';
       const text = typeof item?.text === 'string' ? item.text : '';
-      if (!href || seen.has(href)) continue;
-      seen.add(href);
+      if (!href) continue;
+      // v2 dedupes by href AND normalized label (identical labels with
+      // distinct hrefs read as duplicates to the patient); v1 keeps its
+      // original href-only dedupe for exact rollback behavior.
+      const key = useV2 ? `${href}|${text.toLowerCase()}` : href;
+      if (seen.has(key)) continue;
+      seen.add(key);
       deduped.push({ text: text || href, href });
       if (deduped.length >= 15) break;
     }
@@ -412,6 +504,9 @@ async function sendBrowserPlaybackState(): Promise<void> {
   const view = activeBrowserView;
   const sessionId = activeBrowserViewSessionId;
   if (!mainWindow || !view || view.webContents.isDestroyed()) return;
+  // Skip while a document is loading — the executeJavaScript below would
+  // just be parked (holding a did-stop-loading listener) until dom-ready.
+  if ((view as any)._pageScriptReady === false) return;
   if (playbackPollInFlight) return;
   playbackPollInFlight = true;
   try {
@@ -1343,6 +1438,19 @@ function setupIpcHandlers(): void {
           sandbox: true,          // Sandbox for safety
         },
       });
+      // Electron attaches temporary internal listeners (incl.
+      // 'did-stop-loading') per pending navigation/executeJavaScript, and
+      // our per-frame gaze polls + playback poll around a click/back burst
+      // briefly stack past Node's default warning threshold of 10 — the
+      // on-rig logs showed the count draining back down afterwards
+      // (transient, not a leak). 30 keeps a finite cap so a REAL leak
+      // still warns; the 60s browser-memory diagnostics line samples the
+      // live count as evidence either way.
+      view.webContents.setMaxListeners(30);
+      // Poll gate: false until the first dom-ready — per-frame gaze polls
+      // and the playback poll are skipped while a document is loading
+      // (see the did-start-navigation handler for the full rationale).
+      (view as any)._pageScriptReady = false;
 
       activeBrowserView = view;
       activeBrowserViewSessionId += 1;
@@ -1405,6 +1513,10 @@ function setupIpcHandlers(): void {
           bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
           bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
           zoomScaleRadii: browserGazeConfig.zoomScaleRadii,
+          emptyDwellGuardEnabled: browserGazeConfig.emptyDwellGuardEnabled,
+          cardScanCacheMs: browserGazeConfig.cardScanCacheMs,
+          progressBankEnabled: browserGazeConfig.progressBankEnabled,
+          probeSnapHysteresisPx: browserGazeConfig.probeSnapHysteresisPx,
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1417,6 +1529,8 @@ function setupIpcHandlers(): void {
 
       onBrowserViewEvent('dom-ready', () => {
         browserDiagnostics.debug('dom-ready', `[Main] dom-ready for: ${view.webContents.getURL()}`, 1000);
+        // Page can now run scripts — reopen the per-frame poll gate.
+        (view as any)._pageScriptReady = true;
         void injectBrowserPageHelpers();
       });
 
@@ -1428,7 +1542,20 @@ function setupIpcHandlers(): void {
         return { action: 'deny' };
       });
 
-      onBrowserViewEvent('did-start-navigation', () => {
+      onBrowserViewEvent('did-start-navigation', (_e: any, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
+        // Close the poll gate for cross-document main-frame navigations:
+        // between navigation start and dom-ready, Electron PARKS every
+        // executeJavaScript until the new document can run scripts — each
+        // parked call holds a 'did-stop-loading' listener, and our 33Hz
+        // gaze polls + 5Hz playback poll stacked 31 of them during a ~1s
+        // load (2026-07-06 18:23 on-rig log), then replayed as a burst of
+        // stale polls when the page became ready. The injected cursor
+        // script does not exist in that window anyway, so skipping the
+        // polls loses nothing. Same-document (in-place) navigations keep
+        // the gate open — the script survives those.
+        if (isMainFrame && !isInPlace) {
+          (view as any)._pageScriptReady = false;
+        }
         view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
       });
       onBrowserViewEvent('did-navigate', (_e, nextUrl) => {
@@ -1444,6 +1571,17 @@ function setupIpcHandlers(): void {
       onBrowserViewEvent('did-stop-loading', () => {
         sendBrowserNavState(true);
         extractAndSendPageLinks();
+        // v17.23 — SPA hydration pass: Google News/Search fill in content
+        // AFTER load completes, so the immediate extraction above often sees
+        // only chrome. One debounced re-extract catches the hydrated links.
+        const priorTimer = (view as any)._linksRefreshTimer;
+        if (priorTimer) clearTimeout(priorTimer);
+        (view as any)._linksRefreshTimer = setTimeout(() => {
+          (view as any)._linksRefreshTimer = null;
+          if (activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
+            void extractAndSendPageLinks();
+          }
+        }, 1500);
       });
       onBrowserViewEvent('unresponsive', () => {
         browserDiagnostics.warn('browser-unresponsive', '[BrowserView] renderer became unresponsive');
@@ -1853,6 +1991,9 @@ function setupIpcHandlers(): void {
       probeSnapEnabled: typeof config?.probeSnapEnabled === 'boolean'
         ? config.probeSnapEnabled : browserGazeConfig.probeSnapEnabled,
       probeSnapRadiusPx: clampNumber(config?.probeSnapRadiusPx, browserGazeConfig.probeSnapRadiusPx, 8, 80),
+      progressBankEnabled: typeof config?.progressBankEnabled === 'boolean'
+        ? config.progressBankEnabled : browserGazeConfig.progressBankEnabled,
+      probeSnapHysteresisPx: clampNumber(config?.probeSnapHysteresisPx, browserGazeConfig.probeSnapHysteresisPx, 0, 24),
       progressArcEnabled: typeof config?.progressArcEnabled === 'boolean'
         ? config.progressArcEnabled : browserGazeConfig.progressArcEnabled,
       cursorSmoothingMs: clampNumber(config?.cursorSmoothingMs, browserGazeConfig.cursorSmoothingMs, 0, 200),
@@ -1867,6 +2008,11 @@ function setupIpcHandlers(): void {
         ? config.zoomCompensationEnabled : browserGazeConfig.zoomCompensationEnabled,
       zoomScaleRadii: typeof config?.zoomScaleRadii === 'boolean'
         ? config.zoomScaleRadii : browserGazeConfig.zoomScaleRadii,
+      emptyDwellGuardEnabled: typeof config?.emptyDwellGuardEnabled === 'boolean'
+        ? config.emptyDwellGuardEnabled : browserGazeConfig.emptyDwellGuardEnabled,
+      cardScanCacheMs: clampNumber(config?.cardScanCacheMs, browserGazeConfig.cardScanCacheMs, 0, 2000),
+      linksExtractionV2: typeof config?.linksExtractionV2 === 'boolean'
+        ? config.linksExtractionV2 : browserGazeConfig.linksExtractionV2,
     };
 
     if (activeBrowserView) {
@@ -1894,6 +2040,10 @@ function setupIpcHandlers(): void {
         bayesianStableFrames: browserGazeConfig.bayesianStableFrames,
         bayesianStableMargin: browserGazeConfig.bayesianStableMargin,
         zoomScaleRadii: browserGazeConfig.zoomScaleRadii,
+        emptyDwellGuardEnabled: browserGazeConfig.emptyDwellGuardEnabled,
+        cardScanCacheMs: browserGazeConfig.cardScanCacheMs,
+        progressBankEnabled: browserGazeConfig.progressBankEnabled,
+        probeSnapHysteresisPx: browserGazeConfig.probeSnapHysteresisPx,
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(
@@ -1978,6 +2128,15 @@ function setupIpcHandlers(): void {
     const view = activeBrowserView;
     const sessionId = activeBrowserViewSessionId;
     if (!view || view.webContents.isDestroyed()) return;
+    // Document loading: the in-page cursor script does not exist yet, and
+    // every executeJavaScript issued now would be parked until dom-ready
+    // (each holding a did-stop-loading listener) and then replayed as a
+    // burst of STALE polls. Skip the frame entirely; edge scroll state is
+    // reset so no stale scroll direction survives the navigation.
+    if ((view as any)._pageScriptReady === false) {
+      resetEdgeScrollState();
+      return;
+    }
     try {
       const bounds = view.getBounds();
       const cursorEnabled = options?.cursor !== false;

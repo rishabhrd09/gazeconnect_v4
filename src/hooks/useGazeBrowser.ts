@@ -68,6 +68,8 @@ type BrowserGazeConfig = {
     progressRetentionMs?: number;
     gapPauseEnabled?: boolean;
     gapPauseMs?: number;
+    // v17.23 — per-target progress bank (B3 prototype, default OFF).
+    progressBankEnabled?: boolean;
 };
 
 const getElectronAPI = () => (window as any).electronAPI;

@@ -868,6 +868,57 @@ ALS_COMMUNICATION_VOCABULARY = {
 }
 
 # ===========================================================================
+# GENERAL ENGLISH — common everyday words (esp. the longer ones) that were
+# missing from the AAC vocabularies. Added 2026-07-07 at the patient's request
+# ("initiatives" was one example). These are made AVAILABLE for prefix
+# completion + the trie only; they carry NO extra ranking boost (unlike CORE/
+# PATIENT), so they surface when you type their prefix without changing the
+# ranking of any existing prediction. Guardrails + MIN_WORD_LENGTH still apply
+# via the ALL_VOCABULARY filter below.
+# ===========================================================================
+GENERAL_ENGLISH_VOCABULARY = {
+    # ---------- Common longer nouns ----------
+    'initiative', 'initiatives', 'opportunity', 'opportunities', 'information',
+    'experience', 'situation', 'condition', 'position', 'direction', 'attention',
+    'decision', 'solution', 'question', 'answer', 'problem', 'reason', 'result',
+    'example', 'purpose', 'process', 'progress', 'project', 'program', 'schedule',
+    'calendar', 'appointment', 'meeting', 'message', 'moment', 'minute', 'second',
+    'morning', 'afternoon', 'evening', 'weekend', 'holiday', 'birthday',
+    'family', 'friend', 'friends', 'neighbour', 'neighbor', 'people', 'person',
+    'children', 'daughter', 'brother', 'sister', 'husband', 'parents', 'grandchild',
+    'hospital', 'doctor', 'nurse', 'medicine', 'medication', 'treatment', 'therapy',
+    'exercise', 'appetite', 'breakfast', 'dinner', 'kitchen', 'bathroom', 'bedroom',
+    'window', 'blanket', 'pillow', 'cushion', 'wheelchair', 'computer', 'internet',
+    'website', 'channel', 'weather', 'temperature', 'distance', 'location', 'address',
+    'country', 'company', 'business', 'account', 'community', 'government', 'society',
+    'technology', 'education', 'attention', 'celebration', 'conversation', 'situation',
+    'newspaper', 'magazine', 'picture', 'photograph', 'music', 'movie', 'story',
+    # ---------- Common verbs ----------
+    'continue', 'complete', 'consider', 'describe', 'explain', 'suggest', 'prepare',
+    'arrange', 'organize', 'manage', 'handle', 'receive', 'deliver', 'provide',
+    'require', 'include', 'contain', 'prevent', 'protect', 'improve', 'increase',
+    'decrease', 'reduce', 'remove', 'replace', 'repair', 'maintain', 'control',
+    'operate', 'connect', 'download', 'update', 'install', 'remember', 'forget',
+    'understand', 'realize', 'recognize', 'decide', 'choose', 'compare', 'change',
+    'happen', 'arrive', 'return', 'travel', 'follow', 'listen', 'watch', 'notice',
+    'believe', 'imagine', 'expect', 'promise', 'accept', 'refuse', 'agree', 'explore',
+    'discuss', 'answer', 'question', 'contact', 'visit', 'invite', 'introduce',
+    # ---------- Common adjectives / adverbs ----------
+    'important', 'different', 'difficult', 'possible', 'impossible', 'available',
+    'necessary', 'comfortable', 'uncomfortable', 'wonderful', 'beautiful', 'favourite',
+    'favorite', 'special', 'general', 'personal', 'physical', 'mental', 'emotional',
+    'medical', 'natural', 'normal', 'regular', 'serious', 'careful', 'helpful',
+    'useful', 'powerful', 'peaceful', 'grateful', 'hopeful', 'wonderful', 'similar',
+    'certain', 'recent', 'current', 'entire', 'complete', 'perfect', 'simple',
+    'probably', 'definitely', 'absolutely', 'especially', 'actually', 'usually',
+    'recently', 'finally', 'certainly', 'immediately', 'completely', 'exactly',
+    'obviously', 'suddenly', 'quickly', 'slowly', 'quietly', 'carefully', 'together',
+    'tomorrow', 'yesterday', 'tonight', 'always', 'never', 'sometimes', 'often',
+    'everything', 'something', 'anything', 'nothing', 'everyone', 'someone', 'anyone',
+    'everywhere', 'somewhere', 'anywhere', 'because', 'although', 'however', 'therefore',
+}
+
+# ===========================================================================
 # Merge all vocabularies into one master set
 # ===========================================================================
 ALL_VOCABULARY = (
@@ -880,6 +931,7 @@ ALL_VOCABULARY = (
     | CULTURAL_VOCABULARY
     | EVERYDAY_VOCABULARY
     | ALS_COMMUNICATION_VOCABULARY
+    | GENERAL_ENGLISH_VOCABULARY
     | HINDI_VOCABULARY
 )
 
@@ -2205,13 +2257,19 @@ class PatientBigramTracker:
         self._load()
 
     def learn(self, sentence: str):
-        words = [
-            w.lower()
-            for w in re.findall(r'[a-zA-Z\u0900-\u097F]+', sentence)
-            if is_valid_prediction_token(w, min_length=2)
-        ]
-        for i in range(len(words) - 1):
-            self.pairs[words[i]][words[i + 1]] += 1
+        # Walk the raw token stream and only bond ADJACENT valid tokens. A
+        # blocked/invalid token (guardrails, incl. Hindi/Hinglish harm words)
+        # breaks the chain rather than bridging its neighbours into a pair that
+        # never actually occurred \u2014 safety + correctness in one pass.
+        prev = None
+        for tok in re.findall(r'[a-zA-Z\u0900-\u097F]+', sentence):
+            w = tok.lower()
+            if not is_valid_prediction_token(w, min_length=2):
+                prev = None
+                continue
+            if prev is not None:
+                self.pairs[prev][w] += 1
+            prev = w
         self._dirty = True
 
     def next_word_scores(self, prev_word: str, prefix: str = '') -> Dict[str, float]:
@@ -2366,6 +2424,141 @@ class PredictionResult:
     word: str
     score: float
     source: str  # 'ngram', 'core', 'recent', 'patient', 'abbreviation'
+
+
+# ============================================================================
+# CONVERSATIONAL SCAFFOLD — curated high-confidence next-word continuations.
+#
+# Fixes the "generic junk after a greeting" problem: after conversational
+# openers ("hello", "how are", "nice to") the natural continuations
+# (how/good/there, you, meet) were being drowned out by high-frequency filler
+# words (the, you, want) because those openers had little/no bigram signal.
+# These lists are applied AFTER neural fusion (so they are authoritative) but
+# via max() so a stronger PATIENT-LEARNED score is never demoted — the
+# patient's own history still wins. Curated words may be <3 letters (e.g.
+# Hinglish "ho") since they are hand-picked and safe; keep the lists TIGHT so
+# no low-value filler wastes a prediction slot. All entries still pass the
+# guardrail + language filters at injection time. Keys are lowercase.
+# ============================================================================
+
+# Two-word context → ordered next words (checked first; higher precision).
+CONVERSATIONAL_SCAFFOLD_2: Dict[Tuple[str, str], List[str]] = {
+    ('how', 'are'): ['you'],
+    ('how', 'is'): ['your', 'everything', 'it'],
+    ('how', 'was'): ['your', 'it', 'the'],
+    ('how', 'do'): ['you'],
+    ('are', 'you'): ['okay', 'there', 'feeling', 'free', 'coming', 'sure', 'ready'],
+    ('do', 'you'): ['want', 'need', 'have', 'know', 'feel', 'like'],
+    ('did', 'you'): ['eat', 'sleep', 'take'],
+    ('can', 'you'): ['please', 'help', 'hear', 'come', 'give'],
+    ('could', 'you'): ['please', 'help'],
+    ('would', 'you'): ['like', 'please'],
+    ('what', 'are'): ['you', 'we'],
+    ('what', 'is'): ['your', 'the', 'happening'],
+    ('where', 'are'): ['you', 'we'],
+    ('nice', 'to'): ['meet', 'see'],
+    ('good', 'to'): ['see', 'meet'],
+    ('thank', 'you'): ['so', 'very', 'for'],
+    ('see', 'you'): ['soon', 'later', 'tomorrow'],
+    ('take', 'care'): ['of'],
+    ('good', 'morning'): ['everyone'],
+    ('happy', 'birthday'): ['to'],
+    # Hinglish
+    ('kaise', 'ho'): ['aap'],
+    ('theek', 'hoon'): ['aap'],
+}
+# NOTE: "i" is a single letter and is dropped from the model's context window,
+# so an "i am"/"i want" context arrives as just ("am",)/("want",). The i-family
+# continuations therefore live in the single-word table below, not here.
+
+# Single previous word → ordered next words (fallback when no 2-word match).
+CONVERSATIONAL_SCAFFOLD_1: Dict[str, List[str]] = {
+    'hello': ['how', 'good', 'there', 'everyone'],
+    'hi': ['how', 'there', 'good', 'everyone'],
+    'hey': ['how', 'there'],
+    'good': ['morning', 'afternoon', 'evening', 'night'],
+    'how': ['are', 'was', 'about', 'come'],
+    'thank': ['you'],
+    'thanks': ['for'],
+    'see': ['you'],
+    'take': ['care'],
+    'please': ['help', 'come', 'give', 'wait'],
+    'what': ['are', 'about', 'time', 'happened'],
+    'where': ['are', 'you'],
+    'when': ['are', 'will', 'can'],
+    'why': ['are', 'not', 'did'],
+    'are': ['you', 'they', 'not'],
+    'can': ['you', 'not'],
+    'could': ['you'],
+    'would': ['you', 'like'],
+    'do': ['you', 'not'],
+    'did': ['you'],
+    'have': ['you', 'been'],
+    'god': ['bless'],
+    'happy': ['birthday'],
+    'welcome': ['home', 'back'],
+    'love': ['you'],
+    'miss': ['you'],
+    'talk': ['later'],
+    'you': ['are', 'can', 'want', 'need'],
+    'we': ['are', 'can', 'will', 'need'],
+    'they': ['are', 'will'],
+    # "i X" continuations — reached as a single-word context because "i" drops
+    # out of the model's context window (single letter).
+    'am': ['feeling', 'fine', 'good', 'not', 'tired', 'hungry', 'okay'],
+    'feel': ['tired', 'good', 'better', 'pain', 'cold', 'hot', 'sick'],
+    'love': ['you'],
+    'miss': ['you'],
+    'will': ['be', 'call', 'come', 'try'],
+    # Common short-word grammar (patient asked for is/to/are to be suggested).
+    # These lean on COMMON_SHORT_WORDS so the <3-letter continuations surface.
+    'this': ['is', 'was', 'one'],
+    'that': ['is', 'was'],
+    'it': ['is', 'was'],
+    'he': ['is', 'was', 'will'],
+    'she': ['is', 'was', 'will'],
+    'there': ['is', 'are', 'was'],
+    'here': ['is', 'are'],
+    'going': ['to'],
+    'want': ['to', 'water', 'help', 'you'],
+    'need': ['to', 'help', 'water', 'you'],
+    'have': ['to', 'you', 'been'],
+    'has': ['to', 'been'],
+    'had': ['to', 'been'],
+    'try': ['to'],
+    'able': ['to'],
+    'used': ['to'],
+    'like': ['to', 'this', 'that'],
+    'would': ['like', 'you'],
+    'let': ['me', 'us'],
+    # Hinglish
+    'kaise': ['ho', 'hain'],
+    'mujhe': ['pani', 'dard', 'chahiye', 'neend', 'madad'],
+    'aap': ['kaise', 'kaho'],
+}
+
+# Curated 2-letter words that ARE worth suggesting (patient request 2026-07-06:
+# "is, are, the, to should be suggested"). Normally MIN_WORD_LENGTH=3 hides
+# every 2-letter word; these are allowed through ONLY on the context-driven
+# next-word paths (i.e. when they are a genuine bigram/trigram follower), so
+# they surface as "this __is__", "going __to__" without cluttering everything.
+COMMON_SHORT_WORDS = {
+    'is', 'to', 'be', 'do', 'go', 'we', 'he', 'it', 'of', 'in', 'on', 'at',
+    'as', 'an', 'or', 'so', 'up', 'us', 'am', 'my', 'me', 'no', 'ok', 'if',
+    'by', 'hi', 'ho',
+}
+
+
+def _conversational_scaffold(context: Tuple[str, ...]) -> Optional[List[str]]:
+    """Return the curated next-word list for a conversational context, or None.
+    Prefers a two-word match, then falls back to the last single word."""
+    if not context:
+        return None
+    if len(context) >= 2:
+        two = CONVERSATIONAL_SCAFFOLD_2.get((context[-2], context[-1]))
+        if two:
+            return two
+    return CONVERSATIONAL_SCAFFOLD_1.get(context[-1])
 
 
 class WordPredictionEngine:
@@ -2979,7 +3172,7 @@ class WordPredictionEngine:
                 base_score = 0.5  # Well above generic n-gram scores (~0.02-0.04)
                 for i, next_word in enumerate(sorted(tri_followers,
                         key=lambda w: self.ngram.trigrams.get((tri_key[0], tri_key[1], w), 0), reverse=True)):
-                    if len(next_word) < self.MIN_WORD_LENGTH or next_word in candidates:
+                    if (len(next_word) < self.MIN_WORD_LENGTH and next_word not in COMMON_SHORT_WORDS) or next_word in candidates:
                         continue
                     is_hindi = next_word in HINDI_VOCABULARY
                     if lang == 'hindi' and not is_hindi:
@@ -3006,7 +3199,7 @@ class WordPredictionEngine:
                 base_score = 0.3
                 for i, next_word in enumerate(sorted(bi_followers,
                         key=lambda w: self.ngram.bigrams.get((prev, w), 0), reverse=True)):
-                    if len(next_word) < self.MIN_WORD_LENGTH or next_word in candidates:
+                    if (len(next_word) < self.MIN_WORD_LENGTH and next_word not in COMMON_SHORT_WORDS) or next_word in candidates:
                         continue
                     is_hindi = next_word in HINDI_VOCABULARY
                     if lang == 'hindi' and not is_hindi:
@@ -3035,7 +3228,7 @@ class WordPredictionEngine:
         for word, prob in ngram_preds:
             if is_blocked_prediction_word(word):
                 continue
-            if len(word) < self.MIN_WORD_LENGTH:
+            if len(word) < self.MIN_WORD_LENGTH and word not in COMMON_SHORT_WORDS:
                 continue
 
             # Length Filtering
@@ -3202,7 +3395,7 @@ class WordPredictionEngine:
                     for next_word in self.ngram.trigram_contexts.get(tri_key, set()):
                         if is_blocked_prediction_word(next_word):
                             continue
-                        if next_word not in candidates and len(next_word) >= self.MIN_WORD_LENGTH:
+                        if next_word not in candidates and (len(next_word) >= self.MIN_WORD_LENGTH or next_word in COMMON_SHORT_WORDS):
                             is_hindi_word = next_word in HINDI_VOCABULARY
                             prob = self.ngram.get_probability(next_word, context)
                             if lang == 'hindi':
@@ -3233,7 +3426,7 @@ class WordPredictionEngine:
                     for next_word in self.ngram.bigram_contexts.get(prev, set()):
                         if is_blocked_prediction_word(next_word):
                             continue
-                        if next_word not in candidates and len(next_word) >= self.MIN_WORD_LENGTH:
+                        if next_word not in candidates and (len(next_word) >= self.MIN_WORD_LENGTH or next_word in COMMON_SHORT_WORDS):
                             is_hindi_word = next_word in HINDI_VOCABULARY
                             prob = self.ngram.get_probability(next_word, context)
                             if lang == 'hindi':
@@ -3321,7 +3514,7 @@ class WordPredictionEngine:
                             for word, score in fused:
                                 if is_blocked_prediction_word(word):
                                     continue
-                                if len(word) < self.MIN_WORD_LENGTH:
+                                if len(word) < self.MIN_WORD_LENGTH and word not in COMMON_SHORT_WORDS:
                                     continue
 
                                 is_from_neural_only = word not in ngram_words
@@ -3350,6 +3543,33 @@ class WordPredictionEngine:
             except Exception:
                 # Neural model errors never break predictions — silent fallback
                 pass
+
+        # ---- CONVERSATIONAL SCAFFOLD (curated, authoritative) ----
+        # Applied AFTER fusion so it cannot be clobbered by the n-gram scan or
+        # neural rebuild. Uses max() so a stronger patient-learned score is
+        # never demoted — the patient's own history still wins. Only fires for
+        # next-word (no prefix) in English mode and only for the ~60 curated
+        # conversational contexts; every other prediction is unchanged.
+        if not prefix and context and not strict_length and lang != 'hindi':
+            scaffold = _conversational_scaffold(context)
+            if scaffold:
+                base = 1.0
+                for i, w in enumerate(scaffold):
+                    if is_blocked_prediction_word(w):
+                        continue
+                    if w in HINDI_VOCABULARY:  # english mode: skip Devanagari
+                        continue
+                    sc = base * (0.92 ** i)
+                    if w in PATIENT_VOCABULARY:
+                        sc *= self.PATIENT_BOOST
+                    sc *= _time_boost(w)
+                    sc *= self._topic_multiplier(w, topic_boosts)
+                    existing = candidates.get(w)
+                    if existing is not None and existing.score >= sc:
+                        continue  # a stronger (e.g. patient-learned) score wins
+                    src = ('patient' if w in PATIENT_VOCABULARY else
+                           'core' if w in CORE_VOCABULARY else 'scaffold')
+                    candidates[w] = PredictionResult(word=w, score=sc, source=src)
 
         # Sort by score, return top_k
         sorted_results = sorted(candidates.values(), key=lambda x: -x.score)

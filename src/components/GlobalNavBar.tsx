@@ -15,6 +15,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { darkColors, lightColors, typography } from '../utils/design';
 import { useGazeControl } from './core/GazeControlToggle';
+import { gazeFlags } from '../utils/gazeFlags';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -604,7 +605,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 data-gaze-always="true"
                                 data-snap-priority="3"
                                 data-gaze-context="gazetoggle"
-                                data-gaze-dwell-ms={String(isGazeEnabled ? 1150 : 850)}
+                                data-gaze-dwell-ms={String(isGazeEnabled ? (gazeFlags.toggleCalmFrontend ? 1450 : 1150) : 850)}
                                 style={{
                                     flex: 1, height: '100%', display: 'flex',
                                     alignItems: 'center', justifyContent: 'center',
@@ -672,7 +673,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             data-gaze-always="true"
                             data-snap-priority="3"
                             data-gaze-context="gazetoggle"
-                            data-gaze-dwell-ms={String(isGazeEnabled ? 1150 : 850)}
+                            data-gaze-dwell-ms={String(isGazeEnabled ? (gazeFlags.toggleCalmFrontend ? 1450 : 1150) : 850)}
                             style={{
                                 padding: '0',
                                 backgroundColor: isGazeEnabled ? navigationColors.gazeBackgroundOn : navigationColors.gazeBackgroundOff,

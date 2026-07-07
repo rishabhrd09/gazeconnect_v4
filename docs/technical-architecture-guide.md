@@ -2,15 +2,15 @@
 
 This document covers the internal architecture of GazeConnect Pro: how gaze data flows from hardware to UI action, how the three processes communicate, and how the React component hierarchy is organized.
 
-> **Build:** v4.8.0 (gaze pipeline v17.16 browser safety layer)
+> **Build:** v4.8.0 (main gaze pipeline v17.x; embedded browser cursor includes v17.18-v17.23 refinements)
 >
-> For the comprehensive end-to-end pipeline reference with Mermaid diagrams covering every stage and constant, see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html).
+> For the current-code textbook covering architecture, screens, backend algorithms, scripts, and career alignment, see [`gazeconnect-complete-architecture-and-career-textbook.html`](./gazeconnect-complete-architecture-and-career-textbook.html). For the v17.10 deep gaze-pipeline reference, see [`eye-tracking-pipeline-textbook.html`](./eye-tracking-pipeline-textbook.html).
 
 ---
 
 ## System Overview
 
-GazeConnect Pro consists of three independent processes that communicate over local network sockets:
+GazeConnect Pro's primary runtime consists of local processes that communicate over loopback sockets and Electron IPC:
 
 ```
 +--------------------+    TCP:5555    +------------------+    WS:8765    +------------------+
@@ -50,11 +50,11 @@ This is the end-to-end path from eye movement to on-screen action:
 
 **What it does**:
 1. Loads Tobii DLLs from the local `lib/` folder (not from system paths)
-2. Initializes the Tobii Stream Engine via P/Invoke bindings (`TobiiInterop.cs`)
+2. Initializes the Tobii Interaction SDK gaze stream (`GazePointDataMode.LightlyFiltered`). `TobiiInterop.cs` remains in the project, but the current helper entry point uses the managed Interaction SDK path.
 3. Opens a TCP server on port 5555
 4. On each gaze data callback (133Hz), sends a JSON message to the connected client:
    ```json
-   {"type": "gaze", "x": 0.52, "y": 0.34, "ts": 1707123456789}
+   {"type": "gaze", "x": 0.52, "y": 0.34, "timestamp": 1707123456789, "screen_x": 998, "screen_y": 367}
    ```
 5. Coordinates are normalized (0.0-1.0) representing screen position
 
@@ -87,15 +87,15 @@ These DLLs are referenced locally in `TobiiGazeHelper.csproj` so the project bui
 |---------|------|---------|
 | One Euro Filter + OptiKey 4-Zone | `one_euro_filter.py` | Multi-layer gaze filter: One Euro, Adaptive Kalman (state-aware), Anti-Recoil, OptiKey 4-Zone (LOCK/KEY/FIXATION/FREE). Context-aware parameters per screen. |
 | Dwell Detector | `dwell_detector.py` | Server-side dwell detection with adaptive thresholds per action type. |
-| Word Prediction | `word_prediction.py` | N-gram model + smart bigrams (1,339 pairs) + CIFG-LSTM neural fusion (1.9MB) + vocabulary boosting + RecencyTracker + PatientBigramTracker + time-of-day boost + Datamuse API (optional online). 110 blocked harmful words. Mean 13.5ms latency. |
+| Word Prediction | `word_prediction.py` | N-gram model + smart bigrams (1,339 pairs) + CIFG-LSTM neural fusion (1.9MB) + vocabulary boosting + RecencyTracker + PatientBigramTracker + topic/time-of-day context, plus Datamuse API enrichment only when explicitly enabled. 158 blocked word tokens + 8 blocked phrases. |
 | Sentence Prediction | `sentence_prediction.py` | Local sentence completion from patient history, 180 templates, and fuzzy matching. < 100ms, zero external deps. |
-| Prediction Guardrails | `prediction_guardrails.py` | 110 blocked words (violent, harmful, inappropriate for ALS patients). Enforced at 20+ filter points across all prediction code paths. |
+| Prediction Guardrails | `prediction_guardrails.py` | 158 blocked word tokens + 8 blocked phrases (violent, harmful, inappropriate; English + Hindi/Hinglish). Enforced across prediction code paths. |
 | Neural Language Model | `ml/inference.py` + `ml/fusion.py` | CIFG-LSTM (1.9MB ONNX, 661 vocab, 512 hidden). Fused with n-gram at 75/25 dynamic ratio. 30ms hard timeout. |
 | Fatigue Monitor | `fatigue_monitor.py` | Tracks continuous gaze time. Triggers 20-20-20 rule break reminders and dry eye warnings. |
 
 **WebSocket message types sent to frontend**:
 ```
-gaze_data    — Filtered x,y coordinates + timestamp
+gaze         — Filtered x,y coordinates + timestamp, classifier/filter metadata
 predictions  — Word predictions (words[]) + sentence predictions (sentences[])
 fatigue_warn — Break reminder trigger
 tts_status   — TTS playback state
@@ -281,7 +281,7 @@ This prevents magic numbers in component code and ensures visual consistency.
 | Recency scores | Word usage timestamps | `python/data/patient_data/recency_scores.json` |
 | Patient bigrams | Word-pair frequencies | `python/data/patient_data/patient_bigrams.json` |
 | Sentence history | Spoken sentence log | `python/data/patient_data/patient_sentences.json` |
-| Blocked words | 110 harmful words permanently filtered | `python/prediction_guardrails.py` (code, not data) |
+| Blocked guardrails | 158 harmful word tokens + 8 blocked phrases permanently filtered | `python/prediction_guardrails.py` (code, not data) |
 
 ---
 

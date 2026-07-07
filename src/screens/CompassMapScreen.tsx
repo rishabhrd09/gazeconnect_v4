@@ -2831,18 +2831,18 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
           <GazeButton id="start-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
             onClick={() => { dispatch({ type: 'SWITCH_FLOOR', floor: 'first' }); onSpeak('Starting first floor. Place your rooms.'); }}
-            style={{ padding: '16px 40px', minHeight: 'clamp(60px, 8vh, 80px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)', background: T_accentSubtle, border: `2px solid ${T_accent}`, color: T_accent }}>
+            style={{ padding: '16px 40px', minHeight: 'clamp(80px, 9vh, 96px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)', background: T_accentSubtle, border: `2px solid ${T_accent}`, color: T_accent }}>
             YES, MAP 1ST FLOOR
           </GazeButton>
           <GazeButton id="no-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
             onClick={() => { handleSave(); onSpeak('Saved ground floor only. Done.'); }}
-            style={{ padding: '16px 40px', minHeight: 'clamp(60px, 8vh, 80px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, color: T_textSub }}>
+            style={{ padding: '16px 40px', minHeight: 'clamp(80px, 9vh, 96px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, color: T_textSub }}>
             NO, FINISH
           </GazeButton>
           <GazeButton id="gen-fp-transition" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
             onClick={() => { handleSave(); handleGenerateFloorPlan(); }}
             style={{
-              padding: '16px 40px', minHeight: 'clamp(60px, 8vh, 80px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)',
+              padding: '16px 40px', minHeight: 'clamp(80px, 9vh, 96px)', borderRadius: '14px', fontWeight: 800, fontSize: 'clamp(16px, 2vh, 22px)',
               background: T_generatePlanBg,
               border: `2px solid ${T_generatePlanBorder}`,
               color: T_generatePlanText,
@@ -3024,7 +3024,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           {/* Center: CLOSE */}
           <GazeButton id="close-menu" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
             onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}
-            style={{ padding: '10px 36px', minHeight: 'clamp(52px, 6vh, 68px)', borderRadius: '12px', fontWeight: 900, fontSize: 'clamp(16px, 1.9vh, 21px)', background: T_cardBg, border: `2px solid ${T_danger}`, color: T_textMain, letterSpacing: '1.5px', flexShrink: 0 }}>
+            style={{ padding: '10px 36px', minHeight: 'clamp(80px, 8.5vh, 92px)', borderRadius: '12px', fontWeight: 900, fontSize: 'clamp(16px, 1.9vh, 21px)', background: T_cardBg, border: `2px solid ${T_danger}`, color: T_textMain, letterSpacing: '1.5px', flexShrink: 0 }}>
             {'\u2715'} CLOSE
           </GazeButton>
           <div style={{ flex: 1 }} />
@@ -3038,10 +3038,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             </span>
             <GazeButton id="rm-yes" gazeEnabled={isGazeEnabled} dwellCategory="compassMapAction" gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => { dws({ type: 'REMOVE_PLACED_ROOM', placementId: menuConfirmRemove! }); setMenuConfirmRemove(null); }}
-              style={{ padding: '10px 30px', minHeight: 'clamp(50px, 5.5vh, 64px)', background: isLight ? `${T_danger}26` : isMix ? `${T_danger}33` : '#2d1515', border: `2px solid ${T_danger}`, borderRadius: '12px', color: T_danger, fontSize: 'clamp(15px, 1.7vh, 19px)', fontWeight: 900 }}>YES, REMOVE</GazeButton>
+              style={{ padding: '10px 30px', minHeight: 'clamp(80px, 8.5vh, 92px)', background: isLight ? `${T_danger}26` : isMix ? `${T_danger}33` : '#2d1515', border: `2px solid ${T_danger}`, borderRadius: '12px', color: T_danger, fontSize: 'clamp(15px, 1.7vh, 19px)', fontWeight: 900 }}>YES, REMOVE</GazeButton>
             <GazeButton id="rm-no" gazeEnabled={isGazeEnabled} dwellCategory="backSkipButton" gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={() => setMenuConfirmRemove(null)}
-              style={{ padding: '10px 30px', minHeight: 'clamp(50px, 5.5vh, 64px)', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, borderRadius: '12px', color: T_textMain, fontSize: 'clamp(15px, 1.7vh, 19px)', fontWeight: 800 }}>CANCEL</GazeButton>
+              style={{ padding: '10px 30px', minHeight: 'clamp(80px, 8.5vh, 92px)', background: T_cardBg, border: `2px solid ${T_panelBorderSoft}`, borderRadius: '12px', color: T_textMain, fontSize: 'clamp(15px, 1.7vh, 19px)', fontWeight: 800 }}>CANCEL</GazeButton>
           </div>
         )}
 

@@ -5,6 +5,8 @@
  * Only active during fixation state — no snapping during saccades.
  */
 
+import { gazeFlags } from './gazeFlags';
+
 export interface SnapTarget {
   id: string;
   rect: DOMRect;
@@ -33,6 +35,17 @@ const MAX_SNAP_STRENGTH = 0.30;
 /** Gaze toggle gets extra pull strength (easier to reach enable button) */
 const TOGGLE_SNAP_RADIUS = 220;
 const TOGGLE_MAX_SNAP_STRENGTH = 0.36;
+// B1-FE (flag toggleCalmFrontend, default OFF): the 220px/0.36 toggle halo
+// captures gaze that is merely NEAR the top-right corner ("strong magnetism
+// near the toggle"). Calmed values keep the toggle easy to hit ON target
+// while shrinking the capture halo. The gaze-OFF recovery path is protected
+// separately (GazeCursor keeps the stronger disabled-state assist).
+const TOGGLE_SNAP_RADIUS_CALM = 150;
+const TOGGLE_MAX_SNAP_STRENGTH_CALM = 0.28;
+/** Cap on the score bonus from priority when toggleCalmFrontend is ON
+ * (uncapped, priority 3 adds +0.6 — the toggle outscored a button the
+ * gaze was 30px from the center of). */
+const PRIORITY_BONUS_CAP_CALM = 0.3;
 // v15: Reduced keyboard snap to prevent compound pull with backend magnetism
 // causing rightward drift. Was 126px/0.18, now 90px/0.10.
 // v17.1 (revert): Restored v15 values. Bumping keyboard snap made the
@@ -43,6 +56,13 @@ const KEYBOARD_SNAP_RADIUS = 90;
 const KEYBOARD_MAX_SNAP_STRENGTH = 0.10;
 const PREDICTION_SNAP_RADIUS = 138;
 const PREDICTION_MAX_SNAP_STRENGTH = 0.20;
+// B2 (flag homeSnapCalm, default OFF): home tiles inherited the DEFAULT
+// snap config — the most aggressive in the app (140px, 0.30, boost ×1.45
+// → up to 0.435/frame). The boost was already disabled on keyboard and
+// prediction for exactly the "over-responsive" complaint the patient now
+// reports on home; this gives home tiles the same calm treatment.
+const HOME_TILE_SNAP_RADIUS = 120;
+const HOME_TILE_MAX_SNAP_STRENGTH = 0.22;
 /** Distance from window edge to be considered "edge button" */
 const EDGE_THRESHOLD = 150;
 // v17: When cursor is closer than this fraction of the snap radius to the
@@ -62,7 +82,11 @@ const NEAR_CENTER_BOOST_FACTOR = 1.45;  // 1.45× pull strength inside that zone
 function getSnapConfig(target: SnapTarget): { radius: number; maxStrength: number; useProximityBoost: boolean } {
   const context = (target.element?.getAttribute('data-gaze-context') || '').toLowerCase();
   if (target.priority >= 3 || context === 'gazetoggle') {
-    return { radius: TOGGLE_SNAP_RADIUS, maxStrength: TOGGLE_MAX_SNAP_STRENGTH, useProximityBoost: true };
+    // B1-FE: flag read per call (flags object is live) — rollback via
+    // window.__gazeFlags.set('toggleCalmFrontend', false) is immediate.
+    return gazeFlags.toggleCalmFrontend
+      ? { radius: TOGGLE_SNAP_RADIUS_CALM, maxStrength: TOGGLE_MAX_SNAP_STRENGTH_CALM, useProximityBoost: true }
+      : { radius: TOGGLE_SNAP_RADIUS, maxStrength: TOGGLE_MAX_SNAP_STRENGTH, useProximityBoost: true };
   }
   if (context === 'keyboard') {
     // No proximity boost — keys are tightly packed; boost causes
@@ -73,6 +97,10 @@ function getSnapConfig(target: SnapTarget): { radius: number; maxStrength: numbe
     // Prediction chips are also tightly packed horizontally — same
     // hazard. Linear snap only.
     return { radius: PREDICTION_SNAP_RADIUS, maxStrength: PREDICTION_MAX_SNAP_STRENGTH, useProximityBoost: false };
+  }
+  if (context === 'homescreentile' && gazeFlags.homeSnapCalm) {
+    // B2: calmer tiles — the boost-driven yank is the "rushing" feel.
+    return { radius: HOME_TILE_SNAP_RADIUS, maxStrength: HOME_TILE_MAX_SNAP_STRENGTH, useProximityBoost: false };
   }
   return {
     radius: BASE_SNAP_RADIUS * (target.isEdge ? EDGE_SNAP_MULTIPLIER : 1.0),
@@ -175,7 +203,13 @@ export function computeSnap(
     // Score: closer = better, higher priority = better
     // Normalize distance to 0-1 within snap radius (1 = closest)
     const distScore = 1 - distance / snapRadius;
-    const priorityBonus = target.priority * 0.2;
+    // B1-FE: uncapped, priority 3 adds +0.6 — enough for the toggle to
+    // outscore a button the gaze is 30px from the center of. The cap
+    // keeps priority as a tiebreaker, not an override.
+    const rawBonus = target.priority * 0.2;
+    const priorityBonus = gazeFlags.toggleCalmFrontend
+      ? Math.min(rawBonus, PRIORITY_BONUS_CAP_CALM)
+      : rawBonus;
     const score = distScore + priorityBonus;
 
     if (score > bestScore) {

@@ -23,8 +23,9 @@ import { computeEdgeExpansion, isPointInExpandedRect } from '../../utils/edgeHit
 import { computeScreenProfile } from '../../utils/screenProfile';
 import { useTheme } from '../../contexts/ThemeContext';
 import { collectKeyboardKeys, findBestKeyboardKey, type KeyRect } from '../../utils/hitZoneExpansion';
-import { recordDwellEvent, recordDwellInterrupt, recordFreeze } from '../../utils/gazeTelemetry';
+import { recordDwellEvent, recordDwellInterrupt, recordFreeze, recordGazeLatency, type GazeLatencySample } from '../../utils/gazeTelemetry';
 import { gazeFlags } from '../../utils/gazeFlags';
+import { KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT, type KeyboardCadence } from '../../config/dwellTimeConfig';
 
 // === TUNING PARAMETERS ===
 const CURSOR_SIZES: Record<string, number> = { small: 50, medium: 70, large: 90 };
@@ -104,9 +105,19 @@ export const GazeCursor: React.FC = () => {
   const gazeControl = useGazeControl();
   const { hasRealGaze, reportGazeReceived } = useRealGaze();
   const { settings } = useCustomization();
-  const { settings: dwellSettings } = useDwellTime();
+  const { settings: dwellSettings, currentStage } = useDwellTime();
   const dwellSettingsRef = useRef(dwellSettings);
   useEffect(() => { dwellSettingsRef.current = dwellSettings; }, [dwellSettings]);
+  // Current ALS stage, read live in the frame loop for the keyboardCadence flag.
+  const currentStageRef = useRef(currentStage);
+  useEffect(() => { currentStageRef.current = currentStage; }, [currentStage]);
+  // Keyboard cadence row for the active stage, or null when the flag is OFF
+  // (in which case every keyboard timing stays exactly as today).
+  const getKeyboardCadence = useCallback((): KeyboardCadence | null => {
+    if (!gazeFlags.keyboardCadence) return null;
+    const st = currentStageRef.current;
+    return (st && KEYBOARD_CADENCE_BY_STAGE[st]) || KEYBOARD_CADENCE_DEFAULT;
+  }, []);
   const lastNavigationTimestampRef = useRef(gazeControl.lastNavigationTimestamp);
   useEffect(() => {
     lastNavigationTimestampRef.current = gazeControl.lastNavigationTimestamp;
@@ -166,6 +177,15 @@ export const GazeCursor: React.FC = () => {
   const lastSignalStateRef = useRef<string>('valid');
   const lastDwellTickRef = useRef<number>(0);
 
+  // === LATENCY INSTRUMENTATION REFS (measurement only) ===
+  // lastTHelperMsRef dedupes gap-hold rebroadcasts (same helper stamp);
+  // latencyPaintCounterRef samples the paint delta every 8th frame;
+  // lastLatencySampleRef lets the sampled rAF fill paintMs into the ring
+  // entry after the fact.
+  const lastTHelperMsRef = useRef<number>(0);
+  const latencyPaintCounterRef = useRef<number>(0);
+  const lastLatencySampleRef = useRef<GazeLatencySample | null>(null);
+
   // v15: OptiKey-style 3-sample pre-smoothing (SmoothWhenChangingGazeTarget)
   // Reduces directional bias before EMA amplifies it.
   // Weights: current=0.45, prev1=0.30, prev2=0.25
@@ -207,6 +227,13 @@ export const GazeCursor: React.FC = () => {
   const repeatLastIdRef = useRef<string>('');
   const repeatLastTimeRef = useRef<number>(0);
   const repeatIndexRef = useRef<number>(0);
+  // B2 repeatGuard: set true when the gaze acquires a DIFFERENT onset target
+  // after the last click; reset to false at each click. Used to suppress the
+  // fast-repeat accelerator on an unintended look-away-and-return.
+  const sawDifferentTargetSinceClickRef = useRef<boolean>(false);
+  // B1 keyboardCadence: whether the previous click was a keyboard-context
+  // target — gates the keyboard cooldown base for the next click's cooldown.
+  const lastClickWasKeyboardRef = useRef<boolean>(false);
 
   // === KEYBOARD HIT ZONE REFS ===
   const keyboardKeysRef = useRef<KeyRect[]>([]);
@@ -462,6 +489,11 @@ export const GazeCursor: React.FC = () => {
         : contextKey === 'navigation' || contextKey === 'navigationbutton' ? s.navigationButton
           : contextKey === 'quickfire' ? s.quickfire
             : contextKey === 'keyboard' || contextKey === 'keyboardkey' ? s.keyboardKey
+              // Prediction strip: today it falls through to keyboardKey on the
+              // keyboard screen (isKeyboard=true). Made explicit here so the
+              // suggestion timing can be tuned independently of letter keys
+              // later without changing today's value (still keyboardKey).
+              : contextKey === 'prediction' ? s.keyboardKey
               : contextKey === 'surveyoption' ? s.surveyOption
                 : contextKey === 'phrasebutton' || contextKey === 'phrases' ? s.phraseButton
                   : contextKey === 'homescreentile' ? s.homeScreenTile
@@ -481,12 +513,21 @@ export const GazeCursor: React.FC = () => {
         : isNavOnCompass ? Math.max(s.navigationButton, 1400)
           : contextDwell ?? (isKeyboard ? s.keyboardKey : s.standardButton);
 
+    // NOTE: keyboardCadence (default ON) intentionally does NOT override the
+    // letter DWELL — only onset + cooldown (the dead time) are cut, elsewhere
+    // in the loop. The dwell stays accuracy-critical and untouched here
+    // (patient request 2026-07-07).
+
     // v17: Variable repeat dwell — faster for repeated presses of same key
     const isKeyboardContext = contextKey === 'keyboard' || contextKey === 'keyboardkey';
     if (s.repeatDwellEnabled && isKeyboardContext) {
       const elId = el.id || '';
       const now = Date.now();
-      if (elId && elId === repeatLastIdRef.current && (now - repeatLastTimeRef.current) < (s.repeatWindowMs || 2000)) {
+      // repeatGuard flag (default OFF): suppress the accelerator if the gaze
+      // acquired a DIFFERENT target since the last click on this key (an
+      // unintended look-away-and-return, not a deliberate repeat).
+      const continuityOk = !gazeFlags.repeatGuard || !sawDifferentTargetSinceClickRef.current;
+      if (continuityOk && elId && elId === repeatLastIdRef.current && (now - repeatLastTimeRef.current) < (s.repeatWindowMs || 2000)) {
         const times = s.repeatDwellTimes || [0, 250, 350];
         const idx = Math.min(repeatIndexRef.current, times.length - 1);
         const repeatTime = times[idx];
@@ -545,7 +586,16 @@ export const GazeCursor: React.FC = () => {
 
     // Cooldown check — uses configurable cooldown from DwellTimeContext
     const s = dwellSettingsRef.current;
-    const effectiveCooldown = s.cooldownAfterActivation + 1000; // base 1000ms + configurable
+    // B1 keyboardCadence (default OFF): when the previous click was a keyboard
+    // target, use the stage's keyboard cooldown base INSTEAD of the hidden
+    // +1000ms floor — this is where most of the typing dead time hides. Only
+    // applies to keyboard-after-keyboard clicks; every other cooldown (nav,
+    // home, emergency, and the first click after leaving the keyboard) keeps
+    // the +1000ms floor. With the flag OFF this is exactly today's value.
+    const cadenceForCooldown = getKeyboardCadence();
+    const effectiveCooldown = (cadenceForCooldown && lastClickWasKeyboardRef.current)
+      ? cadenceForCooldown.cooldown
+      : s.cooldownAfterActivation + 1000; // base 1000ms + configurable
     const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
 
     // === v17.9: UNIFIED HIT-TEST POSITION (cursor render == hit test) ====
@@ -681,7 +731,14 @@ export const GazeCursor: React.FC = () => {
 
         const dist = Math.hypot(cx - tcx, cy - tcy);
         // Only consider targets within a reasonable range (half of button diagonal + margin)
-        const maxRange = Math.hypot(target.rect.width, target.rect.height) * 0.5 + 30;
+        // B1-FE extension: with gaze ON + calm flag, the TOGGLE gets no
+        // extra acquisition margin — a ~140px toggle was acquirable from
+        // ~129px away, which fed the capture-then-teleport the patient
+        // reported. Its own rect (half-diagonal ≈ 99px) stays fully
+        // reachable for intentional selection.
+        const acquisitionMargin =
+          (gazeFlags.toggleCalmFrontend && enabled && target.priority >= 3) ? 0 : 30;
+        const maxRange = Math.hypot(target.rect.width, target.rect.height) * 0.5 + acquisitionMargin;
         if (dist < maxRange && dist < bestDist) {
           bestDist = dist;
           bestTarget = target;
@@ -711,6 +768,11 @@ export const GazeCursor: React.FC = () => {
         if (result.element) {
           // Extended hit points (index >= 5) only count for always-active elements
           if (i >= 5 && !result.isAlwaysActive) continue;
+          // B1-FE extension: with gaze ON + calm flag, the extended ±64px
+          // reach no longer applies to the TOGGLE (it kept acquiring the
+          // toggle from ~90px out). Emergency keeps its extended reach,
+          // and the toggle keeps it whenever gaze is OFF (bootstrap).
+          if (i >= 5 && result.isToggle && gazeFlags.toggleCalmFrontend && enabled) continue;
           clickable = result.element;
           isToggle = result.isToggle;
           isAlwaysActive = result.isAlwaysActive;
@@ -895,6 +957,14 @@ export const GazeCursor: React.FC = () => {
       onsetStartTimeRef.current = now;
       onsetCompletedRef.current = false;
 
+      // B2 repeatGuard: acquiring an onset target that isn't the last-clicked
+      // key means the gaze moved elsewhere — flag it so the fast-repeat
+      // accelerator is suppressed on a look-away-and-return to the same key.
+      // Re-acquiring the SAME key (deliberate repeat) does not set this.
+      if ((clickable.id || '') !== repeatLastIdRef.current) {
+        sawDifferentTargetSinceClickRef.current = true;
+      }
+
       // Check if this is a saved target that can be resumed (fixation TTL)
       if (savedDwellRef.current
         && savedDwellRef.current.element === clickable
@@ -953,7 +1023,25 @@ export const GazeCursor: React.FC = () => {
 
     // Check if onset is still in progress
     if (!onsetCompletedRef.current) {
-      const onsetDuration = isAlwaysActive ? ONSET_DELAY_ALWAYS_ACTIVE_MS : ONSET_DELAY_MS;
+      // B1-FE extension (flag toggleCalmFrontend): with gaze ON, the toggle
+      // uses the STANDARD onset — the 100ms fast path let a glance that
+      // merely passed near the toggle become the dwell candidate almost
+      // instantly (on-rig video 2026-07-06: "once it moves very near, it
+      // takes the cursor to the toggle"). The fast onset remains for the
+      // gaze-OFF bootstrap and for Emergency (always-active, not a toggle).
+      const useFastOnset = isAlwaysActive &&
+        !(gazeFlags.toggleCalmFrontend && isToggle && enabled);
+      let onsetDuration = useFastOnset ? ONSET_DELAY_ALWAYS_ACTIVE_MS : ONSET_DELAY_MS;
+      // B1 keyboardCadence (default OFF): use the stage's honest onset for
+      // keyboard/prediction targets. Emergency/always-active keeps its fast
+      // onset. The attr read only happens when the flag is on.
+      const kbOnsetCadence = getKeyboardCadence();
+      if (kbOnsetCadence && !useFastOnset) {
+        const ctxHere = (getTargetAttr(clickable, 'data-gaze-context') || '').toLowerCase();
+        if (ctxHere === 'keyboard' || ctxHere === 'keyboardkey' || ctxHere === 'prediction') {
+          onsetDuration = kbOnsetCadence.onset;
+        }
+      }
       const onsetElapsed = now - onsetStartTimeRef.current;
       if (onsetElapsed < onsetDuration) {
         // Still in onset phase — no visual feedback, no dwell timer
@@ -973,12 +1061,20 @@ export const GazeCursor: React.FC = () => {
         // OptiKey insight: cursor stability comes from freezing at a stable position.
         // Snapping to center gives immediate "locked on target" feel and prevents
         // the cursor from dwelling at the edge of a key/button.
+        // B1-FE extension: for the TOGGLE with gaze ON this teleport IS the
+        // "magnetically takes the cursor to the toggle centre" the patient
+        // reported — skip the jump (the softened anchor in handleGaze
+        // settles the cursor gradually instead); the highlight still marks
+        // the acquisition so intent stays visible.
         const rect = clickable.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
-        posRef.current.x = centerX;
-        posRef.current.y = centerY;
-        applyCursorTransform(centerX, centerY);
+        const calmToggleCapture = gazeFlags.toggleCalmFrontend && isToggle && enabled;
+        if (!calmToggleCapture) {
+          posRef.current.x = centerX;
+          posRef.current.y = centerY;
+          applyCursorTransform(centerX, centerY);
+        }
         // v16: Show visual highlight around the selected element
         setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
       }
@@ -993,12 +1089,15 @@ export const GazeCursor: React.FC = () => {
       const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
       setTargetName(name);
       // v16: Also snap when dwell target changes mid-fixation
+      // (B1-FE extension: same calm-toggle teleport skip as above.)
       const rect = clickable.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      posRef.current.x = centerX;
-      posRef.current.y = centerY;
-      applyCursorTransform(centerX, centerY);
+      if (!(gazeFlags.toggleCalmFrontend && isToggle && enabled)) {
+        posRef.current.x = centerX;
+        posRef.current.y = centerY;
+        applyCursorTransform(centerX, centerY);
+      }
       setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
 
@@ -1036,6 +1135,12 @@ export const GazeCursor: React.FC = () => {
       }
       repeatLastIdRef.current = elId;
       repeatLastTimeRef.current = now;
+      // B2 repeatGuard: this key is now the "last clicked" key; clear the
+      // look-away flag so a deliberate immediate repeat can accelerate.
+      sawDifferentTargetSinceClickRef.current = false;
+      // B1 keyboardCadence: remember whether this click was a keyboard-context
+      // target so the NEXT click's cooldown can use the keyboard cooldown base.
+      lastClickWasKeyboardRef.current = contextKey === 'keyboard' || contextKey === 'keyboardkey' || contextKey === 'prediction';
 
       // === R1: TELEMETRY ===========================================
       // Record this click's residual (raw gaze vs target center),
@@ -1050,9 +1155,29 @@ export const GazeCursor: React.FC = () => {
         };
         const gaze = lastRawPointRef.current;
         const contextAttr = (getTargetAttr(target, 'data-gaze-context') || '').trim();
+        const actionAttr = (getTargetAttr(target, 'data-action') || '').trim();
         const targetLabel = target.id
           || (target.textContent || '').trim().slice(0, 40)
           || target.tagName.toLowerCase();
+        // Runner-up key: nearest OTHER keyboard-key center to the gaze sample.
+        // A small distance => the intended key was ambiguous (confusion fuel).
+        let nearestAlt: { id: string; dist: number } | null = null;
+        if (contextAttr === 'keyboard' && keyboardKeysRef.current.length > 1) {
+          let best = Infinity;
+          for (const k of keyboardKeysRef.current) {
+            if (k.element === target) continue;
+            const ddx = gaze.x - k.centerX;
+            const ddy = gaze.y - k.centerY;
+            const d = Math.sqrt(ddx * ddx + ddy * ddy);
+            if (d < best) {
+              best = d;
+              nearestAlt = {
+                id: k.element.id || (k.element.textContent || '').trim().slice(0, 8) || '?',
+                dist: Math.round(d),
+              };
+            }
+          }
+        }
         recordDwellEvent({
           targetId: targetLabel,
           context: contextAttr,
@@ -1062,6 +1187,8 @@ export const GazeCursor: React.FC = () => {
           gaze: { x: gaze.x, y: gaze.y },
           onsetToClickMs: onsetStartTimeRef.current > 0 ? now - onsetStartTimeRef.current : 0,
           dwellToClickMs: dwellStartTimeRef.current > 0 ? now - dwellStartTimeRef.current : 0,
+          action: actionAttr || undefined,
+          nearestAlt,
         });
       } catch { /* never let telemetry block the click */ }
 
@@ -1080,7 +1207,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr]);
+  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {
@@ -1108,6 +1235,29 @@ export const GazeCursor: React.FC = () => {
     }
     lastGazeFrameAtRef.current = now;
     lastSignalStateRef.current = typeof data.signal_state === 'string' ? data.signal_state : 'valid';
+
+    // === LATENCY RECORDING (measurement only) ===
+    // t_helper_ms / t_sent_wall_ms are same-machine Unix-ms stamps from the
+    // C# helper and the Python broadcast path; `now` is the WS receive time.
+    // Gap-hold rebroadcasts re-send the same payload — identical helper
+    // stamp — and are skipped so held frames don't pollute the percentiles.
+    const tHelperMs = typeof data.t_helper_ms === 'number' ? data.t_helper_ms : 0;
+    const tSentMs = typeof data.t_sent_wall_ms === 'number' ? data.t_sent_wall_ms : 0;
+    if (tHelperMs > 0 && tSentMs > 0 && tHelperMs !== lastTHelperMsRef.current) {
+      lastTHelperMsRef.current = tHelperMs;
+      const ingestMs = typeof data.sample_age_ms === 'number' ? data.sample_age_ms : -1;
+      try {
+        lastLatencySampleRef.current = recordGazeLatency({
+          ingestMs,
+          pipelineMs: Math.max(0, tSentMs - tHelperMs - Math.max(0, ingestMs)),
+          wsMs: Math.max(0, now - tSentMs),
+          e2eMs: Math.max(0, now - tHelperMs),
+          paintMs: -1,
+        });
+      } catch { /* measurement only */ }
+    } else {
+      lastLatencySampleRef.current = null;
+    }
 
     // Track gaze state from backend classifier
     gazeStateRef.current = data.gaze_state;
@@ -1395,8 +1545,13 @@ export const GazeCursor: React.FC = () => {
           bestToggle = t;
         }
       }
-      const assistRadius = enabled ? 112 : 140;
-      const assistStrength = enabled ? 0.12 : 0.18;
+      // B1-FE (flag toggleCalmFrontend): trim the gaze-ON assist — with
+      // gaze enabled the toggle doesn't need a wide capture halo, and the
+      // patient reported being pulled in when looking NEAR (not at) it.
+      // The gaze-OFF branch (0.18/140) is deliberately untouched: it is
+      // the bootstrap path for re-enabling gaze and must stay reliable.
+      const assistRadius = enabled ? (gazeFlags.toggleCalmFrontend ? 90 : 112) : 140;
+      const assistStrength = enabled ? (gazeFlags.toggleCalmFrontend ? 0.08 : 0.12) : 0.18;
       if (bestToggle && bestDist < assistRadius) {
         const cx = bestToggle.rect.left + bestToggle.rect.width / 2;
         const cy = bestToggle.rect.top + bestToggle.rect.height / 2;
@@ -1442,10 +1597,28 @@ export const GazeCursor: React.FC = () => {
       if (rect.width > 0 && rect.height > 0) {
         const anchorX = rect.left + rect.width / 2;
         const anchorY = rect.top + rect.height / 2;
-        posRef.current.x = anchorX;
-        posRef.current.y = anchorY;
+        // B1-FE extension: for the TOGGLE with gaze ON, settle toward the
+        // centre gradually (25%/frame ≈ visually complete in ~5 frames)
+        // instead of pinning it there — the hard pin plus the onset
+        // teleport read as "a strong magnet grabbed the cursor".
+        if (gazeFlags.toggleCalmFrontend && enabled && isGazeToggleElement(target)) {
+          posRef.current.x += (anchorX - posRef.current.x) * 0.25;
+          posRef.current.y += (anchorY - posRef.current.y) * 0.25;
+        } else {
+          posRef.current.x = anchorX;
+          posRef.current.y = anchorY;
+        }
         // Keep the highlight rect synced — covers layout shift mid-dwell.
-        setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+        // v17.22: value-gated. This runs on EVERY gaze frame while
+        // dwelling, and an always-fresh object re-rendered the component
+        // at gaze rate even though the rect almost never changes.
+        // Returning the previous object when values match lets React
+        // bail out; a real layout shift still updates immediately.
+        setHighlightRect((prev) => (
+          prev
+          && prev.left === rect.left && prev.top === rect.top
+          && prev.width === rect.width && prev.height === rect.height
+        ) ? prev : { left: rect.left, top: rect.top, width: rect.width, height: rect.height });
       }
     } else if (onsetTargetRef.current && onsetStartTimeRef.current > 0) {
       // Onset preview: gradually pull cursor toward candidate center.
@@ -1468,7 +1641,20 @@ export const GazeCursor: React.FC = () => {
     }
 
     applyCursorTransform(posRef.current.x, posRef.current.y);
-  }, [enabled, reportGazeReceived, applyCursorTransform]);
+
+    // A5 — sampled paint delta: every 8th recorded frame, one rAF after the
+    // transform write measures WS-receive -> next-composited-frame time.
+    const latencySample = lastLatencySampleRef.current;
+    if (latencySample) {
+      latencyPaintCounterRef.current = (latencyPaintCounterRef.current + 1) % 8;
+      if (latencyPaintCounterRef.current === 0) {
+        const recvTs = now;
+        requestAnimationFrame(() => {
+          latencySample.paintMs = Math.max(0, Date.now() - recvTs);
+        });
+      }
+    }
+  }, [enabled, reportGazeReceived, applyCursorTransform, isGazeToggleElement]);
 
   // v17: Handle gaze_lost events — pause dwell during blink/stale/gap
   // When backend detects blink or tracking loss, we freeze dwell progress

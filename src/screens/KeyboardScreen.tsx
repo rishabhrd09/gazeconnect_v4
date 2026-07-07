@@ -18,6 +18,7 @@ import { useCustomization } from '../contexts/CustomizationContext';
 import {
   PredictionTelemetryKind,
   PredictionTelemetrySnapshot,
+  PredictionAcceptMeta,
   applyPredictionTelemetry,
   loadPredictionTelemetry,
   persistPredictionTelemetry,
@@ -560,7 +561,7 @@ const KeyBtn: React.FC<{
 // Prediction Bar — compact, with LOCKING
 const Predictions: React.FC<{
   predictions: Array<{ word: string; score: number; source?: string }>;
-  onSelect: (w: string) => void; isDarkMode: boolean;
+  onSelect: (w: string, rank?: number) => void; isDarkMode: boolean;
   gazeEnabled: boolean; lastEnabledTs: number; hasRealGaze: boolean;
   compact?: boolean;
   isHindiMode?: boolean;
@@ -613,7 +614,7 @@ const Predictions: React.FC<{
     setHIdx(i); sRef.current = Date.now();
     pRef.current = requestAnimationFrame(tick);
     tRef.current = setTimeout(() => {
-      onSelect(w);
+      onSelect(w, i);
       setHIdx(null);
       setProgress(0);
       setIsLocked(true);
@@ -680,7 +681,7 @@ const Predictions: React.FC<{
               data-gaze-context="prediction"
               onMouseEnter={() => enter(i, p.word)}
               onMouseLeave={leaveItem}
-              onClick={() => onSelect(p.word)}
+              onClick={() => onSelect(p.word, i)}
               style={{
                 position: 'relative',
                 width: '100%',
@@ -830,43 +831,14 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     }
   }, [text]);
 
-  const recordPredictionTelemetry = useCallback((kind: PredictionTelemetryKind, charsSaved: number) => {
+  const recordPredictionTelemetry = useCallback((kind: PredictionTelemetryKind, charsSaved: number, meta?: PredictionAcceptMeta) => {
     setPredictionTelemetry(prev => {
-      const next = applyPredictionTelemetry(prev, kind, charsSaved);
+      const next = applyPredictionTelemetry(prev, kind, charsSaved, meta);
       persistPredictionTelemetry(next);
       return next;
     });
   }, []);
 
-  const inlineCompletion = useMemo(() => {
-    if (!sentencePredictions || sentencePredictions.length === 0 || text.length < 3) {
-      return null;
-    }
-
-    const currentText = text.trimEnd();
-    if (!currentText) {
-      return null;
-    }
-
-    const currentTextLower = currentText.toLowerCase();
-    const match = sentencePredictions.find(sp =>
-      sp.text.toLowerCase().startsWith(currentTextLower) && sp.text.length > currentText.length + 2
-    );
-
-    if (!match) {
-      return null;
-    }
-
-    const continuation = match.text.slice(currentText.length);
-    if (!continuation.trim()) {
-      return null;
-    }
-
-    return {
-      fullText: match.text,
-      continuation,
-    };
-  }, [sentencePredictions, text]);
 
   const starterFallbackPredictions = useMemo(
     () => ENGLISH_STARTER_FALLBACK.map((word, index) => ({
@@ -880,25 +852,16 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   const handleKey = useCallback((key: string, action?: string) => {
     switch (action) {
       case 'space': {
-        // Only accept explicitly visible inline completion on Space.
-        // Never auto-rewrite a typed word into the top suggestion, because
-        // false accepts like "can" → "cancel" are too costly for gaze typing.
-        const trimmed = text.trimEnd();
-
-        if (inlineCompletion) {
-          const acceptedSentence = inlineCompletion.fullText.trim();
-          const charsSaved = acceptedSentence.length - trimmed.length;
-          const n = acceptedSentence + ' ';
-          setText(n); onTextChange?.(n); learnSentence?.(acceptedSentence);
-          recordPredictionTelemetry('ghost', charsSaved);
-        } else {
-          // Normal space — also check abbreviation
-          setText(p => {
-            const n = p + ' '; onTextChange?.(n);
-            const w = p.trim().split(' '); if (w.length && expandAbbreviation) expandAbbreviation(w[w.length - 1]);
-            return n;
-          });
-        }
+        // Space always inserts a plain space (+ abbreviation expansion). The
+        // inline ghost-completion accept was removed at the patient's request
+        // (2026-07-06) — Space must never insert a hidden sentence. Word
+        // predictions are still accepted explicitly via the top strip only;
+        // typed words are never auto-rewritten.
+        setText(p => {
+          const n = p + ' '; onTextChange?.(n);
+          const w = p.trim().split(' '); if (w.length && expandAbbreviation) expandAbbreviation(w[w.length - 1]);
+          return n;
+        });
         setIsShift(false); break;
       }
       case 'backspace':
@@ -961,12 +924,16 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           });
         } else {
           const c = isShift ? key.toUpperCase() : key.toLowerCase();
-          // Smart punctuation: if typing .,?! after an auto-space, remove the trailing space first
+          // Smart punctuation: attach the mark to the previous word (strip a
+          // trailing auto-space first), THEN add a trailing space so the next
+          // letter starts a NEW word. This makes a comma a real word boundary
+          // — a following prediction/typing can never absorb the comma or the
+          // word before it (patient report 2026-07-06).
           const SMART_PUNCT = new Set(['.', ',', '?', '!', ';', ':']);
           if (SMART_PUNCT.has(key)) {
             setText(p => {
               const base = p.endsWith(' ') ? p.slice(0, -1) : p;
-              const n = base + key;
+              const n = base + key + ' ';
               onTextChange?.(n);
               return n;
             });
@@ -976,29 +943,32 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         }
         if (isShift) setIsShift(false); break;
     }
-  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, inlineCompletion, recordPredictionTelemetry, showHindi, onNavigate]);
+  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, recordPredictionTelemetry, showHindi, onNavigate]);
 
-  const handlePrediction = useCallback((word: string) => {
+  const handlePrediction = useCallback((word: string, rank?: number) => {
     const normalizedWord = word.trim();
-    const trimmed = text.trimEnd();
-    const isEmptyText = trimmed.length === 0;
+    const isEmptyText = text.trimEnd().length === 0;
     const isPhrasePrediction = normalizedWord.includes(' ');
-    const lastWord = trimmed.split(/\s+/).pop() || '';
-    const charsSaved = isEmptyText
-      ? normalizedWord.length
-      : text.endsWith(' ')
-        ? normalizedWord.length
-        : normalizedWord.length - lastWord.length;
 
-    if (text.endsWith(' ') || text === '') {
-      const n = text + word + ' ';
-      setText(n); onTextChange?.(n);
+    // The partial word being completed is ONLY the trailing run of letters
+    // (Latin or Devanagari). Punctuation such as a comma is a hard word
+    // boundary — choosing a prediction must replace just the partial word and
+    // never absorb the comma or the word before it (patient report 2026-07-06).
+    const partialMatch = text.match(/[A-Za-zऀ-ॿ]+$/);
+    const partialWord = partialMatch ? partialMatch[0] : '';
+    const charsSaved = Math.max(0, normalizedWord.length - partialWord.length);
+
+    let n: string;
+    if (partialWord) {
+      // Replace only the trailing partial word, keep everything before it.
+      n = text.slice(0, text.length - partialWord.length) + word + ' ';
     } else {
-      const words = text.trim().split(' ');
-      words[words.length - 1] = word;
-      const n = words.join(' ') + ' ';
-      setText(n); onTextChange?.(n);
+      // No partial word (ends with space or punctuation) → append as a NEW
+      // word, adding a separating space only if one isn't already present.
+      const needsSpace = text.length > 0 && !/\s$/.test(text);
+      n = text + (needsSpace ? ' ' : '') + word + ' ';
     }
+    setText(n); onTextChange?.(n);
 
     if (isPhrasePrediction) {
       learnSentence?.(normalizedWord);
@@ -1008,8 +978,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     recordPredictionTelemetry(
       isEmptyText ? 'starter' : (isPhrasePrediction ? 'sentence' : 'word'),
       charsSaved,
+      { rank, lang: keyboardMode === 'hindi' ? 'hi' : 'en' },
     );
-  }, [text, onTextChange, learnSentence, learnWord, recordPredictionTelemetry]);
+  }, [text, onTextChange, learnSentence, learnWord, recordPredictionTelemetry, keyboardMode]);
 
   const handleSentenceSelect = useCallback((sentence: string) => {
     const trimmed = text.trimEnd();
@@ -1025,8 +996,20 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     recordPredictionTelemetry(
       trimmed.length === 0 ? 'starter' : 'sentence',
       shouldCompleteCurrentText ? sentence.trim().length - trimmed.length : sentence.trim().length,
+      { rank: 0, lang: keyboardMode === 'hindi' ? 'hi' : 'en' },
     );
-  }, [text, onTextChange, learnSentence, recordPredictionTelemetry]);
+  }, [text, onTextChange, learnSentence, recordPredictionTelemetry, keyboardMode]);
+
+  // Bottom phrase buttons: only SHORT phrases (patient request 2026-07-06 —
+  // long multi-line sentence suggestions were confusing). Keep the phrase
+  // feature, but cap at <=6 words / <=42 chars so a button stays one short line.
+  const shortSentencePredictions = useMemo(
+    () => (sentencePredictions || []).filter(sp => {
+      const t = (sp.text || '').trim();
+      return t.length > 0 && t.length <= 42 && t.split(/\s+/).length <= 6;
+    }),
+    [sentencePredictions]
+  );
 
   // QuickWord → sentence map. ONLY give choices when options mean DIFFERENT actions.
   // Single-sentence entries insert directly (no picker shown).
@@ -1199,14 +1182,10 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
             fontFamily: UI_FONT,
           }}>
             {text}
-            {/* Ghost text — inline sentence completion (Gboard Smart Compose style).
-                Shows the neural/template sentence continuation as greyed-out text
-                after the cursor. User can accept by pressing Space or ignore it. */}
-            {inlineCompletion && (
-              <span style={{ color: 'rgba(168, 181, 196, 0.42)', fontWeight: 400 }}>
-                {inlineCompletion.continuation}
-              </span>
-            )}
+            {/* Inline ghost sentence-completion inside the display box was
+                removed at the patient's request (2026-07-06): the long
+                greyed-out multi-line synthesis was confusing. The top word
+                strip and the bottom phrase buttons are unaffected. */}
             <span style={{
               display: 'inline-block', width: '4px', height: '1em',
               backgroundColor: keyboardAccent, marginLeft: '6px',
@@ -1613,8 +1592,8 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           {navHidden && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: sentencePredictions.length > 0
-                ? `repeat(${Math.min(sentencePredictions.length, 2)}, 1fr) ${SHOW_NAV_COLUMN}`
+              gridTemplateColumns: shortSentencePredictions.length > 0
+                ? `repeat(${Math.min(shortSentencePredictions.length, 2)}, 1fr) ${SHOW_NAV_COLUMN}`
                 : `repeat(4, 1fr) ${SHOW_NAV_COLUMN}`,
               gap: '4px',
               backgroundColor: 'transparent',
@@ -1629,10 +1608,10 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               boxShadow: isDarkMode ? '0 5px 14px rgba(0,0,0,0.14)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
               margin: '0 -2px',
             }}>
-              {sentencePredictions.length > 0 ? (
+              {shortSentencePredictions.length > 0 ? (
                 <>
-                  {/* Sentence predictions — max 2 shown */}
-                  {sentencePredictions.slice(0, 2).map((sp, i) => {
+                  {/* Sentence predictions — max 2 shown, short phrases only */}
+                  {shortSentencePredictions.slice(0, 2).map((sp, i) => {
                     return (
                       <GazeButton
                         key={`sent-${i}-${sp.text.slice(0,10)}`}

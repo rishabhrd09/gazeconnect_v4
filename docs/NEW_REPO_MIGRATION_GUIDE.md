@@ -197,8 +197,8 @@ Medical-grade AAC app for ALS/MND patients using Tobii Eye Tracker 5.
 - Python 3.10+ asyncio WebSocket backend
 - .NET 6.0 Tobii Eye Tracker bridge
 - OptiKey-parity gaze processing pipeline
-- 5-layer word prediction (N-gram + Smart Bigrams + CIFG-LSTM + Datamuse + Patient)
-- 110 blocked harmful words in prediction guardrails
+- Local-first word prediction (N-gram + Smart Bigrams + CIFG-LSTM neural fusion + patient personalization; optional Datamuse enrichment is off by default)
+- 158 blocked word tokens + 8 blocked phrases in prediction guardrails
 - Bilingual: English + Hindi
 - Self-installing setup scripts for Windows"
 
@@ -283,7 +283,7 @@ The copy at `C:\GAZECONNECT\gazeconnect_new_repo` is your new working directory.
 - [ ] No `.env`, credentials, patient data, or secrets were pushed
 - [ ] `setup.bat` exists in the new repo and works on fresh clone
 - [ ] `start-dev.bat` exists and can launch the app
-- [ ] All 13 screens folder exists under `src/screens/`
+- [ ] Current screen folder exists under `src/screens/` (19 `.tsx` screen files; active routing is defined in `src/App.tsx`)
 - [ ] Python backend files exist under `python/`
 - [ ] Tobii helper source exists under `tobii-helper/`
 - [ ] `python/data/smart_bigrams.json` exists (36KB)

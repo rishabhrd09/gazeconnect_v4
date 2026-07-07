@@ -131,6 +131,18 @@ export function buildBrowserCursorInjectionScript(): string {
         savedProgress: 0,
         savedProgressKey: '',
         savedProgressAt: 0,
+        // v17.23 — per-target progress BANK (gcConfig.progressBankEnabled,
+        // default OFF). OptiKey-style concurrent banking: progress is
+        // keyed by element IDENTITY so ping-ponging between two adjacent
+        // links (dense pages, row pitch below the gaze noise floor) lets
+        // EACH link accumulate toward its dwell instead of every flip
+        // discarding the other link's progress (the audited dominant
+        // quick-search failure: the ring flickers and never completes).
+        // Entries: identity -> { frac, at }. TTL = progressRetentionMs
+        // per entry; capped at 8 entries (oldest evicted). Cleared by
+        // click commit / route change / gcHide / gcResetDwell /
+        // gcBlockDwell — same invalidation set as the single slot.
+        progressBank: {},
         // v17.18 — wall-clock time of the last frame on which the tracked
         // target was REALLY resolved (not via the sticky ghost). The save
         // path counts progress only up to this moment, so time spent with
@@ -144,7 +156,13 @@ export function buildBrowserCursorInjectionScript(): string {
         // v17.21 — live page zoom factor, pushed in from the main process
         // each frame (see buildGazeUpdateAndPollScript). Used by
         // radiusScale() so snap/hold radii keep a constant screen size.
-        pageZoom: 1
+        pageZoom: 1,
+        // v17.22 — hot-path telemetry: duration of the last
+        // resolveClickRequest (ms) and last Bayesian candidate-pool size.
+        // Pushed into the frames ring (rMs / nCand) so DOM scan cost is
+        // measurable on-rig via __gcTelemetry.perf().
+        lastResolveMs: -1,
+        lastCandN: -1
       };
 
       window.gcConfig = Object.assign({
@@ -196,6 +214,11 @@ export function buildBrowserCursorInjectionScript(): string {
         //   window.gcConfig.progressRetentionEnabled = false
         progressRetentionEnabled: true,
         progressRetentionMs: 1000,
+        // v17.23 — per-target progress bank (see state.progressBank).
+        // OFF = the single-slot retention above (current behavior).
+        // Rollback: window.gcConfig.progressBankEnabled = false (or the
+        // persistent gazeFlag 'browserProgressBank').
+        progressBankEnabled: false,
         // v17.17 — pause dwell clocks across gaze-stream gaps longer
         // than gapPauseMs (matches the app-side 150ms stale threshold
         // and the backend POINT_TTL). Rollback:
@@ -211,6 +234,8 @@ export function buildBrowserCursorInjectionScript(): string {
         // card snap. Rollback: window.gcConfig.probeSnapEnabled = false
         probeSnapEnabled: true,
         probeSnapRadiusPx: 36,
+        // v17.23 — see probeSnapTarget; 0 = legacy strict-nearest winner.
+        probeSnapHysteresisPx: 0,
         // v17.19 — dwell progress arc on the in-page ring (visual only).
         // Rollback: window.gcConfig.progressArcEnabled = false
         progressArcEnabled: true,
@@ -227,7 +252,27 @@ export function buildBrowserCursorInjectionScript(): string {
         focusOnResolve: false,
         // v17.21 — keep snap/hold/probe radii a constant on-screen size
         // regardless of page zoom (see radiusScale). Rollback: false.
-        zoomScaleRadii: true
+        zoomScaleRadii: true,
+        // v17.22 — empty-dwell guard. Without it, gaze parked on
+        // NON-interactive page space still runs the dwell clock: the ring
+        // lights up over blank space, dwellState reads onset/dwell/commit
+        // (pausing armed edge-scroll indefinitely while the patient reads),
+        // and — worst — once elapsed exceeds dwellMs, the first interactive
+        // element the gaze drifts onto WITHIN the stability radius is
+        // clicked instantly with zero dwell on it (replay scenario S11).
+        // The guard: (a) no target resolved => dwell clock stays at 0;
+        // (b) the resolved element's IDENTITY changing mid-stability
+        // restarts acquisition (kind flips and small reflows are ignored,
+        // matching the retention-key tolerance); (c) commit requires the
+        // committing element to be the tracked one.
+        // Rollback: window.gcConfig.emptyDwellGuardEnabled = false
+        emptyDwellGuardEnabled: true,
+        // v17.22 — card-scan cache TTL (ms). The YouTube card pool
+        // (document.querySelectorAll + per-card anchor lookup) is cached
+        // per candidate-epoch with this TTL backstop; rects/visibility are
+        // still evaluated fresh every frame. 0 disables caching (legacy
+        // full scan every frame).
+        cardScanCacheMs: 250
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -270,6 +315,55 @@ export function buildBrowserCursorInjectionScript(): string {
       // 300ms after it renders; skip buttons persist for seconds.
       let skipBtnCacheEl = null;
       let skipBtnScanAt = 0;
+
+      // v17.23 — probe-snap incumbent memory (probeSnapHysteresisPx).
+      let probeIncumbentEl = null;
+      let probeIncumbentAt = 0;
+
+      // v17.22 — card scan cache. bayesianYoutubeCard and nearestYoutubeCard
+      // each ran document.querySelectorAll(videoCardSelector) plus a per-card
+      // anchor querySelector on EVERY gaze frame (~33Hz) — and when gaze was
+      // away from all cards, BOTH ran (bayesian finds no pool, falls through
+      // to nearest): ~2 document sweeps + ~160 subtree queries per frame on a
+      // 30-card sidebar. Card-set MEMBERSHIP only changes via DOM mutations,
+      // which the MutationObserver converts into candidate-epoch bumps, so
+      // the {card, anchor} node list is cached per epoch with a TTL backstop
+      // (cardScanCacheMs, default 250ms — same staleness bound as the
+      // skip-button cache) and an isConnected revalidation every use.
+      // Rects and visibility are still evaluated fresh per frame — only the
+      // node DISCOVERY is cached. cardScanCacheMs = 0 restores the legacy
+      // scan-every-frame behavior.
+      let cardListCache = null;
+      let cardListEpoch = -1;
+      let cardListAt = 0;
+      const getCardEntries = () => {
+        const ttl = Math.max(0, Math.min(2000, Number(window.gcConfig?.cardScanCacheMs ?? 250)));
+        const nowMs = performance.now();
+        if (cardListCache && ttl > 0 &&
+            cardListEpoch === state.candidateEpoch &&
+            (nowMs - cardListAt) < ttl) {
+          let ok = true;
+          for (let i = 0; i < cardListCache.length; i++) {
+            if (!cardListCache[i].card.isConnected || !cardListCache[i].anchor.isConnected) { ok = false; break; }
+          }
+          if (ok) return cardListCache;
+        }
+        const out = [];
+        try {
+          const cards = document.querySelectorAll(videoCardSelector);
+          const n = Math.min(cards.length, 80);
+          for (let i = 0; i < n; i++) {
+            const card = cards[i];
+            let anchor = null;
+            try { anchor = card.querySelector(videoAnchorSelector); } catch (_) {}
+            if (anchor) out.push({ card, anchor });
+          }
+        } catch (_) { /* scan best-effort */ }
+        cardListCache = out;
+        cardListEpoch = state.candidateEpoch;
+        cardListAt = nowMs;
+        return out;
+      };
 
       // v17.21 — zoom-aware radius scaling. After the Entry-26 coordinate
       // fix the gaze fed to this script is in page CSS px (= view px /
@@ -701,6 +795,37 @@ export function buildBrowserCursorInjectionScript(): string {
         return i >= 0 ? s.slice(i + 1) : s;
       };
 
+      // v17.22 — element IDENTITY for dwell continuity (empty-dwell guard).
+      // stableKeyFor builds kind|href|label|id|role|aria|tag|<4 rect
+      // segments>; identity drops the kind prefix AND the rect tail, so a
+      // resolution-path flip (youtube_anchor -> youtube_card) or a small
+      // layout reflow does NOT read as "a different element", while a
+      // genuinely different element (different href/label/id) does.
+      const identityKeyOf = (key) => {
+        const parts = String(key || '').split('|');
+        return parts.length > 5 ? parts.slice(1, parts.length - 4).join('|') : String(key || '');
+      };
+
+      // v17.23 — progress-bank maintenance: drop expired entries, then
+      // evict oldest until at most 8 remain. O(8) — called only on
+      // save/resume, never per idle frame.
+      const bankPrune = (nowMs, ttlMs) => {
+        const bank = state.progressBank;
+        let keys = Object.keys(bank);
+        for (let i = 0; i < keys.length; i++) {
+          if ((nowMs - bank[keys[i]].at) >= ttlMs) delete bank[keys[i]];
+        }
+        keys = Object.keys(bank);
+        while (keys.length > 8) {
+          let oldestKey = keys[0];
+          for (let i = 1; i < keys.length; i++) {
+            if (bank[keys[i]].at < bank[oldestKey].at) oldestKey = keys[i];
+          }
+          delete bank[oldestKey];
+          keys = Object.keys(bank);
+        }
+      };
+
       const stableKeyFor = (target, kind, href, label, rect) => [
         kind,
         href || '',
@@ -875,6 +1000,28 @@ export function buildBrowserCursorInjectionScript(): string {
             }
           }
         }
+        // v17.23 — incumbent hysteresis (gcConfig.probeSnapHysteresisPx,
+        // default 0 = legacy strict-nearest). Two links at near-equal
+        // distance flip the probe winner every frame from tremor, and each
+        // flip restarts acquisition (identity guard). With a margin set, a
+        // challenger must beat the RECENT winner by that many screen px to
+        // displace it. Runtime-tunable; 0 restores exact old behavior.
+        const hystPx = Math.max(0, Math.min(24, Number(cfg.probeSnapHysteresisPx || 0))) / radiusScale();
+        if (hystPx > 0 && best && probeIncumbentEl && probeIncumbentEl !== best &&
+            (performance.now() - probeIncumbentAt) < 250) {
+          try {
+            if (probeIncumbentEl.isConnected && isVisible(probeIncumbentEl)) {
+              const incDist = distanceToRect(x, y, safeRect(probeIncumbentEl));
+              if (incDist <= radius && bestDist > incDist - hystPx) {
+                best = probeIncumbentEl;
+              }
+            }
+          } catch (_) { /* hysteresis best-effort */ }
+        }
+        if (best) {
+          probeIncumbentEl = best;
+          probeIncumbentAt = performance.now();
+        }
         return best ? clickRequestFor(best, x, y, 'probe_snap', true) : null;
       };
 
@@ -922,16 +1069,25 @@ export function buildBrowserCursorInjectionScript(): string {
         const unsnap = cardUnsnapRadius();
         let best = null;
         let bestDistance = Infinity;
-        const cards = Array.from(document.querySelectorAll(videoCardSelector)).slice(0, 80);
-        for (const card of cards) {
+        const entries = getCardEntries();
+        for (let i = 0; i < entries.length; i++) {
+          const card = entries[i].card;
+          const anchor = entries[i].anchor;
+          // v17.22 — rect-first pre-filter (exact exclusion): the snap rect
+          // is contained in the full card rect, so dist(snapRect) >=
+          // dist(fullRect); a card whose FULL rect is beyond the widest
+          // possible limit (unsnap >= snapIn) can never qualify below.
+          // Skipping it early avoids the getComputedStyle visibility work
+          // for the ~all cards far from gaze.
+          const fullRect = safeRect(card);
+          if (!fullRect) continue;
+          if (distanceToRect(x, y, fullRect) > unsnap) continue;
           if (!isVisible(card)) continue;
-          const anchor = card.querySelector(videoAnchorSelector);
-          if (!anchor || !isVisible(anchor)) continue;
+          if (!isVisible(anchor)) continue;
           // v17.15 DoD-2 — unlocked cards: distance to snap rect
           // (thumbnail+title region). Locked cards: distance to full
           // rect (wider hold zone via unsnap radius).
           const isLocked = isLockedYoutubeCard(anchor);
-          const fullRect = safeRect(card);
           const snapRect = isLocked ? fullRect : (getCardSnapRect(card) || fullRect);
           const distance = distanceToRect(x, y, snapRect);
           const limit = isLocked ? unsnap : snapIn;
@@ -992,14 +1148,24 @@ export function buildBrowserCursorInjectionScript(): string {
         const alpha = Number(window.gcConfig?.bayesianAlpha || 0.30);
         const commitThreshold = Number(window.gcConfig?.bayesianCommitThreshold || 0.55);
 
-        const cards = Array.from(document.querySelectorAll(videoCardSelector)).slice(0, 80);
+        const entries = getCardEntries();
         const candidates = [];
-        for (const card of cards) {
-          if (!isVisible(card)) continue;
-          const anchor = card.querySelector(videoAnchorSelector);
-          if (!anchor || !isVisible(anchor)) continue;
+        // v17.22 — the widest limit any card (locked or not) can qualify
+        // under; used for the rect-first pre-filter below.
+        const poolLimit = Math.max(expandedZone, unsnap);
+        for (let ei = 0; ei < entries.length; ei++) {
+          const card = entries[ei].card;
+          const anchor = entries[ei].anchor;
+          // v17.22 — rect-first pre-filter (exact exclusion, same argument
+          // as nearestYoutubeCard): snapRect ⊆ fullRect so dist(snapRect)
+          // >= dist(fullRect) > poolLimit can never pass the zone checks
+          // below. Saves the per-card getComputedStyle for far cards.
           const fullRect = safeRect(card);
           if (!fullRect) continue;
+          const distFull = distanceToRect(x, y, fullRect);
+          if (distFull > poolLimit) continue;
+          if (!isVisible(card)) continue;
+          if (!isVisible(anchor)) continue;
           // v17.15 DoD-2 — distance is computed against the snap rect
           // (thumbnail+title union for compact cards, full rect for
           // others). Locked cards additionally check the full rect
@@ -1009,7 +1175,6 @@ export function buildBrowserCursorInjectionScript(): string {
           const distSnap = distanceToRect(x, y, snapRect);
           const isLocked = isLockedYoutubeCard(anchor);
           if (isLocked) {
-            const distFull = distanceToRect(x, y, fullRect);
             if (distFull > Math.max(expandedZone, unsnap)) continue;
           } else {
             if (distSnap > expandedZone) continue;
@@ -1047,6 +1212,8 @@ export function buildBrowserCursorInjectionScript(): string {
         // bump.
         const sig = candidates.length + '|' + candidates.slice(0, 5).map((c) => c.key).join(',');
         state.candidateListSig = sig;
+        // v17.22 — telemetry: last Bayesian pool size (frames-ring nCand).
+        state.lastCandN = candidates.length;
 
         // Out-of-zone aggressive decay — preserved from earlier
         // iterations so a stale belief drops below the commit
@@ -1317,6 +1484,7 @@ export function buildBrowserCursorInjectionScript(): string {
         state.savedProgress = 0;
         state.savedProgressKey = '';
         state.savedProgressAt = 0;
+        state.progressBank = {};
         // v17.15 — clear onset snapshot and stable-winner tracking so
         // the next BrowserView entry starts fresh. Posteriors are
         // preserved (managed by epoch decay).
@@ -1344,6 +1512,7 @@ export function buildBrowserCursorInjectionScript(): string {
         state.savedProgress = 0;
         state.savedProgressKey = '';
         state.savedProgressAt = 0;
+        state.progressBank = {};
         // v17.15 — also clear onset snapshot and stable-winner gate so
         // the next acquisition re-stabilises rather than inheriting a
         // partial count from the prior click.
@@ -1371,6 +1540,7 @@ export function buildBrowserCursorInjectionScript(): string {
         state.savedProgress = 0;
         state.savedProgressKey = '';
         state.savedProgressAt = 0;
+        state.progressBank = {};
         // v17.15 — block also clears onset and stable-winner tracking.
         state.onsetTargetRect = null;
         state.onsetStartGaze = null;
@@ -1422,9 +1592,12 @@ export function buildBrowserCursorInjectionScript(): string {
             (smoothMs > 0 ? (', left ' + smoothMs + 'ms linear, top ' + smoothMs + 'ms linear') : '');
         }
 
-        cursor.style.display = 'block';
-        cursor.style.left = x + 'px';
-        cursor.style.top = y + 'px';
+        // v17.22 — the per-frame cursor position write now happens AFTER
+        // resolveClickRequest (see below). Writing left/top first dirtied
+        // layout, and the resolve's elementFromPoint/getBoundingClientRect
+        // calls then forced a synchronous re-layout EVERY frame (~33Hz of
+        // page main-thread waste). Each early-return path below writes the
+        // cursor position itself, so the visible behavior is unchanged.
         // v17.21 — _rs scales all PIXEL distances below by 1/pageZoom so
         // their on-screen footprint is constant (see radiusScale). Time
         // constants (dwellMs/onsetMs/postClickCooldownMs) are NOT scaled.
@@ -1491,6 +1664,11 @@ export function buildBrowserCursorInjectionScript(): string {
         }
 
         if (now < state.blockedUntil) {
+          // v17.22 — keep the cursor tracking gaze through the post-click
+          // cooldown (this write used to happen unconditionally at the top).
+          cursor.style.display = 'block';
+          cursor.style.left = x + 'px';
+          cursor.style.top = y + 'px';
           cursor.classList.remove('dwelling');
           state.dwellingExpiryAt = 0;
           return null;
@@ -1503,8 +1681,16 @@ export function buildBrowserCursorInjectionScript(): string {
           cursor.classList.remove('dwelling');
         }
 
+        // v17.22 — hit-test FIRST (on clean layout), write styles after.
+        // resolve duration is recorded for the frames-ring rMs metric.
+        const _rT0 = performance.now();
         let clickReq = resolveClickRequest(x, y);
+        state.lastResolveMs = performance.now() - _rT0;
         const dist = Math.hypot(x - state.x, y - state.y);
+
+        cursor.style.display = 'block';
+        cursor.style.left = x + 'px';
+        cursor.style.top = y + 'px';
 
         // === v17.4: STICKY DWELL TARGET (BrowserView equivalent) =======
         // If resolveClickRequest returned null on this frame (Bayesian
@@ -1564,7 +1750,21 @@ export function buildBrowserCursorInjectionScript(): string {
 
         const stabilityHeld = dist < stabilityRadius || (sameTarget && insideTargetRegion);
 
-        if (state.start <= 0 || !stabilityHeld) {
+        // v17.22 — empty-dwell guard, part (b): if the resolved element's
+        // IDENTITY differs from the tracked target's while stability is
+        // held (gaze slid from blank space — or from another element —
+        // onto this one without a saccade big enough to break stability),
+        // force a re-acquisition so the new element gets a full onset +
+        // dwell instead of inheriting the accumulated clock. identityKeyOf
+        // ignores resolution-path kind flips and rect reflows, so ordinary
+        // dwells (including sticky-ghost frames and youtube_anchor <->
+        // youtube_card flips) never re-trigger here.
+        // Rollback: window.gcConfig.emptyDwellGuardEnabled = false
+        const emptyGuardOn = cfg.emptyDwellGuardEnabled !== false;
+        const targetIdentityChanged = emptyGuardOn && !!clickReq && state.start > 0 &&
+          identityKeyOf(clickReq.key) !== identityKeyOf(state.targetKey);
+
+        if (state.start <= 0 || !stabilityHeld || targetIdentityChanged) {
           // === v17.6 OPTION A: VISUAL CONTINUITY IN BROWSERVIEW ========
           // If we'd already passed onset and were showing the dwelling
           // ring, KEEP the ring lit for a 600 ms grace period instead
@@ -1597,9 +1797,25 @@ export function buildBrowserCursorInjectionScript(): string {
             if (onTargetElapsed > onsetMs) {
               const frac = (onTargetElapsed - onsetMs) / Math.max(1, dwellMs - onsetMs);
               if (frac >= 0.05 && frac < 1) {
-                state.savedProgress = frac;
-                state.savedProgressKey = retentionKeyOf(state.targetKey);
-                state.savedProgressAt = now;
+                if (cfg.progressBankEnabled === true) {
+                  // v17.23 — bank mode: progress is stored PER identity so
+                  // acquiring a different link does not destroy this one's
+                  // progress (the single slot's cross-target invalidation
+                  // below is what makes dense-page ping-pong unwinnable).
+                  const bankId = identityKeyOf(state.targetKey);
+                  const prior = state.progressBank[bankId];
+                  // Keep the larger of prior/new so a short re-visit can
+                  // never LOWER banked progress before its TTL.
+                  state.progressBank[bankId] = {
+                    frac: prior && prior.frac > frac ? prior.frac : frac,
+                    at: now
+                  };
+                  bankPrune(now, Number(cfg.progressRetentionMs || 1000));
+                } else {
+                  state.savedProgress = frac;
+                  state.savedProgressKey = retentionKeyOf(state.targetKey);
+                  state.savedProgressAt = now;
+                }
               }
             }
           }
@@ -1618,7 +1834,13 @@ export function buildBrowserCursorInjectionScript(): string {
           // cancelled before commit.
           const newTargetKey = clickReq?.key || '';
           const targetChanged = state.targetKey !== newTargetKey;
-          state.start = now;
+          // v17.22 — empty-dwell guard, part (a): with nothing resolved
+          // under the gaze there is no dwell to time — leave the clock at
+          // 0 so time parked on blank page space can never count toward a
+          // click on whatever the gaze later drifts onto (and so the
+          // wrapper reports dwellState 'idle', keeping armed edge-scroll
+          // alive while the patient reads).
+          state.start = (clickReq || !emptyGuardOn) ? now : 0;
           state.clicked = false;
           state.targetKey = newTargetKey;
           state.targetRect = clickReq?.rect || null;
@@ -1670,7 +1892,33 @@ export function buildBrowserCursorInjectionScript(): string {
         // saved fraction; onset is skipped (the target was already
         // validated), matching the app cursor's resume semantics — the
         // app, too, resumes only on a freshly hit-tested element.
-        if (state.savedProgressKey && cfg.progressRetentionEnabled !== false &&
+        if (cfg.progressBankEnabled === true) {
+          // v17.23 — bank-mode resume: same fresh-real-resolution rules as
+          // the single slot (never the sticky ghost), but looked up per
+          // identity so EVERY recently-visited target can resume its own
+          // progress. The entry is consumed either way (expired or used).
+          if (cfg.progressRetentionEnabled !== false && !state.clicked &&
+              clickReq && clickReq.kind !== 'sticky_resume') {
+            const bankId = identityKeyOf(clickReq.key || '');
+            const entry = state.progressBank[bankId];
+            if (entry) {
+              if ((now - entry.at) < Number(cfg.progressRetentionMs || 1000)) {
+                const resumeElapsed = entry.frac * Math.max(1, dwellMs - onsetMs) + onsetMs;
+                // Backward-only: a resume must never SHRINK live progress.
+                if (now - resumeElapsed < state.start) {
+                  state.start = now - resumeElapsed;
+                  state.lastOnTargetAt = now;
+                  gcEmit('dwellResumed', {
+                    candId: state.targetKey,
+                    frac: Math.round(entry.frac * 100) / 100,
+                    bank: true
+                  });
+                }
+              }
+              delete state.progressBank[bankId];
+            }
+          }
+        } else if (state.savedProgressKey && cfg.progressRetentionEnabled !== false &&
             !state.clicked &&
             clickReq && clickReq.kind !== 'sticky_resume' &&
             retentionKeyOf(clickReq.key || '') === state.savedProgressKey) {
@@ -1741,7 +1989,10 @@ export function buildBrowserCursorInjectionScript(): string {
         }
 
         const elapsed = now - state.start;
-        if (elapsed > onsetMs && !state.clicked) {
+        // v17.22 — the dwelling ring requires a tracked target: a clock
+        // that survived a reset path with no targetKey (gcResetDwell /
+        // post-click) must not light the ring over blank space.
+        if (elapsed > onsetMs && !state.clicked && (state.targetKey || !emptyGuardOn)) {
           cursor.classList.add('dwelling');
           // v17.15 DoD-5 — emit onsetStart once per onset window.
           if (!state.onsetEmitted) {
@@ -1791,7 +2042,11 @@ export function buildBrowserCursorInjectionScript(): string {
           }
         }
 
-        if (elapsed > dwellMs && !state.clicked && clickReq) {
+        // v17.22 — commit requires the committing element to BE the tracked
+        // target (identity-compared, so kind flips / reflows still commit).
+        // Belt-and-braces below the acquisition-level identity restart.
+        if (elapsed > dwellMs && !state.clicked && clickReq &&
+            (!emptyGuardOn || identityKeyOf(clickReq.key) === identityKeyOf(state.targetKey))) {
           // Per-target cooldown — if the same target was just clicked,
           // hold off so we don't immediately re-fire.
           if (clickReq.key === state.lastClickKey && now < state.blockedUntil + 300) {
@@ -1813,9 +2068,12 @@ export function buildBrowserCursorInjectionScript(): string {
             focusable?.focus?.({ preventScroll: true });
           } catch (_) { /* focus is best-effort */ }
           // v17.17 — a committed click consumes any saved progress.
+          // v17.23 — and the whole bank: after a selection the page reacts
+          // (navigation, expansion), so every banked fraction is stale.
           state.savedProgress = 0;
           state.savedProgressKey = '';
           state.savedProgressAt = 0;
+          state.progressBank = {};
           clickReq.id = state.clickSeq;
           cursor.classList.remove('dwelling');
           cursor.classList.add('clicking');
@@ -1908,6 +2166,7 @@ export function buildBrowserCursorInjectionScript(): string {
           state.savedProgress = 0;
           state.savedProgressKey = '';
           state.savedProgressAt = 0;
+          state.progressBank = {};
         }
         // v17.16 — keep the active-video reference and rect fresh so the
         // in-video suppression test below uses this frame's geometry, not
@@ -1965,7 +2224,11 @@ export function buildBrowserCursorInjectionScript(): string {
           let dwellState = 'idle';
           if (state.clicked) {
             dwellState = nowMs < state.blockedUntil ? 'cooldown' : 'idle';
-          } else if (state.start > 0) {
+          } else if (state.start > 0 && (state.targetKey || cfg.emptyDwellGuardEnabled === false)) {
+            // v17.22 — a clock with no tracked target is NOT a dwell in
+            // progress. Reporting onset/dwell/commit here made main.ts
+            // pause armed edge-scrolling indefinitely while gaze rested
+            // on blank page space (reading!). Guard-off restores legacy.
             const el2 = nowMs - state.start;
             if (el2 > dwellMs2) dwellState = 'commit';
             else if (el2 > onsetMs2) dwellState = 'dwell';
@@ -2013,7 +2276,11 @@ export function buildBrowserCursorInjectionScript(): string {
             winMargin: winMargin,
             snapDist: snapDist,
             dwellState: dwellState,
-            epoch: state.candidateEpoch
+            epoch: state.candidateEpoch,
+            // v17.22 — hot-path cost telemetry: resolveClickRequest
+            // duration (0.1ms resolution) + last Bayesian pool size.
+            rMs: state.lastResolveMs >= 0 ? Math.round(state.lastResolveMs * 10) / 10 : -1,
+            nCand: state.lastCandN
           });
         } catch (_) { /* never throw from telemetry */ }
         return result;
@@ -2083,6 +2350,53 @@ export function buildBrowserCursorInjectionScript(): string {
           var snap = {};
           for (var k in state.cardPosteriors) snap[k] = state.cardPosteriors[k];
           return snap;
+        },
+        // v17.22 — hot-path health summary from the frames ring: frame
+        // cadence (dt), resolve/DOM-scan duration, candidate pool size,
+        // approximate incoming frame rate, and ring occupancy. Computed
+        // on demand only — nothing here runs per frame.
+        perf: function () {
+          var fr = state.frames;
+          var dts = [];
+          var rms = [];
+          var ncs = [];
+          for (var i = 0; i < fr.length; i++) {
+            if (fr[i].dtMs > 0) dts.push(fr[i].dtMs);
+            if (typeof fr[i].rMs === 'number' && fr[i].rMs >= 0) rms.push(fr[i].rMs);
+            if (typeof fr[i].nCand === 'number' && fr[i].nCand >= 0) ncs.push(fr[i].nCand);
+          }
+          var pct = function (arr, p) {
+            if (!arr.length) return 0;
+            var s = arr.slice().sort(function (a, b) { return a - b; });
+            return s[Math.min(s.length - 1, Math.floor(s.length * p))];
+          };
+          var maxOf = function (arr) {
+            var m = 0;
+            for (var j = 0; j < arr.length; j++) if (arr[j] > m) m = arr[j];
+            return m;
+          };
+          // Approximate incoming rate over the last 5s of the ring.
+          var hz = 0;
+          if (fr.length > 1) {
+            var tEnd = fr[fr.length - 1].t;
+            var n5 = 0;
+            for (var q = fr.length - 1; q >= 0 && (tEnd - fr[q].t) <= 5000; q--) n5++;
+            var span = n5 > 1 ? (tEnd - fr[fr.length - n5].t) : 0;
+            hz = span > 0 ? Math.round((n5 - 1) / (span / 1000)) : 0;
+          }
+          return {
+            frames: fr.length,
+            approxHz: hz,
+            dtMs: { p50: pct(dts, 0.5), p95: pct(dts, 0.95), max: maxOf(dts) },
+            resolveMs: { p50: pct(rms, 0.5), p95: pct(rms, 0.95), max: maxOf(rms) },
+            bayesPool: { p50: pct(ncs, 0.5), max: maxOf(ncs) },
+            rings: {
+              frames: state.frames.length,
+              events2: state.events2.length,
+              clicks: state.telemetry.length,
+              posteriors: Object.keys(state.cardPosteriors).length
+            }
+          };
         }
       };
 
