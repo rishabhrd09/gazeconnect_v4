@@ -83,3 +83,7 @@ tools/reports/
 # --- Neural Language Model (training-only files, too large for git) ---
 python/ml/trained_models/gazeconnect_lm.pt
 python/ml/trained_models/gazeconnect_lm.onnx
+# Fetched real corpus (regenerable via fetch_external_corpus.py; a few MB) + the
+# pre-retrain model backup that retrain-model.{bat,sh} create. Both are transient.
+python/ml/training_data/external_corpus.txt
+python/ml/trained_models/backup_pre_retrain/

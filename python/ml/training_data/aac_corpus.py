@@ -22,6 +22,7 @@ Categories and training weights:
   - Hindi/Hinglish (weight 5): bilingual support
 """
 
+import os
 from typing import List, Sequence, Tuple
 
 
@@ -1050,9 +1051,249 @@ def _build_generated_intent_variations() -> List[str]:
 GENERATED_INTENT_VARIATIONS = _build_generated_intent_variations()
 
 
+# ============================================================
+# EXTENDED VOCABULARY CORPUS (2026-07 — lift the neural vocab ceiling)
+# The trained model can only predict words it has SEEN in the corpus. The
+# original corpus had ~684 unique words, which is why the model was capped at
+# 661 vocab. This generator introduces a much broader everyday vocabulary
+# (including the GENERAL_ENGLISH_VOCABULARY words) in grammatical context, using
+# TYPED slots so sentences stay sensible ("I want water", never "I want tired").
+# Deterministic (no randomness) so training is reproducible; deduped.
+# ============================================================
+
+def _build_extended_vocabulary_corpus() -> List[str]:
+    sents: List[str] = []
+
+    # Subjects paired with the correct "be" form (keeps grammar clean).
+    subj_be = [
+        ("I", "am"), ("you", "are"), ("we", "are"), ("they", "are"),
+        ("he", "is"), ("she", "is"), ("it", "is"), ("mother", "is"),
+        ("father", "is"), ("my son", "is"), ("my daughter", "is"),
+        ("my wife", "is"), ("my husband", "is"), ("the doctor", "is"),
+        ("the nurse", "is"), ("everyone", "is"),
+    ]
+    # Base-verb subjects (take "want", not "wants") for transitive templates.
+    base_subj = ["I", "you", "we", "they"]
+
+    feelings = [
+        "tired", "cold", "hot", "hungry", "thirsty", "comfortable",
+        "uncomfortable", "better", "worse", "fine", "okay", "happy", "sad",
+        "worried", "sleepy", "dizzy", "weak", "restless", "hopeful",
+        "grateful", "ready", "sure", "awake", "afraid", "confused", "calm",
+        "relaxed", "excited", "bored", "lonely", "nervous", "peaceful",
+    ]
+    trans_verbs = ["want", "need", "like", "have", "see", "bring",
+                   "give", "take", "hold", "find", "use", "want to see"]
+    objects = [
+        "water", "food", "medicine", "blanket", "pillow", "phone", "book",
+        "television", "music", "light", "fan", "window", "door", "glasses",
+        "tissue", "chair", "remote", "newspaper", "computer", "internet",
+        "information", "appointment", "message", "breakfast", "dinner",
+        "juice", "tea", "coffee", "soup", "fruit", "biscuit", "photograph",
+        "picture", "letter", "calendar", "clock", "towel", "bag", "keys",
+        "wheelchair", "oxygen", "napkin", "spoon", "bottle", "charger",
+    ]
+    want_to_verbs = [
+        "rest", "sleep", "eat", "drink", "talk", "read", "watch television",
+        "listen to music", "go outside", "sit up", "lie down", "move",
+        "change position", "walk", "pray", "relax", "sleep now", "call someone",
+        "see the doctor", "go home", "take a bath", "brush my teeth",
+        "get dressed", "make a phone call", "write a message", "remember this",
+        "understand this", "continue", "wait", "try again",
+    ]
+    places = [
+        "bathroom", "kitchen", "bedroom", "hospital", "garden", "doctor",
+        "living room", "balcony", "temple", "market", "park", "window",
+    ]
+    times = [
+        "now", "today", "tomorrow", "tonight", "later", "soon",
+        "this morning", "this afternoon", "this evening", "in the morning",
+        "at night", "right now", "in a minute", "before lunch",
+    ]
+    adjectives = [
+        "important", "difficult", "comfortable", "wonderful", "beautiful",
+        "helpful", "useful", "serious", "nice", "special", "different",
+        "necessary", "possible", "wrong", "correct", "ready", "clear",
+        "expensive", "heavy", "light", "quiet", "noisy", "warm", "cool",
+    ]
+    q_nouns = ["name", "time", "weather", "appointment", "medicine", "plan",
+               "temperature", "schedule", "problem", "reason", "answer"]
+    request_verbs = ["bring", "give", "get", "pass", "hold", "open", "close",
+                     "fix", "check", "clean", "move", "adjust", "find", "turn on",
+                     "turn off"]
+
+    def add(s):
+        sents.append(s)
+
+    # 1) feelings: "{subj} {be} {feeling}" and "feeling {feeling}"
+    for subj, be in subj_be:
+        for f in feelings:
+            add(f"{subj} {be} {f}")
+        for f in feelings[:16]:
+            add(f"{subj} {be} feeling {f}")
+    # 2) feelings + time
+    for f in feelings:
+        for t in times[:8]:
+            add(f"I am {f} {t}")
+    # 3) transitive: "{base_subj} {verb} {object}"
+    for subj in base_subj:
+        for v in trans_verbs:
+            for o in objects:
+                add(f"{subj} {v} {o}")
+    # 4) want/need to + action
+    for lead in ("I want to", "I need to", "I would like to", "please let me",
+                 "can I", "we want to"):
+        for wv in want_to_verbs:
+            add(f"{lead} {wv}")
+    # 5) polite requests with objects
+    for lead in ("please", "can you", "could you please", "would you"):
+        for rv in request_verbs:
+            for o in objects[:26]:
+                add(f"{lead} {rv} the {o}")
+    # 6) go to a place
+    for lead in ("I want to go to the", "please take me to the",
+                 "can we go to the", "I need to go to the"):
+        for p in places:
+            add(f"{lead} {p}")
+    # 7) questions
+    for qn in q_nouns:
+        add(f"what is the {qn}")
+        add(f"how is your {qn}")
+        add(f"when is the {qn}")
+    for o in objects[:24]:
+        add(f"where is my {o}")
+        add(f"where is the {o}")
+    # 8) "this is very / it is" + adjective
+    for lead in ("this is very", "it is", "that is", "this looks",
+                 "everything is", "it feels"):
+        for a in adjectives:
+            add(f"{lead} {a}")
+    # 9) gratitude / social with objects
+    for o in objects[:24]:
+        add(f"thank you for the {o}")
+        add(f"I would like some {o}")
+        add(f"do we have any {o}")
+    # 10) common conversational openers/continuations
+    openers = [
+        "hello how are you", "hello good morning", "good morning everyone",
+        "good afternoon", "good evening", "how are you today",
+        "nice to meet you", "see you soon", "see you tomorrow",
+        "thank you so much", "i love you", "i miss you", "take care",
+        "please come here", "i am doing fine", "how was your day",
+        "did you eat something", "are you feeling okay", "let us talk",
+        "i want to tell you something", "i have an idea", "that is a good idea",
+        "we need more information", "this is a good opportunity",
+        "i understand the situation", "please be careful", "everything will be fine",
+    ]
+    sents.extend(openers)
+    # 11) light Hinglish coverage
+    hinglish = [
+        "mujhe pani chahiye", "mujhe khana chahiye", "mujhe dawa chahiye",
+        "mujhe aaram karna hai", "mujhe neend aa rahi hai",
+        "mujhe dard ho raha hai", "aap kaise ho", "main theek hoon",
+        "thoda pani do", "khana laga do", "dawa ka time ho gaya",
+        "mummy ko bulao", "papa ko bulao", "doctor ko bulao",
+        "mujhe garam pani chahiye", "mujhe thanda pani chahiye",
+        "please light band karo", "please pankha chalu karo",
+    ]
+    sents.extend(hinglish)
+
+    # ---- VOCABULARY SEEDING ----------------------------------------------
+    # The neural model can only predict words it has SEEN. To let it cover the
+    # app's real vocabulary (not just the ~684 words above), seed a broad
+    # common-English word set into a few templates each so every word appears
+    # >=2-3 times and enters the trained vocabulary. Context is light for these,
+    # but it lets the model rerank them instead of being blind to them.
+    seed_nouns = [
+        "doctor", "nurse", "family", "friend", "mother", "father", "brother",
+        "sister", "daughter", "husband", "wife", "child", "children", "people",
+        "person", "neighbour", "hospital", "medicine", "medication", "treatment",
+        "therapy", "appointment", "exercise", "breakfast", "lunch", "dinner",
+        "kitchen", "bathroom", "bedroom", "window", "blanket", "pillow",
+        "cushion", "wheelchair", "computer", "internet", "website", "phone",
+        "television", "channel", "weather", "temperature", "distance", "location",
+        "address", "country", "city", "company", "business", "account",
+        "community", "government", "society", "technology", "education",
+        "information", "opportunity", "initiative", "situation", "condition",
+        "position", "direction", "decision", "solution", "question", "answer",
+        "problem", "reason", "result", "example", "purpose", "process",
+        "progress", "project", "program", "schedule", "calendar", "meeting",
+        "message", "moment", "minute", "morning", "afternoon", "evening",
+        "weekend", "holiday", "birthday", "music", "movie", "story", "picture",
+        "photograph", "newspaper", "magazine", "book", "letter", "water",
+        "juice", "tea", "coffee", "fruit", "food", "bread", "rice", "milk",
+        "sugar", "salt", "oil", "money", "market", "garden", "park", "temple",
+        "church", "office", "school", "college", "road", "car", "bus", "train",
+        "clothes", "shoes", "glasses", "watch", "keys", "bag", "wallet",
+        "oxygen", "ventilator", "suction", "bandage", "wound", "fever", "cough",
+        "pain", "comfort", "rest", "sleep", "dream", "hope", "prayer", "faith",
+        "love", "care", "help", "support", "attention", "patience", "courage",
+    ]
+    seed_verbs = [
+        "continue", "complete", "consider", "describe", "explain", "suggest",
+        "prepare", "arrange", "organize", "manage", "handle", "receive",
+        "deliver", "provide", "require", "include", "prevent", "protect",
+        "improve", "increase", "reduce", "remove", "replace", "repair",
+        "maintain", "control", "operate", "connect", "update", "install",
+        "remember", "forget", "understand", "realize", "recognize", "decide",
+        "choose", "compare", "change", "happen", "arrive", "return", "travel",
+        "follow", "listen", "watch", "notice", "believe", "imagine", "expect",
+        "promise", "accept", "agree", "explore", "discuss", "contact", "visit",
+        "invite", "introduce", "celebrate", "finish", "start", "explain",
+    ]
+    seed_adjs = [
+        "important", "different", "difficult", "possible", "impossible",
+        "available", "necessary", "comfortable", "uncomfortable", "wonderful",
+        "beautiful", "special", "general", "personal", "physical", "mental",
+        "emotional", "medical", "natural", "normal", "regular", "serious",
+        "careful", "helpful", "useful", "powerful", "peaceful", "grateful",
+        "hopeful", "similar", "certain", "recent", "current", "entire",
+        "complete", "perfect", "simple", "quiet", "gentle", "kind", "patient",
+        "strong", "weak", "healthy", "clean", "fresh", "warm", "cool", "bright",
+    ]
+    for n in seed_nouns:
+        add(f"I need the {n}")
+        add(f"where is the {n}")
+        add(f"please bring the {n}")
+    for v in seed_verbs:
+        add(f"I want to {v}")
+        add(f"can you {v} this")
+        add(f"please {v} it")
+    for a in seed_adjs:
+        add(f"it is very {a}")
+        add(f"this is {a}")
+        add(f"that looks {a}")
+
+    return _dedupe_sentences(sents)
+
+
+EXTENDED_VOCABULARY_CORPUS = _build_extended_vocabulary_corpus()
+
+
+def _load_external_corpus() -> List[str]:
+    """Load the optional real-English corpus produced by fetch_external_corpus.py.
+
+    Returns [] when the file is absent, so the blueprint (and therefore every
+    training run, corpus stat, and the shipped app) is byte-identical to before
+    unless a developer explicitly fetched it. The file is training-time only —
+    nothing in the runtime app imports this module.
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "external_corpus.txt")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return [line.strip() for line in fh if line.strip()]
+    except OSError:
+        return []
+
+
+EXTERNAL_CORPUS = _load_external_corpus()
+
+
 def get_corpus_blueprint() -> List[Tuple[List[str], int, str]]:
     """Return the weighted category blueprint used to assemble the corpus."""
-    return [
+    blueprint = [
         (CORE_DAILY_NEEDS, 10, "core_daily"),
         (EMERGENCY_PHRASES, 10, "emergency"),
         (MEDICAL_CAREGIVING, 8, "medical"),
@@ -1067,7 +1308,14 @@ def get_corpus_blueprint() -> List[Tuple[List[str], int, str]]:
         (SENTENCE_PATTERNS, 6, "patterns"),
         (CONTEXTUAL_SEQUENCES, 3, "contextual"),
         (GENERATED_INTENT_VARIATIONS, 4, "generated"),
+        (EXTENDED_VOCABULARY_CORPUS, 2, "extended_vocab"),
     ]
+    # Weight 1: teaches real vocabulary + grammar for breadth, while the curated
+    # AAC categories above stay over-represented (weights 2-10) so the model still
+    # prioritizes patient-critical phrasing. Present only if a developer fetched it.
+    if EXTERNAL_CORPUS:
+        blueprint.append((EXTERNAL_CORPUS, 1, "external_real"))
+    return blueprint
 
 # ============================================================
 # BUILD THE FULL CORPUS

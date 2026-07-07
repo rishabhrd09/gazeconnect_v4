@@ -339,6 +339,34 @@ def test_predictions(model, vocab, device, config):
         print(f'  "{prompt}" -> {", ".join(predictions)}')
 
 
+def _resolve_device(pref: str):
+    """Pick the compute device. cuda (NVIDIA) > mps (Apple Silicon GPU) > cpu.
+
+    On a MacBook, 'auto' selects Apple's Metal (MPS) backend for a real speedup
+    over CPU. Set PYTORCH_ENABLE_MPS_FALLBACK=1 so any op MPS doesn't support
+    transparently runs on CPU instead of erroring (retrain-model.sh sets this).
+    """
+    mps_ok = (
+        getattr(torch.backends, "mps", None) is not None
+        and torch.backends.mps.is_available()
+    )
+    if pref == "cpu":
+        return torch.device("cpu")
+    if pref == "cuda":
+        return torch.device("cuda")
+    if pref == "mps":
+        if not mps_ok:
+            print("  [warn] MPS not available; falling back to CPU.")
+            return torch.device("cpu")
+        return torch.device("mps")
+    # auto
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if mps_ok:
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train GazeConnect CIFG-LSTM")
     parser.add_argument("--epochs", type=int, default=25, help="Training epochs")
@@ -346,6 +374,12 @@ def main():
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
     parser.add_argument("--hidden", type=int, default=512, help="LSTM hidden size")
     parser.add_argument("--embed", type=int, default=128, help="Embedding dimension")
+    parser.add_argument("--vocab-size", type=int, default=Config.vocab_size,
+                        help="Max vocabulary size (tie_weights keeps the file tiny even at high caps)")
+    parser.add_argument("--min-freq", type=int, default=Config.min_word_freq,
+                        help="Min word frequency to enter the vocabulary (>=2 drops corpus noise/typos)")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto",
+                        help="Compute device. 'auto' picks cuda > mps (Apple Silicon GPU) > cpu")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     parser.add_argument("--no-export", action="store_true", help="Skip ONNX export")
     args = parser.parse_args()
@@ -357,9 +391,11 @@ def main():
     config.batch_size = args.batch_size
     config.hidden_size = args.hidden
     config.embed_dim = args.embed
+    config.vocab_size = args.vocab_size
+    config.min_word_freq = args.min_freq
 
-    # Device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Device — cuda (NVIDIA) > mps (Apple Silicon GPU) > cpu.
+    device = _resolve_device(args.device)
     print(f"Device: {device}")
 
     # Get corpus
