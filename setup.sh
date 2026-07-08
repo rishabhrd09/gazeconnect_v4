@@ -38,7 +38,7 @@ if [ "$ERRORS" -gt 0 ]; then echo "[ABORT] $ERRORS critical prerequisite(s) miss
 echo "============================================================"
 echo "[1/3] Installing Node.js packages..."
 echo "============================================================"
-npm install || { echo "  [FAIL] npm install failed."; exit 1; }
+npm install --no-audit --no-fund || { echo "  [FAIL] npm install failed."; exit 1; }
 echo "  Done."; echo
 
 # ---- Step 2: Python venv + packages ----
@@ -47,7 +47,11 @@ echo "[2/3] Setting up Python environment..."
 echo "============================================================"
 VENV="python/.venv"
 PY="$VENV/bin/python"
+mkdir -p "python/.cache/pip"
 [ -x "$PY" ] || "$PYBASE" -m venv "$VENV" || { echo "  [FAIL] Could not create venv."; exit 1; }
+export PYTHONNOUSERSITE=1
+export PIP_NO_CACHE_DIR=1
+export PIP_DISABLE_PIP_VERSION_CHECK=1
 "$PY" -m pip install --quiet --upgrade pip >/dev/null 2>&1
 
 REQ="requirements.txt"; [ -f "$REQ" ] || REQ="python/requirements.txt"

@@ -254,10 +254,11 @@ def export_to_onnx(model, vocab, config, device):
 
     os.makedirs(MODEL_DIR, exist_ok=True)
 
+    temp_onnx_path = ONNX_PATH.with_name("gazeconnect_lm.onnx.tmp")
     torch.onnx.export(
         wrapper,
         (dummy_input, dummy_h, dummy_c),
-        str(ONNX_PATH),
+        str(temp_onnx_path),
         input_names=["input_ids", "h_in", "c_in"],
         output_names=["probs", "h_out", "c_out"],
         dynamic_axes={
@@ -273,6 +274,7 @@ def export_to_onnx(model, vocab, config, device):
     )
 
     # Get file size
+    os.replace(temp_onnx_path, ONNX_PATH)
     onnx_size = os.path.getsize(ONNX_PATH)
     print(f"  ONNX model saved: {ONNX_PATH}")
     print(f"  ONNX model size: {onnx_size / (1024*1024):.2f} MB")
@@ -286,11 +288,13 @@ def quantize_onnx():
         from onnxruntime.quantization import quantize_dynamic, QuantType
 
         quantized_path = MODEL_DIR / "gazeconnect_lm_quantized.onnx"
+        temp_quantized_path = MODEL_DIR / "gazeconnect_lm_quantized.onnx.tmp"
         quantize_dynamic(
             str(ONNX_PATH),
-            str(quantized_path),
+            str(temp_quantized_path),
             weight_type=QuantType.QInt8,
         )
+        os.replace(temp_quantized_path, quantized_path)
         q_size = os.path.getsize(quantized_path)
         print(f"  Quantized model saved: {quantized_path}")
         print(f"  Quantized model size: {q_size / (1024*1024):.2f} MB")
@@ -495,6 +499,7 @@ def main():
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             os.makedirs(MODEL_DIR, exist_ok=True)
+            temp_checkpoint_path = CHECKPOINT_PATH.with_name("gazeconnect_lm.pt.tmp")
             torch.save({
                 "epoch": epoch + 1,
                 "model_state_dict": model.state_dict(),
@@ -507,17 +512,21 @@ def main():
                     "dropout": config.dropout,
                     "tie_weights": config.tie_weights,
                 },
-            }, CHECKPOINT_PATH)
+            }, temp_checkpoint_path)
+            os.replace(temp_checkpoint_path, CHECKPOINT_PATH)
 
     print("-" * 60)
     print(f"Best validation loss: {best_val_loss:.4f}")
 
     # Save vocabulary
-    vocab.save(str(VOCAB_PATH))
+    temp_vocab_path = VOCAB_PATH.with_name("vocabulary.json.tmp")
+    vocab.save(str(temp_vocab_path))
+    os.replace(temp_vocab_path, VOCAB_PATH)
     print(f"Vocabulary saved: {VOCAB_PATH}")
 
     # Save training log
-    with open(LOG_PATH, "w") as f:
+    temp_log_path = LOG_PATH.with_name("training_log.json.tmp")
+    with open(temp_log_path, "w") as f:
         json.dump({
             "config": {
                 "vocab_size": vocab.size,
@@ -534,6 +543,7 @@ def main():
             "best_val_loss": round(best_val_loss, 4),
             "training_log": training_log,
         }, f, indent=2)
+    os.replace(temp_log_path, LOG_PATH)
 
     # Test predictions
     test_predictions(model, vocab, device, config)

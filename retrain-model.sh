@@ -21,6 +21,11 @@ set -uo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Keep pip activity inside repo for predictable, auditable behavior.
+export PYTHONNOUSERSITE=1
+export PIP_NO_CACHE_DIR=1
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # ---- Tunables (edit for a bigger corpus / longer training) ----
 EPOCHS=20
 MAXSENT=45000
@@ -68,12 +73,21 @@ echo
 
 MODELDIR="python/ml/trained_models"
 BACKUP="$MODELDIR/backup_pre_retrain"
+BUILD_TOOLS_INSTALLED=0
 
 restore_backup() {
   for f in gazeconnect_lm_quantized.onnx gazeconnect_lm.onnx vocabulary.json training_log.json; do
     [ -f "$BACKUP/$f" ] && cp -f "$BACKUP/$f" "$MODELDIR/$f"
   done
 }
+
+cleanup_build_tools() {
+  if [ "$BUILD_TOOLS_INSTALLED" -eq 1 ]; then
+    "$PY" -m pip uninstall -y torch onnx >/dev/null 2>&1 || true
+    BUILD_TOOLS_INSTALLED=0
+  fi
+}
+trap cleanup_build_tools EXIT
 
 # ---- Step 1: real English corpus ----
 echo "============================================================"
@@ -111,9 +125,15 @@ echo "============================================================"
 # One-time build tools (removed at the end). On macOS the default PyPI torch
 # wheel already supports Apple-Silicon MPS - do NOT use the CPU-only index.
 if ! "$PY" -c "import torch" >/dev/null 2>&1; then
+  BUILD_TOOLS_INSTALLED=1
   "$PY" -m pip install --quiet torch || { echo "  [ABORT] Could not install torch. Backup is safe in $BACKUP."; exit 1; }
+else
+  echo "  [OK] torch already present."
 fi
-"$PY" -m pip install --quiet onnx || { echo "  [ABORT] Could not install onnx."; exit 1; }
+if ! "$PY" -c "import onnx" >/dev/null 2>&1; then
+  BUILD_TOOLS_INSTALLED=1
+  "$PY" -m pip install --quiet onnx || { echo "  [ABORT] Could not install onnx."; exit 1; }
+fi
 echo "  [OK] Build tools ready."
 echo
 
@@ -149,7 +169,8 @@ echo
 echo "============================================================"
 echo "[6/6] Reclaiming space (build tools + dev-only artifacts)..."
 echo "============================================================"
-"$PY" -m pip uninstall -y torch onnx >/dev/null 2>&1 || true
+# Keep one-time build tools clean and predictable after successful run.
+cleanup_build_tools
 # Dev-only outputs the runtime never loads - keep the folder ship-lean.
 rm -f "$MODELDIR/gazeconnect_lm.onnx" "$MODELDIR/gazeconnect_lm.pt" \
       "python/ml/training_data/external_corpus.txt"

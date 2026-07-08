@@ -30,6 +30,24 @@ if [ ! -x "$PY" ]; then
   exit 1
 fi
 
+HF_CACHE="python/.hf_cache"
+mkdir -p "$HF_CACHE"
+
+export HF_HOME="$HF_CACHE"
+export PYTHONNOUSERSITE=1
+export PIP_NO_CACHE_DIR=1
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+
+BUILD_TOOLS_INSTALLED=0
+cleanup_build_tools() {
+  if [ "$BUILD_TOOLS_INSTALLED" -eq 1 ]; then
+    "$PY" -m pip uninstall -y torch transformers onnx >/dev/null 2>&1 || true
+    rm -rf "$HF_CACHE"
+    BUILD_TOOLS_INSTALLED=0
+  fi
+}
+trap cleanup_build_tools EXIT
+
 echo "[INFO] Free disk space here:"
 df -h . | awk 'NR==2 {print "        "$4" free"}'
 echo
@@ -53,22 +71,22 @@ else
 fi
 echo
 
-# ---- Step 2: build a model (idempotent) ----
+# ---- Step 2: choose + build a model (idempotent) ----
 MODEL_ID="HuggingFaceTB/SmolLM2-360M-Instruct"
 OUT="python/ml/trained_models/smollm2-360m-onnx"
 echo "[2/4] Preparing model: $MODEL_ID"
 if [ -f "$OUT/genai_config.json" ]; then
-  echo "  [OK] Model already built at $OUT - skipping."
+  echo "  [OK] Model already built at $OUT - skipping download/build."
 else
   echo "  Installing one-time build tools (torch + transformers + onnx)..."
+  BUILD_TOOLS_INSTALLED=1
   "$PY" -m pip install --quiet torch transformers onnx || { echo "  [WARN] Could not install build tools. App still works without the LLM."; exit 1; }
   echo "  Building int4 CPU model (downloads + converts; can take a while)..."
-  "$PY" -m onnxruntime_genai.models.builder -m "$MODEL_ID" -o "$OUT" -p int4 -e cpu -c "python/.hf_cache" \
+  "$PY" -m onnxruntime_genai.models.builder -m "$MODEL_ID" -o "$OUT" -p int4 -e cpu -c "$HF_CACHE" \
     || { echo "  [WARN] Model build failed. App still works without the LLM."; exit 1; }
   echo "  [OK] Model built at $OUT"
-  echo "  Reclaiming space: removing one-time build tools + source cache..."
-  "$PY" -m pip uninstall -y torch transformers >/dev/null 2>&1 || true
-  rm -rf "python/.hf_cache"
+  BUILD_TOOLS_INSTALLED=0
+  cleanup_build_tools
   echo "  [OK] Reclaimed. Kept only: onnxruntime-genai runtime + the int4 model."
 fi
 echo

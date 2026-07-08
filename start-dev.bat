@@ -27,53 +27,46 @@ echo.
 REM ---- Cleanup old processes ----
 echo [CLEANUP] Stopping any existing GazeConnect processes...
 
-REM Kill old Electron instances (prevents single-instance lock blocking new launch)
 tasklist /FI "IMAGENAME eq electron.exe" 2>NUL | find /I /N "electron.exe" >NUL
 if "%ERRORLEVEL%"=="0" (
     taskkill /F /IM electron.exe >nul 2>&1
     echo   Stopped: Electron
 )
 
-REM Kill packaged app instances (productName from package.json)
 tasklist /FI "IMAGENAME eq GazeConnect Pro.exe" 2>NUL | find /I /N "GazeConnect Pro.exe" >NUL
 if "%ERRORLEVEL%"=="0" (
     taskkill /F /IM "GazeConnect Pro.exe" >nul 2>&1
     echo   Stopped: GazeConnect Pro
 )
 
-REM Kill Python backend instances
 tasklist /FI "IMAGENAME eq GazeConnectBackend.exe" 2>NUL | find /I /N "GazeConnectBackend.exe" >NUL
 if "%ERRORLEVEL%"=="0" (
     taskkill /F /IM GazeConnectBackend.exe >nul 2>&1
     echo   Stopped: GazeConnectBackend
 )
 
-REM Also kill by window title in case the exe name differs
 tasklist /FI "WINDOWTITLE eq GazeConnect*" 2>NUL | find /I /N "GazeConnect" >NUL
 if "%ERRORLEVEL%"=="0" (
     taskkill /F /FI "WINDOWTITLE eq GazeConnect*" >nul 2>&1
     echo   Stopped: GazeConnect window
 )
 
-REM Kill specific GazeConnect processes (not all python/electron instances)
 tasklist /FI "IMAGENAME eq TobiiGazeHelper.exe" 2>NUL | find /I /N "TobiiGazeHelper.exe" >NUL
 if "%ERRORLEVEL%"=="0" (
     taskkill /F /IM TobiiGazeHelper.exe >nul 2>&1
     echo   Stopped: TobiiGazeHelper
 )
 
-REM Free ports 5173, 5555 and 8765 if occupied
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":5173 " ^| findstr "LISTENING" 2^>nul') do (
-    taskkill /F /PID %%p >nul 2>&1
-    echo   Freed port 5173 ^(PID %%p^)
+REM ---- Check project ports only; do not kill unknown listeners ----
+set PORT_BUSY=0
+for %%p in (5173 5555 8765) do (
+    for /f "tokens=5" %%q in ('netstat -ano ^| findstr ":%%p " ^| findstr "LISTENING" 2^>nul') do (
+        echo   [WARN] Port %%p is still in use by PID %%q.
+        set PORT_BUSY=1
+    )
 )
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":5555 " ^| findstr "LISTENING" 2^>nul') do (
-    taskkill /F /PID %%p >nul 2>&1
-    echo   Freed port 5555 ^(PID %%p^)
-)
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8765 " ^| findstr "LISTENING" 2^>nul') do (
-    taskkill /F /PID %%p >nul 2>&1
-    echo   Freed port 8765 ^(PID %%p^)
+if "%PORT_BUSY%"=="1" (
+    echo   You may need to stop the listed process(es) manually if startup fails.
 )
 
 echo   Done.
