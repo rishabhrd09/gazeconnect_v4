@@ -1936,19 +1936,27 @@ class GazeConnectBackend:
         """
         Dedicated loop that sends the latest gaze data to clients.
 
-        v17.19 push mode (default): waits on an asyncio.Event that the
-        gaze path sets the moment a frame is stored, so each frame is
-        sent immediately on arrival instead of waiting for the next
-        paced tick. The ET5 delivers ~33Hz, so the old fixed 66Hz pacing
-        added 0-15.2ms (mean ~7.6ms) to every frame for no benefit.
-        Set GAZECONNECT_GAZE_PUSH=0 to revert to the paced loop.
+        Paced mode is the DEFAULT (v17.24). It emits the latest gaze frame on a
+        steady ~66Hz tick, which smooths out the eye tracker's natural frame
+        jitter before it reaches the cursor.
+
+        The alternative "push-on-frame" mode (v17.19) waits on an asyncio.Event
+        the gaze path sets the moment a frame is stored, sending each frame
+        immediately on arrival. In theory that trims 0-15.2ms of pacing latency,
+        but on-rig (Windows, Tobii ET5) it REGRESSED smoothness: the asyncio.Event
+        wakeups are lower-priority under load, producing large frame gaps (MaxGap
+        up to ~2.5s), frequent [POINT-TTL] stale-sample drops, and a jittery
+        broadcast rate (dipping to ~8 msgs/s). Switching back to paced restored
+        MaxGap ~100ms, ZERO stale drops, and a steady ~30-33 msgs/s (validated
+        on-rig 2026-07-08). So push-on-frame is now OPT-IN only.
+        Set GAZECONNECT_GAZE_PUSH=1 to opt back into push-on-frame.
         """
-        push_mode = os.environ.get('GAZECONNECT_GAZE_PUSH', '1').strip().lower() not in ('0', 'false', 'no', 'off')
+        push_mode = os.environ.get('GAZECONNECT_GAZE_PUSH', '0').strip().lower() not in ('0', 'false', 'no', 'off')
         self._gaze_push_event = asyncio.Event() if push_mode else None
         if push_mode:
-            logger.info("Gaze broadcast loop started (push-on-frame mode; set GAZECONNECT_GAZE_PUSH=0 for the paced loop)")
+            logger.info("Gaze broadcast loop started (push-on-frame mode [OPT-IN]; unset GAZECONNECT_GAZE_PUSH for the default paced loop)")
         else:
-            logger.info("Gaze broadcast loop started (paced mode, ~66Hz tick / ~33Hz effective; GAZECONNECT_GAZE_PUSH=0)")
+            logger.info("Gaze broadcast loop started (paced mode [default], ~66Hz tick / ~33Hz effective; set GAZECONNECT_GAZE_PUSH=1 for push-on-frame)")
         self._latest_gaze_msg = None
         send_count = 0
         last_log = time.time()
