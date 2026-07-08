@@ -334,6 +334,11 @@ class ServerConfig:
     spoken_log_max_files: int = 0
     retain_spoken_logs: bool = False
     keyboard_chat_keep_files: int = 5
+    # Per-keystroke session logs (session_*.log / text_*.txt) are the only
+    # user-data files without a retention cap. Keep the newest N launch pairs
+    # (0 = unlimited); optionally also drop anything older than N days (0 = off).
+    session_log_keep_files: int = 20
+    session_log_retention_days: int = 0
     enable_datamuse: bool = False
 
 # ============================================
@@ -809,9 +814,14 @@ class SessionLogger:
 
     MAX_IN_MEMORY_ENTRIES = 2000
 
-    def __init__(self, data_dir: str):
+    def __init__(self, data_dir: str, keep_files: int = 20, retention_days: int = 0):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Prune old logs from PRIOR launches before we start this session, so
+        # ./data cannot grow without bound. The current session's files are
+        # created lazily on first write, so they are never at risk here.
+        self._prune_old_logs(keep_files, retention_days)
 
         # Create session file
         timestamp = time.strftime('%Y%m%d_%H%M%S')
@@ -821,6 +831,45 @@ class SessionLogger:
         self.current_text = ""
         # Keep a bounded in-memory ring buffer; full data is still persisted to file.
         self.entries = deque(maxlen=self.MAX_IN_MEMORY_ENTRIES)
+
+    def _prune_old_logs(self, keep_files: int, retention_days: int = 0):
+        """Bound session_*.log / text_*.txt by count (and optionally age).
+
+        Mirrors the backend's _prune_keyboard_chat_logs / _prune_spoken_logs
+        retention pattern. Scoped strictly to the two session-log globs, so
+        custom_dictionary.json, patient_data/, survey_data, etc. are untouched.
+        """
+        now = time.time()
+        for pattern in ('session_*.log', 'text_*.txt'):
+            files = sorted(
+                self.data_dir.glob(pattern),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            # Age cap (optional): drop anything older than retention_days.
+            if retention_days and retention_days > 0:
+                cutoff = now - retention_days * 86400
+                survivors = []
+                for path in files:
+                    try:
+                        too_old = path.stat().st_mtime < cutoff
+                    except OSError:
+                        too_old = False
+                    if too_old:
+                        try:
+                            path.unlink(missing_ok=True)
+                        except OSError:
+                            pass
+                    else:
+                        survivors.append(path)
+                files = survivors
+            # Count cap: keep only the newest N files (0 = unlimited, no cap).
+            if keep_files and keep_files > 0:
+                for path in files[keep_files:]:
+                    try:
+                        path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
 
     def log(self, event_type: str, data: Any = None):
         """Log an event."""
@@ -988,7 +1037,11 @@ class GazeConnectBackend:
         self.breaks = BreakReminderManager()
         self.dry_eye = DryEyeMonitor()
         self.tts = TTSEngine(enabled=self.config.tts_enabled)
-        self.logger = SessionLogger(self.config.data_dir) if self.config.log_sessions else None
+        self.logger = SessionLogger(
+            self.config.data_dir,
+            keep_files=self.config.session_log_keep_files,
+            retention_days=self.config.session_log_retention_days,
+        ) if self.config.log_sessions else None
 
         # Web Hub services (additive â€” no impact on gaze pipeline)
         self.news = NewsService() if NEWS_AVAILABLE and NewsService else None

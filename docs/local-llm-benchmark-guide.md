@@ -2,6 +2,16 @@
 
 **Branch:** `feature/local_llm_keyboard_suggestion`
 
+> **Decision (2026-07-08): the local LLM is NOT shipped to end users — it is a future option only.**
+> This benchmark is opt-in and dev-only, and is **never** bundled into the installer.
+> **Rationale:** SmolLM2-360M (int4) adds ~300–400 MB permanent disk and can push runtime
+> RAM to ~1–2 GB — unacceptable for the end-user build, which must stay **≤ ~700 MB peak**.
+> The shipped predictor stays lean: n-gram + smart bigrams + the 1.8 MB CIFG-LSTM ONNX +
+> patient personalization. Revisit only if a distilled/int4 model provably meets a strict RAM
+> budget on target hardware. Full analysis: [`footprint-and-llm-decision.md`](footprint-and-llm-decision.md).
+> Lean, offline way to capture the SpeakFaster benefit *without* a heavy model:
+> [`speakfaster-lite-milestone.md`](speakfaster-lite-milestone.md).
+
 ## Why this step exists
 The goal is that the patient almost never types a whole word letter‑by‑letter —
 the intended word or short phrase should appear in the top ~5 predictions. The
