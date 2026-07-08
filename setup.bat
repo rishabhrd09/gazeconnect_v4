@@ -125,7 +125,7 @@ if errorlevel 1 (
 echo   Verifying floor plan modules...
 python -c "import flask, flask_cors, cairo, ezdxf, PIL, numpy, svgwrite, shapely, networkx, squarify; from ortools.sat.python import cp_model" >nul 2>&1
 if errorlevel 1 (
-    echo   [FAIL] One or more floor plan dependencies (v4/v5) are missing after install.
+    echo   [FAIL] One or more floor plan dependencies ^(v4/v5^) are missing after install.
     echo          Please re-run setup or check pip output for errors.
     pause
     exit /b 1
@@ -145,7 +145,7 @@ if errorlevel 1 (
 
 echo   Verifying neural model files...
 if exist "python\ml\trained_models\gazeconnect_lm_quantized.onnx" (
-    echo   [OK] Neural model found (gazeconnect_lm_quantized.onnx, ~1.9 MB)
+    echo   [OK] Neural model found ^(gazeconnect_lm_quantized.onnx, ~1.9 MB^)
 ) else (
     echo   [WARN] Neural model not found in python\ml\trained_models\
     echo          Neural predictions disabled until model is trained.

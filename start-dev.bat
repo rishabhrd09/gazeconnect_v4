@@ -66,7 +66,7 @@ for %%p in (5173 5555 8765) do (
     )
 )
 if "%PORT_BUSY%"=="1" (
-    echo   You may need to stop the listed process(es) manually if startup fails.
+    echo   You may need to stop the listed process^(es^) manually if startup fails.
 )
 
 echo   Done.

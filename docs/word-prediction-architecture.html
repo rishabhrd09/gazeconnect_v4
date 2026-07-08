@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GazeConnect — Word Prediction Architecture (End-to-End)</title>
+<style>
+  :root{
+    --bg:#0D1117; --panel:#161B22; --panel2:#1C2430; --ink:#E6EDF3; --muted:#9AA7B4;
+    --line:#2A3541; --accent:#2DD4BF; --accent2:#38BDF8;
+    --fe:#60A5FA; --tr:#C084FC; --be:#2DD4BF; --nn:#FBBF24; --data:#34D399; --safe:#F472B6;
+    --chip:#0B1220; --code:#0A0E14; --shadow:rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#F6F8FA; --panel:#FFFFFF; --panel2:#F0F3F6; --ink:#1F2328; --muted:#59636E;
+      --line:#D0D7DE; --chip:#EEF2F6; --code:#0A0E14; --shadow:rgba(140,149,159,.2); }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 80px;}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:8px}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+  h1{font-size:30px;margin:.3em 0 .15em;line-height:1.15}
+  h2{font-size:22px;margin:2.2em 0 .5em;padding-top:.4em;border-top:1px solid var(--line)}
+  h3{font-size:16px;margin:1.4em 0 .4em;color:var(--ink)}
+  .sub{color:var(--muted);font-size:14px}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,.mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.86em}
+  .path{background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--accent);white-space:nowrap}
+  p{margin:.6em 0}
+  .lede{font-size:16px;color:var(--muted);max-width:78ch}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 6px}
+  .toc a{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--ink)}
+  .toc a:hover{border-color:var(--accent);text-decoration:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 1px 0 var(--shadow)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:720px){.grid2{grid-template-columns:1fr}}
+  .note{border-left:3px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0;padding:10px 14px;margin:14px 0}
+  .warn{border-left:3px solid var(--nn)}
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+  /* Layer diagram */
+  .diagram{margin:18px 0}
+  .layer{position:relative;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 auto;background:var(--panel);max-width:760px}
+  .layer .lyr-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .layer .lyr-desc{color:var(--muted);font-size:13px;margin-top:4px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .arrow{color:var(--muted);text-align:center;font-size:13px;margin:7px auto;max-width:760px}
+  .arrow b{color:var(--ink)}
+  .arrow .ln{color:var(--accent)}
+  .sources{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .src{background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12.5px;flex:1 1 150px;min-width:150px}
+  .src b{display:block;font-size:12.5px}
+  .src span{color:var(--muted)}
+  /* Tables */
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{background:var(--panel2);color:var(--ink);font-weight:700;position:sticky;top:0}
+  tbody tr:hover{background:var(--panel2)}
+  td .path{font-size:12px}
+  .yes{color:var(--data);font-weight:700}.no{color:var(--safe);font-weight:700}
+  ul{margin:.4em 0 .6em;padding-left:1.2em}li{margin:.25em 0}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.5px}
+  .kv dt{color:var(--muted)}.kv dd{margin:0}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin:10px 0}
+  .legend span{display:flex;align-items:center;gap:6px}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  .pill{font-size:12px;color:var(--muted)}
+  .formula{background:var(--code);color:#E6EDF3;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.7}
+  .formula .op{color:var(--accent)} .formula .cm{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">GazeConnect Pro · AAC Keyboard</div>
+  <h1>Word Prediction &amp; Word Suggestion — End-to-End Architecture</h1>
+  <p class="lede">Everything a new developer needs to understand how the keyboard's word prediction works: the full request flow, every file and algorithm involved, the on-device neural model (the <code>.onnx</code>), how the layers fuse, the current capabilities, footprint, and the decisions behind the design. Scope is <b>only</b> keyboard word prediction / suggestion.</p>
+  <p class="pill">Branch <code>feature/local_llm_keyboard_suggestion</code> · Updated 2026-07-08</p>
+  <nav class="toc">
+    <a href="#tldr">TL;DR</a>
+    <a href="#arch">Architecture</a>
+    <a href="#flow">Request flow</a>
+    <a href="#pipeline">Prediction pipeline</a>
+    <a href="#files">Files involved</a>
+    <a href="#model">Neural model</a>
+    <a href="#capabilities">Capabilities table</a>
+    <a href="#footprint">Footprint table</a>
+    <a href="#decisions">Decisions</a>
+    <a href="#run">Run &amp; verify</a>
+  </nav>
+</header>
+
+<section id="tldr">
+  <h2>TL;DR</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">What it is</h3>
+      <p>A fully <b>offline</b>, on-device prediction stack. As the patient types (by eye-gaze dwell), the app suggests the most likely next words / completions so they type fewer letters.</p>
+      <p>It fuses four signals: <b>n-gram statistics</b>, <b>smart bigrams</b>, a tiny <b>neural language model</b> (CIFG-LSTM), and <b>per-patient personalization</b> — all filtered by safety guardrails.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Key numbers</h3>
+      <dl class="kv">
+        <dt>Neural model</dt><dd>CIFG-LSTM · 1.81&nbsp;MB ONNX · 661-word vocab</dd>
+        <dt>Keyboard vocab</dt><dd>2,574 live words (EN + Hindi/Hinglish)</dd>
+        <dt>Smart bigrams</dt><dd>1,339 pairs / 378 contexts</dd>
+        <dt>Latency</dt><dd>~13.5&nbsp;ms mean · 30&nbsp;ms neural timeout</dd>
+        <dt>Peak RAM (user)</dt><dd>~400–650&nbsp;MB (ceiling ~700)</dd>
+        <dt>Local LLM</dt><dd><span class="no">not used / not shipped</span></dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section id="arch">
+  <h2>System architecture — the layers</h2>
+  <p class="sub">Five layers. The UI never predicts; it asks the Python backend over a local WebSocket, and the backend runs the whole engine.</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--fe)"></i> Frontend (Electron/React)</span>
+    <span><i class="dot" style="background:var(--tr)"></i> Transport (WebSocket)</span>
+    <span><i class="dot" style="background:var(--be)"></i> Backend (Python)</span>
+    <span><i class="dot" style="background:var(--nn)"></i> Neural (ONNX)</span>
+    <span><i class="dot" style="background:var(--data)"></i> Data &amp; safety</span>
+  </div>
+
+  <div class="diagram">
+    <div class="layer" style="border-color:var(--fe)">
+      <div class="lyr-title"><i class="dot" style="background:var(--fe)"></i> 1 · UI — keyboard screen</div>
+      <div class="lyr-desc">Renders keys + the prediction strip; captures typed text as the patient dwells on keys.
+        <span class="path">src/screens/KeyboardScreen.tsx</span> <span class="path">src/screens/SpatialKeyboardScreen.tsx</span></div>
+    </div>
+    <div class="arrow">▼ &nbsp;<b>update_text</b> (for logging) &nbsp;+&nbsp; <b>get_predictions</b> <span class="ln">{ text, top_k: 12, lang, request_id }</span></div>
+    <div class="layer" style="border-color:var(--fe)">
+      <div class="lyr-title"><i class="dot" style="background:var(--fe)"></i> 2 · Frontend WebSocket client</div>
+      <div class="lyr-desc">Sends prediction requests, receives the <code>predictions</code> reply, exposes results to the UI as state.
+        <span class="path">src/hooks/useWebSocket.tsx</span></div>
+    </div>
+    <div class="arrow">▼▲ &nbsp;<span class="ln">ws://127.0.0.1:8765</span> &nbsp;(JSON messages)</div>
+    <div class="layer" style="border-color:var(--be)">
+      <div class="lyr-title"><i class="dot" style="background:var(--be)"></i> 3 · Python backend / WebSocket server</div>
+      <div class="lyr-desc">Routes <code>get_predictions</code> → <code>_get_predictions()</code> → calls the engine; returns <code>{ words[], sentences[] }</code>.
+        <span class="path">python/main.py</span> · launched by <span class="path">electron/main.ts</span></div>
+    </div>
+    <div class="arrow">▼ &nbsp;<b>prediction.predict(text, top_k)</b></div>
+    <div class="layer" style="border-color:var(--be)">
+      <div class="lyr-title"><i class="dot" style="background:var(--be)"></i> 4 · Word Prediction Engine</div>
+      <div class="lyr-desc">The brain. Orchestrates all signals, ranks candidates, applies guardrails.
+        <span class="path">python/services/word_prediction.py</span></div>
+      <div class="sources">
+        <div class="src" style="border-color:var(--be)"><b>N-gram model</b><span>uni/bi/trigram · primary (weight ≈ 0.75)</span></div>
+        <div class="src" style="border-color:var(--data)"><b>Smart bigrams</b><span>1,339 pairs · smart_bigrams.json</span></div>
+        <div class="src" style="border-color:var(--be)"><b>Prefix trie</b><span>completes partial words vs 2,574 vocab</span></div>
+        <div class="src" style="border-color:var(--data)"><b>Personalization</b><span>recency + patient bigrams + custom dict</span></div>
+        <div class="src" style="border-color:var(--nn)"><b>Neural fusion</b><span>CIFG-LSTM reranking →</span></div>
+      </div>
+    </div>
+    <div class="arrow">▼ &nbsp;neural rerank via <b>fusion.py</b> + <b>inference.py</b> (onnxruntime)</div>
+    <div class="layer" style="border-color:var(--nn)">
+      <div class="lyr-title"><i class="dot" style="background:var(--nn)"></i> 5 · Neural model (on-device)</div>
+      <div class="lyr-desc">CIFG-LSTM quantized ONNX + its vocabulary; loaded once, cached, 30&nbsp;ms timeout.
+        <span class="path">python/ml/trained_models/gazeconnect_lm_quantized.onnx</span> <span class="path">vocabulary.json</span></div>
+    </div>
+    <div class="arrow">▼ &nbsp;final candidates filtered by <b>guardrails</b> → returned as <code>predictions</code> back up to the UI</div>
+    <div class="layer" style="border-color:var(--data)">
+      <div class="lyr-title"><i class="dot" style="background:var(--data)"></i> Safety guardrails (always last)</div>
+      <div class="lyr-desc">Blocks harmful words (English + Hindi/Hinglish) across every path — nothing blocked ever surfaces.
+        <span class="path">python/prediction_guardrails.py</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="flow">
+  <h2>End-to-end request flow (one keystroke → suggestions)</h2>
+  <div class="card">
+    <ol>
+      <li><b>Type</b> — the patient dwells on a key; <span class="path">KeyboardScreen.tsx</span> appends the character and updates its <code>text</code> state.</li>
+      <li><b>Emit</b> — <span class="path">useWebSocket.tsx</span> sends two messages: <code>update_text</code> (for the session log) and <code>get_predictions</code> <span class="mono">{ text, top_k: 12, lang, request_id }</span>.</li>
+      <li><b>Route</b> — <span class="path">main.py</span> receives it and calls <code>_get_predictions()</code>, which calls <code>WordPredictionEngine.predict(text, top_k)</code>.</li>
+      <li><b>Predict</b> — the engine builds context, generates candidates from n-gram + smart bigrams + prefix trie, reranks them with the neural model (<code>fusion.py</code> blends neural + n-gram probabilities), then applies patient personalization boosts.</li>
+      <li><b>Filter</b> — every candidate passes through <code>prediction_guardrails.py</code>; blocked words are dropped.</li>
+      <li><b>Reply</b> — the backend sends a <code>predictions</code> message: <span class="mono">{ words:[{word,score,source}], sentences:[…], request_id }</span>.</li>
+      <li><b>Render</b> — <span class="path">useWebSocket.tsx</span> (<code>case 'predictions'</code>) updates state; <span class="path">KeyboardScreen.tsx</span> shows up to ~12 suggestions in the strip. The patient dwells one to insert it (space-committed words feed back into learning).</li>
+    </ol>
+    <div class="note">The neural step has a <b>30&nbsp;ms timeout</b> and runs off the gaze path — if it's slow it silently falls back to n-gram, so the 66&nbsp;Hz eye-tracking loop is never blocked.</div>
+  </div>
+</section>
+
+<section id="pipeline">
+  <h2>The prediction pipeline — how candidates are ranked</h2>
+  <p class="sub">Predictions come from four cooperating signals, blended by linear interpolation, then boosted for the individual patient and filtered for safety.</p>
+
+  <h3>Fusion formula</h3>
+  <div class="formula">
+P<span class="op">_final</span>(word) = λ<span class="op">_ngram</span> · P<span class="op">_ngram</span>(word) &nbsp;<span class="op">+</span>&nbsp; λ<span class="op">_nn</span> · P<span class="op">_neural</span>(word)
+
+  <span class="cm"># λ_ngram is primary (default ≈ 0.75, clamped 0.50–0.90)</span>
+  <span class="cm"># λ_nn is the neural weight (clamped 0.10–0.50) — semantic reranking, not the base</span>
+  <span class="cm"># +15% "agreement bonus" when both n-gram AND neural rank the same word</span>
+  <span class="cm"># patient-learned words get a history boost (×1.8), ranking highest overall</span>
+  <span class="cm"># a neural-only word must exist in the 2,574-word ALL_VOCABULARY to survive</span>
+  <span class="cm"># finally: guardrails drop any blocked word</span>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">1 · N-gram model <span class="tag">primary</span></h3>
+      <p>Unigram/bigram/trigram frequencies trained at startup from in-code AAC corpora + the merged vocabulary. Fast, deterministic, and the base ranker (~0.75 weight).</p>
+      <h3>2 · Smart bigrams</h3>
+      <p>1,339 pre-computed high-value word-pair frequencies (378 context words) that sharpen "next word given previous word." Ships as a 34&nbsp;KB JSON, loaded fully at startup.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">3 · Neural CIFG-LSTM <span class="tag">semantic rerank</span></h3>
+      <p>A tiny on-device language model that understands sentence context better than pure statistics. It <b>reranks</b> the n-gram candidates (~10–15% quality lift), it does not replace them.</p>
+      <h3>4 · Patient personalization</h3>
+      <p>Per-user recency (30-day window), patient bigrams, and a custom dictionary. Patient-learned words always rank highest (up to ~2–3× boost). Stored on disk, pruned/capped so it never grows unbounded.</p>
+    </div>
+  </div>
+</section>
+
+<section id="files">
+  <h2>Every file involved in word prediction</h2>
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>File</th><th>Layer</th><th>Role in word prediction</th></tr></thead>
+    <tbody>
+      <tr><td><span class="path">src/screens/KeyboardScreen.tsx</span></td><td>Frontend</td><td>QWERTY keyboard UI; captures typed text; renders the prediction strip; inserts a suggestion on dwell.</td></tr>
+      <tr><td><span class="path">src/screens/SpatialKeyboardScreen.tsx</span></td><td>Frontend</td><td>Alternative spatial keyboard layout (same prediction data path).</td></tr>
+      <tr><td><span class="path">src/hooks/useWebSocket.tsx</span></td><td>Frontend</td><td>WebSocket client — sends <code>update_text</code> + <code>get_predictions</code> (top_k=12), handles the <code>predictions</code> reply.</td></tr>
+      <tr><td><span class="path">src/utils/predictionTelemetry.ts</span></td><td>Frontend</td><td>Client-side telemetry for prediction usage/acceptance.</td></tr>
+      <tr><td><span class="path">src/components/QuickWordsOverlay.tsx</span></td><td>Frontend</td><td>Quick-word / phrase overlays surfaced alongside predictions.</td></tr>
+      <tr><td><span class="path">electron/main.ts</span></td><td>Backend launch</td><td>Spawns the Python backend (<code>resolveDevPython()</code> = venv on Win/macOS, else <code>python3</code>); dev vs bundled exe.</td></tr>
+      <tr><td><span class="path">python/main.py</span></td><td>Backend</td><td>WebSocket server (port 8765); routes <code>get_predictions</code> → <code>_get_predictions()</code> → engine; returns words + sentences.</td></tr>
+      <tr><td><span class="path">python/services/word_prediction.py</span></td><td>Engine</td><td><b>The core.</b> WordPredictionEngine: n-gram model, bigram loader, prefix trie, 2,574-word vocab, personalization, neural fusion, <code>predict()</code>.</td></tr>
+      <tr><td><span class="path">python/ml/model.py</span></td><td>Neural (train)</td><td>Defines the CIFG-LSTM architecture (Embedding→CIFG-LSTM→Linear→Softmax) used for training.</td></tr>
+      <tr><td><span class="path">python/ml/inference.py</span></td><td>Neural (run)</td><td>NeuralPredictor — loads the ONNX via onnxruntime, runs inference, 200-entry cache.</td></tr>
+      <tr><td><span class="path">python/ml/fusion.py</span></td><td>Neural (run)</td><td>PredictionFusion — blends neural + n-gram probabilities (the formula above).</td></tr>
+      <tr><td><span class="path">python/ml/train.py</span></td><td>Neural (train)</td><td>Training pipeline; exports + quantizes the model to ONNX. Run via retrain scripts.</td></tr>
+      <tr><td><span class="path">python/ml/trained_models/gazeconnect_lm_quantized.onnx</span></td><td>Model</td><td>The shipped 1.81&nbsp;MB quantized CIFG-LSTM weights (committed to git → ships to users).</td></tr>
+      <tr><td><span class="path">python/ml/trained_models/vocabulary.json</span></td><td>Model</td><td>The neural model's 661-word vocabulary (word↔index map).</td></tr>
+      <tr><td><span class="path">python/ml/trained_models/training_log.json</span></td><td>Model</td><td>Training metadata (config, param count, metrics).</td></tr>
+      <tr><td><span class="path">python/data/smart_bigrams.json</span></td><td>Data</td><td>1,339 pre-computed bigram pairs (378 contexts), 34&nbsp;KB, loaded at startup.</td></tr>
+      <tr><td><span class="path">python/prediction_guardrails.py</span></td><td>Safety</td><td>Blocked-word lists (English + Hindi/Hinglish); enforced on every prediction path.</td></tr>
+      <tr><td><span class="path">./data/custom_dictionary.json · ./data/patient_data/*</span></td><td>Data (runtime)</td><td>Per-patient learned words, recency, patient bigrams. Created at runtime, pruned/capped.</td></tr>
+      <tr><td><span class="path">retrain-model.sh · retrain-model.bat</span></td><td>Tooling</td><td>Retrain the CIFG-LSTM → regenerate the ONNX (only when deliberately improving the model).</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">Datamuse (online enrichment) exists in code but is <b>OFF by default</b> (<code>enable_datamuse=False</code>). The shipped predictor is 100% offline.</div>
+</section>
+
+<section id="model">
+  <h2>The neural model (the <code>.onnx</code>) — deep dive</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">What it is</h3>
+      <p>A <b>small on-device neural language model</b> — a "mini NLM", <b>not</b> a large LLM. It adds semantic understanding of context that pure n-gram statistics can't.</p>
+      <dl class="kv">
+        <dt>Type</dt><dd>CIFG-LSTM (Coupled Input-Forget Gate LSTM)</dd>
+        <dt>Shape</dt><dd>Embedding(128) → CIFG-LSTM(512) → Dropout(0.2) → Linear → Softmax</dd>
+        <dt>Params</dt><dd>~1.79&nbsp;M</dd>
+        <dt>File / size</dt><dd>gazeconnect_lm_quantized.onnx · 1.81&nbsp;MB</dd>
+        <dt>Vocab</dt><dd>661 words</dd>
+        <dt>Runtime</dt><dd>onnxruntime (CPU)</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">How it is trained &amp; shipped</h3>
+      <p>Training runs on the Mac (Apple-Silicon GPU) via <span class="path">retrain-model.sh</span> (or <span class="path">retrain-model.bat</span> on Windows), which runs <code>python -m ml.train</code> and exports the quantized ONNX.</p>
+      <p><b>Train once → benefit everywhere.</b> The output <code>.onnx</code> is <b>committed to git</b>, so it flows automatically to Windows dev and into the shipped installer — every end user gets neural-enhanced predictions. It is <b>not</b> a per-session step; retrain only when deliberately changing the model, then commit the new file.</p>
+      <div class="note warn">Not Gboard-level — it is far smaller than Google's models. The lean path toward better quality is to retrain <b>this same model bigger</b> (larger vocab + richer data), never to add a heavy LLM.</div>
+    </div>
+  </div>
+</section>
+
+<section id="capabilities">
+  <h2>Capabilities — lab vs end-user vs exact file</h2>
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>Capability / Metric</th><th>Lab / Dev (MacBook)</th><th>End-user shipped app</th><th>Exact model / value / file</th></tr></thead>
+    <tbody>
+      <tr><td>Prediction engine</td><td>same as shipped</td><td>n-gram + smart bigrams + neural fusion + personalization</td><td><span class="path">word_prediction.py</span></td></tr>
+      <tr><td>Neural model</td><td>CIFG-LSTM (active with venv onnxruntime)</td><td>CIFG-LSTM (bundled, always on)</td><td><span class="path">gazeconnect_lm_quantized.onnx</span></td></tr>
+      <tr><td>Neural architecture</td><td colspan="2">Embedding(128)→CIFG-LSTM(512)→Dropout(0.2)→Linear→Softmax</td><td>Coupled Input-Forget Gate LSTM</td></tr>
+      <tr><td>Neural size / params</td><td colspan="2">1.81&nbsp;MB / ~1.79&nbsp;M</td><td>1,897,931 bytes, quantized ONNX</td></tr>
+      <tr><td>Neural vocabulary</td><td colspan="2">661 words</td><td><span class="path">vocabulary.json</span> (23&nbsp;KB)</td></tr>
+      <tr><td>N-gram model</td><td colspan="2">uni/bi/trigram — primary (weight ≈ 0.75)</td><td>in-code corpora at startup</td></tr>
+      <tr><td>Smart bigrams</td><td colspan="2">1,339 pairs / 378 contexts</td><td><span class="path">smart_bigrams.json</span> (34&nbsp;KB)</td></tr>
+      <tr><td>Live keyboard vocabulary</td><td colspan="2">2,574 (deduped, guardrail-filtered)</td><td><span class="path">ALL_VOCABULARY</span></td></tr>
+      <tr><td>English vocab (overlapping sets)</td><td colspan="2">Core 547 + Top-500 606 + Everyday 475 + General 239 (+Patient 281)</td><td>merged → 2,574</td></tr>
+      <tr><td>Bilingual</td><td colspan="2">Hindi 286 + Hinglish 546</td><td><span class="path">HINDI_/HINGLISH_VOCABULARY</span></td></tr>
+      <tr><td>Patient personalization</td><td colspan="2">learns per user; 1.8–3× boost, ranks top</td><td><span class="path">custom_dictionary.json</span> + <span class="path">patient_data/</span></td></tr>
+      <tr><td>Safety guardrails</td><td colspan="2">English + Hindi/Hinglish blocked words</td><td><span class="path">prediction_guardrails.py</span></td></tr>
+      <tr><td>General-purpose local LLM</td><td><span class="no">not used (parity)</span></td><td><span class="no">not shipped</span></td><td>SmolLM2 documented future-only</td></tr>
+      <tr><td>Online enrichment</td><td colspan="2">Datamuse OFF by default</td><td><span class="path">enable_datamuse=False</span></td></tr>
+      <tr><td>Inference runtime</td><td>onnxruntime in <span class="path">.venv</span></td><td>CPU onnxruntime bundled in exe</td><td>onnxruntime ≥ 1.16 (verified 1.27.0)</td></tr>
+      <tr><td>Latency</td><td colspan="2">~13.5&nbsp;ms mean · 30&nbsp;ms neural timeout · 0 impact on 66&nbsp;Hz gaze</td><td>—</td></tr>
+      <tr><td>Dev ↔ shipped consistency</td><td colspan="2">same artifact, same code, same data — verified identical on macOS</td><td>one ONNX + pure-data pipeline everywhere</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="footprint">
+  <h2>Footprint (end-user shipped app)</h2>
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>Metric</th><th>Value</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Peak RAM (worst case, hours of use)</td><td><b>~400–650&nbsp;MB</b> (ceiling ~700)</td><td>Plateaus — never approaches 1–2&nbsp;GB; all caches bounded, no leak.</td></tr>
+      <tr><td>Installer download</td><td>~150–220&nbsp;MB</td><td>NSIS, LZMA-compressed.</td></tr>
+      <tr><td>Installed on disk</td><td>~380–460&nbsp;MB</td><td>Electron ~200 + Python backend ~90–150 + .NET Tobii ~70–80; <b>model + data only ~1.9&nbsp;MB</b>.</td></tr>
+      <tr><td>Data growth over time</td><td>bounded</td><td>Personalization pruned; session logs capped (keep newest 20).</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="sub">The prediction "brain" (ONNX + bigrams + vocab) is only ~1.9&nbsp;MB — footprint is dominated by fixed runtimes, not the models.</p>
+</section>
+
+<section id="decisions">
+  <h2>Design decisions &amp; rationale</h2>
+  <div class="card">
+    <ul>
+      <li><b>Consistency (dev-prod parity) is a hard rule.</b> ONE model artifact is identical across Mac-dev, Windows-dev, and the shipped installer — what a developer tests is exactly what the patient gets.</li>
+      <li><b>No general-purpose local LLM anywhere — not even in dev.</b> SmolLM2-360M / onnxruntime-genai are memory-heavy (~1–2&nbsp;GB RAM) and would break parity if used only in dev. They stay a <b>documented, theoretical future option only</b>, never bundled.</li>
+      <li><b>Model kept as-is.</b> The n-gram + bigram + CIFG-LSTM + personalization stack ships as-is. More quality later = retrain the <b>same</b> CIFG-LSTM bigger, never a heavy LLM.</li>
+      <li><b>SpeakFaster (Google, Nature Comms 2024) = paradigm only.</b> Its real engine is a 64B cloud LaMDA that can't run on-device; only the interaction idea (initials→phrase + personalized phrase cache) is a future, offline milestone.</li>
+      <li><b>Data hygiene.</b> Per-keystroke session logs were the only unbounded on-disk growth → now capped via <code>session_log_keep_files</code> (keep 20).</li>
+      <li><b>macOS dev-launch fix.</b> Electron previously only knew the Windows venv path and fell back to bare <code>python</code> (absent on macOS), so the backend never started and no real predictions reached the UI. Fixed with a cross-platform <code>resolveDevPython()</code>.</li>
+    </ul>
+    <p class="sub">Full detail: <code>docs/footprint-and-llm-decision.md</code>, <code>docs/speakfaster-lite-milestone.md</code>, <code>docs/word-prediction-context-and-decisions.md</code>.</p>
+  </div>
+</section>
+
+<section id="run">
+  <h2>Run &amp; verify</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">Mac (dev / train)</h3>
+      <div class="formula"><span class="cm"># one-time</span>
+./setup.sh
+
+<span class="cm"># run the app (mouse-as-gaze; eye tracking is Windows-only)</span>
+./start-dev.sh
+
+<span class="cm"># quick engine check — expect "Neural ... ACTIVE"</span>
+cd python
+.venv/bin/python tests/test_prediction_pipeline.py</div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Windows (eye tracking / ship)</h3>
+      <div class="formula"><span class="cm"># get latest, then setup</span>
+git pull --ff-only
+.\setup.bat
+
+<span class="cm"># run (add --simulate if no tracker)</span>
+.\start-dev.bat
+
+<span class="cm"># build the installer</span>
+.\build-installer.bat</div>
+    </div>
+  </div>
+  <div class="note">Green means: backend logs <code>WebSocket server started on ws://127.0.0.1:8765</code>, the smoke test prints <code>Neural CIFG-LSTM: ACTIVE</code>, and the pipeline suite passes (11/11). Then the keyboard's top strip shows live suggestions.</div>
+</section>
+
+<footer>
+  GazeConnect Pro — Word Prediction Architecture · Scope: keyboard word prediction / suggestion only ·
+  Branch <code>feature/local_llm_keyboard_suggestion</code> · 2026-07-08.
+  Built for Papa, and for every ALS patient who deserves to communicate freely.
+</footer>
+
+</div>
+</body>
+</html>
