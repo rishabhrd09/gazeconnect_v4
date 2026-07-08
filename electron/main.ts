@@ -728,6 +728,24 @@ function getManagedRuntimePaths() {
   return { dataDir, surveyDataDir };
 }
 
+/**
+ * Resolve the Python interpreter for dev mode across platforms.
+ * Prefers the project venv (it has all backend deps incl. onnxruntime):
+ *   Windows      -> python/.venv/Scripts/python.exe
+ *   macOS/Linux  -> python/.venv/bin/python
+ * Falls back to a system interpreter: 'python' on Windows, 'python3' elsewhere.
+ * (macOS/Linux have no bare `python`, which previously caused spawn ENOENT and
+ *  an endless backend-restart loop — the backend never came up, so the UI showed
+ *  "Connecting..." with no real predictions.)
+ */
+function resolveDevPython(): string {
+  const venvWin = path.join(__dirname, '..', 'python', '.venv', 'Scripts', 'python.exe');
+  const venvUnix = path.join(__dirname, '..', 'python', '.venv', 'bin', 'python');
+  if (fs.existsSync(venvWin)) return venvWin;
+  if (fs.existsSync(venvUnix)) return venvUnix;
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
 function startPythonBackend(): void {
   const isDev = !app.isPackaged;
 
@@ -736,8 +754,7 @@ function startPythonBackend(): void {
 
   if (isDev) {
     // Development: use venv Python
-    const venvPython = path.join(__dirname, '..', 'python', '.venv', 'Scripts', 'python.exe');
-    command = fs.existsSync(venvPython) ? venvPython : 'python';
+    command = resolveDevPython();
     const scriptPath = path.join(__dirname, '..', 'python', 'main.py');
 
     if (!fs.existsSync(scriptPath)) {
@@ -831,8 +848,7 @@ function startFloorplanServer(): void {
   let args: string[];
 
   if (isDev) {
-    const venvPython = path.join(__dirname, '..', 'python', '.venv', 'Scripts', 'python.exe');
-    command = fs.existsSync(venvPython) ? venvPython : 'python';
+    command = resolveDevPython();
     const scriptPath = path.join(__dirname, '..', 'tools', 'floorplan_server.py');
     if (!fs.existsSync(scriptPath)) {
       console.warn(`Floor plan server script not found at: ${scriptPath}`);
