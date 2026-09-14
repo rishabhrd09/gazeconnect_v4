@@ -185,20 +185,17 @@ export interface AACCategory {
 
 export interface AppSettings {
   isDarkMode: boolean;
-  showHindi: boolean;
+  showHindi: boolean; // Legacy storage field; normalized to false for this English-only release.
   dwellTime: number;
   filterPreset: string;
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';
   ttsRate: number;
   ttsVolume: number;
   breakReminderInterval: number;   // minutes (10–60, default 20)
-  emergencyDwellTime: number;      // ms (800–2000, default 1200)
-  ttsLanguage: string;             // 'english' | 'hindi' | 'auto'
+  ttsLanguage: string;             // Legacy storage field; normalized to 'english'.
   gazeCursorSize: string;          // 'small' | 'medium' | 'large'
   soundEffects: boolean;
   userName: string;                // Name shown on splash screen (default: 'Papa')
-  emergencyPhraseEn: string;       // English emergency phrase
-  emergencyPhraseHi: string;       // Hindi emergency phrase
   // Gaze accuracy settings
   gazeOffsetX: number;             // Manual X offset correction in px (-100 to +100, default 0)
   gazeOffsetY: number;             // Manual Y offset correction in px (-100 to +100, default 0)

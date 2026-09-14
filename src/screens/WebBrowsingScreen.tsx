@@ -2,6 +2,7 @@
  * WebBrowsingScreen v3.6 — Real gaze cursor inside BrowserView, bigger buttons
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import '../styles/browsing-refinement.css';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { screenThemes, typography, warmScreenTokens } from '../utils/design';
@@ -13,6 +14,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useDwellTime } from '../contexts/DwellTimeContext';
 import { gazeFlags } from '../utils/gazeFlags';
+import { isUsableGaze, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../utils/gazeSafety';
 import {
     BackIcon,
     BrainIcon,
@@ -35,7 +37,6 @@ const T = screenThemes.web;
 const GAP = 'clamp(24px, 3vh, 40px)'; // Even larger gap
 const CR = '24px';
 const FONT_PRIMARY = typography.fontFamily.primary;
-const CBG = T.cardBg;
 const CB = T.cardBorder;
 const GL = T.glass;
 const TL = T.ai;
@@ -53,13 +54,6 @@ const STATUS_BORDER = 'rgba(142, 169, 183, 0.22)';
 
 type WebIconProps = { size?: number; color?: string; strokeWidth?: number; style?: React.CSSProperties };
 
-const EmergencyIcon: React.FC<WebIconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => (
-    <svg width={size} height={size} viewBox="0 0 96 96" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
-        <circle cx="48" cy="48" r="30" />
-        <path d="M48 25v28" />
-        <path d="M48 69h.1" />
-    </svg>
-);
 
 const WEB_SURFACE = {
     pageBg: T.bg,
@@ -320,8 +314,8 @@ const toolbarStyle: React.CSSProperties = {
 };
 
 const cs: React.CSSProperties = {
-    background: CBG, border: CB, borderRadius: CR, boxShadow: WEB_SURFACE.cardShadow,
-    transition: 'all 0.2s ease', display: 'flex', flexDirection: 'column',
+    background: 'var(--ui-surface)', border: '1px solid var(--ui-border)', borderRadius: CR, boxShadow: 'none',
+    transition: 'background-color 120ms ease, border-color 120ms ease', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', cursor: 'pointer',
 };
 
@@ -337,8 +331,8 @@ const pill = (on: boolean, ac = AC): React.CSSProperties => ({
 const cb: React.CSSProperties = {
     padding: 'clamp(20px, 2.6vh, 30px) clamp(30px, 4vw, 48px)', // Generous padding
     fontSize: 'clamp(19px, 2.4vh, 26px)', fontWeight: 600, fontFamily: FONT_PRIMARY,
-    color: T.textMain, background: GL, border: WEB_SURFACE.borderSoft, borderRadius: '20px',
-    minHeight: 'clamp(70px, 9vh, 100px)', width: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+    color: 'var(--ui-ink)', background: 'var(--ui-surface)', border: '1px solid var(--ui-border)', borderRadius: '16px',
+    minHeight: 'clamp(80px, 9vh, 100px)', width: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
 };
 
 const browserToolbarButton = (
@@ -351,7 +345,7 @@ const browserToolbarButton = (
     minWidth: 'clamp(158px, 12vw, 226px)',
     padding: 'clamp(20px, 2.35vh, 30px) clamp(20px, 2.4vw, 36px)',
     fontSize: 'clamp(21px, 2.7vh, 30px)',
-    fontWeight: 760,
+    fontWeight: 650,
     borderRadius: '20px',
     border: '0',
     position: 'relative',
@@ -364,32 +358,32 @@ const browserToolbarIconSize = 34;
 
 // ── UNIFIED TOOLBAR BUTTON SYSTEM (Tier 1 E) ──────────────────────────────
 // Consolidates 5 prior button-style functions (browserToolbarButton,
-// hiddenBrowserButton, hiddenEmergencyButton, showNavButtonStyle,
-// browserModeButtonStyle) into 3 roles: primary, secondary, emergency.
+// hiddenBrowserButton, showNavButtonStyle,
+// browserModeButtonStyle) into 3 roles: primary, secondary, dismiss.
 // All share identical geometry — only the color triplet differs.
-type ToolbarRole = 'primary' | 'secondary' | 'emergency';
+type ToolbarRole = 'primary' | 'secondary' | 'dismiss';
 
 // Professional cool-slate palette — replaces the warm-tan / sage-teal scheme
 // that read as "toyish" in the screenshots. Inspired by macOS Big Sur toolbar
-// chrome and pro browser UIs (Edge, Arc). Emergency keeps its distinct maroon.
+// chrome; close and stop actions retain a subdued semantic accent.
 const TOOLBAR_ROLE: Record<ToolbarRole, { color: string; bg: string; border: string }> = {
     // PRIMARY — cool cream text on dark slate, used for Back / Exit / Show-Nav / Close / Hide-Controls
     primary: {
-        color: '#D8DEE6',
+        color: 'var(--ui-ink)',
         bg: 'transparent',
         border: 'rgba(180, 195, 220, 0.10)',
     },
     // SECONDARY — slate-blue accent, used for Play/Pause, Show Controls
     secondary: {
-        color: '#9DB7CC',
+        color: 'var(--ui-accent-ink)',
         bg: 'transparent',
         border: 'rgba(157, 183, 204, 0.18)',
     },
-    // EMERGENCY — maroon, kept distinct as the only color-coded role
-    emergency: {
-        color: '#F0BCB0',
-        bg: 'rgba(80, 32, 30, 0.82)',
-        border: 'rgba(220, 158, 144, 0.30)',
+    // DISMISS — close and stop actions
+    dismiss: {
+        color: 'var(--ui-care-ink)',
+        bg: 'var(--ui-panel)',
+        border: 'var(--ui-border)',
     },
 };
 
@@ -400,9 +394,9 @@ const toolbarBtn = (role: ToolbarRole, hidden: boolean): React.CSSProperties => 
         minWidth: hidden ? 'clamp(128px, 9.8vw, 190px)' : 'clamp(158px, 12vw, 226px)',
         padding: hidden ? 'clamp(18px, 2.1vh, 28px) clamp(14px, 1.6vw, 24px)' : 'clamp(20px, 2.35vh, 30px) clamp(20px, 2.4vw, 36px)',
         fontSize: hidden ? 'clamp(19px, 2.45vh, 28px)' : 'clamp(21px, 2.7vh, 30px)',
-        fontWeight: 760,
+        fontWeight: 650,
         fontFamily: FONT_PRIMARY,
-        letterSpacing: '0.05em',
+        letterSpacing: '0.005em',
         borderRadius: '20px',
         color: r.color,
         background: r.bg,
@@ -431,10 +425,10 @@ const connectedToolbarStyle: React.CSSProperties = {
     width: '100%',
     boxSizing: 'border-box',
     padding: 0,
-    background: '#181D24',
-    border: '1.5px solid rgba(180, 195, 220, 0.12)',
+    background: 'var(--ui-surface)',
+    border: '1.5px solid var(--ui-border)',
     borderRadius: '20px',
-    boxShadow: '0 10px 24px rgba(0,0,0,0.40)',
+    boxShadow: 'none',
     overflow: 'hidden',
 };
 
@@ -447,14 +441,14 @@ const toolbarBtnConnected = (role: ToolbarRole, hidden: boolean, position: 'firs
         minHeight: hidden ? 'clamp(118px, 13.2vh, 158px)' : 'clamp(100px, 11vh, 132px)',
         padding: hidden ? 'clamp(18px, 2.1vh, 28px) clamp(14px, 1.6vw, 24px)' : 'clamp(20px, 2.35vh, 30px) clamp(20px, 2.4vw, 36px)',
         fontSize: hidden ? 'clamp(19px, 2.45vh, 28px)' : 'clamp(21px, 2.7vh, 30px)',
-        fontWeight: 760,
+        fontWeight: 650,
         fontFamily: FONT_PRIMARY,
-        letterSpacing: '0.05em',
+        letterSpacing: '0.005em',
         borderRadius: 0,
         color: r.color,
         background: r.bg,
         // Single 1px divider line on the right of every button except the last
-        borderRight: position !== 'last' ? '1px solid rgba(180, 195, 220, 0.08)' : '0',
+        borderRight: position !== 'last' ? '1px solid var(--ui-border)' : '0',
         borderTop: 0,
         borderBottom: 0,
         borderLeft: 0,
@@ -499,12 +493,10 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
         width: '100%',
         flex: '1 1 0',
         minHeight: hasMax || hasAutoScroll ? 'clamp(86px, 10.5vh, 140px)' : 'clamp(120px, 16vh, 200px)',
-        background: 'rgba(24, 29, 36, 0.78)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        border: '1.5px solid rgba(180, 195, 220, 0.18)',
+        background: 'var(--ui-surface)',
+        border: '1px solid var(--ui-border)',
         borderRadius: '20px',
-        color: '#D8DEE6',
+        color: 'var(--ui-ink)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -513,10 +505,10 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
         cursor: 'pointer',
         fontFamily: FONT_PRIMARY,
         fontWeight: 720,
-        fontSize: 'clamp(15px, 1.75vh, 21px)',
-        letterSpacing: '0.05em',
-        boxShadow: '0 10px 22px rgba(0,0,0,0.36)',
-        transition: 'opacity 200ms ease, transform 150ms ease, background 150ms ease',
+        fontSize: 'clamp(19px, 2vh, 23px)',
+        letterSpacing: '0.005em',
+        boxShadow: 'none',
+        transition: 'background-color 120ms ease, border-color 120ms ease',
     };
     const iconSize = hasMax || hasAutoScroll ? 36 : 42;
     return (
@@ -535,7 +527,7 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
                 <span>Up</span>
             </GazeButton>
             {onToggleAutoScroll && (
-                <GazeButton id="content-auto-scroll" onClick={onToggleAutoScroll}
+                <GazeButton id="content-auto-scroll" selected={!!autoScrollEnabled} onClick={onToggleAutoScroll}
                     gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                     dwellCategory="navigationButton"
                     style={{
@@ -549,7 +541,7 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
                 </GazeButton>
             )}
             {onMaximize && (
-                <GazeButton id="content-maximize" onClick={onMaximize}
+                <GazeButton id="content-maximize" selected={!!maximized} onClick={onMaximize}
                     gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                     dwellCategory="navigationButton"
                     style={maximized ? {
@@ -559,7 +551,7 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
                         color: '#86F0D3',
                         borderColor: 'rgba(134, 240, 211, 0.46)',
                         background: 'rgba(22, 96, 78, 0.36)',
-                    } : { ...buttonStyle, color: '#9DB7CC', borderColor: 'rgba(157, 183, 204, 0.36)' }}>
+                    } : { ...buttonStyle, color: 'var(--ui-accent-ink)', borderColor: 'rgba(157, 183, 204, 0.36)' }}>
                     {maximized ? (
                         // Contract glyph — arrows point inward (exit full screen).
                         <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -600,7 +592,7 @@ const modeToggleCompact = (isWatch: boolean, hidden: boolean): React.CSSProperti
     fontSize: hidden ? 'clamp(18px, 2.3vh, 26px)' : 'clamp(19px, 2.4vh, 26px)',
     fontWeight: 740,
     fontFamily: FONT_PRIMARY,
-    letterSpacing: '0.05em',
+    letterSpacing: '0.005em',
     borderRadius: '20px',
     color: isWatch ? WATCH_MODE_TEXT : CONTROL_MODE_TEXT,
     background: isWatch ? 'rgba(54, 42, 22, 0.86)' : 'rgba(25, 49, 47, 0.86)',
@@ -642,14 +634,6 @@ const hiddenBrowserButton = (
     flex: '1 1 0',
 });
 
-const hiddenEmergencyButton = (): React.CSSProperties => ({
-    ...hiddenBrowserButton(WEB_ACCENTS.maroonText, 'rgba(70, 31, 29, 0.82)', DANGER_BORDER),
-    minWidth: 'clamp(178px, 13vw, 260px)',
-    flex: '1.12 1 0',
-    fontWeight: 900,
-    letterSpacing: '0.12em',
-});
-
 const showNavButtonStyle = (): React.CSSProperties => ({
     ...hiddenBrowserButton('#38C7FF', 'rgba(23, 44, 54, 0.86)', 'rgba(56, 199, 255, 0.40)'),
     minWidth: 'clamp(145px, 11vw, 210px)',
@@ -676,7 +660,7 @@ const watchModeBadgeStyle: React.CSSProperties = {
     color: WATCH_MODE_TEXT,
     border: '1px solid rgba(220, 200, 155, 0.18)',
     fontSize: 'clamp(13px, 1.55vh, 17px)',
-    fontWeight: 760,
+    fontWeight: 650,
     letterSpacing: '0.04em',
     boxShadow: '0 8px 18px rgba(0,0,0,0.18)',
 };
@@ -734,7 +718,7 @@ const BackBtn = ({ onClick, ige, ts, toggleGaze, label = "← Home Grid", showHo
                     color: T.textMain, background: GL,
                     border: '1px solid rgba(168, 181, 196, 0.14)', borderRadius: '24px',
                     backdropFilter: 'blur(16px)', letterSpacing: '0.5px',
-                    minWidth: 'clamp(260px, 30vw, 380px)', cursor: 'pointer', transition: 'all 0.2s ease', gap: '12px'
+                    minWidth: 'clamp(260px, 30vw, 380px)', cursor: 'pointer', transition: 'background-color 120ms ease, border-color 120ms ease', gap: '12px'
                 }}>
                 {label}
             </GazeButton>
@@ -1057,7 +1041,7 @@ const QUICK_TOPIC_SUBTITLES: Record<string, string> = {
     stock_market:   'Sensex · Nifty today',
 };
 
-type ViewState = 'grid' | 'news' | 'youtube' | 'knowledge' | 'search' | 'whatsapp' | 'social';
+type ViewState = 'grid' | 'news' | 'youtube' | 'knowledge' | 'search' | 'social';
 
 // ── NEWS PANEL ──
 type NewsItem = {
@@ -1106,6 +1090,27 @@ const formatNewsAsReadableParagraphs = (rawText: string): string[] => {
     return deduped;
 };
 
+// Fit discrete gaze choices to the actual pane height instead of clipping overflow.
+// This changes page capacity only; selection durations and native gaze coordinates are unchanged.
+const useGazePageCapacity = (minimumHeight: number, maximum: number) => {
+    const [capacity, setCapacity] = useState(1);
+    const observer = useRef<ResizeObserver | null>(null);
+    const ref = useCallback((node: HTMLDivElement | null) => {
+        observer.current?.disconnect();
+        if (!node) return;
+        const update = () => {
+            const gap = parseFloat(getComputedStyle(node).rowGap) || 0;
+            const height = node.getBoundingClientRect().height;
+            setCapacity(Math.max(1, Math.min(maximum, Math.floor((height + gap) / (minimumHeight + gap)))));
+        };
+        update();
+        observer.current = new ResizeObserver(update);
+        observer.current.observe(node);
+    }, [minimumHeight, maximum]);
+    useEffect(() => () => observer.current?.disconnect(), []);
+    return { ref, capacity };
+};
+
 const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gpRef, isNavHidden }: {
     ige: boolean;
     ts: number;
@@ -1119,17 +1124,22 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
     const ws = useWS();
     const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. Content cards stay dark in all modes.
-    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_pageBg = 'var(--ui-page)';
+    const T_chromeBg = 'var(--ui-panel)';
+    const T_chromeBorder = 'var(--ui-border)';
+    const T_chromeText = 'var(--ui-ink)';
+    const T_chromeTextMuted = 'var(--ui-muted)';
+    const T_chromeShadow = 'none';
     const T_chromePillSelected = isLight ? 'rgba(31, 107, 126, 0.16)' : isWarm ? warmScreenTokens.web.chromePillSelected : isMix ? 'rgba(180, 147, 98, 0.22)' : 'rgba(198, 154, 69, 0.16)';
     const T_chromePillSelectedBorder = isLight ? 'rgba(31, 107, 126, 0.34)' : isWarm ? warmScreenTokens.web.chromePillSelectedBorder : isMix ? 'rgba(180, 147, 98, 0.40)' : 'rgba(198, 154, 69, 0.34)';
     const T_chromePillSelectedText = isLight ? '#1F6B7E' : isWarm ? warmScreenTokens.web.chromePillSelectedText : isMix ? '#E3C28E' : '#F1E2C2';
     const T_chromeAccentLine = isLight ? '#1F6B7E' : isWarm ? warmScreenTokens.web.accentLine : isMix ? '#B49362' : '#C69A45';
     const [cat, setCat] = useState('positive_india');
+    const [categoryPage, setCategoryPage] = useState(0);
+    const [articlePage, setArticlePage] = useState(0);
+    const categoryChoices = useGazePageCapacity(90, 7);
+    const [readerPage, setReaderPage] = useState(0);
+    const readerChoices = useGazePageCapacity(120, 5);
     const [sel, setSel] = useState<NewsItem | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [readerUrl, setReaderUrl] = useState('');
@@ -1160,6 +1170,8 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
 
     useEffect(() => {
         setIsLoading(true);
+        setArticlePage(0);
+        setReaderPage(0);
         setSel(null);
         setReaderUrl('');
         setReaderData(null);
@@ -1190,7 +1202,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
         return () => {
             try { browser.closePage(); } catch { /* ignore */ }
         };
-    }, [browser]);
+    }, [browser.closePage]);
 
     useEffect(() => {
         if (autoReadTimerRef.current) {
@@ -1270,15 +1282,18 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
     }, [sel, ws.fetchArticle, disableGaze]);
 
     const cardCount = isCompactGrid ? 4 : 6;
-    const visibleItems = ws.newsItems.slice(0, cardCount) as NewsItem[];
+    const articlePages = Math.max(1, Math.ceil(ws.newsItems.length / cardCount));
+    const visibleArticlePage = Math.min(articlePage, articlePages - 1);
+    const visibleItems = ws.newsItems.slice(visibleArticlePage * cardCount, (visibleArticlePage + 1) * cardCount) as NewsItem[];
     const activeAutoReadIndex = ws.newsItems.length ? autoReadIndex % ws.newsItems.length : -1;
-    const sidebarVisibleCount = 5;
-    const sidebarItems = ws.newsItems.slice(0, sidebarVisibleCount) as NewsItem[];
-    // Note: sidebarVisibleCount caps how many items we pull from ws.newsItems;
-    // we render only the items that actually exist so the available vertical
-    // space is split across real headlines (no empty placeholder slots).
+    const readerPages = Math.max(1, Math.ceil(ws.newsItems.length / readerChoices.capacity));
+    const visibleReaderPage = Math.min(readerPage, readerPages - 1);
+    const sidebarItems = ws.newsItems.slice(visibleReaderPage * readerChoices.capacity, (visibleReaderPage + 1) * readerChoices.capacity) as NewsItem[];
     const categoryIndex = Math.max(0, cats.findIndex((c: any) => c.id === cat));
     const currentCategory = cats[categoryIndex] || cats[0];
+    const categoryPages = Math.max(1, Math.ceil(cats.length / categoryChoices.capacity));
+    const visibleCategoryPage = Math.min(categoryPage, categoryPages - 1);
+    const visibleCategories = cats.slice(visibleCategoryPage * categoryChoices.capacity, (visibleCategoryPage + 1) * categoryChoices.capacity);
     const readerBodyRaw = readerData?.text || sel?.content || sel?.description || sel?.summary || '';
     const readableParagraphs = formatNewsAsReadableParagraphs(readerBodyRaw);
 
@@ -1286,7 +1301,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
         // Simplified toolbar — embedded BrowserView removed (it crashed on open).
         // 5 essential actions: Close · Read · Read Full Story · Stop · Scroll.
         // All buttons sit in one connected container with internal dividers;
-        // semantic roles: emergency=destructive, primary=open/scroll, secondary=TTS.
+        // semantic roles: dismiss=close/stop, primary=open/scroll, secondary=TTS.
         const totalBtns = 5;
         const positionAt = (idx: number): 'first' | 'middle' | 'last' =>
             idx === 0 ? 'first' : idx === totalBtns - 1 ? 'last' : 'middle';
@@ -1309,9 +1324,9 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     flexShrink: 0,
                     marginBottom: 'clamp(14px,2vh,22px)',
                 }}>
-                    <div style={{ ...connectedToolbarStyle, flex: 1 }}>
+                    <div className="browser-toolbar" style={{ ...connectedToolbarStyle, flex: 1 }}>
                         <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                            style={{ ...toolbarBtnConnected('emergency', false, nextPos()), fontWeight: 800, letterSpacing: '0.08em' }}>
+                            style={{ ...toolbarBtnConnected('dismiss', false, nextPos()), fontWeight: 800, letterSpacing: '0.08em' }}>
                             <XIcon size={26} color="currentColor" strokeWidth={2.4} />
                             <span>Close</span>
                         </GazeButton>
@@ -1326,7 +1341,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             <span>Read Full Story</span>
                         </GazeButton>
                         <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                            style={toolbarBtnConnected('emergency', false, nextPos())}>
+                            style={toolbarBtnConnected('dismiss', false, nextPos())}>
                             <span>Stop</span>
                         </GazeButton>
                         <GazeButton id="n-scroll" onClick={() => scrollRef.current?.scrollBy({ top: 280, behavior: 'smooth' })} gazeEnabled={ige}
@@ -1390,10 +1405,10 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             placeholders). Items distribute across the available
                             vertical space via 1fr rows, so 3 items fill the panel
                             cleanly instead of stacking at the top with empty slots. */}
-                        <div style={{
+                        <div ref={readerChoices.ref} className="browse-reader-choices" style={{
                             flex: 1,
                             display: 'grid',
-                            gridTemplateRows: `repeat(${Math.max(1, sidebarItems.length)}, minmax(clamp(110px, 12vh, 150px), 1fr))`,
+                            gridTemplateRows: `repeat(${Math.max(1, sidebarItems.length)}, minmax(80px, 1fr))`,
                             gap: 'clamp(12px, 1.4vh, 16px)',
                             overflow: 'hidden',
                             minHeight: 0,
@@ -1402,7 +1417,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             {sidebarItems.map((it, i) => (
                                 <GazeButton
                                     key={`${it.title}-${i}`}
-                                    id={`ni-side-${i}`}
+                                    id={`ni-side-${visibleReaderPage * readerChoices.capacity + i}`} selected={sel.title === it.title}
                                     onClick={() => selectItem(it)}
                                     gazeEnabled={ige}
                                     gazeEnabledTimestamp={ts}
@@ -1412,7 +1427,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                         alignItems: 'flex-start',
                                         justifyContent: 'space-between',
                                         padding: 'clamp(16px,1.9vh,22px) clamp(16px, 1.6vw, 22px)',
-                                        minHeight: 'clamp(110px, 12vh, 150px)',
+                                        minHeight: 80,
                                         background: sel.title === it.title
                                           ? (isLight ? 'rgba(31, 107, 126, 0.12)'
                                             : isWarm ? 'rgba(63, 105, 104, 0.14)'
@@ -1431,7 +1446,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                     }}
                                 >
                                     <div style={{
-                                        fontSize: 'clamp(16px,1.8vh,21px)',
+                                        fontSize: 'clamp(20px,2.2vh,26px)',
                                         fontWeight: 700,
                                         color: isLight ? '#2E2A24' : isWarm ? '#2F2A26' : T.textMain,
                                         lineHeight: 1.32,
@@ -1469,6 +1484,10 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                 </div>
                             )}
                         </div>
+                        <div className="browse-page-controls">
+                            <GazeButton id="news-related-prev" disabled={visibleReaderPage === 0} onClick={() => setReaderPage(Math.max(0, visibleReaderPage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton">Previous</GazeButton>
+                            <GazeButton id="news-related-next" disabled={visibleReaderPage >= readerPages - 1} onClick={() => setReaderPage(Math.min(readerPages - 1, visibleReaderPage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton">More</GazeButton>
+                        </div>
                     </div>
 
                     {(() => {
@@ -1504,7 +1523,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             : isMix ? 'rgba(180, 147, 98, 0.30)'
                             : 'rgba(56, 189, 248, 0.20)';
                         return (
-                        <div ref={scrollRef} style={{
+                        <div className="browse-reader" ref={scrollRef} style={{
                             flex: 1, display: 'flex', flexDirection: 'column',
                             alignItems: 'stretch', justifyContent: 'flex-start',
                             padding: 'clamp(32px, 4.2vh, 56px) clamp(28px, 3.6vw, 56px)',
@@ -1538,7 +1557,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                 </div>
                                 <h2 style={{
                                     fontSize: 'clamp(32px, 4.4vh, 52px)',
-                                    fontWeight: 760,
+                                    fontWeight: 650,
                                     color: T_titleColor,
                                     margin: 0,
                                     fontFamily: FONT_PRIMARY,
@@ -1582,7 +1601,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: 'clamp(18px, 2.3vh, 28px)',
-                                        fontFamily: "'Merriweather', 'Georgia', serif",
+                                        fontFamily: FONT_PRIMARY,
                                     }}>
                                         {(readableParagraphs.length ? readableParagraphs : ['No article content available right now. Use Open in Browser.']).map((para, idx) => (
                                             <p key={`np-${idx}`} style={{
@@ -1625,10 +1644,9 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                 zones, larger title fonts, accent line on selection, neutral
                 hairline border at all times. Each category gets a small
                 diversified accent in paper modes (visual variety like YT). */}
-            <div style={{
-                width: 'clamp(340px, 30vw, 440px)', flexShrink: 0,
-                display: 'grid',
-                gridAutoRows: 'minmax(clamp(110px, 12.5vh, 150px), 1fr)',
+            <div className="browse-category-panel" style={{
+                width: 'clamp(300px, 28vw, 440px)', flexShrink: 0,
+                display: 'flex', flexDirection: 'column', minHeight: 0,
                 gap: 'clamp(10px, 1.2vh, 16px)',
                 background: T_chromeBg,
                 border: `1.5px solid ${T_chromeBorder}`,
@@ -1637,7 +1655,8 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                 overflow: 'hidden',
                 boxShadow: T_chromeShadow,
             }}>
-                {cats.map((c: any, ci: number) => {
+                <div ref={categoryChoices.ref} className="browse-category-choices">
+                {visibleCategories.map((c: any, ci: number) => {
                     const isSelected = cat === c.id;
                     // Rotating diversified accent — matches news-card palette pattern.
                     // 9 colors so even longer category lists stay visually distinct.
@@ -1682,7 +1701,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         ? (isSelected ? `${catAccent}26` : `${catAccent}14`)
                         : (isSelected ? `${catAccent}33` : `${catAccent}1A`);
                     return (
-                        <GazeButton key={c.id} id={`nc-${c.id}`} onClick={() => { setCat(c.id); disableGaze(); }}
+                        <GazeButton key={c.id} id={`nc-${c.id}`} className="browse-category-choice" selected={cat === c.id} onClick={() => { setCat(c.id); disableGaze(); }}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             contentFill
                             style={{
@@ -1756,6 +1775,11 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         </GazeButton>
                     );
                 })}
+                </div>
+                <div className="browse-page-controls">
+                    <GazeButton id="news-categories-prev" disabled={visibleCategoryPage === 0} onClick={() => setCategoryPage(Math.max(0, visibleCategoryPage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton">Previous</GazeButton>
+                    <GazeButton id="news-categories-next" disabled={visibleCategoryPage >= categoryPages - 1} onClick={() => setCategoryPage(Math.min(categoryPages - 1, visibleCategoryPage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton">More</GazeButton>
+                </div>
             </div>
 
             {/* CONTENT — refresh header + article grid + reader controls strip */}
@@ -1766,13 +1790,15 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     flexShrink: 0,
                 }}>
                     <GazeButton id="n-ref" onClick={() => { setIsLoading(true); ws.refreshNews(cat, 9); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                        style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(72px, 8.5vh, 96px)', minWidth: 'clamp(140px, 12vw, 180px)', fontSize: 'clamp(18px, 2.2vh, 24px)' }}>
+                        style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px, 8.5vh, 96px)', minWidth: 'clamp(140px, 12vw, 180px)', fontSize: 'clamp(18px, 2.2vh, 24px)' }}>
                         <RefreshIcon size={26} color="currentColor" strokeWidth={2.3} />
                         <span>Refresh</span>
                     </GazeButton>
+                    <GazeButton id="news-articles-prev" disabled={visibleArticlePage === 0} onClick={() => setArticlePage(Math.max(0, visibleArticlePage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton" style={toolbarBtn('primary', false)}>Previous</GazeButton>
+                    <GazeButton id="news-articles-next" disabled={visibleArticlePage >= articlePages - 1} onClick={() => setArticlePage(Math.min(articlePages - 1, visibleArticlePage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton" style={toolbarBtn('primary', false)}>More</GazeButton>
                     {ws.newsCached && (
                         <div style={{
-                            minHeight: 'clamp(72px, 8.5vh, 96px)',
+                            minHeight: 'clamp(80px, 8.5vh, 96px)',
                             padding: '0 clamp(18px, 1.8vw, 26px)',
                             display: 'flex', alignItems: 'center',
                             color: isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#B6D7D1' : '#A9CAC7',
@@ -1813,13 +1839,13 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                             '#6B5F84', // deeper lavender
                         ];
                         const cardBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241F18' : '#20221E';
-                        const cardBorder = autoReadOn && i === activeAutoReadIndex
+                        const cardBorder = autoReadOn && (visibleArticlePage * cardCount + i) === activeAutoReadIndex
                             ? `2px solid ${isLight || isWarm ? '#5F7C58' : '#789D91'}`
                             : isLight ? '1.5px solid rgba(168, 120, 56, 0.30)'
                             : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
                             : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)'
                             : '1.5px solid rgba(213, 216, 188, 0.14)';
-                        const cardShadow = autoReadOn && i === activeAutoReadIndex
+                        const cardShadow = autoReadOn && (visibleArticlePage * cardCount + i) === activeAutoReadIndex
                             ? (isLight || isWarm
                                 ? '0 0 0 2px rgba(95, 124, 88, 0.20), 0 4px 12px rgba(82, 65, 48, 0.10)'
                                 : '0 0 0 2px rgba(120, 157, 145, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)')
@@ -1836,7 +1862,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         const sourceBadgeText = (isLight || isWarm) ? accentColor : titleColor;
                         const dividerColor = (isLight || isWarm) ? 'rgba(122, 99, 71, 0.16)' : 'rgba(213, 216, 188, 0.10)';
                         return (
-                            <GazeButton key={it?.title || `ph-${i}`} id={`ni-${i}`} onClick={() => { if (it) selectItem(it); }}
+                            <GazeButton key={it?.title || `ph-${i}`} id={`ni-${i}`} className="browse-news-choice" disabled={!it} onClick={() => { if (it) selectItem(it); }}
                                 gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                                 contentFill
                                 style={{
@@ -1872,7 +1898,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                     gap: 'clamp(10px, 1.2vh, 14px)',
                                 }}>
                                     <div style={{
-                                        fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 760,
+                                        fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 650,
                                         color: titleColor,
                                         fontFamily: FONT_PRIMARY, lineHeight: 1.28,
                                         display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
@@ -1917,7 +1943,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         <span>{autoReadPaused ? 'Resume' : 'Pause'}</span>
                     </GazeButton>
                     <GazeButton id="n-stop-auto" onClick={stopAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                        style={{ ...toolbarBtn('emergency', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)', fontWeight: 800 }}>
+                        style={{ ...toolbarBtn('dismiss', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)', fontWeight: 800 }}>
                         <span>Stop</span>
                     </GazeButton>
                 </div>
@@ -1927,7 +1953,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
 };
 
 // ── YOUTUBE PANEL ──
-const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onVideoActive, onNavHiddenToggle, onEmergency }: {
+const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onVideoActive, onNavHiddenToggle }: {
     ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>;
     gpRef: React.MutableRefObject<{ x: number; y: number }>;
     goBack: () => void;
@@ -1938,16 +1964,15 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     onBrowserInteractionModeChange: (mode: BrowserInteractionMode) => void;
     onVideoActive?: (active: boolean) => void;
     onNavHiddenToggle?: (hidden: boolean) => void;
-    onEmergency: () => void;
 }) => {
     const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. The YouTube video card stays dark in all modes.
-    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.22)';
+    const T_pageBg = 'var(--ui-page)';
+    const T_chromeBg = 'var(--ui-panel)';
+    const T_chromeBorder = 'var(--ui-border)';
+    const T_chromeText = 'var(--ui-ink)';
+    const T_chromeTextMuted = 'var(--ui-muted)';
+    const T_chromeShadow = 'none';
     // Watch / Control mode toggle: dark teal/maroon work fine on dark, but on
     // cream/walnut chrome they're too heavy — use tinted-but-transparent variants.
     const T_watchModeBg = isLight ? 'rgba(122, 54, 58, 0.14)' : isWarm ? warmScreenTokens.web.watchModeBg : isMix ? 'rgba(122, 54, 58, 0.30)' : WATCH_MODE_BG;
@@ -2196,15 +2221,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             background: T_pageBg,
         }}>
             {/* ── CONNECTED TOOLBAR — bi-modal + nav-aware (no duplicates with global nav) ── */}
-            <div style={{ ...connectedToolbarStyle, flexShrink: 0 }}>
-                {/* WATCH MODE — 3 buttons (Emergency · Pause/Play · Show Controls) */}
+            <div className="browser-toolbar" style={{ ...connectedToolbarStyle, flexShrink: 0 }}>
+                {/* WATCH MODE — playback and navigation */}
                 {isWatchMode && <>
-                    {isNavHidden && <GazeButton id="yt-emergency" onClick={onEmergency}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
-                        style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
-                        <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>Emergency</span>
-                    </GazeButton>}
+
                     <GazeButton id="yt-watch-back" onClick={handleYouTubeBack}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
@@ -2233,12 +2253,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
 
                 {/* CONTROL MODE — large AAC controls for reliable video use */}
                 {!isWatchMode && <>
-                    {isNavHidden && <GazeButton id="yt-emergency-c" onClick={onEmergency}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
-                        style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
-                        <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>Emergency</span>
-                    </GazeButton>}
+
                     <GazeButton id="yt-back" onClick={isNavHidden ? handleYouTubeBack : stop}
                         gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                         style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
@@ -2313,7 +2328,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                     {!isWatchMode && browser.edgeScrollDirection === 'down' && (
                         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to top, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `0 0 ${CR} ${CR}` }} />
                     )}
-                    <div ref={viewRef} style={{
+                    <div className="browser-content-frame" ref={viewRef} style={{
                         width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden',
                         background: isWarm ? '#F5EEDF' : T.bg,
                         border: WEB_SURFACE.borderSoft, boxShadow: WEB_SURFACE.panelShadow
@@ -2357,12 +2372,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                 category icon (no more identical YouTube glyph everywhere) and
                 a small subtitle for context. Phrases/Activities sidebar grammar:
                 accent line + warm-gold tint on selection. */}
-            <div style={{
-                width: 'clamp(360px, 32vw, 460px)', flexShrink: 0,
-                /* 4 cards with `1fr` each — they share the available container
-                   height equally. With container ~840px (after top nav + padding),
-                   each card gets ~190px. Min 130 prevents collapse on small screens. */
-                display: 'grid', gridTemplateRows: 'repeat(4, minmax(clamp(130px, 16vh, 200px), 1fr))',
+            <div className="browse-youtube-categories" style={{
+                width: 'clamp(320px, 30vw, 460px)', flexShrink: 0,
+                /* Four stable, equal gaze targets share the actual available height. */
+                display: 'grid', gridTemplateRows: 'repeat(4, minmax(80px, 1fr))',
                 gap: 'clamp(10px, 1.2vh, 16px)',
                 background: T_chromeBg,
                 border: `1.5px solid ${T_chromeBorder}`,
@@ -2374,7 +2387,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                 {YT_CATS.map((c) => {
                     const isSelected = catId === c.id;
                     // Muted, darker antique-gold palette — less neon than #C69A45.
-                    const SELECTED_ACCENT_DARK = '#9B7A38';           // Accent line + icon tint (deep antique gold) — dark mode
+                    const SELECTED_ACCENT_DARK = '#9CCFC7';           // Accent line + icon tint (deep antique gold) — dark mode
                     const SELECTED_ACCENT = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#B49362' : SELECTED_ACCENT_DARK;
                     const SELECTED_BG = isLight ? 'rgba(31, 107, 126, 0.14)'
                         : isWarm ? 'rgba(73, 119, 117, 0.14)'
@@ -2388,10 +2401,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                     const UNSELECTED_SUBTITLE = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : T.textSub;
                     const iconColor = isSelected ? SELECTED_ACCENT : UNSELECTED_ICON;
                     const titleColor = isSelected ? SELECTED_TITLE : UNSELECTED_TITLE;
-                    const subtitleColor = isSelected ? (isLight ? 'rgba(31, 107, 126, 0.72)' : isWarm ? 'rgba(73, 119, 117, 0.72)' : isMix ? 'rgba(227, 194, 142, 0.65)' : 'rgba(224, 205, 166, 0.58)') : UNSELECTED_SUBTITLE;
+                    const subtitleColor = isSelected ? (isLight ? 'rgba(31, 107, 126, 0.72)' : isWarm ? 'rgba(73, 119, 117, 0.72)' : isMix ? 'rgba(227, 194, 142, 0.65)' : 'var(--ui-muted)') : UNSELECTED_SUBTITLE;
                     const meta = YT_CATEGORY_META[c.id] || { subtitle: '', renderIcon: () => <YoutubeIcon size={48} color={iconColor} strokeWidth={2.2} /> };
                     return (
-                        <GazeButton key={c.id} id={`yc-${c.id}`} onClick={() => { setCatId(c.id); disableGaze(); }}
+                        <GazeButton key={c.id} id={`yc-${c.id}`} className="browse-category-choice" selected={isSelected} onClick={() => { setCatId(c.id); disableGaze(); }}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             contentFill
                             style={{
@@ -2459,12 +2472,12 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                     const validId = isValidYouTubeId(vid);
                     const thumbUrl = validId ? `https://img.youtube.com/vi/${vid}/mqdefault.jpg` : '';
                     return (
-                        <GazeButton key={(vid || v.title || 'yv') + i} id={`yv-${i}`} onClick={() => { setPlaying(v); disableGaze(); }}
+                        <GazeButton key={(vid || v.title || 'yv') + i} id={`yv-${i}`} className="browse-video-choice" onClick={() => { setPlaying(v); disableGaze(); }}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             contentFill
                             style={{
                                 width: '100%', height: '100%', minHeight: 0,
-                                background: isWarm ? '#FBF5E5' : '#20221E',
+                                background: 'var(--ui-surface)',
                                 border: isWarm ? '1px solid rgba(122, 99, 71, 0.16)' : '1.5px solid rgba(213, 216, 188, 0.14)',
                                 borderRadius: '26px',
                                 boxShadow: isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)',
@@ -2475,8 +2488,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                             {/* Thumbnail (top ~65%, 16:9) */}
                             <div style={{
                                 position: 'relative',
-                                width: '100%', flex: '0 0 65%',
-                                background: isWarm ? '#EFE7D8' : '#0F100E',
+                                width: '100%', flex: '1 1 52%', minHeight: 0,
+                                background: 'var(--ui-inset)',
                                 overflow: 'hidden',
                                 borderBottom: isWarm ? '1px solid rgba(122, 99, 71, 0.12)' : '1px solid rgba(213, 216, 188, 0.10)',
                             }}>
@@ -2492,6 +2505,8 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                             img.style.display = 'none';
                                             const fallback = img.parentElement?.querySelector('[data-fallback]') as HTMLElement | null;
                                             if (fallback) fallback.style.display = 'flex';
+                                            const playOverlay = img.parentElement?.querySelector('[data-play-overlay]') as HTMLElement | null;
+                                            if (playOverlay) playOverlay.style.display = 'none';
                                         }}
                                         style={{
                                             width: '100%', height: '100%', objectFit: 'cover',
@@ -2504,13 +2519,13 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                     position: thumbUrl ? 'absolute' : 'static',
                                     inset: 0,
                                     alignItems: 'center', justifyContent: 'center',
-                                    background: 'linear-gradient(135deg, rgba(28, 47, 45, 0.8), rgba(54, 42, 22, 0.8))',
+                                    background: 'var(--ui-panel)',
                                     color: WEB_ACCENTS.tealText,
                                 }}>
-                                    <YoutubeIcon size={56} color="currentColor" strokeWidth={2.2} />
+                                    <PlayIcon size={48} color="currentColor" strokeWidth={2} />
                                 </div>
                                 {/* Faint play-arrow overlay centered */}
-                                <div style={{
+                                {thumbUrl && <div data-play-overlay style={{
                                     position: 'absolute', inset: 0,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     pointerEvents: 'none',
@@ -2519,25 +2534,25 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                         width: 'clamp(54px, 7vh, 78px)', height: 'clamp(54px, 7vh, 78px)',
                                         borderRadius: '50%',
                                         background: 'rgba(15, 18, 16, 0.62)',
-                                        backdropFilter: 'blur(2px)',
+
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         border: '1.5px solid rgba(245, 240, 220, 0.36)',
                                         color: '#F4EAD0',
                                     }}>
                                         <PlayIcon size={32} color="currentColor" strokeWidth={2.4} />
                                     </div>
-                                </div>
+                                </div>}
                             </div>
                             {/* Title + channel */}
                             <div style={{
-                                flex: '1 1 0', minHeight: 0,
+                                flex: '0 0 auto', minHeight: 'clamp(106px, 12vh, 144px)',
                                 display: 'flex', flexDirection: 'column', justifyContent: 'center',
                                 padding: 'clamp(14px, 1.6vh, 22px) clamp(18px, 1.8vw, 26px)',
                                 gap: '6px',
                                 textAlign: 'left',
                             }}>
                                 <div style={{
-                                    fontSize: 'clamp(20px, 2.4vh, 28px)', fontWeight: 760, color: isWarm ? '#2F2A26' : T.textMain,
+                                    fontSize: 'clamp(20px, 2.4vh, 28px)', fontWeight: 650, color: isWarm ? '#2F2A26' : T.textMain,
                                     fontFamily: FONT_PRIMARY, lineHeight: 1.18,
                                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
                                     overflow: 'hidden',
@@ -2560,12 +2575,12 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
     const ws = useWS();
     const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. The knowledge article card stays dark in all modes.
-    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_pageBg = 'var(--ui-page)';
+    const T_chromeBg = 'var(--ui-panel)';
+    const T_chromeBorder = 'var(--ui-border)';
+    const T_chromeText = 'var(--ui-ink)';
+    const T_chromeTextMuted = 'var(--ui-muted)';
+    const T_chromeShadow = 'none';
     void T_chromeTextMuted;
     const [selCat, setSelCat] = useState<string | null>(null);
     const [selArt, setSelArt] = useState<any>(null);
@@ -2601,12 +2616,12 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                     <span>Scroll</span>
                 </GazeButton>
             </div>
-            <div ref={scrollRef} style={{
+            <div className="browse-reader" ref={scrollRef} style={{
                 ...cs, flex: 1, width: '100%', height: 'auto', alignItems: 'flex-start', justifyContent: 'flex-start',
                 padding: 'clamp(24px,3.5vh,40px)', overflow: 'auto', minHeight: 0
             }}>
                 <h2 style={{ fontSize: 'clamp(22px,3vh,32px)', fontWeight: 700, color: isWarm ? '#2F2A26' : T.textMain, margin: '0 0 10px 0', fontFamily: FONT_PRIMARY }}>{selArt.title}</h2>
-                <div style={{ fontSize: 'clamp(16px,2.2vh,22px)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.75, whiteSpace: 'pre-line' as const }}>{selArt.content}</div>
+                <div style={{ fontSize: 'clamp(22px,2.6vh,30px)', color: 'var(--ui-ink)', lineHeight: 1.75, whiteSpace: 'pre-line' as const }}>{selArt.content}</div>
             </div>
         </div>
     );
@@ -2634,12 +2649,12 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
                                 width: '100%', padding: 'clamp(14px,1.8vh,20px) 14px', textAlign: 'left' as const,
                                 background: isSel ? selectedBg : 'transparent',
                                 borderLeft: isSel ? `4px solid ${selectedAccentLine}` : '4px solid transparent',
-                                borderRadius: '0 14px 14px 0', border: 'none', minHeight: 'clamp(60px,7.5vh,78px)',
+                                borderRadius: '0 14px 14px 0', border: 'none', minHeight: 'clamp(80px,9vh,98px)',
                                 display: 'flex', alignItems: 'center', gap: '10px'
                             }}>
                             <BookIcon size={28} color={isSel ? selectedAccentLine : (isLight ? '#76624A' : isWarm ? '#7A5638' : WEB_ACCENTS.oliveText)} strokeWidth={2} />
                             <div>
-                                <div style={{ fontSize: 'clamp(15px,1.8vh,19px)', fontWeight: 600, color: isSel ? selectedTextColor : T_chromeText }}>{c.title}</div>
+                                <div style={{ fontSize: 'clamp(20px,2.2vh,25px)', fontWeight: 600, color: isSel ? selectedTextColor : T_chromeText }}>{c.title}</div>
                                 <div style={{ fontSize: '12px', color: isLight ? 'rgba(74, 58, 42, 0.55)' : isWarm ? '#8A7C6B' : isMix ? 'rgba(196, 182, 151, 0.55)' : 'rgba(255,255,255,0.3)' }}>{c.article_count} articles</div>
                             </div>
                         </GazeButton>
@@ -2679,7 +2694,7 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
 };
 
 // ── QUICK SEARCH PANEL (with gaze cursor forwarding) ──
-const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onEmergency, onSpeak }: {
+const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onSpeak }: {
     ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>; gpRef: React.MutableRefObject<{ x: number; y: number }>;
     goBack: () => void;
     disableGaze: () => void;
@@ -2689,7 +2704,6 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     onBrowserInteractionModeChange: (mode: BrowserInteractionMode) => void;
     onTopicActive?: (active: boolean) => void;
     onNavHiddenToggle?: (hidden: boolean) => void;
-    onEmergency: () => void;
     // v17.18: ALL speech must flow through App.handleSpeak so the routing
     // rules apply (volume-0 mute, TTS-health fallback, overlap cancel).
     onSpeak: (t: string) => void;
@@ -2697,16 +2711,17 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     const ws = useWS();
     const { isLight, isMix, isWarm } = useTheme();
     // Theme-aware chrome tokens. Search-result / card-mode card stay dark.
-    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
-    const T_chromeBg = isLight ? '#FFFCF1' : isWarm ? warmScreenTokens.web.glass : isMix ? '#241F18' : T.glass;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : '0 8px 18px rgba(0,0,0,0.16)';
+    const T_pageBg = 'var(--ui-page)';
+    const T_chromeBg = 'var(--ui-panel)';
+    const T_chromeBorder = 'var(--ui-border)';
+    const T_chromeText = 'var(--ui-ink)';
+    const T_chromeTextMuted = 'var(--ui-muted)';
+    const T_chromeShadow = 'none';
     void T_chromeShadow;
     const [topic, setTopic] = useState<QuickTopic | null>(null);
     const [showLinksSidebar, setShowLinksSidebar] = useState(false);
     const [largeLinkTargets, setLargeLinkTargets] = useState(true);
+    const linkChoices = useGazePageCapacity(largeLinkTargets ? 104 : 80, largeLinkTargets ? 4 : 6);
     const [linkPage, setLinkPage] = useState(0);
     const viewRef = useRef<HTMLDivElement>(null);
     const hasInitRef = useRef(false);
@@ -2813,7 +2828,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         }
     }, [topic, ws.quickSnapshot, onSpeak]);
 
-    const linksPerPage = largeLinkTargets ? 4 : 6;
+    const linksPerPage = linkChoices.capacity;
     const totalLinkPages = Math.max(1, Math.ceil(browser.pageLinks.length / linksPerPage));
     const currentLinkPage = Math.min(linkPage, totalLinkPages - 1);
     const visiblePageLinks = browser.pageLinks.slice(
@@ -2833,15 +2848,10 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     padding: 'clamp(10px,1.2vh,16px) clamp(16px,2vw,24px) clamp(6px,0.8vh,10px)',
                     boxSizing: 'border-box', gap: '6px',
                 }}>
-                    <div style={connectedToolbarStyle}>
+                    <div className="browser-toolbar" style={connectedToolbarStyle}>
                         {/* READ MODE — minimal, nav-aware */}
                         {isWatchMode && <>
-                            {isNavHidden && <GazeButton id="bv-emergency-r" onClick={onEmergency}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
-                                style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
-                                <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                                <span>Emergency</span>
-                            </GazeButton>}
+
                             {/* 'k' is the YOUTUBE play/pause hotkey; on Google/News
                                 pages typeText('k') just typed the letter k into
                                 whatever had focus. Show the button only on YouTube. */}
@@ -2868,12 +2878,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
 
                         {/* CONTROL MODE — full toolset, no duplicates with global nav */}
                         {!isWatchMode && <>
-                            {isNavHidden && <GazeButton id="bv-emergency-c" onClick={onEmergency}
-                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="medicalUrgent"
-                                style={{ ...toolbarBtnConnected('emergency', !!isNavHidden, 'first'), fontWeight: 900, letterSpacing: '0.12em' }}>
-                                <EmergencyIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                                <span>Emergency</span>
-                            </GazeButton>}
+
                             <GazeButton id="bv-back" onClick={isNavHidden ? handleBrowserBack : closeWebTopic}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
@@ -2935,7 +2940,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                     {currentLinkPage + 1}/{totalLinkPages}
                                 </span>
                             </div>
-                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 'clamp(10px,1.2vh,14px)', minHeight: 0 }}>
+                            <div ref={linkChoices.ref} className="browse-link-choices" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 'clamp(10px,1.2vh,14px)', minHeight: 0 }}>
                                 {browser.pageLinks.length ? visiblePageLinks.map((link, idx) => {
                                     const absoluteIdx = currentLinkPage * linksPerPage + idx;
                                     return (
@@ -2949,13 +2954,13 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                             style={{
                                                 ...cb,
                                                 flex: '1 1 0',
-                                                minHeight: largeLinkTargets ? 'clamp(88px,10.8vh,124px)' : 'clamp(80px,8.8vh,98px)',
+                                                minHeight: largeLinkTargets ? 104 : 80,
                                                 width: '100%',
                                                 justifyContent: 'center',
                                                 textAlign: 'center' as const,
-                                                fontSize: largeLinkTargets ? 'clamp(18px,2.25vh,24px)' : 'clamp(16px,2vh,21px)',
-                                                lineHeight: 1.14,
-                                                fontWeight: 820,
+                                                fontSize: largeLinkTargets ? 'clamp(22px,2.5vh,28px)' : 'clamp(20px,2.2vh,24px)',
+                                                lineHeight: 1.3,
+                                                fontWeight: 650,
                                                 padding: 'clamp(10px,1.2vh,16px) clamp(12px,1vw,18px)',
                                                 overflow: 'hidden',
                                             }}
@@ -2965,7 +2970,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                     );
                                 }) : (
                                     <div style={{
-                                        color: isLight ? 'rgba(74, 58, 42, 0.65)' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(255,255,255,0.5)',
+                                        color: 'var(--ui-muted)',
                                         fontSize: 'clamp(16px,2vh,21px)',
                                         minHeight: 'clamp(100px,14vh,150px)',
                                         display: 'flex',
@@ -3038,7 +3043,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         {!isWatchMode && browser.edgeScrollDirection === 'down' && (
                             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to top, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none' }} />
                         )}
-                        <div ref={viewRef} style={{
+                        <div className="browser-content-frame" ref={viewRef} style={{
                             width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden', background: '#fff',
                             border: WEB_SURFACE.borderSoft, boxShadow: WEB_SURFACE.panelShadow,
                         }}>
@@ -3124,7 +3129,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                     )}
                 </div>
 
-                <div style={{
+                <div className="browse-snapshot" style={{
                     ...cs,
                     flex: 1,
                     alignItems: 'flex-start',
@@ -3137,11 +3142,11 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         {renderQuickTopicIcon(topic.id, 52, WEB_ACCENTS.tealText)}
                         <span>{stripLeadingEmoji(topic.label)}</span>
                     </div>
-                    <div style={{ fontSize: 'clamp(22px,3vh,34px)', color: 'rgba(255,255,255,0.92)', lineHeight: 1.8 }}>
+                    <div style={{ fontSize: 'clamp(22px,3vh,34px)', color: 'var(--ui-ink)', lineHeight: 1.8 }}>
                         {cardBody}
                     </div>
                     {!snapshot && (
-                        <div style={{ marginTop: '30px', fontSize: 'clamp(18px,2.4vh,26px)', color: 'rgba(255,255,255,0.55)' }}>
+                        <div style={{ marginTop: '30px', fontSize: 'clamp(18px,2.4vh,26px)', color: 'var(--ui-muted)' }}>
                             Loading data...
                         </div>
                     )}
@@ -3160,7 +3165,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
             background: T_pageBg,
         }}>
             <div style={{
-                color: T_chromeText, fontSize: 'clamp(30px, 3.8vh, 42px)', fontWeight: 820,
+                color: T_chromeText, fontSize: 'clamp(30px, 3.8vh, 42px)', fontWeight: 650,
                 flexShrink: 0, fontFamily: FONT_PRIMARY, letterSpacing: '0.02em',
                 display: 'flex', alignItems: 'center', gap: 'clamp(14px, 1.4vw, 20px)',
                 paddingBottom: 'clamp(6px, 0.8vh, 12px)',
@@ -3243,7 +3248,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                 gap: 'clamp(4px, 0.6vh, 8px)',
                             }}>
                                 <span style={{
-                                    fontSize: 'clamp(28px, 3.4vh, 40px)', fontWeight: 820, color: labelColor,
+                                    fontSize: 'clamp(28px, 3.4vh, 40px)', fontWeight: 650, color: labelColor,
                                     fontFamily: FONT_PRIMARY, lineHeight: 1.08, letterSpacing: '0.005em',
                                 }}>{stripLeadingEmoji(t.label)}</span>
                                 {/* Subtitle — per-topic caption (mirrors YT card subtitle). */}
@@ -3264,330 +3269,58 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     );
 };
 
-// ── WHATSAPP PANEL ──
-const WhatsAppPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, isNavHidden }: {
-    ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>; gpRef: React.MutableRefObject<{ x: number; y: number }>;
-    goBack: () => void;
-    isNavHidden?: boolean;
-}) => {
-    const { isLight, isMix, isWarm } = useTheme();
-    // Theme-aware chrome tokens. The chat / message-list card stays dark.
-    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
-    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
-    const T_chromeTextMuted = isLight ? '#76624A' : isWarm ? warmScreenTokens.web.textSub : isMix ? '#C4B697' : T.textSub;
-    void T_chromeText; void T_chromeTextMuted;
-    const [connected, setConnected] = useState(false);
-    const viewRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!connected) return;
-        let cancelled = false;
-        const raf = requestAnimationFrame(() => {
-            if (cancelled || !viewRef.current) return;
-            const r = viewRef.current.getBoundingClientRect();
-            if (r.width > 50 && r.height > 50)
-                browser.openPage('https://web.whatsapp.com', { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) });
-        });
-        return () => { cancelled = true; cancelAnimationFrame(raf); };
-    }, [connected]);
-
-    useBrowserViewBoundsSync(viewRef, browser.updateBounds, connected && browser.isOpen);
-
-    // Gaze cursor forwarding handled centrally by main component
-
-    const close = useCallback(() => { browser.closePage(); setConnected(false); }, [browser]);
-
-    if (connected) return (
-        <div style={{
-            flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)',
-            background: T_pageBg,
-        }}>
-            {/* ── HORIZONTAL TOOLBAR ── */}
-            <div style={{ ...toolbarStyle, flexShrink: 0 }}>
-                <GazeButton id="bv-close" onClick={close} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                    style={{
-                        ...actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER), flex: 1, minWidth: 'clamp(100px,10vw,140px)',
-                        fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
-                    }}>
-                    <XIcon size={26} color="currentColor" strokeWidth={2.4} />
-                    <span>Close</span>
-                </GazeButton>
-                <GazeButton id="bv-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                    style={{
-                        ...actionButton(WEB_ACCENTS.tealText, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER), flex: 1.2, minWidth: 'clamp(120px,12vw,160px)',
-                        fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
-                    }}>
-                    <PointerIcon size={28} color="currentColor" strokeWidth={2.2} />
-                    <span>Click Here</span>
-                </GazeButton>
-                <GazeButton id="bv-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                    style={{
-                        ...actionButton(WEB_ACCENTS.blueText), flex: 1, minWidth: 'clamp(100px,10vw,130px)',
-                        fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
-                    }}>
-                    <ArrowUpIcon size={26} color="currentColor" strokeWidth={2.3} />
-                    <span>Up</span>
-                </GazeButton>
-                <GazeButton id="bv-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                    style={{
-                        ...actionButton(WEB_ACCENTS.blueText), flex: 1, minWidth: 'clamp(100px,10vw,130px)',
-                        fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
-                    }}>
-                    <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
-                    <span>Down</span>
-                </GazeButton>
-
-                <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
-
-                <GazeButton id="bv-back" onClick={() => browser.canGoBack && browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                    disabled={!browser.canGoBack}
-                    style={{
-                        ...actionButton(WEB_ACCENTS.goldText, 'rgba(49, 36, 20, 0.72)', 'rgba(178, 138, 69, 0.22)'), flex: 1, minWidth: 'clamp(80px,8vw,110px)',
-                        fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
-                    }}>
-                    <BackIcon size={26} color="currentColor" strokeWidth={2.4} />
-                    <span>Back</span>
-                </GazeButton>
-                <GazeButton id="bv-fwd" onClick={() => browser.canGoForward && browser.goForward()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                    disabled={!browser.canGoForward}
-                    style={{
-                        ...actionButton(WEB_ACCENTS.blueText), flex: 1, minWidth: 'clamp(80px,8vw,110px)',
-                        fontSize: 'clamp(17px,2.2vh,22px)', padding: 'clamp(14px,2vh,22px) clamp(16px,2vw,24px)'
-                    }}>
-                    <ExternalIcon size={24} color="currentColor" strokeWidth={2.2} />
-                    <span>Fwd</span>
-                </GazeButton>
-            </div>
-            <div style={{
-                fontSize: 'clamp(15px,1.8vh,18px)', color: isLight ? '#4F6B3F' : isMix ? '#A8BC8E' : WEB_ACCENTS.oliveText, padding: 'clamp(6px,1vh,10px) clamp(14px,2vw,24px)',
-                flexShrink: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px'
-            }}>
-                <WhatsAppIcon size={20} color="currentColor" strokeWidth={2} />
-                <span>WhatsApp Web. Scan QR from your phone to connect.</span>
-            </div>
-            <div style={{ flex: 1, padding: '0 clamp(14px,2vw,24px) clamp(10px,1.5vh,16px)', overflow: 'hidden', minHeight: 0 }}>
-                <div ref={viewRef} style={{
-                    width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden', background: '#111B21',
-                    border: WEB_SURFACE.borderSoft, boxShadow: WEB_SURFACE.panelShadow
-                }}>
-                    <div style={{
-                        width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'rgba(255,255,255,0.3)', fontSize: '15px', gap: '8px'
-                    }}>{browser.loading ? 'Loading WhatsApp...' : <><WhatsAppIcon size={18} color="currentColor" strokeWidth={2} /> WhatsApp loaded</>}</div>
-                </div>
-            </div>
-        </div>
-    );
-
-    return (
-        <div style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: GAP,
-            marginTop: isNavHidden ? '0' : 'clamp(95px,12.5vh,125px)', paddingBottom: 'clamp(20px, 2.5vh, 40px)', transition: 'margin-top 0.3s ease',
-            background: T_pageBg,
-        }}>
-            <div style={{ ...cs, width: 'clamp(420px,42vw,620px)', height: 'auto', padding: 'clamp(40px,5.5vh,65px)', gap: 'clamp(20px,3.2vh,36px)', border: WEB_SURFACE.borderSoft }}>
-                <div style={{ color: WEB_ACCENTS.oliveText, display: 'flex', filter: 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' }}><WhatsAppIcon size={88} /></div>
-                <h2 style={{ fontSize: 'clamp(24px,3.2vh,34px)', fontWeight: 700, color: isWarm ? '#2F2A26' : T.textMain, margin: 0, fontFamily: FONT_PRIMARY }}>WhatsApp Web</h2>
-                <p style={{ fontSize: 'clamp(15px,2vh,19px)', color: isWarm ? '#6A625B' : 'rgba(255,255,255,0.5)', lineHeight: 1.6, margin: 0, textAlign: 'center', maxWidth: '420px' }}>
-                    Connect WhatsApp to send messages using eye gaze. Scan a QR code with your phone.
-                </p>
-                <GazeButton id="wa-connect" onClick={() => setConnected(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                    style={{
-                        ...actionButton(WEB_ACCENTS.oliveText, 'rgba(36, 48, 32, 0.70)', SUCCESS_BORDER),
-                        padding: 'clamp(18px,2.4vh,26px) clamp(40px,5.5vw,60px)', fontSize: 'clamp(17px,2.2vh,22px)', fontWeight: 700, borderRadius: '50px'
-                    }}>
-                    Open WhatsApp Web
-                </GazeButton>
-            </div>
-        </div>
-    );
-};
-
 // ── SOCIAL PANEL ──
-const SocialPanel = ({ ige, ts, browser, gpRef, goBack, disableGaze, isNavHidden, setView }: {
-    ige: boolean, ts: number, browser: any, gpRef: React.MutableRefObject<{ x: number; y: number }>, goBack: () => void, disableGaze: () => void, isNavHidden: boolean, setView?: (view: any) => void
+// These services remain local placeholders until their gaze workflows are ready.
+// No URL or native BrowserView is opened from this panel.
+const SOCIAL_SERVICES = [
+    { id: 'linkedin', label: 'LinkedIn', Icon: WorkIcon },
+    { id: 'gmail', label: 'Gmail', Icon: MailIcon },
+    { id: 'whatsapp', label: 'WhatsApp', Icon: WhatsAppIcon },
+] as const;
+type SocialServiceId = typeof SOCIAL_SERVICES[number]['id'];
+
+const SocialPanel = ({ ige, ts, selectedService, onSelect, onBack }: {
+    ige: boolean;
+    ts: number;
+    selectedService: SocialServiceId | null;
+    onSelect: (service: SocialServiceId) => void;
+    onBack: () => void;
 }) => {
-    const { isLight, isMix, isWarm } = useTheme();
-    // Theme-aware chrome tokens. The browser-view content card stays dark.
-    const T_pageBg = isLight ? '#F4EFE0' : isWarm ? warmScreenTokens.web.bg : isMix ? '#1A1611' : T.bg;
-    const T_chromeBorder = isLight ? 'rgba(168, 120, 56, 0.30)' : isWarm ? warmScreenTokens.web.glassBorder : isMix ? 'rgba(180, 147, 98, 0.28)' : T.cardBorder;
-    const T_chromeText = isLight ? '#2E2A24' : isWarm ? warmScreenTokens.web.textMain : isMix ? '#FFFCF1' : T.textMain;
-    const T_chromeShadow = isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)' : isWarm ? '0 4px 12px rgba(122, 99, 71, 0.10)' : isMix ? '0 4px 14px rgba(0,0,0,0.32)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
-    const [topic, setTopic] = useState<{ id: string, url: string, label: string } | null>(null);
-    const viewRef = useRef<HTMLDivElement>(null);
+    const service = SOCIAL_SERVICES.find(item => item.id === selectedService);
 
-    useEffect(() => {
-        if (!topic) return;
-        let cancelled = false;
-        const raf = requestAnimationFrame(() => {
-            if (cancelled) return;
-            if (viewRef.current) {
-                const r = viewRef.current.getBoundingClientRect();
-                browser.openPage(topic.url, {
-                    x: Math.round(r.left),
-                    y: Math.round(r.top),
-                    width: Math.round(r.width),
-                    height: Math.round(r.height),
-                });
-            }
-        });
-        return () => { cancelled = true; cancelAnimationFrame(raf); };
-    }, [topic?.id, topic?.url, isNavHidden, browser]);
-
-    useBrowserViewBoundsSync(viewRef, browser.updateBounds, !!topic && browser.isOpen);
-
-    // Reuse the QuickSearchPanel browser layout when a topic is selected
-    if (topic && browser.isOpen) {
+    if (service) {
+        const Icon = service.Icon;
         return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg, paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
-                <div style={{
-                    flex: '0 0 clamp(170px, 20vh, 220px)', width: '100%',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                    padding: '0 clamp(16px,2vw,24px)', boxSizing: 'border-box'
-                }}>
-                    <div style={toolbarStyle}>
-                        <GazeButton id="soc-close" onClick={() => { browser.closePage(); setTopic(null); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                            style={{ ...browserToolbarButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER), flex: 1 }}>
-                            <XIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                            <span>Close</span>
-                        </GazeButton>
-                        <GazeButton id="soc-click" onClick={() => browser.clickAtGaze(gpRef.current.x, gpRef.current.y)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            style={{ ...browserToolbarButton(WEB_ACCENTS.tealText, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER), flex: 1 }}>
-                            <PointerIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} />
-                            <span>Click Here</span>
-                        </GazeButton>
-                        <GazeButton id="soc-up" onClick={() => browser.scrollUp()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            style={{ ...browserToolbarButton(WEB_ACCENTS.blueText), flex: 1 }}>
-                            <ArrowUpIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                            <span>Up</span>
-                        </GazeButton>
-                        <GazeButton id="soc-down" onClick={() => browser.scrollDown()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            style={{ ...browserToolbarButton(WEB_ACCENTS.blueText), flex: 1 }}>
-                            <ArrowDownIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                            <span>Down</span>
-                        </GazeButton>
-
-                        <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
-
-                        <GazeButton id="soc-back" onClick={() => browser.goBack()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                            style={{ ...browserToolbarButton(WEB_ACCENTS.goldText, 'rgba(49, 36, 20, 0.72)', 'rgba(178, 138, 69, 0.22)'), flex: 1 }}>
-                            <BackIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                            <span>{browser.canGoBack ? 'Back' : 'Exit'}</span>
-                        </GazeButton>
-                        <GazeButton id="soc-zoom-in" onClick={() => browser.adjustZoom(0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            style={{ ...browserToolbarButton(SOFT_INFO), minWidth: 'clamp(92px,7vw,118px)' }}>
-                            <ZoomIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} direction="in" />
-                            <span>+</span>
-                        </GazeButton>
-                        <GazeButton id="soc-zoom-out" onClick={() => browser.adjustZoom(-0.25)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            style={{ ...browserToolbarButton(SOFT_INFO), minWidth: 'clamp(92px,7vw,118px)' }}>
-                            <ZoomIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} direction="out" />
-                            <span>-</span>
-                        </GazeButton>
-                    </div>
+            <section className="browse-social-panel" aria-labelledby="social-service-name">
+                <div className="browse-coming-soon">
+                    <Icon size={64} color="var(--ui-accent-ink)" strokeWidth={1.8} />
+                    <h2 id="social-service-name">{service.label}</h2>
+                    <p role="status">Coming soon</p>
+                    <GazeButton id="soc-back" onClick={onBack}
+                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        dwellCategory="backSkipButton" className="browse-social-back">
+                        <BackIcon size={28} color="currentColor" strokeWidth={2} />
+                        <span>Back</span>
+                    </GazeButton>
                 </div>
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%', padding: 'clamp(12px,1.5vh,20px) clamp(16px,2vw,24px)', boxSizing: 'border-box' }}>
-                    <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                        {browser.edgeScrollDirection === 'up' && (
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to bottom, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 6, pointerEvents: 'none', borderRadius: '16px 16px 0 0' }} />
-                        )}
-                        {browser.edgeScrollDirection === 'down' && (
-                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to top, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 6, pointerEvents: 'none', borderRadius: '0 0 16px 16px' }} />
-                        )}
-                        <div style={{ position: 'absolute', inset: 0, border: '4px solid rgba(45, 212, 191, 0.4)', borderRadius: '16px', zIndex: 5, pointerEvents: 'none' }} />
-                        <div id="browser-view-container" ref={viewRef} style={{ width: '100%', height: '100%', background: '#fff', borderRadius: '16px', overflow: 'hidden' }} />
-                    </div>
-                </div>
-            </div>
+            </section>
         );
     }
 
-    const socialCards = [
-        {
-            id: 'linkedin',
-            label: 'LinkedIn',
-            accent: WEB_ACCENTS.blueText,
-            bg: 'rgba(27, 38, 44, 0.78)',
-            icon: <WorkIcon size={54} color="currentColor" strokeWidth={1.9} />,
-            onClick: () => setTopic({ id: 'linkedin', url: 'https://www.linkedin.com', label: 'LinkedIn' }),
-        },
-        {
-            id: 'gmail',
-            label: 'Gmail',
-            accent: WEB_ACCENTS.maroonText,
-            bg: 'rgba(52, 28, 24, 0.70)',
-            icon: <MailIcon size={54} color="currentColor" strokeWidth={1.9} />,
-            onClick: () => setTopic({ id: 'gmail', url: 'https://mail.google.com', label: 'Gmail' }),
-        },
-        {
-            id: 'whatsapp',
-            label: 'WhatsApp',
-            accent: WEB_ACCENTS.oliveText,
-            bg: 'rgba(34, 42, 27, 0.74)',
-            icon: <WhatsAppIcon size={54} color="currentColor" strokeWidth={1.9} />,
-            onClick: () => { if (setView) setView('whatsapp'); },
-        },
-    ];
-
-    // Theme-aware tile bg per social platform (cream-elevated in light, walnut in mix, dark in dark)
-    const tileBgFor = (id: string, darkBg: string) => {
-        if (isLight) {
-            // Cream tiles with subtle platform-tint hue
-            if (id === 'linkedin') return 'rgba(31, 107, 126, 0.10)';
-            if (id === 'gmail') return 'rgba(165, 106, 96, 0.12)';
-            if (id === 'whatsapp') return 'rgba(143, 161, 123, 0.14)';
-            return '#FFFCF1';
-        }
-        if (isMix) {
-            if (id === 'linkedin') return 'rgba(31, 50, 60, 0.85)';
-            if (id === 'gmail') return 'rgba(72, 38, 32, 0.85)';
-            if (id === 'whatsapp') return 'rgba(48, 56, 36, 0.85)';
-            return '#241F18';
-        }
-        return darkBg;
-    };
-    const tileBorder = isLight ? `1.5px solid ${T_chromeBorder}` : isMix ? '1.5px solid rgba(180, 147, 98, 0.20)' : WEB_SURFACE.borderSoft;
-    const tileLabelColor = isLight ? '#2E2A24' : isMix ? '#FFFCF1' : T.textMain;
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: T_pageBg, padding: 'clamp(20px, 4vh, 60px)' }}>
-            <h2 style={{ fontSize: 'clamp(32px, 4.5vh, 48px)', color: T_chromeText, marginBottom: 'clamp(40px, 6vh, 80px)', fontFamily: FONT_PRIMARY, fontWeight: 800 }}>
-                Social Media
-            </h2>
-            <div style={{ display: 'flex', gap: 'clamp(22px, 3vw, 36px)', width: 'clamp(800px, 85vw, 1200px)' }}>
-                {socialCards.map((card) => (
-                    <GazeButton
-                        key={card.id}
-                        id={`soc-${card.id}`}
-                        onClick={card.onClick}
-                        gazeEnabled={ige}
-                        gazeEnabledTimestamp={ts}
-                        isDarkMode dwellCategory="navigationButton"
-                        style={{
-                            ...cb,
-                            flex: 1,
-                            height: 'clamp(170px, 23vh, 240px)',
-                            borderRadius: '26px',
-                            fontFamily: FONT_PRIMARY,
-                            fontSize: 'clamp(25px, 3vh, 36px)',
-                            fontWeight: 800,
-                            background: tileBgFor(card.id, card.bg),
-                            border: tileBorder,
-                            boxShadow: T_chromeShadow,
-                            color: tileLabelColor,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 'clamp(18px, 2.4vw, 30px)',
-                        }}
-                    >
-                        <span style={{ color: card.accent, display: 'flex', opacity: 0.92, filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.24))' }}>
-                            {card.icon}
-                        </span>
-                        <span>{card.label}</span>
+        <section className="browse-social-panel" aria-labelledby="social-heading">
+            <h2 id="social-heading">Social Media</h2>
+            <div className="browse-social-grid">
+                {SOCIAL_SERVICES.map(({ id, label, Icon }) => (
+                    <GazeButton key={id} id={`soc-${id}`} onClick={() => onSelect(id)}
+                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
+                        dwellCategory="navigationButton" className="browse-social-card">
+                        <Icon size={54} color="var(--ui-accent-ink)" strokeWidth={1.9} />
+                        <span>{label}</span>
                     </GazeButton>
                 ))}
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -3668,6 +3401,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const { isLight, isWarm, isMix } = useTheme();
     const { data: { settings } } = useCustomization();
     const [view, setView] = useState<ViewState>('grid');
+    const [socialService, setSocialService] = useState<SocialServiceId | null>(null);
     const { isGazeEnabled: ige, lastEnabledTimestamp: ts, disableGaze, enableGaze } = useGazeControl();
     const browser = useGazeBrowser();
     const ws = useWS();
@@ -3678,6 +3412,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     // component at 66Hz (plus every mousemove) — and nothing ever read the
     // state. Consumers all use gpRef.
     const gpRef = useRef({ x: 0, y: 0 });
+    const browserSampleRef = useRef({ valid: false, receivedAt: 0, emittedAtWallMs: 0, pipeline: '' });
     const [windowBounds, setWindowBounds] = useState<{ x: number; y: number; width: number; height: number; screenWidth: number; screenHeight: number; scaleFactor: number; isFullScreen: boolean; isMaximized: boolean; } | null>(null);
     const windowBoundsRef = useRef<typeof windowBounds>(null);
     const [isNavHidden, setIsNavHidden] = useState(false);
@@ -3690,7 +3425,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     useEffect(() => {
         const stageFactor = currentStage === 'late_als' ? 1.35 : currentStage === 'mid_als' ? 1.15 : currentStage === 'caregiver' ? 0.85 : 1.0;
         browser.setGazeConfig({
-            dwellMs: Math.max(850, Math.min(2800, dwellSettings.standardButton)),
+            dwellMs: dwellSettings.navigationButton,
             onsetMs: Math.max(150, Math.min(700, dwellSettings.onsetDelay)),
             stabilityRadiusPx: Math.round(48 * stageFactor),
             postClickCooldownMs: Math.max(800, Math.min(1800, dwellSettings.cooldownAfterActivation)),
@@ -3711,23 +3446,17 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             // dense pages; same persistence path as the toggles above.
             progressBankEnabled: gazeFlags.browserProgressBank,
         });
-    }, [browser.setGazeConfig, currentStage, dwellSettings.cooldownAfterActivation, dwellSettings.onsetDelay, dwellSettings.standardButton]);
+    }, [browser.setGazeConfig, currentStage, dwellSettings.cooldownAfterActivation, dwellSettings.onsetDelay, dwellSettings.navigationButton]);
 
     // Tier 0 A — single-dwell gaze toggle for hidden-nav embedded browser strip
     const toggleGaze = useCallback(() => {
         if (ige) disableGaze(); else enableGaze();
     }, [ige, disableGaze, enableGaze]);
 
-    const handleEmergency = useCallback(() => {
-        const english = settings?.emergencyPhraseEn || 'I need help immediately. This is an emergency.';
-        const hindi = settings?.emergencyPhraseHi || 'मुझे तुरंत मदद चाहिए। यह आपातकालीन स्थिति है।';
-        onSpeak(`${english} ${hindi}`.trim());
-    }, [onSpeak, settings?.emergencyPhraseEn, settings?.emergencyPhraseHi]);
-
     // ── DISABLE GAZE on every view change (prevents accidental selections) ──
     useEffect(() => {
         disableGaze();
-    }, [view]);
+    }, [view, socialService]);
 
     useEffect(() => {
         if (isEmbeddedBrowserActive) setIsNavHidden(true);
@@ -3755,15 +3484,12 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         }
     }, [isEmbeddedBrowserActive, view]);
 
-    // Force-enable gaze whenever the embedded browser is active. Previously
-    // this only fired when nav was hidden, which left YouTube's toolbar
-    // buttons (play/pause/skip-ad) dead if the patient had left the gaze
-    // toggle OFF on a prior screen. Now any embedded-browser view (YouTube,
-    // search, knowledge article) guarantees the cursor can drive its
-    // toolbar buttons via dwell. Mouse-only mode still wins — enableGaze()
-    // itself no-ops when isMouseMode is true (see GazeControlToggle.tsx).
+    // Enable on entry only. A subsequent Pause Gaze action must stay paused.
+    const browserWasActiveRef = useRef(false);
     useEffect(() => {
-        if (isEmbeddedBrowserActive && !ige) {
+        const enteringBrowser = isEmbeddedBrowserActive && !browserWasActiveRef.current;
+        browserWasActiveRef.current = isEmbeddedBrowserActive;
+        if (enteringBrowser && !ige) {
             enableGaze();
         }
     }, [enableGaze, ige, isEmbeddedBrowserActive]);
@@ -3788,7 +3514,16 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     // Uses the exact same coordinate transform as GazeCursor.tsx
     useEffect(() => {
         const unsub = ws.subscribeGaze((data: any) => {
-            if (!data || typeof data.x !== 'number' || typeof data.y !== 'number') return;
+            if (!isUsableGaze(data, Date.now())) {
+                browserSampleRef.current.valid = false;
+                return;
+            }
+            browserSampleRef.current = {
+                valid: true,
+                receivedAt: performance.now(),
+                emittedAtWallMs: data.t_helper_ms || data.t_sent_wall_ms || Date.now(),
+                pipeline: data.active_pipeline || '',
+            };
 
             let rawX: number, rawY: number;
             const coordSpace = data?.coord_space === 'screen' ? 'screen' : 'window';
@@ -3811,10 +3546,8 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 }
             }
 
-            // Clamp to screen
-            rawX = Math.max(0, Math.min(window.innerWidth, rawX));
-            rawY = Math.max(0, Math.min(window.innerHeight, rawY));
-
+            // Preserve outside-window coordinates so they cannot become an
+            // edge target merely by clamping a gaze from another window.
             gpRef.current = { x: rawX, y: rawY };
         });
         return unsub;
@@ -3832,12 +3565,8 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         return () => window.removeEventListener('mousemove', h);
     }, [hasRealGaze]);
 
-    // Forward gaze into BrowserView using an accuracy-first page cursor filter.
-    // Backend Kalman/OptiKey already stabilizes gaze, and the injected page cursor
-    // has its own dwell radius. Avoid a second hard fixation lock here because it
-    // can make the page cursor appear offset from the user's actual gaze.
-    // Keep only a tiny 1.5px jitter gate, snap large moves (>18px), and otherwise
-    // use high-alpha EWMA so dense web and YouTube controls track promptly.
+    // Forward each fresh sample into BrowserView. The adaptive backend owns
+    // position estimation; legacy sources retain their existing visual filter.
     //
     // v17.17: forwarding is event-driven (per gaze frame, ~66Hz) instead of a
     // 33ms poll. The poll added up to 33ms of lag, dropped roughly every other
@@ -3847,11 +3576,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     // path keeps simulation mode working: with no eye tracker there are no WS
     // gaze frames at all, so mouse-as-gaze must forward on its own events.
     const smoothedGazeRef = useRef<{ x: number; y: number } | null>(null);
-    // v17.17: 3-sample weighted moving average over the raw input, the same
-    // 0.45/0.30/0.25 pre-smoothing the main-app cursor applies before its EMA
-    // (GazeCursor "SmoothWhenChangingGazeTarget"). Causal, ~zero added lag at
-    // 66Hz; takes the sample-to-sample sawtooth out of the page cursor before
-    // the EMA and the page-side stability radius see it.
+    // Legacy estimator history; bypassed for the adaptive backend pipeline.
     const wmaPrev1Ref = useRef<{ x: number; y: number } | null>(null);
     const wmaPrev2Ref = useRef<{ x: number; y: number } | null>(null);
     const hasRealGazeRef = useRef(hasRealGaze);
@@ -3877,21 +3602,32 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
 
         // Hide exactly once per transition, no matter how the filter refs
         // were reset in between; show records visibility for the next hide.
-        const hidePageCursor = () => {
+        const hidePageCursor = (force = false) => {
             smoothedGazeRef.current = null;
             wmaPrev1Ref.current = null;
             wmaPrev2Ref.current = null;
-            if (pageCursorVisibleRef.current) {
+            if (force || pageCursorVisibleRef.current) {
                 pageCursorVisibleRef.current = false;
                 browser.hideGazeCursor();
             }
         };
         const showPageCursor = (x: number, y: number, opts?: { cursor?: boolean }) => {
-            pageCursorVisibleRef.current = opts?.cursor !== false;
-            browser.updateGazeCursor(x, y, opts);
+            // Even cursor:false frames can arm edge scrolling and must be
+            // cancelled when input becomes unavailable.
+            pageCursorVisibleRef.current = true;
+            browser.updateGazeCursor(x, y, {
+                ...opts,
+                emittedAtWallMs: hasRealGazeRef.current ? browserSampleRef.current.emittedAtWallMs : Date.now(),
+            });
         };
 
         const forward = () => {
+            const sample = browserSampleRef.current;
+            if (hasRealGazeRef.current && (!sample.valid ||
+                performance.now() - sample.receivedAt > GAZE_STALE_MS)) {
+                hidePageCursor();
+                return;
+            }
             const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed' && view !== 'youtube';
             if (!ige || (isBrowserWatchMode && !allowWatchScroll)) {
                 hidePageCursor();
@@ -3906,9 +3642,11 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             // threshold the page-side gapPause uses) or a real<->simulation
             // mode flip, so seconds-old samples never blend into the first
             // post-gap frames (the "ghost mid-point sweep" review finding).
-            if (lastForwardAtRef.current > 0 && nowMs - lastForwardAtRef.current > 150) {
+            if (lastForwardAtRef.current > 0 && nowMs - lastForwardAtRef.current > GAZE_STALE_MS) {
                 wmaPrev1Ref.current = null;
                 wmaPrev2Ref.current = null;
+                smoothedGazeRef.current = null;
+                if (nowMs - lastForwardAtRef.current > GAZE_RECOVERY_MS) hidePageCursor(true);
             }
             if (lastForwardModeRef.current !== hasRealGazeRef.current) {
                 lastForwardModeRef.current = hasRealGazeRef.current;
@@ -3923,6 +3661,14 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
 
             if (view === 'youtube' && isYtVideoActive && activeBounds && gazeNow.y < activeBounds.y + 96) {
                 hidePageCursor();
+                return;
+            }
+
+            if (sample.pipeline === 'adaptive_cursor_v1') {
+                smoothedGazeRef.current = { x: gazeNow.x, y: gazeNow.y };
+                wmaPrev1Ref.current = null;
+                wmaPrev2Ref.current = null;
+                showPageCursor(gazeNow.x, gazeNow.y, allowWatchScroll ? { cursor: false } : undefined);
                 return;
             }
 
@@ -3998,16 +3744,19 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             if (!hasRealGazeRef.current) forward();
         };
         window.addEventListener('mousemove', onMouse);
-        // v17.18: a STATIONARY mouse fires no events, so simulation mode
-        // (and the automatic mouse fallback 1.5s after a tracker dropout)
-        // could never complete a dwell — the page dwell only ticks when
-        // frames arrive, and the page-side gap pause neutralizes wall-clock
-        // catch-up. This heartbeat re-sends the held position ONLY when no
-        // real gaze stream exists; with real gaze it is a no-op, so blink
-        // gaps stay gaps and stale-gaze dwell advancement is NOT
-        // reintroduced (review-confirmed critical).
+        const onGazeLost = () => {
+            browserSampleRef.current.valid = false;
+            hidePageCursor(true);
+        };
+        window.addEventListener('gaze_lost', onGazeLost);
+        // UI-only simulation can dwell with a stationary mouse. RealGazeContext
+        // never changes to simulation after a hardware disconnect.
         const heartbeat = window.setInterval(() => {
             if (!hasRealGazeRef.current) forward();
+            else if (performance.now() - browserSampleRef.current.receivedAt > GAZE_RECOVERY_MS) {
+                browserSampleRef.current.valid = false;
+                hidePageCursor();
+            }
         }, 33);
         // Entering a hidden state (gaze off / watch mode) must hide even
         // if no further frames arrive.
@@ -4017,21 +3766,27 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         return () => {
             unsub();
             window.removeEventListener('mousemove', onMouse);
+            window.removeEventListener('gaze_lost', onGazeLost);
             window.clearInterval(heartbeat);
+            hidePageCursor();
         };
     }, [ws.subscribeGaze, browser.boundsRef, browser.isOpen, browser.scrollMode, ige, isBrowserWatchMode, browser.hideGazeCursor, browser.updateGazeCursor, isYtVideoActive, view]);
 
     const goBack = useCallback(() => {
+        if (view === 'social' && socialService) {
+            setSocialService(null);
+            return;
+        }
         browser.closePage();
         setIsQsTopicActive(false);
         setIsYtVideoActive(false);
         setIsNavHidden(false);
         setBrowserInteractionMode('control');
         setView('grid');
-    }, [browser]);
+    }, [browser, view, socialService]);
 
     if (view !== 'grid') return (
-        <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} data-gaze-context="webbrowse" style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} data-gaze-context="webbrowse" data-browser-view={view} style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Nav visibility — driven SOLELY by isNavHidden (the single source of truth).
                 Previous code gated this on isEmbeddedBrowserActive, which flapped on
                 child-state resync (websocket reconnects, focus events) and caused the
@@ -4040,7 +3795,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 <GlobalNavBar
                     currentPage="web"
                     onNavigate={onNavigate}
-                    onSpeak={onSpeak}
+
                     isDarkMode={isDarkMode}
                     onBack={isEmbeddedBrowserActive ? undefined : goBack}
                     isNavHidden={isNavHidden}
@@ -4053,11 +3808,10 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             </div>}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {view === 'news' && <NewsPanel ige={ige} ts={ts} onSpeak={onSpeak} goBack={goBack} disableGaze={disableGaze} browser={browser} gpRef={gpRef} isNavHidden={isNavHidden} />}
-                {view === 'youtube' && <YouTubePanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onVideoActive={setIsYtVideoActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} />}
+                {view === 'youtube' && <YouTubePanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onVideoActive={setIsYtVideoActive} onNavHiddenToggle={setIsNavHidden}  />}
                 {view === 'knowledge' && <KnowledgePanel ige={ige} ts={ts} onSpeak={onSpeak} isNavHidden={isNavHidden} />}
-                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden} onEmergency={handleEmergency} onSpeak={onSpeak} />}
-                {view === 'whatsapp' && <WhatsAppPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} isNavHidden={isNavHidden} />}
-                {view === 'social' && <SocialPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} isNavHidden={isNavHidden} setView={setView} />}
+                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden}  onSpeak={onSpeak} />}
+                {view === 'social' && <SocialPanel ige={ige} ts={ts} selectedService={socialService} onSelect={setSocialService} onBack={goBack} />}
             </div>
         </div>
     );
@@ -4148,22 +3902,14 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                         gap: '6px',
                     }}>
                         <span style={{
-                            fontFamily: FONT_PRIMARY, fontWeight: 820,
+                            fontFamily: FONT_PRIMARY, fontWeight: 650,
                             fontSize: 'clamp(30px, 3.4vh, 43px)', color: labelColor,
                             textAlign: 'left', lineHeight: 1.08, letterSpacing: 0,
                             textShadow: labelTextShadow,
                         }}>
                             {card.label}
                         </span>
-                        {showHindi && (
-                            <span style={{
-                                fontFamily: "'Noto Sans Devanagari', sans-serif", fontWeight: 700,
-                                fontSize: 'clamp(20px, 2.4vh, 28px)', color: hindiColor,
-                                textAlign: 'left', lineHeight: 1.25,
-                            }}>
-                                {card.labelHindi}
-                            </span>
-                        )}
+
                     </div>
                 </div>
             </GazeButton>
@@ -4184,7 +3930,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     return (
         <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
             <div style={{ zIndex: 10 }}>
-                <GlobalNavBar currentPage="web" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+                <GlobalNavBar currentPage="web" onNavigate={onNavigate} isDarkMode={isDarkMode} />
             </div>
 
             <div style={{

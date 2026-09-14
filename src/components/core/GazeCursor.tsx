@@ -25,7 +25,25 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { collectKeyboardKeys, findBestKeyboardKey, type KeyRect } from '../../utils/hitZoneExpansion';
 import { recordDwellEvent, recordDwellInterrupt, recordFreeze, recordGazeLatency, type GazeLatencySample } from '../../utils/gazeTelemetry';
 import { gazeFlags } from '../../utils/gazeFlags';
-import { KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT, type KeyboardCadence } from '../../config/dwellTimeConfig';
+import { GazeFreshness, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../../utils/gazeSafety';
+import { KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT, dwellForContext, fixedDwell, type KeyboardCadence } from '../../config/dwellTimeConfig';
+
+// Match native pointer hit testing: an opaque/noninteractive surface blocks targets
+// below it. The rendered gaze cursor is decorative and must never block its target.
+function topGazeElementAtPoint(px: number, py: number): Element | null {
+  return document.elementsFromPoint(px, py).find(el => !el.closest('[data-cursor="true"]')) || null;
+}
+
+// Revalidate cached snap/sticky targets after modal or readiness changes. A target
+// can remain connected while its screen is covered or gaze selection is disarmed.
+function isGazeTargetAvailable(target: HTMLElement): boolean {
+  if (!target.isConnected || target.closest('[data-gaze="false"], [inert]') ||
+      target.matches(':disabled, [aria-disabled="true"]')) return false;
+  const rect = target.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const top = topGazeElementAtPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  return Boolean(top && target.contains(top));
+}
 
 // === TUNING PARAMETERS ===
 const CURSOR_SIZES: Record<string, number> = { small: 50, medium: 70, large: 90 };
@@ -33,9 +51,8 @@ const DEFAULT_CURSOR_SIZE = 70;
 const DWELL_TIME = 1000;         // v10: 1.0s base dwell (was 0.7s) — less overwhelming for Papa
 const CLICK_COOLDOWN = 1300;     // v10: 1.3s cooldown (was 0.9s) — prevents rapid re-fire
 const TOGGLE_LOCKOUT_MS = 2500;  // v10: ignore toggle for 2.5s after any toggle fires
-// v16: Lock threshold lowered from 0.50 to 0.10 — OptiKey freezes cursor INSTANTLY on fixation.
-// At 50%, cursor drifted for ~500ms before freezing, causing the "gaze keeps drifting" feel.
-// At 10%, cursor freezes within ~100ms of dwell start — nearly instant like OptiKey.
+// Acquire the display lock after 10% of the configured dwell duration.
+// This is GazeConnect behavior, not an OptiKey default or a hardware accuracy claim.
 const LOCK_THRESHOLD = 0.10;
 const LOCK_BREAK_DISTANCE = 80;  // px to break lock — easier escape since backend handles stickiness
 
@@ -176,6 +193,7 @@ export const GazeCursor: React.FC = () => {
   const lastGazeFrameAtRef = useRef<number>(0);
   const lastSignalStateRef = useRef<string>('valid');
   const lastDwellTickRef = useRef<number>(0);
+  const freshnessRef = useRef(new GazeFreshness());
 
   // === LATENCY INSTRUMENTATION REFS (measurement only) ===
   // lastTHelperMsRef dedupes gap-hold rebroadcasts (same helper stamp);
@@ -222,15 +240,6 @@ export const GazeCursor: React.FC = () => {
   // either gaze returns (resume) OR this timestamp passes (hard clear).
   const savedDwellExpiryRef = useRef<number>(0);
 
-  // === v17: REPEAT DWELL TRACKING ===
-  // Track last selected element to enable faster repeat key presses (OptiKey-style)
-  const repeatLastIdRef = useRef<string>('');
-  const repeatLastTimeRef = useRef<number>(0);
-  const repeatIndexRef = useRef<number>(0);
-  // B2 repeatGuard: set true when the gaze acquires a DIFFERENT onset target
-  // after the last click; reset to false at each click. Used to suppress the
-  // fast-repeat accelerator on an unintended look-away-and-return.
-  const sawDifferentTargetSinceClickRef = useRef<boolean>(false);
   // B1 keyboardCadence: whether the previous click was a keyboard-context
   // target — gates the keyboard cooldown base for the next click's cooldown.
   const lastClickWasKeyboardRef = useRef<boolean>(false);
@@ -384,76 +393,25 @@ export const GazeCursor: React.FC = () => {
     return false;
   }, []);
 
-  // Find clickable element at point
+  // Inspect only the top painted element and its ancestors; never click through
+  // a dialog background, an unready choice, or a disabled button to a lower layer.
   const findClickableElement = useCallback((px: number, py: number): { element: HTMLElement | null; isToggle: boolean; isAlwaysActive: boolean } => {
-    const elements = document.elementsFromPoint(px, py);
-
-    for (const el of elements) {
-      if (!(el instanceof HTMLElement)) continue;
-      if (el.getAttribute('data-cursor') === 'true') continue;
-
-      // Check if always-active (Emergency, Gaze Toggle - respond even when gaze disabled)
-      const alwaysActive = isAlwaysActiveElement(el);
-
-      // Check if toggle
-      if (isGazeToggleElement(el)) {
-        let check: HTMLElement | null = el;
-        let depth = 0;
-        while (check && depth < 15) {
-          const tag = check.tagName?.toLowerCase() || '';
-          if (tag === 'button' || check.getAttribute('data-gaze-toggle') === 'true') {
-            return { element: check, isToggle: true, isAlwaysActive: true };
-          }
-          check = check.parentElement;
-          depth++;
-        }
-        return { element: el, isToggle: true, isAlwaysActive: true };
+    const top = topGazeElementAtPoint(px, py);
+    let check: HTMLElement | null = top instanceof HTMLElement ? top : top?.parentElement || null;
+    let depth = 0;
+    while (check && depth < 15) {
+      if (check.closest('[data-gaze="false"], [inert]') || check.matches(':disabled, [aria-disabled="true"]')) break;
+      const tag = check.tagName.toLowerCase();
+      const className = check.className;
+      const isClickable = tag === 'button' || tag === 'a' || check.getAttribute('role') === 'button' ||
+        check.getAttribute('data-gaze') === 'true' || check.getAttribute('data-gaze-toggle') === 'true' ||
+        (typeof className === 'string' && (className.includes('gaze-button') || className.includes('gaze-card')));
+      if (isClickable) {
+        const isToggle = isGazeToggleElement(check);
+        return { element: check, isToggle, isAlwaysActive: isToggle || isAlwaysActiveElement(check) };
       }
-
-      // Regular clickable
-      let check: HTMLElement | null = el;
-      let depth = 0;
-      let inGazeDisabledZone = false;
-      while (check && depth < 15) {
-        const tag = check.tagName?.toLowerCase() || '';
-        const role = check.getAttribute('role');
-        const dataGaze = check.getAttribute('data-gaze');
-        const className = check.className || '';
-
-        // Explicit gaze opt-out: data-gaze="false" means this element
-        // or zone is mouse-click only (e.g. Settings page content area)
-        if (dataGaze === 'false') {
-          inGazeDisabledZone = true;
-          break; // Entire subtree is gaze-disabled
-        }
-
-        const isClickable = (
-          tag === 'button' || tag === 'a' || role === 'button' ||
-          dataGaze === 'true' ||
-          (typeof className === 'string' && (
-            className.includes('gaze-button') || className.includes('gaze-card')
-          ))
-        );
-
-        if (isClickable) {
-          // Check if any ancestor opts out of gaze (gaze-disabled zone)
-          let ancestor: HTMLElement | null = check.parentElement;
-          while (ancestor) {
-            if (ancestor.getAttribute('data-gaze') === 'false') {
-              inGazeDisabledZone = true;
-              break;
-            }
-            ancestor = ancestor.parentElement;
-          }
-          if (inGazeDisabledZone) break;
-
-          // Check if this clickable element is always-active
-          const elementAlwaysActive = isAlwaysActiveElement(check);
-          return { element: check, isToggle: false, isAlwaysActive: elementAlwaysActive };
-        }
-        check = check.parentElement;
-        depth++;
-      }
+      check = check.parentElement;
+      depth++;
     }
     return { element: null, isToggle: false, isAlwaysActive: false };
   }, [isGazeToggleElement, isAlwaysActiveElement]);
@@ -484,60 +442,26 @@ export const GazeCursor: React.FC = () => {
     const explicitDwellRaw = getAttr(el, 'data-gaze-dwell-ms') || getAttr(el, 'data-gaze-dwell');
     const explicitDwell = explicitDwellRaw ? Number(explicitDwellRaw) : NaN;
 
-    const contextDwell =
-      contextKey === 'emergency' || contextKey === 'emergencybutton' ? s.emergencyButton
-        : contextKey === 'navigation' || contextKey === 'navigationbutton' ? s.navigationButton
-          : contextKey === 'quickfire' ? s.quickfire
-            : contextKey === 'keyboard' || contextKey === 'keyboardkey' ? s.keyboardKey
-              // Prediction strip: today it falls through to keyboardKey on the
-              // keyboard screen (isKeyboard=true). Made explicit here so the
-              // suggestion timing can be tuned independently of letter keys
-              // later without changing today's value (still keyboardKey).
-              : contextKey === 'prediction' ? s.keyboardKey
-              : contextKey === 'surveyoption' ? s.surveyOption
-                : contextKey === 'phrasebutton' || contextKey === 'phrases' ? s.phraseButton
-                  : contextKey === 'homescreentile' ? s.homeScreenTile
-                    : contextKey === 'spatialzone' || contextKey === 'spatial' ? s.spatialZone
-                      : contextKey === 'settingsbutton' || contextKey === 'settings' ? s.settingsButton
-                        : contextKey === 'medicalurgent' ? s.medicalUrgent
-                          : contextKey === 'backskipbutton' ? s.backSkipButton
-                            : contextKey === 'compassmapaction' || contextKey === 'compass' || contextKey === 'compass-map' ? s.compassMapAction
-                              : contextKey === 'gazetoggle' ? s.gazeToggle
-                                : contextKey === 'standard' || contextKey === 'standardbutton' ? s.standardButton
-                                  : null;
+    const contextDwell = isToggle ? s.gazeToggle : contextKey
+      ? dwellForContext(contextKey) : isKeyboard ? s.keyboardKey : s.standardButton;
+    return fixedDwell(explicitDwell, contextDwell);
 
-    const isNavOnCompass = contextKey === 'navigation' && isCompass;
-    let baseDwell = Number.isFinite(explicitDwell) && explicitDwell > 0
-      ? explicitDwell
-      : isToggle ? s.gazeToggle
-        : isNavOnCompass ? Math.max(s.navigationButton, 1400)
-          : contextDwell ?? (isKeyboard ? s.keyboardKey : s.standardButton);
+  }, []);
 
-    // NOTE: keyboardCadence (default ON) intentionally does NOT override the
-    // letter DWELL — only onset + cooldown (the dead time) are cut, elsewhere
-    // in the loop. The dwell stays accuracy-critical and untouched here
-    // (patient request 2026-07-07).
-
-    // v17: Variable repeat dwell — faster for repeated presses of same key
-    const isKeyboardContext = contextKey === 'keyboard' || contextKey === 'keyboardkey';
-    if (s.repeatDwellEnabled && isKeyboardContext) {
-      const elId = el.id || '';
-      const now = Date.now();
-      // repeatGuard flag (default OFF): suppress the accelerator if the gaze
-      // acquired a DIFFERENT target since the last click on this key (an
-      // unintended look-away-and-return, not a deliberate repeat).
-      const continuityOk = !gazeFlags.repeatGuard || !sawDifferentTargetSinceClickRef.current;
-      if (continuityOk && elId && elId === repeatLastIdRef.current && (now - repeatLastTimeRef.current) < (s.repeatWindowMs || 2000)) {
-        const times = s.repeatDwellTimes || [0, 250, 350];
-        const idx = Math.min(repeatIndexRef.current, times.length - 1);
-        const repeatTime = times[idx];
-        if (repeatTime > 0) {
-          baseDwell = Math.max(200, repeatTime);  // Safety minimum
-        }
-      }
-    }
-
-    return baseDwell;
+  const resetSelection = useCallback(() => {
+    dwellTargetRef.current = null;
+    dwellStartTimeRef.current = 0;
+    onsetTargetRef.current = null;
+    onsetStartTimeRef.current = 0;
+    onsetCompletedRef.current = false;
+    savedDwellRef.current = null;
+    savedDwellExpiryRef.current = 0;
+    isLockedRef.current = false;
+    preSmoothInitRef.current = false;
+    setDwellProgress(0);
+    setIsLocked(false);
+    setTargetName('');
+    setHighlightRect(null);
   }, []);
 
   const dwellFrame = useCallback(() => {
@@ -566,22 +490,20 @@ export const GazeCursor: React.FC = () => {
       return;
     }
 
-    // === DWELL PAUSE-ON-GAP (flag: dwellPauseOnGap, default ON) ===========
-    // While gaze is stale (no fresh frame >150ms) or the backend signal
-    // state is blink/oob/frozen, freeze every dwell-related clock by
-    // shifting its start/expiry forward by this frame's dt. Progress
-    // neither advances (no mid-blink clicks) nor resets (no corner
-    // restart loops); the saved-progress TTL also stops burning down.
-    // Only engages once at least one real gaze frame has arrived, so
-    // mouse-simulation sessions (no WS gaze frames) are unaffected.
-    if (gazeFlags.dwellPauseOnGap && lastGazeFrameAtRef.current > 0 && frameDt > 0) {
-      const gazeAge = now - lastGazeFrameAtRef.current;
-      if (gazeAge > DWELL_PAUSE_STALE_MS || lastSignalStateRef.current !== 'valid') {
-        if (dwellStartTimeRef.current > 0) dwellStartTimeRef.current += frameDt;
-        if (onsetStartTimeRef.current > 0) onsetStartTimeRef.current += frameDt;
-        if (savedDwellExpiryRef.current > 0) savedDwellExpiryRef.current += frameDt;
-        if (savedDwellRef.current) savedDwellRef.current.timestamp += frameDt;
+    // No onset, hit-test, or click may run on invalid or stale input. Short
+    // interruptions pause; a one-second loss expires progress in real time.
+    // A stalled renderer must also not credit unobserved wall-clock time.
+    const fresh = freshnessRef.current.allowsDwell(performance.now());
+    if (!fresh || frameDt > GAZE_STALE_MS || frameDt < 0) {
+      if (freshnessRef.current.age(performance.now()) > GAZE_RECOVERY_MS ||
+          frameDt > GAZE_RECOVERY_MS || frameDt < 0) {
+        resetSelection();
+      } else {
+        if (dwellStartTimeRef.current > 0) dwellStartTimeRef.current += Math.max(0, frameDt);
+        if (onsetStartTimeRef.current > 0) onsetStartTimeRef.current += Math.max(0, frameDt);
       }
+      frameRef.current = requestAnimationFrame(dwellFrame);
+      return;
     }
 
     // Cooldown check — uses configurable cooldown from DwellTimeContext
@@ -670,9 +592,8 @@ export const GazeCursor: React.FC = () => {
     let isAlwaysActive = false;
 
     // === v16: NEAREST-CENTER SELECTION (PRIMARY for ALL screens) ===
-    // OptiKey insight: select the element whose CENTER is closest to gaze, not whichever
-    // element the cursor pixel happens to be inside. This prevents wrong selections at
-    // button edges and boundaries.
+    // GazeConnect uses nearest-center disambiguation within eligible hit zones.
+    // OptiKey uses rectangle containment; see docs/optikey-gaze-reference-review.md.
     // For keyboard: use dedicated keyboard key rects (more precise, tighter grid).
     // For other screens: use snap targets (all gaze-enabled buttons).
     //
@@ -739,7 +660,7 @@ export const GazeCursor: React.FC = () => {
         const acquisitionMargin =
           (gazeFlags.toggleCalmFrontend && enabled && target.priority >= 3) ? 0 : 30;
         const maxRange = Math.hypot(target.rect.width, target.rect.height) * 0.5 + acquisitionMargin;
-        if (dist < maxRange && dist < bestDist) {
+        if (dist < maxRange && dist < bestDist && target.element && isGazeTargetAvailable(target.element)) {
           bestDist = dist;
           bestTarget = target;
         }
@@ -750,7 +671,7 @@ export const GazeCursor: React.FC = () => {
           bestTarget.rect.left + bestTarget.rect.width / 2,
           bestTarget.rect.top + bestTarget.rect.height / 2
         );
-        if (result.element) {
+        if (result.element === bestTarget.element) {
           clickable = result.element;
           isToggle = result.isToggle;
           isAlwaysActive = result.isAlwaysActive;
@@ -801,7 +722,7 @@ export const GazeCursor: React.FC = () => {
     //     hit test, not sticky.
     if (!clickable) {
       const stickyTarget = dwellTargetRef.current || onsetTargetRef.current;
-      if (stickyTarget && stickyTarget.isConnected) {
+      if (stickyTarget && isGazeTargetAvailable(stickyTarget)) {
         const sRect = stickyTarget.getBoundingClientRect();
         if (sRect.width > 0 && sRect.height > 0) {
           const inDwellPhase = !!dwellTargetRef.current;
@@ -836,6 +757,18 @@ export const GazeCursor: React.FC = () => {
           }
         }
       }
+    }
+
+    // Every acquisition path (including keyboard and cached sticky targets) must
+    // respect the currently visible layer and the current READY state.
+    if (clickable && !isGazeTargetAvailable(clickable)) {
+      clickable = null;
+      isToggle = false;
+      isAlwaysActive = false;
+    }
+    if (savedDwellRef.current && !isGazeTargetAvailable(savedDwellRef.current.element)) {
+      savedDwellRef.current = null;
+      savedDwellExpiryRef.current = 0;
     }
 
     // v10: Toggle lockout — if target is toggle and within lockout or user hasn't looked away, ignore it
@@ -889,7 +822,7 @@ export const GazeCursor: React.FC = () => {
       // === INCOMPLETE FIXATION TTL ===
       // Save progress when gaze leaves so it can be resumed if user looks back
       let didCaptureSave = false;
-      if (dwellTargetRef.current && dwellStartTimeRef.current > 0 && onsetCompletedRef.current) {
+      if (dwellTargetRef.current && isGazeTargetAvailable(dwellTargetRef.current) && dwellStartTimeRef.current > 0 && onsetCompletedRef.current) {
         const elapsed = now - dwellStartTimeRef.current;
         const targetContext = (getTargetAttr(dwellTargetRef.current, 'data-gaze-context') || '').trim();
         const contextKey = targetContext.toLowerCase();
@@ -956,14 +889,6 @@ export const GazeCursor: React.FC = () => {
       onsetTargetRef.current = clickable;
       onsetStartTimeRef.current = now;
       onsetCompletedRef.current = false;
-
-      // B2 repeatGuard: acquiring an onset target that isn't the last-clicked
-      // key means the gaze moved elsewhere — flag it so the fast-repeat
-      // accelerator is suppressed on a look-away-and-return to the same key.
-      // Re-acquiring the SAME key (deliberate repeat) does not set this.
-      if ((clickable.id || '') !== repeatLastIdRef.current) {
-        sawDifferentTargetSinceClickRef.current = true;
-      }
 
       // Check if this is a saved target that can be resumed (fixation TTL)
       if (savedDwellRef.current
@@ -1117,7 +1042,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     // Fire click at 100%
-    if (progress >= 1 && dwellTargetRef.current) {
+    if (progress >= 1 && dwellTargetRef.current && isGazeTargetAvailable(dwellTargetRef.current)) {
       lastClickTimeRef.current = now;
       // v10: Record toggle lockout state before firing
       if (isGazeToggleElement(dwellTargetRef.current)) {
@@ -1125,19 +1050,6 @@ export const GazeCursor: React.FC = () => {
         toggleLookedAwayRef.current = false;
       }
 
-      // v17: Track repeat dwell state for faster subsequent key presses
-      const elId = dwellTargetRef.current.id || '';
-      const repeatWindow = s.repeatWindowMs || 2000;
-      if (elId && elId === repeatLastIdRef.current && (now - repeatLastTimeRef.current) < repeatWindow) {
-        repeatIndexRef.current++;
-      } else {
-        repeatIndexRef.current = 1;  // Next press = index 1 (second press)
-      }
-      repeatLastIdRef.current = elId;
-      repeatLastTimeRef.current = now;
-      // B2 repeatGuard: this key is now the "last clicked" key; clear the
-      // look-away flag so a deliberate immediate repeat can accelerate.
-      sawDifferentTargetSinceClickRef.current = false;
       // B1 keyboardCadence: remember whether this click was a keyboard-context
       // target so the NEXT click's cooldown can use the keyboard cooldown base.
       lastClickWasKeyboardRef.current = contextKey === 'keyboard' || contextKey === 'keyboardkey' || contextKey === 'prediction';
@@ -1207,12 +1119,14 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence]);
+  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {
     const now = Date.now();
+    if (!freshnessRef.current.receive(data, now, performance.now())) return;
     reportGazeReceived();
+    if (lastGazeFrameAtRef.current && now - lastGazeFrameAtRef.current > GAZE_RECOVERY_MS) resetSelection();
 
     // Rate tracking
     msgCountRef.current++;
@@ -1302,10 +1216,10 @@ export const GazeCursor: React.FC = () => {
     rawY = Math.max(-EDGE_OVERSHOOT, Math.min(window.innerHeight + EDGE_OVERSHOOT, rawY));
 
     // === v16: OptiKey-style 3-sample pre-smoothing (ALL SCREENS) ===
-    // Matches OptiKey's SmoothWhenChangingGazeTarget: weighted average of current + 2 previous.
+    // Legacy GazeConnect weighted average; bypassed with the adaptive backend.
     // Reduces directional EMA lag bias by pre-centering the input signal.
     // v16: Extended to ALL screens — cursor stability benefits every screen, not just keyboard.
-    const backendOwnsStability = backendLocked || backendOnKey || backendMagnetPx > BACKEND_MAGNET_ACTIVE_PX;
+    const backendOwnsStability = data.active_pipeline === 'adaptive_cursor_v1' || backendLocked || backendOnKey || backendMagnetPx > BACKEND_MAGNET_ACTIVE_PX;
     if (!backendOwnsStability) {
       if (!preSmoothInitRef.current) {
         preSmoothPrev1Ref.current = { x: rawX, y: rawY };
@@ -1381,7 +1295,9 @@ export const GazeCursor: React.FC = () => {
     // bug — which the video analysis isolated to a single frame
     // around timestamp v1 0:23.6 — disappears.
     if (isLockedRef.current) {
-      const distFromLock = Math.hypot(rawX - lockPosRef.current.x, rawY - lockPosRef.current.y);
+      const intentX = Number.isFinite(data.intent_x) ? data.intent_x * window.innerWidth : rawX;
+      const intentY = Number.isFinite(data.intent_y) ? data.intent_y * window.innerHeight : rawY;
+      const distFromLock = Math.hypot(intentX - lockPosRef.current.x, intentY - lockPosRef.current.y);
       let shouldBreakLock = distFromLock > LOCK_BREAK_DISTANCE;
 
       if (shouldBreakLock && dwellTargetRef.current && dwellTargetRef.current.isConnected) {
@@ -1393,10 +1309,10 @@ export const GazeCursor: React.FC = () => {
           // (rect + this) is meaningfully larger than the lockPos circle.
           const LOCK_RECT_TOLERANCE = 45;
           const insideTargetRect = (
-            rawX >= tRect.left - LOCK_RECT_TOLERANCE
-            && rawX <= tRect.right + LOCK_RECT_TOLERANCE
-            && rawY >= tRect.top - LOCK_RECT_TOLERANCE
-            && rawY <= tRect.bottom + LOCK_RECT_TOLERANCE
+            intentX >= tRect.left - LOCK_RECT_TOLERANCE
+            && intentX <= tRect.right + LOCK_RECT_TOLERANCE
+            && intentY >= tRect.top - LOCK_RECT_TOLERANCE
+            && intentY <= tRect.bottom + LOCK_RECT_TOLERANCE
           );
           if (insideTargetRect) {
             shouldBreakLock = false;
@@ -1526,6 +1442,9 @@ export const GazeCursor: React.FC = () => {
       }
     }
 
+    // The adaptive backend owns smoothing; avoid adding frame-rate dependent lag.
+    if (data.active_pipeline === 'adaptive_cursor_v1') alpha = 1;
+
     // Apply EMA
     posRef.current.x += alpha * dx;
     posRef.current.y += alpha * dy;
@@ -1654,27 +1573,20 @@ export const GazeCursor: React.FC = () => {
         });
       }
     }
-  }, [enabled, reportGazeReceived, applyCursorTransform, isGazeToggleElement]);
+  }, [enabled, reportGazeReceived, applyCursorTransform, isGazeToggleElement, resetSelection]);
 
   // v17: Handle gaze_lost events — pause dwell during blink/stale/gap
   // When backend detects blink or tracking loss, we freeze dwell progress
   // instead of resetting it. This prevents blinks from losing typing progress.
   useEffect(() => {
-    const handleGazeLost = () => {
-      // If currently dwelling on a target, freeze progress (don't reset)
-      // The dwell frame loop will simply not advance until valid gaze returns
-      // and the cursor re-enters the same element.
-      // No action needed here — the backend already stops sending gaze frames
-      // during blink, so dwellFrame won't advance. This event is informational
-      // for future use (e.g., showing a "tracking lost" indicator).
-    };
+    const handleGazeLost = () => { freshnessRef.current.lose(); };
     window.addEventListener('gaze_lost', handleGazeLost);
     return () => window.removeEventListener('gaze_lost', handleGazeLost);
   }, []);
 
   // Startup
   useEffect(() => {
-    console.log('[v35] GazeCursor v35 - OptiKey accuracy parity + blink pause + repeat dwell');
+    console.log('[GazeCursor] Single selection owner with freshness gating');
     const unsub = ws.subscribeGaze(handleGaze);
     frameRef.current = requestAnimationFrame(dwellFrame);
     return () => {

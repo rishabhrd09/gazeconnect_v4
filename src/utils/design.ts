@@ -726,29 +726,6 @@ export const buttonSizes = {
   xxl: { width: 160, height: 160, fontSize: typography.fontSize['3xl'], padding: spacing[8] },
 };
 
-// DEPRECATED TABLE — kept only as GazeButton's last-resort fallback for
-// elements with no dwellCategory. The AUTHORITATIVE dwell configuration is
-// src/config/dwellTimeConfig.ts (user-adjustable, ALS-stage-aware); the real
-// gaze path (GazeCursor) never reads this table. Do NOT tune timings here —
-// these values are known to disagree with dwellTimeConfig (e.g. emergency
-// 1500 here vs 2000 shipped) and only survive for legacy fallback safety.
-export const dwellTiming = {
-  bySize: { xs: 1500, sm: 1350, md: 1200, lg: 1050, xl: 975, xxl: 900 },
-  contexts: {
-    quickfire: 700,
-    keyboard: 700,
-    keyboardKey: 700,
-    spatialZone: 900,
-    navigation: 1200,
-    phrases: 1000,
-    settings: 1300,
-    emergency: 1500,
-    calibration: 1300,
-    spatial: 1200,
-  },
-  onsetDelay: 150, min: 400, max: 2000,
-};
-
 export const layout = {
   borderRadius: { none: '0', sm: '4px', md: '8px', lg: '12px', xl: '16px', '2xl': '24px', full: '9999px' },
   zIndex: { base: 0, dropdown: 100, modal: 200, toast: 300, tooltip: 400, gaze: 500, emergency: 999 },
@@ -786,28 +763,28 @@ export const splitScreenLayouts = {
 // Per-screen theme colors — centralizes hardcoded hex values from individual screens
 export const screenThemes = {
   home: {
-    bg: '#131412',
-    glass: 'rgba(27, 28, 24, 0.94)',
-    border: 'rgba(213, 216, 188, 0.12)',
-    cardBg: '#20221E',
-    cardBorder: '1.5px solid rgba(213, 216, 188, 0.12)',
-    teal: '#D6C98E',
-    tealIcon: '#D6C98E',
-    text: '#ECEDE3',
-    subtleBorder: 'rgba(213, 216, 188, 0.14)',
+    bg: '#101923',
+    glass: '#13202D',
+    border: '#304254',
+    cardBg: '#152231',
+    cardBorder: '1.5px solid #304254',
+    teal: '#C1D1E3',
+    tealIcon: '#C1D1E3',
+    text: '#EDF1F5',
+    subtleBorder: '#304254',
     red: '#8A463D',
-    brand: '#B4AB96',
+    brand: '#C1D1E3',
     dockSeparator: 'rgba(213, 216, 188, 0.10)',
-    quickPhrasesBg: '#1B1C18',
-    quickPhrasesBorder: '#3D4034',
-    quickPhrasesText: '#ECEDE3',
+    quickPhrasesBg: '#13202D',
+    quickPhrasesBorder: '#304254',
+    quickPhrasesText: '#EDF1F5',
   },
   phrases: {
     selectedColor: '#C69A45',
-    sidebarBg: '#1B1C18',
+    sidebarBg: '#13202D',
     accentTeal: '#6FB7B1',
-    cardBg: '#20221E',
-    cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
+    cardBg: '#152231',
+    cardBorder: '1.5px solid #304254',
     selectedBg: 'rgba(198, 154, 69, 0.16)',
     aacLinkBg: 'rgba(111, 183, 177, 0.10)',
     aacLinkBorder: 'rgba(111, 183, 177, 0.24)',
@@ -819,18 +796,18 @@ export const screenThemes = {
     bed: '#C69A45',
     daily: '#8FAE72',
     symptoms: '#C7838F',
-    sidebarBg: '#1B1C18',
-    sidebarBorder: 'rgba(213, 216, 188, 0.14)',
-    cardBg: '#20221E',
-    cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
-    headerDivider: 'rgba(213, 216, 188, 0.14)',
+    sidebarBg: '#13202D',
+    sidebarBorder: '#304254',
+    cardBg: '#152231',
+    cardBorder: '1.5px solid #304254',
+    headerDivider: '#304254',
   },
   activities: {
     selectedColor: '#C69A45',
-    sidebarBg: '#1B1C18',
+    sidebarBg: '#13202D',
     accentTeal: '#6FB7B1',
-    cardBg: '#20221E',
-    cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
+    cardBg: '#152231',
+    cardBorder: '1.5px solid #304254',
     selectedBg: 'rgba(198, 154, 69, 0.16)',
     hindiSubtext: 'rgba(255, 235, 205, 0.9)',
   },
@@ -856,13 +833,13 @@ export const screenThemes = {
     predictionHoverBg: 'rgba(56, 189, 248, 0.10)',
   },
   web: {
-    bg: '#11140F',
-    cardBg: '#20221E',
-    cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
-    textMain: '#ECEDE3',
-    textSub: '#B4B8A9',
+    bg: '#101923',
+    cardBg: '#152231',
+    cardBorder: '1.5px solid #304254',
+    textMain: '#EDF1F5',
+    textSub: '#ADBCCC',
     accent: '#B28A45',
-    glass: 'rgba(25, 31, 24, 0.94)',
+    glass: '#13202D',
     chrome: '#648D8B',
     youtube: '#9A5D54',
     ai: '#6F9B96',
@@ -921,29 +898,28 @@ export const screenThemes = {
  * rather than re-declaring their own card surface values.
  */
 export const sharedCardTokens = {
-  cardBg: '#20221E',
-  cardBorder: '1.5px solid rgba(213, 216, 188, 0.14)',
-  cardShadow: '0 8px 18px rgba(0,0,0,0.22)',
+  cardBg: '#152231',
+  cardBorder: '1.5px solid #304254',
+  cardShadow: 'none',
   cardRadius: '22px',
   // Sidebar grammar (Phrases / Activities pattern)
-  sidebarBg: '#1B1C18',
-  sidebarBorder: '1.5px solid rgba(213, 216, 188, 0.12)',
+  sidebarBg: '#13202D',
+  sidebarBorder: '1.5px solid #304254',
   sidebarSelectedAccent: '#C69A45',
   sidebarSelectedBg: 'rgba(198, 154, 69, 0.16)',
 } as const;
 
-export type Theme = 'dark' | 'light' | 'mix' | 'warm';
+export type Theme = 'dark' | 'warm';
 export const getColors = (theme: Theme) =>
-  theme === 'light' ? lightColors
-    : theme === 'warm' ? warmColors
+  theme === 'warm' ? warmColors
     : darkColors;
 export const createTheme = (theme: Theme) => ({
-  colors: getColors(theme), typography, spacing, buttonSizes, dwellTiming, layout,
+  colors: getColors(theme), typography, spacing, buttonSizes, layout,
   screenLayouts, animations, accessibility, splitScreenLayouts, screenThemes,
 });
 
 export default {
   darkColors, lightColors, mixColors, warmColors, warmScreenTokens,
-  typography, spacing, buttonSizes, dwellTiming, layout,
+  typography, spacing, buttonSizes, layout,
   screenLayouts, animations, accessibility, splitScreenLayouts, screenThemes, getColors, createTheme,
 };

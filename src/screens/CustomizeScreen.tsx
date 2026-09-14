@@ -477,17 +477,7 @@ const CustomizeScreen: React.FC<Props> = ({ onNavigate, isDarkMode = true }) => 
                   autoFocus
                 />
               </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <label style={{ display: 'block', fontSize: 13, color: colors.text.secondary, marginBottom: 6 }}>
-                  Name (Hindi)
-                </label>
-                <input
-                  className="cz-input"
-                  value={newNameHi}
-                  onChange={e => setNewNameHi(e.target.value)}
-                  placeholder="e.g. &#x092A;&#x093E;&#x092A;&#x093E;"
-                />
-              </div>
+
               <div style={{ minWidth: 140 }}>
                 <label style={{ display: 'block', fontSize: 13, color: colors.text.secondary, marginBottom: 6 }}>
                   Role
@@ -533,11 +523,7 @@ const CustomizeScreen: React.FC<Props> = ({ onNavigate, isDarkMode = true }) => 
                       <span style={{ fontSize: 16, fontWeight: 700, color: colors.text.primary }}>
                         {person.name}
                       </span>
-                      {person.nameHi && person.nameHi !== person.name && (
-                        <span style={{ fontSize: 14, color: colors.text.secondary }}>
-                          ({person.nameHi})
-                        </span>
-                      )}
+
                     </div>
                     <div style={{ fontSize: 13, color: colors.text.tertiary, marginTop: 2 }}>
                       {person.role} &middot; {person.phrases.length} phrase{person.phrases.length !== 1 ? 's' : ''}
@@ -574,10 +560,7 @@ const CustomizeScreen: React.FC<Props> = ({ onNavigate, isDarkMode = true }) => 
                         <label style={{ display: 'block', fontSize: 12, color: colors.text.tertiary, marginBottom: 4 }}>Name</label>
                         <input className="cz-input" value={person.name} onChange={e => updatePersonField(idx, 'name', e.target.value)} />
                       </div>
-                      <div style={{ flex: 1, minWidth: 140 }}>
-                        <label style={{ display: 'block', fontSize: 12, color: colors.text.tertiary, marginBottom: 4 }}>Hindi Name</label>
-                        <input className="cz-input" value={person.nameHi} onChange={e => updatePersonField(idx, 'nameHi', e.target.value)} />
-                      </div>
+
                       <div style={{ minWidth: 120 }}>
                         <label style={{ display: 'block', fontSize: 12, color: colors.text.tertiary, marginBottom: 4 }}>Role</label>
                         <select className="cz-select" value={person.role} onChange={e => updatePersonField(idx, 'role', e.target.value)}>
@@ -602,7 +585,7 @@ const CustomizeScreen: React.FC<Props> = ({ onNavigate, isDarkMode = true }) => 
                     {/* Phrase column headers */}
                     <div style={{ display: 'flex', gap: 10, padding: '0 0 6px 0', alignItems: 'center' }}>
                       <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, paddingLeft: 2 }}>English</span>
-                      <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, paddingLeft: 2 }}>Hindi</span>
+
                       <span style={{ width: 32 }} />
                     </div>
 
@@ -616,13 +599,7 @@ const CustomizeScreen: React.FC<Props> = ({ onNavigate, isDarkMode = true }) => 
                           placeholder="English phrase"
                           style={{ flex: 1 }}
                         />
-                        <input
-                          className="cz-input"
-                          value={phrase.hi}
-                          onChange={e => updatePhrase(idx, phIdx, 'hi', e.target.value)}
-                          placeholder="Hindi phrase"
-                          style={{ flex: 1 }}
-                        />
+
                         <button
                           className="cz-phrase-delete"
                           onClick={() => deletePhrase(idx, phIdx)}

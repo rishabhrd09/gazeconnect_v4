@@ -1,0 +1,72 @@
+/* Stationary, matte gaze targets. Only dwell feedback animates. */
+:root[data-theme] .zone-workspace {
+  --zone-gap: clamp(12px, 1.4vh, 16px);
+  --zone-nav-height: clamp(104px, 15.625vh, 160px);
+  height: 100%;
+  display: grid;
+  grid-template-rows: clamp(112px, 12.8vh, 138px) clamp(96px, 11vh, 120px) minmax(0, 1fr) var(--zone-nav-height);
+  gap: var(--zone-gap);
+  padding: clamp(10px, 1.5vh, 16px) 20px clamp(22px, 2.7vh, 30px);
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  font-family: var(--ui-font);
+}
+:root[data-theme] .zone-workspace-reading { grid-template-rows: minmax(0, 1fr) var(--zone-nav-height); }
+.zone-eyebrow { font: 600 clamp(16px, 1.8vh, 20px)/1.4 var(--ui-font); color: var(--ui-muted); }
+.zone-suggestions { display: grid; grid-template-columns: repeat(6, minmax(80px, 1fr)); gap: var(--zone-gap); min-height: 0; }
+.zone-board {
+  display: grid;
+  grid-template-areas: 'topLeft front topRight' 'left current right' 'delete space speak';
+  grid-template-columns: repeat(3, minmax(80px, 1fr));
+  grid-template-rows: repeat(3, minmax(80px, 1fr));
+  min-height: 0;
+  gap: var(--zone-gap);
+}
+:root[data-theme] .zone-workspace :where(button:not(.message-display-action)) {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 80px !important;
+  min-height: 80px !important;
+  padding: 10px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: none !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-ink) !important;
+  font: 600 clamp(26px, 3.1vh, 36px)/1.25 var(--ui-font) !important;
+}
+:root[data-theme] .zone-workspace button:not(.message-display-action):hover,
+:root[data-theme] .zone-workspace button:not(.message-display-action):focus-visible { border-color: var(--ui-accent) !important; background: var(--ui-hover) !important; }
+:root[data-theme] .zone-workspace button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -3px; }
+:root[data-theme] .zone-workspace .zone-group { font-size: clamp(32px, 4vh, 46px) !important; letter-spacing: 0.035em; font-weight: 650 !important; }
+:root[data-theme] .zone-workspace .zone-suggestion { font-size: clamp(24px, 2.8vh, 32px) !important; color: var(--ui-accent-ink) !important; overflow-wrap: anywhere; }
+.zone-current-word {
+  grid-area: current;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 8px 16px;
+  overflow: hidden;
+  border-block: 1px solid var(--ui-border);
+}
+.zone-current-text { color: var(--ui-accent-ink); font-size: clamp(32px, 4.4vh, 52px); line-height: 1.15; font-weight: 650; overflow-wrap: anywhere; max-width: 100%; }
+.zone-delete { grid-area: delete; }
+.zone-space { grid-area: space; }
+.zone-speak { grid-area: speak; }
+:root[data-theme] .zone-workspace :is(.zone-delete, .zone-space, .zone-back) { background: var(--ui-panel) !important; }
+:root[data-theme] .zone-workspace .zone-delete { color: var(--ui-care-ink) !important; }
+:root[data-theme] .zone-workspace :is(.zone-speak, #spatial-gaze[aria-pressed='true']) { background: var(--ui-selected) !important; color: var(--ui-accent-ink) !important; border-color: var(--ui-accent-ink) !important; }
+.zone-navigation { display: grid; grid-template-columns: repeat(5, minmax(80px, 1fr)); gap: var(--zone-gap); }
+:root[data-theme] .zone-workspace .zone-navigation button { font-size: clamp(22px, 2.5vh, 28px) !important; background: var(--ui-panel) !important; }
+.zone-nav-content { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 1.2vh, 14px); }
+.zone-nav-content svg { width: clamp(28px, 3.3vh, 36px); height: clamp(28px, 3.3vh, 36px); color: var(--ui-accent-ink); }
+.zone-board-expanded { grid-template-areas: none; grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) clamp(104px, 15vh, 156px); }
+.zone-letter-grid { display: grid; grid-template-columns: repeat(3, minmax(80px, 1fr)); grid-template-rows: repeat(2, minmax(80px, 1fr)); gap: var(--zone-gap); }
+:root[data-theme] .zone-workspace .zone-letter { font-size: clamp(44px, 6.7vh, 76px) !important; }
+.zone-fullscreen-notice { position: absolute; bottom: 4px; left: 20px; font-size: 14px; color: var(--ui-muted); }

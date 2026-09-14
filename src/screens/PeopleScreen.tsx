@@ -84,7 +84,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
       <GlobalNavBar
         currentPage="people"
         onNavigate={onNavigate}
-        onSpeak={onSpeak}
+
         isDarkMode={isDarkMode}
       />
 
@@ -197,17 +197,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
             }}>
               {selectedPerson.name}
             </span>
-            {showHindi && (
-              <div style={{
-                fontSize: 'clamp(22px, 2.5vh, 32px)',
-                fontWeight: 700,
-                color: phraseHindi,
-                fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif",
-                lineHeight: 1.2,
-              }}>
-                {selectedPerson.nameHi}
-              </div>
-            )}
+
           </GazeButton>
         </div>
       )}

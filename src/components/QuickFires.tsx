@@ -4,8 +4,9 @@
  * Clean design with larger fonts for easy gaze selection.
  */
 
+import { DWELL_GROUPS } from '../config/dwellTimeConfig';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { darkColors, lightColors, dwellTiming } from '../utils/design';
+import { darkColors, lightColors } from '../utils/design';
 
 interface QuickFireItem {
   id: string; label: string; labelHindi?: string; speak?: string;
@@ -54,7 +55,7 @@ const QuickFireButton: React.FC<{
   const [progress, setProgress] = useState(0);
   const [isActivated, setIsActivated] = useState(false);
   const colors = isDarkMode ? darkColors : lightColors;
-  const dwellTime = dwellTiming.contexts.quickfire;
+  const dwellTime = DWELL_GROUPS.communication.ms;
   const dwellTimerRef = useRef<NodeJS.Timeout | null>(null);
   const progressTimerRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -150,17 +151,7 @@ const QuickFireButton: React.FC<{
       )}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
         <span>{item.label}</span>
-        {showHindi && item.labelHindi && (
-          <span style={{
-            fontSize: compact ? 'clamp(11px, 1vh, 14px)' : 'clamp(14px, 1.5vh, 18px)',
-            fontWeight: 700,
-            color: isHovered ? colors.accent.main : colors.text.secondary,
-            marginTop: '2px',
-            fontFamily: "'Noto Sans Devanagari', 'Mangal', sans-serif"
-          }}>
-            {item.labelHindi}
-          </span>
-        )}
+
       </div>
     </button>
   );

@@ -163,8 +163,6 @@ const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
         { key: 'core_vocabulary', label: 'Core English', fg: isDarkMode ? '#8CB4C8' : '#4B7A8C', bg: isDarkMode ? 'rgba(140,180,200,0.1)' : 'rgba(75,122,140,0.08)' },
         { key: 'medical_vocabulary', label: 'Medical / ALS', fg: isDarkMode ? '#D4A574' : '#9A7046', bg: isDarkMode ? 'rgba(212,165,116,0.1)' : 'rgba(154,112,70,0.08)' },
         { key: 'patient_vocabulary', label: 'Papa', fg: isDarkMode ? '#B0A0D0' : '#7B6BA0', bg: isDarkMode ? 'rgba(176,160,208,0.1)' : 'rgba(123,107,160,0.08)' },
-        { key: 'hindi_vocabulary', label: 'Hindi', fg: isDarkMode ? '#C89EB0' : '#9A6B80', bg: isDarkMode ? 'rgba(200,158,176,0.1)' : 'rgba(154,107,128,0.08)' },
-        { key: 'hinglish_vocabulary', label: 'Hinglish', fg: isDarkMode ? '#9EA8D4' : '#6B74A0', bg: isDarkMode ? 'rgba(158,168,212,0.1)' : 'rgba(107,116,160,0.08)' },
         { key: 'cultural_vocabulary', label: 'Cultural', fg: isDarkMode ? '#88BEB0' : '#5A8A7C', bg: isDarkMode ? 'rgba(136,190,176,0.1)' : 'rgba(90,138,124,0.08)' },
     ];
 
@@ -447,14 +445,12 @@ const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
 
                     {showBuiltinSentences && builtinData?.training_corpus && (
                         <div style={card}>
-                            <div style={cardHead}>Training Corpus ({builtinData.training_corpus.length} English + {builtinData.hindi_corpus?.length || 0} Hindi)</div>
+                            <div style={cardHead}>Training Corpus ({builtinData.training_corpus.length} sentences)</div>
                             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                                 {builtinData.training_corpus.map((s: string, i: number) => (
                                     <div key={i} style={{ ...row, borderLeft: `2px solid ${isDarkMode ? 'rgba(140,180,200,0.15)' : 'rgba(75,122,140,0.12)'}`, paddingLeft: '14px' }}>{s}</div>
                                 ))}
-                                {builtinData.hindi_corpus?.map((s: string, i: number) => (
-                                    <div key={`h-${i}`} style={{ ...row, borderLeft: `2px solid ${isDarkMode ? 'rgba(200,158,176,0.15)' : 'rgba(154,107,128,0.12)'}`, paddingLeft: '14px' }}>{s}</div>
-                                ))}
+
                             </div>
                         </div>
                     )}

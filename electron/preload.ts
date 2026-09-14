@@ -7,7 +7,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const validEventChannels = [
-  'emergency-triggered',
   'gaze-data',
   'dwell-event',
   'mouse-only-mode-changed',
@@ -39,7 +38,7 @@ const api = {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
-    fullscreen: () => ipcRenderer.invoke('window:fullscreen'),
+    fullscreen: (enabled?: boolean) => ipcRenderer.invoke('window:fullscreen', enabled),
     isFullscreen: () => ipcRenderer.invoke('window:isFullscreen'),
   },
 
@@ -64,6 +63,7 @@ const api = {
 
   floorplan: {
     ensureServer: () => ipcRenderer.invoke('floorplan:ensure-server'),
+    request: (input: { endpoint: string; body?: string }) => ipcRenderer.invoke('floorplan:request', input),
   },
 
   // Settings persistence
@@ -122,8 +122,11 @@ const api = {
     // v17.19: one-way send (was invoke) — this fires per gaze frame
     // (~33Hz); the handler returns nothing, so the invoke reply message
     // was pure per-frame overhead on the main-process loop.
-    updateGaze: (x: number, y: number, options?: { cursor?: boolean }) => {
-      ipcRenderer.send('webview:updateGaze', x, y, options);
+    updateGaze: (x: number, y: number, options?: { cursor?: boolean; emittedAtWallMs?: number }) => {
+      ipcRenderer.send('webview:updateGaze', x, y, {
+        ...options,
+        emittedAtWallMs: options?.emittedAtWallMs ?? Date.now(),
+      });
       return Promise.resolve();
     },
     navigate: (url: string) => ipcRenderer.invoke('webview:navigate', url),

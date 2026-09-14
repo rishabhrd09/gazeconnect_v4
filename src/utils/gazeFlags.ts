@@ -1,9 +1,8 @@
 /**
  * gazeFlags.ts — runtime-toggleable gaze behavior flags (A/B switches).
  *
- * Safety rule (docs/EYE_TRACKING_CHANGES.md): every behavioral gaze change
- * ships behind one of these flags and is reversible at runtime without a
- * code edit.
+ * Optional tuning remains reversible. Input-validity and stale-frame guards
+ * are mandatory and cannot be disabled by old tuning preferences.
  *
  * Defaults are ON since the 2026-06-11 on-rig A/B validation (lock-breaks
  * −28%/click, worst click residual 480px → 109px, no felt regression —
@@ -21,10 +20,9 @@
 
 export interface GazeFlags {
   /**
-   * Pause (never reset, never advance) dwell + onset timers while gaze is
-   * stale (no fresh frame for >150ms) or the backend signal_state is not
-   * 'valid' (blink / out-of-bounds / frozen stream). Prevents a dwell
-   * click from firing mid-blink or mid-tracking-loss.
+   * Legacy preference retained for storage compatibility. Freshness protection
+   * is mandatory: short gaps pause, and long gaps reset selection. Setting
+   * this false no longer enables dwell on invalid or stale input.
    */
   dwellPauseOnGap: boolean;
   /**
@@ -44,10 +42,8 @@ export interface GazeFlags {
    */
   browserProgressRetention: boolean;
   /**
-   * In-page BROWSER cursor: freeze dwell clocks across >150ms gaps in
-   * the gaze stream (blink / look-away / stall) instead of letting the
-   * wall-clock dwell jump-commit when frames resume. Forwarded as
-   * browserGazeConfig.gapPauseEnabled (persists across page loads).
+   * Legacy browser preference retained for compatibility. Browser freshness
+   * and gap protection are mandatory even when this stored flag is false.
    */
   browserGapPause: boolean;
   /**
@@ -95,19 +91,9 @@ export interface GazeFlags {
    * KEYBOARD_CADENCE_BY_STAGE. Faster at every ALS stage, driven mostly by
    * the cooldown. Never touches nav/home/emergency or non-keyboard screens.
    * With the flag OFF the table is never read and typing is byte-identical
-   * to today. Ships WITH repeatGuard (below).
+   * to today.
    */
   keyboardCadence: boolean;
-  /**
-   * KEYBOARD plan B2 (on-rig A/B prototype, default OFF): continuity guard on
-   * the fast-repeat dwell. The repeat accelerator ([0,250,350]) is already
-   * same-key gated; this adds that it only applies if the gaze did NOT
-   * acquire a DIFFERENT target since the last click on this key — so an
-   * unintended look-away-and-return to the same letter no longer triggers a
-   * 250ms fast repeat (it falls back to the full dwell). Only ever LENGTHENS
-   * a repeat; with the flag OFF the accelerator behaves as today.
-   */
-  repeatGuard: boolean;
   /**
    * KEYBOARD plan B3 (on-rig A/B prototype, default OFF): ZoneBoard cost
    * restructure. (1) Spatial-keyboard LETTERS get the keyboardKey dwell
@@ -143,15 +129,11 @@ const DEFAULTS: GazeFlags = {
   //   window.__gazeFlags.set('homeSnapCalm', true)
   homeSnapCalm: false,
   browserProgressBank: false,
-  // keyboardCadence + repeatGuard: DEFAULT ON since 2026-07-07. The patient
+  // keyboardCadence: DEFAULT ON since 2026-07-07. The patient
   // reported the wait before the dwell ring appears on the next key felt
   // sluggish — it was ~1.4s post-click cooldown + 250ms onset of pure dead
   // time. These cut that dead time (per-stage onset+cooldown, dwell UNCHANGED)
-  // so typing feels snappy at zero accuracy cost; repeatGuard ships with it to
-  // keep the faster cooldown from enabling accidental repeats. Revert with:
-  //   window.__gazeFlags.set('keyboardCadence', false)  // restores today's timing
   keyboardCadence: true,
-  repeatGuard: true,
   // Keyboard plan B3 — OFF until validated on the rig:
   //   window.__gazeFlags.set('zoneBoardV2', true)
   zoneBoardV2: false,

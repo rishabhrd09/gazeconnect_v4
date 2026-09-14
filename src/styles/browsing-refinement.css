@@ -1,0 +1,279 @@
+/* App-owned browser surfaces. Native BrowserView contents retain their own styling. */
+:root[data-theme] .web-hub-screen {
+  font-family: var(--ui-font);
+  color: var(--ui-ink);
+}
+:root[data-theme] .web-hub-screen :is(.browse-category-panel, .browse-youtube-categories, .browse-reader, .browse-snapshot) {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border) !important;
+  box-shadow: none !important;
+  color: var(--ui-ink) !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choices {
+  display: grid;
+  grid-auto-rows: minmax(80px, 1fr);
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  overflow: hidden;
+}
+:root[data-theme] .web-hub-screen .browse-page-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(80px, 1fr));
+  gap: 12px;
+  flex: 0 0 80px;
+}
+:root[data-theme] .web-hub-screen .browse-page-controls button {
+  width: 100% !important;
+  min-width: 80px !important;
+  height: 80px !important;
+  min-height: 80px !important;
+  background: var(--ui-panel) !important;
+  color: var(--ui-ink) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  font: 600 clamp(20px, 2.25vh, 25px)/1.25 var(--ui-font) !important;
+  padding: 8px !important;
+}
+:root[data-theme] .web-hub-screen :is(.browse-category-choice, .browse-news-choice, .browse-video-choice) {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  min-height: 80px !important;
+  min-width: 80px !important;
+  color: var(--ui-ink) !important;
+  transform: none !important;
+  filter: none !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choice[aria-pressed='true'] {
+  background: var(--ui-selected) !important;
+  border-color: var(--ui-accent) !important;
+  box-shadow: inset 3px 0 var(--ui-accent) !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choice span {
+  color: var(--ui-ink) !important;
+  font-family: var(--ui-font) !important;
+  font-weight: 650 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+  opacity: 1 !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choice span + span {
+  color: var(--ui-muted) !important;
+  font-size: clamp(16px, 1.75vh, 20px) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choice > div:first-child {
+  background: transparent !important;
+  border-color: var(--ui-border) !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choice svg {
+  color: var(--ui-accent-ink) !important;
+}
+:root[data-theme] .web-hub-screen :is(.browse-reader, .browse-snapshot) {
+  scrollbar-color: var(--ui-border) var(--ui-surface);
+}
+:root[data-theme] .web-hub-screen :is(.browse-reader, .browse-snapshot) p {
+  color: var(--ui-ink) !important;
+  font-family: var(--ui-font) !important;
+  font-size: clamp(22px, 2.6vh, 30px) !important;
+  line-height: 1.75 !important;
+  font-weight: 450 !important;
+}
+:root[data-theme] .web-hub-screen .browse-news-choice:not(:disabled) { opacity: 1 !important; }
+:root[data-theme] .web-hub-screen :is(.browse-news-choice, .browse-video-choice) > div {
+  color: var(--ui-ink);
+}
+:root[data-theme] .web-hub-screen .browse-link-choices button {
+  color: var(--ui-ink) !important;
+  border: 1px solid var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+}
+:root[data-theme] .web-hub-screen :is([id^='bv-links-'], #bv-links-size-toggle) {
+  min-width: 80px !important;
+  padding: 10px 6px !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  font-size: clamp(18px, 2vh, 23px) !important;
+  font-weight: 600 !important;
+}
+:root[data-theme] .web-hub-screen :is(.browse-page-controls button, .browse-category-choice, .browse-news-choice, .browse-video-choice, .browse-link-choices button):hover:not(:disabled) {
+  background: var(--ui-hover) !important;
+  border-color: var(--ui-accent) !important;
+}
+:root[data-theme] .web-hub-screen button:focus-visible {
+  outline: 3px solid var(--ui-accent) !important;
+  outline-offset: -4px;
+}
+:root[data-theme] .web-hub-screen .browse-page-controls button:disabled {
+  opacity: 1 !important;
+  color: var(--ui-muted) !important;
+  background: var(--ui-inset) !important;
+  border-style: dashed !important;
+  cursor: default;
+}
+:root[data-theme] .web-hub-screen :is([id^='kb-'], [id^='qs-card-'], [id^='wa-']) {
+  color: var(--ui-ink) !important;
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border) !important;
+  box-shadow: none !important;
+  min-height: 80px !important;
+}
+:root[data-theme] .web-hub-screen .browser-toolbar button {
+  font-family: var(--ui-font) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.25 !important;
+  min-width: 80px !important;
+  padding-inline: clamp(12px, 1.5vw, 24px) !important;
+}
+@media (max-height: 900px) {
+  :root[data-theme] .web-hub-screen .browse-youtube-categories .browse-category-choice {
+    padding: 10px 12px !important;
+  }
+  :root[data-theme] .web-hub-screen .browse-category-choice span:first-child {
+    font-size: clamp(20px, 2.8vh, 24px) !important;
+  }
+  :root[data-theme] .web-hub-screen .browse-category-choice svg {
+    max-width: 42px;
+    max-height: 42px;
+  }
+  :root[data-theme] .web-hub-screen .browse-news-choice > div:first-child {
+    flex-basis: 18% !important;
+  }
+  :root[data-theme] .web-hub-screen .browse-news-choice svg { width: 36px; }
+  :root[data-theme] .web-hub-screen .browser-toolbar button {
+    flex-direction: column;
+    gap: 8px !important;
+    font-size: 20px !important;
+  }
+}
+/* GazeButton wraps its content; keep the thumbnail/title stack inside that wrapper. */
+:root[data-theme] .web-hub-screen .browse-video-choice > div:last-child {
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+:root[data-theme] .web-hub-screen .browse-video-choice [data-fallback] {
+  height: 100%;
+  width: 100%;
+  color: var(--ui-accent-ink) !important;
+}
+:root[data-theme] .web-hub-screen .browse-category-choice > div > div:first-child {
+  background: transparent !important;
+  border-color: var(--ui-border) !important;
+}
+@media (max-height: 900px) {
+  :root[data-theme] .web-hub-screen .browse-news-choice > div > div:first-child { flex-basis: 18% !important; }
+}
+:root[data-theme] .web-hub-screen #bv-links-size-toggle {
+  flex: 0 0 80px !important;
+  height: 80px !important;
+  min-height: 80px !important;
+}
+:root[data-theme] .web-hub-screen :is([id^='bv-links-'], #bv-links-size-toggle) > div:last-child,
+:root[data-theme] .web-hub-screen .browser-toolbar button > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+:root[data-theme] .web-hub-screen [id^='content-'] > div:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+@media (max-height: 900px) {
+  :root[data-theme] .web-hub-screen .browser-toolbar button > div:last-child,
+  :root[data-theme] .web-hub-screen :is([id^='bv-links-']) > div:last-child { flex-direction: column; }
+}
+:root[data-theme] .web-hub-screen .browse-reader-choices button {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  padding: 12px 16px !important;
+}
+:root[data-theme] .web-hub-screen .browse-reader-choices button[aria-pressed='true'] {
+  background: var(--ui-selected) !important;
+  border-color: var(--ui-accent) !important;
+}
+:root[data-theme] .web-hub-screen .browse-reader-choices button > div > div:first-child {
+  color: var(--ui-ink) !important;
+}
+:root[data-theme] .web-hub-screen .browse-reader-choices button > div > div + div {
+  color: var(--ui-muted) !important;
+  font-size: clamp(15px, 1.7vh, 19px) !important;
+}
+/* Local placeholders share the same three large service targets and navigation. */
+:root[data-theme] .web-hub-screen .browse-social-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(28px, 5vh, 56px);
+  padding: clamp(20px, 4vh, 48px);
+  background: var(--ui-page);
+}
+:root[data-theme] .web-hub-screen .browse-social-panel h2 {
+  margin: 0;
+  color: var(--ui-ink);
+  font: 650 clamp(30px, 4vh, 44px)/1.25 var(--ui-font);
+}
+:root[data-theme] .web-hub-screen .browse-social-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(80px, 1fr));
+  gap: clamp(18px, 2.5vw, 36px);
+  width: min(100%, 1200px);
+}
+:root[data-theme] .web-hub-screen :is(.browse-social-card, .browse-social-back) {
+  background: var(--ui-surface) !important;
+  color: var(--ui-ink) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  min-width: 80px !important;
+  min-height: 80px !important;
+  font: 600 clamp(25px, 3vh, 34px)/1.25 var(--ui-font) !important;
+  padding: 16px !important;
+}
+:root[data-theme] .web-hub-screen .browse-social-card {
+  width: 100% !important;
+  height: clamp(170px, 23vh, 240px) !important;
+}
+:root[data-theme] .web-hub-screen :is(.browse-social-card, .browse-social-back) > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 2.4vw, 30px);
+}
+:root[data-theme] .web-hub-screen .browse-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: clamp(18px, 2.5vh, 28px);
+  width: min(100%, 620px);
+}
+:root[data-theme] .web-hub-screen .browse-coming-soon h2 {
+  font-size: clamp(24px, 3vh, 32px);
+  color: var(--ui-muted);
+}
+:root[data-theme] .web-hub-screen .browse-coming-soon p {
+  margin: 0;
+  color: var(--ui-ink);
+  font: 600 clamp(36px, 5vh, 54px)/1.25 var(--ui-font);
+}
+:root[data-theme] .web-hub-screen .browse-social-back {
+  width: min(100%, 340px) !important;
+  height: clamp(88px, 11vh, 112px) !important;
+  margin-top: clamp(12px, 2vh, 24px);
+}

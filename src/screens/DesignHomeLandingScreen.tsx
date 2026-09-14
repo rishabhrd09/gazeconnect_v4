@@ -10,8 +10,8 @@ import React, { useCallback } from 'react';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useGazeControl } from '../components/core/GazeControlToggle';
-import { mixColors } from '../utils/design';
 import { useTheme } from '../contexts/ThemeContext';
+import '../styles/home-design-refinement.css';
 
 interface DesignHomeLandingScreenProps {
   onNavigate: (screen: string) => void;
@@ -20,61 +20,14 @@ interface DesignHomeLandingScreenProps {
   showHindi?: boolean;
 }
 
-const DARK_PAGE = {
-  bg: '#0B1120',
-  title: '#E8EDF5',
-  subtitle: '#9BA8BA',
-  cardBg: 'rgba(30, 41, 59, 0.68)',
-  cardBorder: 'rgba(100, 116, 139, 0.22)',
-  cardShadow: '0 10px 24px rgba(0,0,0,0.22)',
-  icon: '#64B5F6',
-  iconBg: 'rgba(100, 181, 246, 0.08)',
-  iconBorder: 'rgba(100, 181, 246, 0.16)',
-  titleText: '#E8EDF5',
-  bodyText: '#9BA8BA',
-};
-
 function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: DesignHomeLandingScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix, isWarm } = useTheme();
-
-  const pageTheme = isMix ? {
-    bg: mixColors.home.root,
-    title: '#FFFCF1',
-    subtitle: '#CDB98E',
-    cardBg: mixColors.home.tileSurfaces.fp,
-    cardBorder: mixColors.home.cardBorder,
-    cardShadow: mixColors.home.cardShadow,
-    icon: '#4E6E69',
-    iconBg: 'rgba(78, 110, 105, 0.10)',
-    iconBorder: 'rgba(78, 110, 105, 0.24)',
-    titleText: mixColors.home.text,
-    bodyText: mixColors.home.subtleText,
-  } : isWarm ? {
-    bg: '#F7F2E8',
-    title: '#2F2A26',
-    subtitle: '#6A625B',
-    cardBg: '#FFFDF8',
-    cardBorder: '#DED2C2',
-    cardShadow: '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)',
-    icon: '#497775',
-    iconBg: '#E7EEEA',
-    iconBorder: 'rgba(73, 119, 117, 0.32)',
-    titleText: '#2F2A26',
-    bodyText: '#6A625B',
-  } : isLight ? {
-    bg: '#F2EDE0',
-    title: '#5A4530',
-    subtitle: '#6A625B',
-    cardBg: '#FAF5E8',
-    cardBorder: 'rgba(122, 99, 71, 0.22)',
-    cardShadow: '0 6px 16px rgba(82, 65, 48, 0.10), 0 1px 3px rgba(82, 65, 48, 0.06)',
-    icon: '#497775',
-    iconBg: '#E7EEEA',
-    iconBorder: 'rgba(73, 119, 117, 0.32)',
-    titleText: '#2F2A26',
-    bodyText: '#6A625B',
-  } : DARK_PAGE;
+  const { isWarm } = useTheme();
+  const pageTheme = {
+    bg: 'var(--ui-page)', title: 'var(--ui-ink)', subtitle: 'var(--ui-muted)',
+    cardBg: 'var(--ui-surface)', cardBorder: 'var(--ui-border)', cardShadow: 'none',
+    icon: 'var(--ui-accent-ink)', titleText: 'var(--ui-ink)', bodyText: 'var(--ui-muted)',
+  };
 
   const handleTileNavigate = useCallback((screen: string, title: string) => {
     onSpeak(`Opening ${title}.`);
@@ -114,7 +67,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
   ];
 
   return (
-    <div className={`design-home-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
+    <div className={`design-home-screen${isWarm ? ' theme-warm' : ''}`} style={{
       width: '100vw',
       height: '100vh',
       overflow: 'hidden',
@@ -122,7 +75,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
       display: 'flex',
       flexDirection: 'column',
     }}>
-      <GlobalNavBar currentPage="design-home" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="design-home" onNavigate={onNavigate} isDarkMode={isDarkMode} />
 
       <main style={{
         flex: 1,
@@ -144,7 +97,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
         }}>
           <h1 style={{
             fontSize: 'clamp(30px, 4.3vh, 46px)',
-            fontWeight: 780,
+            fontWeight: 650,
             color: pageTheme.title,
             margin: 0,
             lineHeight: 1.05,
@@ -153,7 +106,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
             Design Your Home
           </h1>
           <p style={{
-            fontSize: 'clamp(16px, 2vh, 21px)',
+            fontSize: 'clamp(18px, 2vh, 23px)',
             color: pageTheme.subtitle,
             margin: 0,
             lineHeight: 1.35,
@@ -222,7 +175,7 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
               }}>
                 <div style={{
                   fontSize: 'clamp(28px, 3.45vh, 36px)',
-                  fontWeight: 780,
+                  fontWeight: 650,
                   color: pageTheme.titleText,
                   lineHeight: 1.08,
                   letterSpacing: '-0.015em',
@@ -231,8 +184,8 @@ function DesignHomeLandingScreen({ onNavigate, onSpeak, isDarkMode = true }: Des
                   {tile.title}
                 </div>
                 <div style={{
-                  fontSize: 'clamp(16px, 1.95vh, 20px)',
-                  fontWeight: 650,
+                  fontSize: 'clamp(18px, 2vh, 22px)',
+                  fontWeight: 500,
                   color: pageTheme.bodyText,
                   lineHeight: 1.35,
                   maxWidth: '360px',

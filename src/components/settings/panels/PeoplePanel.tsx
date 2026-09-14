@@ -66,21 +66,11 @@ const AddPersonForm: React.FC<{
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="e.g. पापा"
-            style={inputStyle}
-          />
-        </div>
-        <div style={{ flex: 1, minWidth: 140 }}>
-          <label style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, display: 'block', marginBottom: 4 }}>
-            Name (Hindi)
-          </label>
-          <input
-            value={nameHi}
-            onChange={e => setNameHi(e.target.value)}
             placeholder="e.g. Papa"
             style={inputStyle}
           />
         </div>
+
       </div>
       <GazeButton
         id="add-person-btn"
@@ -140,9 +130,6 @@ const PersonRow: React.FC<{
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>
           {person.name}
-          <span style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginLeft: 8 }}>
-            ({person.nameHi})
-          </span>
         </div>
         <div style={{
           fontSize: typography.fontSize.sm,

@@ -17,11 +17,12 @@
  *   />
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import GazeButton from './core/GazeButton';
 import { useGazeControl } from './core/GazeControlToggle';
 import { screenThemes, typography } from '../utils/design';
 import { useTheme } from '../contexts/ThemeContext';
+import '../styles/home-design-refinement.css';
 import {
   generateFloorPlan,
   checkBackendHealth,
@@ -157,44 +158,29 @@ export function FloorPlanViewerModal({
   initialCustomNotes = '',
 }: FloorPlanViewerProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
-  const { isLight, isMix, isWarm } = useTheme();
+  const { isWarm } = useTheme();
 
-  // ── Theme-aware tokens (drafting paper / workshop dusk) ──
-  const T_overlayBg = isLight
-    ? 'rgba(74, 58, 42, 0.55)'
-    : isWarm
-      ? 'rgba(47, 42, 38, 0.50)'
-      : isMix
-        ? 'rgba(0,0,0,0.78)'
-        : 'rgba(0,0,0,0.94)';
-  const T_modalBg = isLight ? '#F2EDE0' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : T.bg;
-  const T_panel = isLight ? '#FAF5E8' : isWarm ? '#F8F1DF' : isMix ? '#241F18' : T.panel;
-  const T_card = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#2A2419' : T.card;
-  const T_border = isLight
-    ? '#D6CAB7'
-    : isWarm
-      ? '#DED2C2'
-      : isMix
-        ? 'rgba(180, 147, 98, 0.42)'
-        : T.border;
-  const T_text = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : T.text;
-  const T_sub = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : T.sub;
-  const T_dim = isLight ? '#9A8568' : isWarm ? '#8A7C6B' : isMix ? '#8E7E62' : T.dim;
-  const T_accent = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : T.accent;
-  const T_accentSubtle = isLight
-    ? 'rgba(31, 107, 126, 0.14)'
-    : isWarm
-      ? '#E7EEEA'
-      : isMix
-        ? 'rgba(94, 156, 168, 0.16)'
-        : T.accentSubtle;
-  const T_danger = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#9C5A53' : T.danger;
-  const T_blue = isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : T.blue;
-  const T_elevated = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#2A2419' : T.elevatedBg;
+  const T_overlayBg = 'var(--ui-page)';
+  const T_modalBg = 'var(--ui-page)';
+  const T_panel = 'var(--ui-panel)';
+  const T_card = 'var(--ui-surface)';
+  const T_border = 'var(--ui-border)';
+  const T_text = 'var(--ui-ink)';
+  const T_sub = 'var(--ui-muted)';
+  const T_dim = 'var(--ui-muted)';
+  const T_accent = 'var(--ui-accent-ink)';
+  const T_accentSubtle = 'var(--ui-selected)';
+  const T_danger = isWarm ? '#904a41' : '#edb3ab';
+  const T_blue = 'var(--ui-accent-ink)';
+  const T_elevated = 'var(--ui-inset)';
 
   const [style, setStyle] = useState<FloorPlanStyle>('modern');
-  const [floor, setFloor] = useState<'ground' | 'first'>('ground');
+  const [floor, setFloor] = useState<'ground' | 'first'>(() => (compassData as any).editor_active_floor === '1f' ? 'first' : 'ground');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const imageUrlRef = useRef<string | null>(null);
+  const generationId = useRef(0);
+  const speakRef = useRef(onSpeak);
+  speakRef.current = onSpeak;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
@@ -202,10 +188,17 @@ export function FloorPlanViewerModal({
   const [blob, setBlob] = useState<Blob | null>(null);
   const [customNotes, setCustomNotes] = useState(initialCustomNotes);
   const [appliedNotes, setAppliedNotes] = useState(initialCustomNotes);
+  const [detailPage, setDetailPage] = useState(0);
 
   const hasFF = !!(compassData.first_floor?.placements?.length);
   const gfCount = compassData.ground_floor?.placements?.length || 0;
   const ffCount = compassData.first_floor?.placements?.length || 0;
+
+  const floorPlacements = (floor === 'first' ? compassData.first_floor : compassData.ground_floor)?.placements || [];
+  const roomDetailPages = Math.max(1, Math.ceil(floorPlacements.length / 6));
+  const detailPageCount = roomDetailPages + 3;
+  useEffect(() => setDetailPage(0), [floor]);
+  useEffect(() => setDetailPage(page => Math.min(page, detailPageCount - 1)), [detailPageCount]);
 
   const fusionContext: FloorPlanFusionContext = useMemo(
     () => ({
@@ -215,6 +208,14 @@ export function FloorPlanViewerModal({
     }),
     [surveyData, appliedNotes],
   );
+
+  // The renderer accepts one legacy refinement set per request. Send the chosen
+  // floor's set so equal cell keys on another floor cannot alter this plan.
+  const renderPayload = useMemo(() => {
+    const selected = (floor === 'first' ? compassData.first_floor : compassData.ground_floor) as any;
+    if (!selected || !Object.prototype.hasOwnProperty.call(selected, 'advanced_refinements')) return compassData;
+    return { ...compassData, advanced_refinements: selected.advanced_refinements, cell_layouts: selected.cell_layouts };
+  }, [compassData, floor]);
 
   // Check backend on mount
   useEffect(() => {
@@ -229,45 +230,56 @@ export function FloorPlanViewerModal({
   // Generate on style/floor change
   const doGenerate = useCallback(async () => {
     if (!compassData) return;
+    const requestId = ++generationId.current;
     setLoading(true);
     setError(null);
-    onSpeak(`Generating ${STYLE_INFO[style].label} floor plan...`);
+    speakRef.current(`Generating ${STYLE_INFO[style].label} floor plan...`);
 
-    const result = await generateFloorPlan(compassData, style, 'png', floor, fusionContext);
+    const result = await generateFloorPlan(renderPayload, style, 'png', floor, fusionContext);
+    // Fast style/floor changes must not show an older request under a newer heading.
+    if (requestId !== generationId.current) {
+      if (!('error' in result)) URL.revokeObjectURL(result.url);
+      return;
+    }
 
     if ('error' in result) {
       setError(result.error);
       setLoading(false);
-      onSpeak('Generation failed.');
+      speakRef.current('Generation failed.');
     } else {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
+      imageUrlRef.current = result.url;
       setImageUrl(result.url);
       setBlob(result.blob);
       setLoading(false);
-      onSpeak(`${STYLE_INFO[style].label} plan ready.`);
+      speakRef.current(`${STYLE_INFO[style].label} plan ready.`);
     }
-  }, [compassData, style, floor, onSpeak, fusionContext]);
+  }, [renderPayload, style, floor, fusionContext]);
 
   useEffect(() => {
     doGenerate();
-  }, [style, floor, appliedNotes]);
+  }, [doGenerate]);
 
   // Cleanup URLs on unmount
   useEffect(() => {
-    return () => { if (imageUrl) URL.revokeObjectURL(imageUrl); };
+    return () => {
+      generationId.current += 1;
+      if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
+      imageUrlRef.current = null;
+    };
   }, []);
 
   // Download
   const handleDownload = useCallback(async (fmt: FloorPlanFormat) => {
-    if (fmt === 'png' && blob) {
+    if (fmt === 'png' && blob && imageUrl) {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = imageUrl;
       a.download = `floorplan_${floor}_${style}.png`;
       a.click();
       onSpeak('PNG downloaded.');
       return;
     }
-    const result = await generateFloorPlan(compassData, style, fmt, floor, fusionContext);
+    const result = await generateFloorPlan(renderPayload, style, fmt, floor, fusionContext);
     if ('error' in result) { onSpeak('Download failed.'); return; }
     const a = document.createElement('a');
     a.href = result.url;
@@ -275,18 +287,18 @@ export function FloorPlanViewerModal({
     a.click();
     URL.revokeObjectURL(result.url);
     onSpeak(`${fmt.toUpperCase()} downloaded.`);
-  }, [compassData, style, floor, blob, onSpeak, fusionContext]);
+  }, [renderPayload, style, floor, blob, imageUrl, onSpeak, fusionContext]);
 
   // ─── Render ──────────────────────────────────────────────
 
   return (
-    <div style={{
+    <div className="floor-plan-viewer" role="dialog" aria-modal="true" aria-label="Architectural floor plan" style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       background: T_overlayBg, display: 'flex', flexDirection: 'column',
       fontFamily: UI_FONT,
     }}>
       {/* ═══ HEADER BAR ═══ */}
-      <div style={{
+      <div className="plan-viewer-header" style={{
         flexShrink: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap',
         padding: 'clamp(8px, 1.2vh, 14px) clamp(12px, 1.5vw, 24px)',
         paddingLeft: 'clamp(300px, 28vw, 420px)',
@@ -297,7 +309,7 @@ export function FloorPlanViewerModal({
         position: 'relative',
       }}>
         {/* Title */}
-        <div style={{ position: 'absolute', left: 'clamp(12px, 1.5vw, 24px)', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+        <div className="plan-viewer-title" style={{ position: 'absolute', left: 'clamp(12px, 1.5vw, 24px)', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
           <div style={{ fontSize: 'clamp(15px, 2vh, 22px)', fontWeight: 900, color: T_text, letterSpacing: '1.5px' }}>
             ARCHITECTURAL FLOOR PLAN
           </div>
@@ -309,15 +321,15 @@ export function FloorPlanViewerModal({
         {/* Style Switcher */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {STYLES.map(s => (
-            <GazeButton key={s} id={`vs-${s}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
+            <GazeButton key={s} id={`vs-${s}`} aria-pressed={style === s} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
               onClick={() => setStyle(s)}
               style={{
                 padding: '8px 12px', minHeight: 'clamp(84px, 9vh, 108px)', minWidth: 'clamp(104px, 8.5vw, 136px)',
                 borderRadius: '10px', fontWeight: 800,
                 fontSize: 'clamp(11px, 1.35vh, 14px)', letterSpacing: '0.6px',
                 background: style === s ? T_accentSubtle : T_card,
-                border: `2px solid ${style === s ? STYLE_INFO[s].color : T_border}`,
-                color: style === s ? STYLE_INFO[s].color : T_dim,
+                border: `2px solid ${style === s ? T_accent : T_border}`,
+                color: style === s ? T_accent : T_text,
                 fontFamily: UI_FONT,
               }}>
               {STYLE_INFO[s].icon} {STYLE_INFO[s].label}
@@ -329,7 +341,7 @@ export function FloorPlanViewerModal({
         {hasFF && (
           <div style={{ display: 'flex', gap: '8px', marginLeft: '0px', flexWrap: 'wrap', justifyContent: 'center' }}>
             {(['ground', 'first'] as const).map(f => (
-              <GazeButton key={f} id={`vf-${f}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
+              <GazeButton key={f} id={`vf-${f}`} aria-pressed={floor === f} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
                 onClick={() => setFloor(f)}
                 style={{
                   padding: '8px 12px', minHeight: 'clamp(84px, 9vh, 108px)', minWidth: 'clamp(96px, 8vw, 128px)',
@@ -363,14 +375,15 @@ export function FloorPlanViewerModal({
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
 
         {/* ── Left Panel: Mini-Map + Data + Downloads ── */}
-        <div style={{
+        <div className="plan-details" style={{
           width: 'clamp(320px, 28vw, 420px)', flexShrink: 0,
           background: T_panel, borderRight: `2px solid ${T_border}`,
           display: 'flex', flexDirection: 'column', gap: '20px',
-          padding: 'clamp(24px, 3vh, 32px)', overflowY: 'auto',
+          padding: 'clamp(16px, 2vh, 24px)', overflow: 'hidden',
         }}>
+          <div className="plan-detail-page" aria-live="polite">
           {/* Mini-Map */}
-          <div>
+          {detailPage === 0 && <div>
             <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               CELL MAPPING — {floor === 'first' ? '1ST FLOOR' : 'GROUND'}
             </div>
@@ -379,19 +392,19 @@ export function FloorPlanViewerModal({
               floor={floor}
               miniBg={T_modalBg}
               miniBorder={T_border}
-              miniEmptyCellBg={isLight ? '#FAF5E8' : isMix ? '#241E16' : undefined}
-              miniEmptyText={isLight ? '#9A8568' : isMix ? '#8E7E62' : undefined}
-              miniDataText={isLight ? '#FBE9DE' : isMix ? '#FFFCF1' : undefined}
+              miniEmptyCellBg={T_card}
+              miniEmptyText={T_sub}
+              miniDataText={T_text}
             />
-          </div>
+          </div>}
 
           {/* Room Legend */}
-          <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
+          {detailPage > 0 && detailPage <= roomDetailPages && <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
             <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               ROOMS ({floor === 'first' ? ffCount : gfCount})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {(floor === 'first' ? compassData.first_floor : compassData.ground_floor)?.placements?.map((p, i) => (
+              {floorPlacements.slice((detailPage - 1) * 6, detailPage * 6).map((p, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '12px', height: '12px', borderRadius: '3px', flexShrink: 0,
@@ -404,12 +417,13 @@ export function FloorPlanViewerModal({
                     {p.area_sqft}ft²
                   </span>
                 </div>
-              )) || <span style={{ fontSize: '12px', color: T_dim }}>No rooms placed</span>}
+              ))}
+              {floorPlacements.length === 0 && <span style={{ fontSize: '12px', color: T_dim }}>No rooms placed</span>}
             </div>
-          </div>
+          </div>}
 
           {/* Plan Data */}
-          <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
+          {detailPage === roomDetailPages + 1 && <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
             <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               PLOT INFO
             </div>
@@ -425,21 +439,21 @@ export function FloorPlanViewerModal({
                 <span style={{ fontSize: '13px', color: T_text, fontWeight: 800 }}>{v}</span>
               </div>
             ))}
-          </div>
+          </div>}
 
           {/* Custom notes for advanced fusion */}
-          <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
+          {detailPage === roomDetailPages + 2 && <div style={{ background: T_card, borderRadius: '8px', padding: '12px', border: `1px solid ${T_border}` }}>
             <div style={{ fontSize: '11px', color: T_dim, fontWeight: 800, letterSpacing: '1.5px', marginBottom: '8px' }}>
               CUSTOM PLAN NOTES (OPTIONAL)
             </div>
-            <textarea
+            <textarea aria-label="Custom plan notes"
               value={customNotes}
               onChange={(e) => setCustomNotes(e.target.value)}
               placeholder="Example: Elderly-friendly access, larger kitchen, private guest room..."
               style={{
                 width: '100%',
                 minHeight: '84px',
-                resize: 'vertical',
+                resize: 'none',
                 background: T_elevated,
                 color: T_text,
                 border: `1px solid ${T_border}`,
@@ -470,9 +484,13 @@ export function FloorPlanViewerModal({
               }}>
               APPLY NOTES
             </GazeButton>
+          </div>}
           </div>
-
-
+          <div className="plan-detail-pager">
+            <div className="plan-detail-page-count">{detailPage + 1} / {detailPageCount}</div>
+            <GazeButton id="plan-detail-previous" disabled={detailPage === 0} gazeEnabled={isGazeEnabled} dwellCategory="navigationButton" onClick={() => setDetailPage(page => page - 1)}>← Previous</GazeButton>
+            <GazeButton id="plan-detail-more" disabled={detailPage >= detailPageCount - 1} gazeEnabled={isGazeEnabled} dwellCategory="navigationButton" onClick={() => setDetailPage(page => page + 1)}>More →</GazeButton>
+          </div>
 
           {/* Backend Status */}
           <div style={{
@@ -489,9 +507,9 @@ export function FloorPlanViewerModal({
         </div>
 
         {/* ── Main Image Area ── */}
-        <div style={{
+        <div className="plan-image-area" style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: T_modalBg, overflow: 'auto', position: 'relative',
+          background: T_modalBg, overflow: 'hidden', position: 'relative',
           padding: 'clamp(4px, 0.8vh, 12px)',
         }}>
           {loading && (
@@ -538,7 +556,7 @@ export function FloorPlanViewerModal({
           )}
 
           {imageUrl && !loading && !error && (
-            <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="plan-image-layout" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img
                 src={imageUrl}
                 alt={`Floor Plan — ${STYLE_INFO[style].label}`}
@@ -549,7 +567,16 @@ export function FloorPlanViewerModal({
                   boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
                 }}
               />
-              <GazeButton id="magnify-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
+              {/* Actions stay beside the image so they never cover the plan. */}
+              <div className="plan-actions" style={{
+                position: 'absolute', right: '24px', bottom: '24px',
+                background: T_panel,
+                border: `2px solid ${T_border}`, borderRadius: '16px',
+                padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.22)',
+                zIndex: 40, width: '220px',
+              }}>
+              <GazeButton id="magnify-btn" aria-label="Enlarge floor plan" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="navigationButton"
                 onClick={() => setIsFullscreen(true)}
                 style={{
                   position: 'absolute', bottom: '60px', right: '320px', // Further inward, above the downloads
@@ -563,15 +590,6 @@ export function FloorPlanViewerModal({
                 ＋
               </GazeButton>
 
-              {/* Downloads — Now floating on the right side */}
-              <div style={{
-                position: 'absolute', right: '24px', bottom: '24px',
-                background: T_panel,
-                border: `2px solid ${T_border}`, borderRadius: '16px',
-                padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.22)',
-                zIndex: 40, width: '220px',
-              }}>
                 <div style={{ fontSize: '13px', color: T_dim, fontWeight: 900, letterSpacing: '2px', textAlign: 'center' }}>
                   DOWNLOAD PLAN
                 </div>
@@ -614,7 +632,7 @@ export function FloorPlanViewerModal({
               }}
             />
           </div>
-          <GazeButton id="minimize-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
+          <GazeButton id="minimize-btn" aria-label="Return to floor plan controls" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
             onClick={() => setIsFullscreen(false)}
             style={{
               position: 'absolute', bottom: '60px', right: '80px', // Further inward from corner

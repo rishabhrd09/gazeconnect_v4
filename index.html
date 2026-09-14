@@ -4,18 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="GazeConnect Pro - Medical-Grade AAC for ALS Patients" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Baloo+2:wght@500;600;700;800&family=Orbitron:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet">
+  <meta name="description" content="GazeConnect Pro - Eye-gaze communication and everyday activities for Windows" />
   <title>GazeConnect Pro</title>
   <!-- Anti-flash: apply saved theme BEFORE React hydrates -->
   <script>
     try {
       var t = localStorage.getItem('gc-theme') || 'dark';
-      if (t !== 'dark' && t !== 'light' && t !== 'mix' && t !== 'warm') t = 'dark';
+      t = (t === 'warm' || t === 'light') ? 'warm' : 'dark';
       document.documentElement.setAttribute('data-theme', t);
       document.documentElement.classList.add('theme-' + t);
     } catch (e) {}

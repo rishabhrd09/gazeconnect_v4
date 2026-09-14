@@ -27,8 +27,6 @@ export interface AppSettings {
   people: Person[];
 
   // Emergency
-  emergencyPhraseEn: string;
-  emergencyPhraseHi: string;
 
   // Gaze accuracy
   gazeOffsetX: number;
@@ -48,8 +46,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ttsRate: 1.0,
   ttsVolume: 1.0,
   people: [],
-  emergencyPhraseEn: 'I need help immediately! This is an emergency!',
-  emergencyPhraseHi: 'मुझे तुरंत मदद चाहिए! यह एक आपातकालीन स्थिति है!',
   gazeOffsetX: 0,
   gazeOffsetY: 0,
   gazeDebugOverlay: false,

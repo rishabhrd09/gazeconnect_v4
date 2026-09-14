@@ -212,7 +212,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
       padding: '4px 20px 6px 20px',
       overflow: 'hidden',
     }}>
-      <GlobalNavBar currentPage="activities" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="activities" onNavigate={onNavigate} isDarkMode={isDarkMode} />
 
       <div style={{
         flex: 1,
@@ -418,23 +418,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
                   {item.label}
                 </span>
 
-                {showHindi && 'sub' in item && !!item.sub && (
-                  <>
-                    <div style={{ width: '36px', height: '1.5px', background: isMix ? 'rgba(75,53,32,0.28)' : 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '6px auto 3px' }} />
-                    <span style={{
-                      display: 'block',
-                      fontSize: 'clamp(18px, 2.2vh, 28px)',
-                      fontWeight: 700,
-                      color: isMix ? '#4B3520' : 'rgba(255, 210, 140, 0.95)',
-                      textAlign: 'center',
-                      lineHeight: 1.5,
-                      fontFamily: HINDI_UI_FONT,
-                      letterSpacing: '0.02em',
-                    }}>
-                      {item.sub}
-                    </span>
-                  </>
-                )}
+
                 </GazeButton>
               ))}
           </div>

@@ -12,7 +12,7 @@
  * - Mouse hover triggers dwell (for testing without eye tracker)
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 interface RealGazeContextType {
     hasRealGaze: boolean;
@@ -28,33 +28,19 @@ const RealGazeContext = createContext<RealGazeContextType>({
 
 export const useRealGaze = () => useContext(RealGazeContext);
 
-const REAL_GAZE_TIMEOUT = 1500; // If no gaze for 1.5s, switch to simulation mode
-
+// Electron uses the backend as its only dwell input owner (including explicit
+// --simulate). UI-only development may use hover until a gaze stream arrives.
+// Tracking loss never changes input mode or enables a parked mouse to select.
 export const RealGazeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [hasRealGaze, setHasRealGaze] = useState(false);
-    const lastGazeTimeRef = useRef(0);
-    const hasRealGazeRef = useRef(false);
-
+    const [hasRealGaze, setHasRealGazeState] = useState(() => Boolean((window as any).electronAPI));
+    const hasRealGazeRef = useRef(hasRealGaze);
+    const setHasRealGaze = useCallback((value: boolean) => {
+        hasRealGazeRef.current = value;
+        setHasRealGazeState(value);
+    }, []);
     const reportGazeReceived = useCallback(() => {
-        lastGazeTimeRef.current = Date.now();
-        if (!hasRealGazeRef.current) {
-            hasRealGazeRef.current = true;
-            setHasRealGaze(true);
-            console.log('[RealGaze] 📡 Real Tobii gaze detected - disabling mouse dwell');
-        }
-    }, []);
-
-    // Check for gaze timeout
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (hasRealGazeRef.current && Date.now() - lastGazeTimeRef.current > REAL_GAZE_TIMEOUT) {
-                hasRealGazeRef.current = false;
-                setHasRealGaze(false);
-                console.log('[RealGaze] ⚠️ No gaze data - enabling mouse dwell for simulation');
-            }
-        }, 500);
-        return () => clearInterval(interval);
-    }, []);
+        if (!hasRealGazeRef.current) setHasRealGaze(true);
+    }, [setHasRealGaze]);
 
     return (
         <RealGazeContext.Provider value={{ hasRealGaze, setHasRealGaze, reportGazeReceived }}>

@@ -24,7 +24,7 @@ const SelectSetting: React.FC<SelectSettingProps> = ({
   const colors = isWarm ? warmColors : isDarkMode ? darkColors : lightColors;
 
   return (
-    <div style={{
+    <div className="settings-choice-section" style={{
       padding: spacing[4],
       backgroundColor: isWarm ? warmColors.background.elevated : colors.background.secondary,
       borderRadius: layout.borderRadius.lg,
@@ -52,6 +52,8 @@ const SelectSetting: React.FC<SelectSettingProps> = ({
         {options.map((option) => (
           <GazeButton
             key={option.value}
+            selected={value === option.value}
+            dwellCategory="settingsButton"
             id={`${label}-${option.value}`}
             size="md"
             variant={value === option.value ? 'primary' : 'default'}

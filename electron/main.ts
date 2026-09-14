@@ -14,16 +14,17 @@ import { app, BrowserWindow, BrowserView, ipcMain, Tray, Menu, screen, nativeIma
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { requestFloorplan, type FloorplanRequest } from './floorplanTransport';
 import { browserDiagnostics } from './browser/browserDiagnostics';
 import {
   BROWSER_CURSOR_CSS,
   BROWSER_CURSOR_HIDE_SCRIPT,
-  BROWSER_CURSOR_RESET_SCRIPT,
   buildBrowserCursorBlockScript,
   buildBrowserCursorInjectionScript,
   buildGazeUpdateAndPollScript,
 } from './browser/browserGazeController';
 import { disposeBrowserView } from './browser/browserViewController';
+import { BrowserGazeGate, type BrowserGazeOptions } from './browser/browserGazeGate';
 import {
   buildYoutubeCommandScript,
   isYoutubeCommand,
@@ -41,6 +42,22 @@ let floorplanProcess: ChildProcess | null = null;
 let tobiiProcess: ChildProcess | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+const runtimeRetries = { tobii: 0, python: 0, floorplan: 0 };
+const runtimeRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function scheduleRuntimeRetry(kind: keyof typeof runtimeRetries, restart: () => void, startedAt: number): void {
+  if (isQuitting || runtimeRetryTimers.has(kind)) return;
+  if (Date.now() - startedAt > 60000) runtimeRetries[kind] = 0;
+  if (runtimeRetries[kind] >= 5) {
+    console.error(`${kind} failed repeatedly; restart the app after fixing the reported dependency or port problem.`);
+    return;
+  }
+  const delay = Math.min(30000, 1000 * 2 ** runtimeRetries[kind]++);
+  runtimeRetryTimers.set(kind, setTimeout(() => {
+    runtimeRetryTimers.delete(kind);
+    if (!isQuitting) restart();
+  }, delay));
+}
+
 let isMouseOnlyMode = false;
 let isFocusModeActive = false;
 let isAlertModeActive = false;
@@ -58,6 +75,8 @@ let isUiLocked = false;
 
 let activeBrowserView: BrowserView | null = null; // Gaze-controlled BrowserView
 let activeBrowserViewSessionId = 0;
+const browserGazeGates = new WeakMap<BrowserView, BrowserGazeGate>();
+let lastBrowserGazeFrameAt = 0;
 let lastNavState: { canGoBack: boolean; canGoForward: boolean; url: string } | null = null;
 // v17.16 — last playback state sent to React, for change-detection so we
 // only emit webview:playbackState on transitions, not every poll.
@@ -147,7 +166,7 @@ let browserGazeConfig: BrowserGazeConfig = {
   // stop on a video card; widening these defaults gives a larger lock
   // zone once a target is acquired without making fresh acquisition
   // looser. Mirror gcConfig defaults in browserGazeController.ts.
-  dwellMs: 1100,
+  dwellMs: 1500,
   onsetMs: 280,
   stabilityRadiusPx: 60,
   postClickCooldownMs: 900,
@@ -213,9 +232,55 @@ function resetEdgeScrollState(notify: boolean = true) {
   if (notify) sendEdgeScrollState('none');
 }
 
-function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activeBrowserViewSessionId) {
+function gazeGateFor(view: BrowserView): BrowserGazeGate {
+  let gate = browserGazeGates.get(view);
+  if (!gate) {
+    gate = new BrowserGazeGate();
+    browserGazeGates.set(view, gate);
+  }
+  return gate;
+}
+
+function flushBrowserGazeReset(view: BrowserView): void {
+  if (activeBrowserView !== view || view.webContents.isDestroyed() ||
+      (view as any)._pageScriptReady === false) return;
+  const gate = gazeGateFor(view);
+  const request = gate.beginReset();
+  if (!request) return;
+  // Reset shares the one-request slot with gaze polling. Repeated loss events
+  // can request one further reset, never one queued script per gaze frame.
+  try {
+    view.webContents.executeJavaScript(BROWSER_CURSOR_HIDE_SCRIPT).catch(() => { }).finally(() => {
+      gate.finish(request);
+      flushBrowserGazeReset(view);
+    });
+  } catch {
+    gate.finish(request);
+  }
+}
+
+function invalidateBrowserGaze(view: BrowserView): void {
+  gazeGateFor(view).invalidate();
+  lastBrowserGazeFrameAt = 0;
+  lastBrowserDwellState = 'idle';
+  resetEdgeScrollState();
+  flushBrowserGazeReset(view);
+}
+
+function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activeBrowserViewSessionId,
+    gazeStillCurrent?: () => boolean) {
   const view = activeBrowserView;
-  if (!view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
+  if (!view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed() ||
+      (gazeStillCurrent && !gazeStillCurrent())) return;
+  // Explicit toolbar/caregiver commands retain their existing behavior and
+  // cancel any older gaze request that could otherwise race their click.
+  if (!gazeStillCurrent) {
+    // The block script below performs the page reset. Do not enqueue gcHide
+    // afterwards: it would erase the manual command's post-click cooldown.
+    gazeGateFor(view).invalidate(false);
+    lastBrowserDwellState = 'idle';
+    resetEdgeScrollState();
+  }
   // v17.21 — x,y arrive in PAGE CSS px (both live callers source them from
   // in-page scripts: the dwell click request and youtubeCommand's
   // trustedClick). sendInputEvent expects view DIPs, and Blink maps DIPs
@@ -239,10 +304,13 @@ function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activ
   ).catch(() => { });
   view.webContents.sendInputEvent({ type: 'mouseMove', x: cx, y: cy } as any);
   setTimeout(() => {
-    if (activeBrowserView !== view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
+    if (activeBrowserView !== view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed() ||
+        (gazeStillCurrent && !gazeStillCurrent())) return;
     view.webContents.sendInputEvent({ type: 'mouseDown', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
     setTimeout(() => {
-      if (activeBrowserView !== view || expectedSessionId !== activeBrowserViewSessionId || view.webContents.isDestroyed()) return;
+      // Once mouseDown was emitted, always release that same surviving view,
+      // even if pause/navigation changed the gaze generation in the meantime.
+      if (view.webContents.isDestroyed()) return;
       view.webContents.sendInputEvent({ type: 'mouseUp', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
       setTimeout(() => sendBrowserNavState(true), 350);
     }, 60);
@@ -268,6 +336,8 @@ function startBrowserDiagnosticsSampling(): void {
 
 async function closeActiveBrowserView(reason: string): Promise<void> {
   const view = activeBrowserView;
+  if (view) gazeGateFor(view).invalidate();
+  lastBrowserGazeFrameAt = 0;
   activeBrowserView = null;
   activeBrowserViewSessionId += 1;
 
@@ -650,13 +720,14 @@ function quitAppNow(): void {
 // ============================================
 
 function startTobiiHelper(): void {
+  if (isQuitting || tobiiProcess || process.env.GAZE_SIMULATE === '1' || process.platform !== 'win32') return;
   const isDev = !app.isPackaged;
   let helperPath: string;
 
   if (isDev) {
     // Development: use the build output (built with -r win-x64)
     helperPath = path.join(__dirname, '..', 'tobii-helper', 'TobiiGazeHelper',
-      'bin', 'Release', 'net6.0-windows', 'win-x64', 'TobiiGazeHelper.exe');
+      'bin', 'Release', 'net8.0-windows', 'win-x64', 'TobiiGazeHelper.exe');
   } else {
     // Production: bundled in resources
     helperPath = path.join(process.resourcesPath, 'tobii-helper', 'TobiiGazeHelper.exe');
@@ -666,10 +737,11 @@ function startTobiiHelper(): void {
 
   if (!fs.existsSync(helperPath)) {
     console.warn(`Tobii Helper not found at: ${helperPath}`);
-    console.warn('Gaze tracking will not be available. App will work in simulation mode.');
+    console.warn('Gaze tracking is unavailable. Caregiver clicks remain available; use the Windows setup script to restore the helper.');
     return;
   }
 
+  const startedAt = Date.now();
   try {
     tobiiProcess = spawn(helperPath, [], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -692,6 +764,7 @@ function startTobiiHelper(): void {
     tobiiProcess.on('close', (code) => {
       console.log(`Tobii Helper exited with code ${code}`);
       tobiiProcess = null;
+      scheduleRuntimeRetry('tobii', startTobiiHelper, startedAt);
     });
 
     tobiiProcess.on('error', (err) => {
@@ -729,6 +802,7 @@ function getManagedRuntimePaths() {
 }
 
 function startPythonBackend(): void {
+  if (isQuitting || pythonProcess) return;
   const isDev = !app.isPackaged;
 
   let command: string;
@@ -755,7 +829,7 @@ function startPythonBackend(): void {
     }
   } else {
     // Production: use PyInstaller-bundled executable
-    const bundledExe = path.join(process.resourcesPath, 'python', 'GazeConnectBackend.exe');
+    const bundledExe = path.join(process.resourcesPath, 'python', 'backend', 'GazeConnectBackend.exe');
     if (fs.existsSync(bundledExe)) {
       command = bundledExe;
       args = [];
@@ -776,6 +850,7 @@ function startPythonBackend(): void {
   const managedPaths = getManagedRuntimePaths();
   const shouldUseManagedPaths = app.isPackaged || process.env.GAZECONNECT_USE_MANAGED_DATA === '1';
   args.push('--host', '127.0.0.1');
+  if (process.env.GAZE_SIMULATE === '1') args.push('--simulate');
   if (shouldUseManagedPaths) {
     args.push('--data-dir', managedPaths.dataDir);
     args.push('--survey-data-dir', managedPaths.surveyDataDir);
@@ -783,7 +858,9 @@ function startPythonBackend(): void {
 
   console.log(`Starting Python backend: ${command} ${args.join(' ')}`);
 
+  const startedAt = Date.now();
   pythonProcess = spawn(command, args, {
+    windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -804,10 +881,7 @@ function startPythonBackend(): void {
     pythonProcess = null;
 
     // Restart if not quitting
-    if (!isQuitting && code !== 0) {
-      console.log('Restarting Python backend in 3 seconds...');
-      setTimeout(startPythonBackend, 3000);
-    }
+    scheduleRuntimeRetry('python', startPythonBackend, startedAt);
   });
 
   pythonProcess.on('error', (err) => {
@@ -824,7 +898,7 @@ function stopPythonBackend(): void {
 }
 
 function startFloorplanServer(): void {
-  if (floorplanProcess) return;
+  if (isQuitting || floorplanProcess) return;
 
   const isDev = !app.isPackaged;
   let command: string;
@@ -840,18 +914,17 @@ function startFloorplanServer(): void {
     }
     args = [scriptPath];
   } else {
-    const embeddedPython = path.join(process.resourcesPath, 'python', 'python.exe');
-    const scriptPath = path.join(process.resourcesPath, 'tools', 'floorplan_server.py');
-    if (!fs.existsSync(embeddedPython) || !fs.existsSync(scriptPath)) {
-      console.warn('Floor plan server not bundled. Skipping auto-start.');
+    command = path.join(process.resourcesPath, 'python', 'floorplan', 'GazeConnectFloorplan.exe');
+    if (!fs.existsSync(command)) {
+      console.error('Floor plan server is missing from the installed bundle.');
       return;
     }
-    command = embeddedPython;
-    args = [scriptPath];
+    args = [];
   }
 
   console.log(`Starting floor plan server: ${command} ${args.join(' ')}`);
 
+  const startedAt = Date.now();
   floorplanProcess = spawn(command, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, FLOORPLAN_PORT: process.env.FLOORPLAN_PORT || '5050' },
@@ -873,10 +946,7 @@ function startFloorplanServer(): void {
   floorplanProcess.on('close', (code) => {
     console.log(`Floor plan server exited with code ${code}`);
     floorplanProcess = null;
-    if (!isQuitting && code !== 0) {
-      console.log('Restarting floor plan server in 3 seconds...');
-      setTimeout(startFloorplanServer, 3000);
-    }
+    scheduleRuntimeRetry('floorplan', startFloorplanServer, startedAt);
   });
 
   floorplanProcess.on('error', (err) => {
@@ -1190,14 +1260,7 @@ function createTray(): void {
         mainWindow?.focus();
       },
     },
-    {
-      label: 'Emergency Alert',
-      click: () => {
-        mainWindow?.webContents.send('emergency-triggered');
-        mainWindow?.show();
-        mainWindow?.focus();
-      },
-    },
+
     { type: 'separator' },
     {
       label: 'Quit',
@@ -1242,8 +1305,9 @@ function setupIpcHandlers(): void {
     mainWindow?.hide();
   });
 
-  ipcMain.handle('window:fullscreen', () => {
-    mainWindow?.setFullScreen(!mainWindow.isFullScreen());
+  ipcMain.handle('window:fullscreen', (_event, enabled?: boolean) => {
+    mainWindow?.setFullScreen(typeof enabled === 'boolean' ? enabled : !mainWindow.isFullScreen());
+    return mainWindow?.isFullScreen() ?? false;
   });
 
   ipcMain.handle('window:isFullscreen', () => {
@@ -1274,6 +1338,9 @@ function setupIpcHandlers(): void {
       y: contentBounds.y,
       width: contentBounds.width,
       height: contentBounds.height,
+      gazeActive: mainWindow.isVisible() && !mainWindow.isMinimized() && mainWindow.isFocused(),
+      screenX: display.bounds.x,
+      screenY: display.bounds.y,
       screenWidth: display.bounds.width,
       screenHeight: display.bounds.height,
       scaleFactor: display.scaleFactor,
@@ -1305,6 +1372,13 @@ function setupIpcHandlers(): void {
       startFloorplanServer();
     }
     return true;
+  });
+
+  ipcMain.handle('floorplan:request', (event, input: FloorplanRequest) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+      throw new Error('Floor-plan requests are only available to the main app.');
+    }
+    return requestFloorplan(input);
   });
 
   // Stream app context
@@ -1438,14 +1512,9 @@ function setupIpcHandlers(): void {
           sandbox: true,          // Sandbox for safety
         },
       });
-      // Electron attaches temporary internal listeners (incl.
-      // 'did-stop-loading') per pending navigation/executeJavaScript, and
-      // our per-frame gaze polls + playback poll around a click/back burst
-      // briefly stack past Node's default warning threshold of 10 — the
-      // on-rig logs showed the count draining back down afterwards
-      // (transient, not a leak). 30 keeps a finite cap so a REAL leak
-      // still warns; the 60s browser-memory diagnostics line samples the
-      // live count as evidence either way.
+      // Framework navigation/scripts add temporary listeners. This is a
+      // warning threshold, not a memory cap; gaze requests are bounded by
+      // BrowserGazeGate independently and diagnostics report actual counts.
       view.webContents.setMaxListeners(30);
       // Poll gate: false until the first dom-ready — per-frame gaze polls
       // and the playback poll are skipped while a document is loading
@@ -1532,6 +1601,7 @@ function setupIpcHandlers(): void {
         // Page can now run scripts — reopen the per-frame poll gate.
         (view as any)._pageScriptReady = true;
         void injectBrowserPageHelpers();
+        flushBrowserGazeReset(view);
       });
 
       view.webContents.setWindowOpenHandler(({ url }) => {
@@ -1556,16 +1626,16 @@ function setupIpcHandlers(): void {
         if (isMainFrame && !isInPlace) {
           (view as any)._pageScriptReady = false;
         }
-        view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+        if (isMainFrame) invalidateBrowserGaze(view);
       });
       onBrowserViewEvent('did-navigate', (_e, nextUrl) => {
         browserDiagnostics.debug('did-navigate', `[Main] did-navigate: ${nextUrl}`, 1000);
-        view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+        invalidateBrowserGaze(view);
         void injectBrowserPageHelpers();
       });
       onBrowserViewEvent('did-navigate-in-page', (_e, nextUrl) => {
         browserDiagnostics.debug('did-navigate-in-page', `[Main] did-navigate-in-page: ${nextUrl}`, 1000);
-        view.webContents.executeJavaScript(BROWSER_CURSOR_RESET_SCRIPT).catch(() => { });
+        invalidateBrowserGaze(view);
         void injectBrowserPageHelpers();
       });
       onBrowserViewEvent('did-stop-loading', () => {
@@ -1964,7 +2034,7 @@ function setupIpcHandlers(): void {
     */
   ipcMain.handle('webview:setGazeConfig', async (_event: any, config: Partial<BrowserGazeConfig>) => {
     browserGazeConfig = {
-      dwellMs: clampNumber(config?.dwellMs, browserGazeConfig.dwellMs, 700, 3200),
+      dwellMs: typeof config?.dwellMs === 'number' && [500, 1000, 1250, 1500, 2000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
       onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
       stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),
@@ -2071,6 +2141,10 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('webview:setBounds', (_event: any, bounds: { x: number; y: number; width: number; height: number }) => {
     if (activeBrowserView) {
+      const previous = activeBrowserView.getBounds();
+      if (previous.x !== bounds.x || previous.y !== bounds.y || previous.width !== bounds.width || previous.height !== bounds.height) {
+        invalidateBrowserGaze(activeBrowserView);
+      }
       activeBrowserView.setBounds(bounds);
     }
   });
@@ -2098,6 +2172,7 @@ function setupIpcHandlers(): void {
     try {
       const current = activeBrowserView.webContents.getZoomFactor();
       const next = Math.max(0.75, Math.min(2.5, current + Number(delta || 0)));
+      if (current !== next) invalidateBrowserGaze(activeBrowserView);
       activeBrowserView.webContents.setZoomFactor(next);
       rememberZoomForCurrentPage(next);
       return next;
@@ -2124,10 +2199,26 @@ function setupIpcHandlers(): void {
   // v17.19: registered on BOTH ipcMain.handle (legacy invoke) and ipcMain.on
   // (one-way send — no reply message per frame). The preload now uses send;
   // the handle registration keeps older renderer code working.
-  const handleWebviewGazeFrame = (x: number, y: number, options?: { cursor?: boolean }) => {
+  const handleWebviewGazeFrame = (x: number, y: number, options?: BrowserGazeOptions) => {
     const view = activeBrowserView;
     const sessionId = activeBrowserViewSessionId;
     if (!view || view.webContents.isDestroyed()) return;
+    const gate = gazeGateFor(view);
+    const cursorEnabled = options?.cursor !== false;
+    const emittedAt = options?.emittedAtWallMs ?? Date.now();
+    const bounds = view.getBounds();
+    // Hide is a cancellation signal even during loading or IPC backlog. It
+    // must invalidate an already-resolving page click before any early return.
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 ||
+        x > bounds.width || y > bounds.height || !BrowserGazeGate.isFresh(emittedAt, Date.now())) {
+      invalidateBrowserGaze(view);
+      return;
+    }
+    if (!cursorEnabled) {
+      gate.disable();
+      lastBrowserDwellState = 'idle';
+      flushBrowserGazeReset(view);
+    }
     // Document loading: the in-page cursor script does not exist yet, and
     // every executeJavaScript issued now would be parked until dom-ready
     // (each holding a did-stop-loading listener) and then replayed as a
@@ -2138,16 +2229,6 @@ function setupIpcHandlers(): void {
       return;
     }
     try {
-      const bounds = view.getBounds();
-      const cursorEnabled = options?.cursor !== false;
-      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > bounds.width || y > bounds.height) {
-        view.webContents.executeJavaScript(
-          BROWSER_CURSOR_HIDE_SCRIPT
-        ).catch(() => { });
-        resetEdgeScrollState();
-        return;
-      }
-
       // 1b. Edge-gaze auto-scrolling (throttled ~10Hz)
       // x,y are already BrowserView-local coordinates.
       const viewHeight = bounds.height;
@@ -2166,6 +2247,10 @@ function setupIpcHandlers(): void {
       }
 
       const now = Date.now();
+      if (lastBrowserGazeFrameAt > 0 && (now - lastBrowserGazeFrameAt > 150 || now < lastBrowserGazeFrameAt)) {
+        resetEdgeScrollState();
+      }
+      lastBrowserGazeFrameAt = now;
       // v17.20 — while the page dwell is acquiring or committing a target,
       // edge scrolling is paused (and its 650ms hold restarts after). The
       // sidebar spans the edge zones, and a scroll burst 650ms into a dwell
@@ -2217,6 +2302,13 @@ function setupIpcHandlers(): void {
       }
 
       browserDiagnostics.recordIpcTick();
+      // Watch/scroll mode never starts a selection request. A busy renderer
+      // receives no intermediate samples; the next live frame tries again.
+      if (!cursorEnabled) return;
+      gate.enable();
+      flushBrowserGazeReset(view);
+      const request = gate.begin(emittedAt, Date.now());
+      if (!request) return;
       // v17.21 — convert view DIPs → page CSS px before hit-testing. The
       // page runs at zoomFactor (1.35 default), so CSS coords = view/zoom.
       // Without this, the injected script treated view px as CSS px:
@@ -2230,10 +2322,11 @@ function setupIpcHandlers(): void {
       if (browserGazeConfig.zoomCompensationEnabled) {
         try { zf = view.webContents.getZoomFactor() || 1; } catch { zf = 1; }
       }
-      view.webContents.executeJavaScript(
-        buildGazeUpdateAndPollScript(x / zf, y / zf, cursorEnabled, zf)
-      ).then((json: string | null) => {
-        if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId && !view.webContents.isDestroyed()) {
+      Promise.resolve().then(() => view.webContents.executeJavaScript(
+        buildGazeUpdateAndPollScript(x / zf, y / zf, cursorEnabled, zf, emittedAt)
+      )).then((json: string | null) => {
+        if (json && activeBrowserView === view && activeBrowserViewSessionId === sessionId &&
+            !view.webContents.isDestroyed() && gate.allowsSelection(request, Date.now())) {
           try {
             // v17.20 envelope: { c: clickRequest|null, s: dwellState }.
             const res = JSON.parse(json);
@@ -2249,16 +2342,19 @@ function setupIpcHandlers(): void {
                 `[Main] Gaze dwell click ${clickReq.kind || 'unknown'} at (${cx}, ${cy})`,
                 1000
               );
-              sendTrustedBrowserClick(cx, cy, sessionId);
+              sendTrustedBrowserClick(cx, cy, sessionId, () => gate.allowsSelection(request, Date.now()));
             }
           } catch { /* ignore parse errors */ }
         }
-      }).catch(() => { });
+      }).catch(() => { }).finally(() => {
+        gate.finish(request);
+        flushBrowserGazeReset(view);
+      });
     } catch { /* ignore */ }
   };
-  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) =>
+  ipcMain.handle('webview:updateGaze', (_event: any, x: number, y: number, options?: BrowserGazeOptions) =>
     handleWebviewGazeFrame(x, y, options));
-  ipcMain.on('webview:updateGaze', (_event: any, x: number, y: number, options?: { cursor?: boolean }) =>
+  ipcMain.on('webview:updateGaze', (_event: any, x: number, y: number, options?: BrowserGazeOptions) =>
     handleWebviewGazeFrame(x, y, options));
 
   // Mouse Only Mode: renderer can query current state
@@ -2536,6 +2632,8 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  runtimeRetryTimers.forEach(timer => clearTimeout(timer));
+  runtimeRetryTimers.clear();
   stopPythonBackend();
   stopFloorplanServer();
   stopTobiiHelper();

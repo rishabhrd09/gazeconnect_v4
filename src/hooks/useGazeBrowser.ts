@@ -7,6 +7,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { BrowserGazeOptions } from '../../electron/browser/browserGazeGate';
 
 interface BrowserViewBounds {
     x: number;
@@ -402,12 +403,12 @@ export function useGazeBrowser() {
         if (!api?.webview?.updateGaze) return;
         cursorInsideRef.current = false;
         try {
-            await api.webview.updateGaze(-1, -1);
+            await api.webview.updateGaze(-1, -1, { emittedAtWallMs: Date.now() });
         } catch { /* ignore - may fail if page navigating */ }
     }, []);
 
     // Send gaze position to BrowserView to show a visible cursor inside web content
-    const updateGazeCursor = useCallback(async (clientX: number, clientY: number, options?: { cursor?: boolean }) => {
+    const updateGazeCursor = useCallback(async (clientX: number, clientY: number, options?: BrowserGazeOptions) => {
         const api = getElectronAPI();
         if (!api?.webview?.updateGaze || !boundsRef.current) return;
         const b = boundsRef.current;
@@ -419,7 +420,10 @@ export function useGazeBrowser() {
         if (localX >= safeInsetPx && localY >= 0 && localX <= b.width - safeInsetPx && localY <= b.height) {
             cursorInsideRef.current = true;
             try {
-                await api.webview.updateGaze(localX, localY, options);
+                await api.webview.updateGaze(localX, localY, {
+                    ...options,
+                    emittedAtWallMs: options?.emittedAtWallMs ?? Date.now(),
+                });
             } catch { /* ignore — may fail if page navigating */ }
         } else if (cursorInsideRef.current) {
             await hideGazeCursor();

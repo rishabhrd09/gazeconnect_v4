@@ -270,9 +270,7 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
   // Update progress
   const updateProgress = useCallback(() => {
     const elapsed = Date.now() - startTimeRef.current;
-    // Enable: capped at 800ms for quick access; Disable: +400ms to prevent accidental turn-off
-    const enableDwell = Math.min(toggleDwellTime, 800);
-    const dwellTime = isGazeEnabled ? toggleDwellTime + 400 : enableDwell;
+    const dwellTime = toggleDwellTime;
     const progress = Math.min(1, elapsed / dwellTime);
     setDwellProgress(progress);
 
@@ -287,8 +285,7 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
     startTimeRef.current = Date.now();
     progressTimerRef.current = requestAnimationFrame(updateProgress);
 
-    const enableDwell = Math.min(toggleDwellTime, 800);
-    const dwellTime = isGazeEnabled ? toggleDwellTime + 400 : enableDwell;
+    const dwellTime = toggleDwellTime;
     dwellTimerRef.current = setTimeout(() => {
       if (isGazeEnabled) {
         disableGaze();
@@ -366,7 +363,7 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
           data-gaze-always="true"
           data-snap-priority="3"
           data-gaze-context="gazetoggle"
-          data-gaze-dwell-ms={String(toggleDwellTime + 350)}
+          data-gaze-dwell-ms={String(toggleDwellTime)}
           className="gaze-toggle gaze-button"
           style={{
             display: 'flex',
@@ -470,7 +467,7 @@ export const GazeControlToggle: React.FC<GazeControlToggleProps> = ({
           data-gaze-always="true"
           data-snap-priority="3"
           data-gaze-context="gazetoggle"
-          data-gaze-dwell-ms={String(Math.min(toggleDwellTime, 800))}
+          data-gaze-dwell-ms={String(toggleDwellTime)}
           className="gaze-toggle gaze-button"
           style={{
             display: 'flex',

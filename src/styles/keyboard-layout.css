@@ -1,0 +1,41 @@
+/* The keyboard's two right controls own their width; neither may spill into
+   Quick Words. Keep these rules scoped to the keyboard navigation variant. */
+.keyboard-screen .keyboard-key { transform: none !important; }
+.keyboard-screen .keyboard-gaze-hub {
+  background: var(--ui-panel) !important;
+  border-color: var(--ui-accent-ink) !important;
+}
+.keyboard-screen .keyboard-gaze-label { color: var(--ui-ink) !important; }
+.keyboard-screen .keyboard-inline-gaze:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -3px; }
+.keyboard-screen .nav-bar-container[data-gaze-screen='keyboard'] {
+  --keyboard-nav-height: clamp(112px, 14vh, 154px);
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  column-gap: clamp(16px, 2vw, 36px) !important;
+  padding: 8px 0 !important;
+  margin-top: 0 !important;
+}
+.keyboard-screen .nav-reserved-cell { display: none !important; }
+.keyboard-screen .nav-center-cell { margin-left: 0 !important; justify-content: flex-end !important; }
+.keyboard-screen .nav-pill { width: 100%; max-width: 1000px; }
+.keyboard-screen .nav-pill .nav-btn {
+  flex: 1 1 0;
+  min-width: 0 !important;
+  padding-inline: clamp(10px, 1.4vw, 24px) !important;
+  overflow-wrap: normal;
+}
+.keyboard-screen .nav-control-cell { gap: clamp(16px, 2vw, 36px) !important; }
+.keyboard-screen .keyboard-navigation .nav-btn {
+  min-height: var(--keyboard-nav-height) !important;
+  height: var(--keyboard-nav-height) !important;
+  font-size: clamp(20px, 2.3vh, 26px) !important;
+}
+.keyboard-screen #gaze-toggle-nav {
+  width: var(--keyboard-nav-height) !important;
+  min-width: var(--keyboard-nav-height) !important;
+  height: var(--keyboard-nav-height) !important;
+  margin-right: 0 !important;
+}
+.keyboard-screen .nav-control-cell > .nav-btn {
+  min-width: clamp(170px, 16vw, 280px) !important;
+  padding-inline: clamp(10px, 1.4vw, 24px) !important;
+}

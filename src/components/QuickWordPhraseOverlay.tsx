@@ -431,21 +431,7 @@ const QuickWordPhraseOverlay: React.FC<QuickWordPhraseOverlayProps> = ({
                 >
                   {phrase.en}
                 </div>
-                {showHindi && phrase.hi && (
-                  <div
-                    style={{
-                      width: '100%',
-                      fontSize: 'clamp(17px, 1.8vh, 22px)',
-                      lineHeight: 1.2,
-                      fontWeight: 720,
-                      color: tone.helper,
-                      fontFamily: HINDI_FONT,
-                      overflowWrap: 'anywhere',
-                    }}
-                  >
-                    {phrase.hi}
-                  </div>
-                )}
+
               </GazeButton>
             ))}
           </div>

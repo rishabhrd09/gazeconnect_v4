@@ -110,7 +110,7 @@ class GazeClassifier:
         self._classify_log_count += 1
         if self._classify_log_count <= 10 or self._classify_log_count % 500 == 0:
             import logging
-            logging.getLogger('GazeConnect').info(
+            logging.getLogger('GazeConnect').debug(
                 f"[CLASSIFIER] dt={dt:.6f}s vel={velocity:.1f} deg/s "
                 f"median={median_velocity:.1f} deg/s state={self.state.value} "
                 f"fix_count={self._low_velocity_count} sac_count={self._high_velocity_count}"

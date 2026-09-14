@@ -10,8 +10,9 @@ const start = Date.now();
 
 function checkVite() {
     if (Date.now() - start > MAX_WAIT) {
-        console.log("Timed out waiting for Vite. Starting Electron anyway...");
-        process.exit(0);
+        console.error("Vite did not become ready on port 5173. Electron was not started. Check the development log.");
+        process.exit(1);
+        return;
     }
 
     let pending = CANDIDATE_URLS.length;
@@ -25,22 +26,29 @@ function checkVite() {
     };
 
     CANDIDATE_URLS.forEach((viteUrl) => {
+        let settled = false;
+        const failed = () => {
+            if (settled) return;
+            settled = true;
+            onNotReady();
+        };
         const req = http.get(viteUrl, (res) => {
-            // Any non-5xx response means HTTP server is up.
-            if (!ready && res.statusCode && res.statusCode < 500) {
+            res.resume();
+            if (!ready && res.statusCode === 200) {
+                settled = true;
                 ready = true;
                 console.log(`Vite server is ready at ${viteUrl}. Starting Electron...`);
                 process.exit(0);
                 return;
             }
-            onNotReady();
+            failed();
         });
 
-        req.on('error', onNotReady);
+        req.on('error', failed);
 
         req.setTimeout(1000, () => {
             req.destroy();
-            onNotReady();
+            failed();
         });
     });
 }

@@ -1,29 +1,17 @@
-/**
- * GlobalNavBar - Consistent Navigation on ALL Pages
- * ==================================================
- * Shows ALL 5 buttons on EVERY page:
- * - 🏠 Home
- * - ⌨️ Keyboard
- * - 🏥 Medical
- * - 🆘 EMERGENCY
- * - 👁 Gaze ON/OFF (toggle)
- *
- * All buttons always visible, large, centered at top.
- * Responsive: 13"–27" via clamp() — identical on 23" (1920×1080)
- */
+/** Shared navigation. The reserved left cell keeps navigation and gaze targets stable. */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { darkColors, lightColors, typography } from '../utils/design';
+import React from 'react';
+import { DWELL_GROUPS } from '../config/dwellTimeConfig';
+import { LiveClock } from './LiveClock';
+import { darkColors, warmColors } from '../utils/design';
 import { useGazeControl } from './core/GazeControlToggle';
 import { gazeFlags } from '../utils/gazeFlags';
 import { useFocusMode } from '../contexts/FocusModeContext';
-import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface GlobalNavBarProps {
     currentPage: string;
     onNavigate: (screen: string) => void;
-    onSpeak: (text: string) => void;
     isDarkMode?: boolean;
     compact?: boolean;
     showZoneBoardButton?: boolean;
@@ -71,7 +59,6 @@ const KeyboardNavIcon: React.FC = () => (
 const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     currentPage,
     onNavigate,
-    onSpeak,
     isDarkMode = true,
     compact = false,
     showZoneBoardButton = false,
@@ -85,75 +72,12 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     gazePositionOffset,
     onBack,
 }) => {
-    const colors = isDarkMode ? darkColors : lightColors;
+    const colors = isDarkMode ? darkColors : warmColors;
     const navFontFamily = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
-    const emergencyFontFamily = `'Arial Black', ${typography.fontFamily.primary}`;
     const { isGazeEnabled, toggleGaze } = useGazeControl();
     const { isFocusMode } = useFocusMode();
-    const { data: { settings } } = useCustomization();
     const { theme } = useTheme();
-    const useHomeNavPalette = currentPage === 'home';
-    const homeNavigationColors = theme === 'mix' ? {
-        ...darkColors.navigation,
-        pillBackground: 'rgba(36, 30, 23, 0.96)',
-        pillBorder: 'rgba(180, 157, 112, 0.34)',
-        pillShadow: '0 8px 22px rgba(0,0,0,0.30)',
-        idleBackground: 'rgba(17, 14, 11, 0.42)',
-        idleText: '#D8C8A8',
-        activeBackground: 'rgba(196, 178, 142, 0.30)',
-        activeBorder: 'rgba(196, 178, 142, 0.46)',
-        activeShadow: 'inset 0 0 0 1px rgba(240, 226, 196, 0.10)',
-        activeText: '#F7E9CB',
-        gazeBackgroundOn: '#3B3123',
-        gazeBackgroundOff: '#191510',
-        gazeBorderOn: '#D6C98E',
-        gazeBorderOff: '#8B6F49',
-        gazeGlow: '0 0 16px rgba(214, 201, 142, 0.16)',
-        gazeTextOn: '#F7E9CB',
-        gazeTextOff: '#EADAB8',
-    } : theme === 'dark' ? {
-        ...darkColors.navigation,
-        pillBackground: 'rgba(27, 28, 24, 0.94)',
-        pillBorder: 'rgba(213, 216, 188, 0.18)',
-        pillShadow: '0 8px 20px rgba(0,0,0,0.28)',
-        idleBackground: 'rgba(9, 10, 8, 0.42)',
-        idleText: '#B8B4A8',
-        activeBackground: 'rgba(213, 216, 188, 0.18)',
-        activeBorder: 'rgba(213, 216, 188, 0.28)',
-        activeShadow: 'inset 0 0 0 1px rgba(236, 237, 227, 0.08)',
-        activeText: '#ECEDE3',
-        gazeBackgroundOn: '#2C2D25',
-        gazeBackgroundOff: '#121914',
-        gazeBorderOn: '#D6C98E',
-        gazeBorderOff: '#676B55',
-        gazeGlow: '0 0 16px rgba(214, 201, 142, 0.16)',
-        gazeTextOn: '#ECEDE3',
-        gazeTextOff: '#D4D0C2',
-    } : {
-        ...lightColors.navigation,
-        pillBackground: 'rgba(232, 215, 186, 0.92)',
-        pillBorder: 'rgba(122, 99, 71, 0.22)',
-        pillShadow: '0 8px 16px rgba(122, 99, 71, 0.10)',
-        idleBackground: 'rgba(240, 228, 203, 0.86)',
-        idleText: '#7A6347',
-        activeBackground: 'rgba(196, 179, 146, 0.28)',
-        activeBorder: 'rgba(122, 99, 71, 0.28)',
-        activeShadow: 'inset 0 0 0 1px rgba(255, 248, 236, 0.18)',
-        activeText: '#5A4530',
-        gazeBackgroundOn: '#D9C8A6',
-        gazeBackgroundOff: '#D9C8A6',
-        gazeBorderOn: '#7A6347',
-        gazeBorderOff: '#7A6347',
-        gazeGlow: '0 0 0 1px rgba(122, 99, 71, 0.10), 0 6px 14px rgba(122, 99, 71, 0.10)',
-        gazeTextOn: '#5A4530',
-        gazeTextOff: '#5A4530',
-        auxiliaryBackground: 'rgba(236, 223, 195, 0.92)',
-        auxiliaryBorder: 'rgba(122, 99, 71, 0.24)',
-    };
-    const navigationColors = useHomeNavPalette ? homeNavigationColors : colors.navigation;
-    const homeEmergencyStyle = theme === 'light'
-        ? { background: '#8A3B38', text: '#FBE9DE', border: 'rgba(122, 54, 58, 0.6)' }
-        : { background: '#4A2023', text: '#F0A5A5', border: '#8A3B38' };
+    const navigationColors = colors.navigation;
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)
     const isKbOrSpatial = currentPage === 'keyboard' || currentPage === 'spatial';
@@ -173,13 +97,6 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     const [localIsNavHidden, setLocalIsNavHidden] = React.useState(false);
     const isNavHidden = externalIsNavHidden !== undefined ? externalIsNavHidden : localIsNavHidden;
 
-    const [emergencyActivated, setEmergencyActivated] = useState(false);
-    const emergencyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-        return () => { if (emergencyTimerRef.current) clearTimeout(emergencyTimerRef.current); };
-    }, []);
-
     const handleNavHiddenToggle = () => {
         const nextState = !isNavHidden;
         setLocalIsNavHidden(nextState);
@@ -193,20 +110,6 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
         filter: 'grayscale(60%)',
     } : {};
 
-    const handleEmergency = useCallback(() => {
-        const enPhrase = settings?.emergencyPhraseEn || 'I need help immediately! This is an emergency!';
-        const hiPhrase = settings?.emergencyPhraseHi || 'मुझे तुरंत मदद चाहिए! यह एक आपातकालीन स्थिति है!';
-        const fullPhrase = settings?.showHindi
-            ? `${enPhrase} ... ${hiPhrase}`
-            : enPhrase;
-        onSpeak(fullPhrase);
-        setEmergencyActivated(true);
-        if (emergencyTimerRef.current) clearTimeout(emergencyTimerRef.current);
-        emergencyTimerRef.current = setTimeout(() => {
-            setEmergencyActivated(false);
-        }, 3200);
-    }, [onSpeak, settings]);
-
     const getNavButtonClassName = (screen: string) => {
         const classes = ['gaze-button', 'nav-btn'];
         classes.push(`nav-btn-${screen.replace(/_/g, '-').replace(/^--/, '')}`);
@@ -216,42 +119,9 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     };
 
     // Button styles
-    const getButtonStyle = (screen: string, isEmergency = false) => {
+    const getButtonStyle = (screen: string) => {
         const isCurrentPage = currentPage === screen;
         const isBackButton = screen === '__back__';
-
-        if (isEmergency) {
-            return {
-                padding: compact
-                    ? 'clamp(8px, 1.1vh, 12px) clamp(16px, 2vw, 26px)'
-                    : 'clamp(10px, 1.4vh, 16px) clamp(20px, 2.5vw, 34px)',
-                backgroundColor: homeEmergencyStyle.background,
-                border: `1.5px solid ${homeEmergencyStyle.border}`,
-                borderRadius: 'clamp(14px, 2vh, 20px)',
-                color: homeEmergencyStyle.text,
-                fontSize: isKbOrSpatial ? 'clamp(18px, 2.35vh, 24px)' : standardNavTextSize,
-                fontWeight: 900 as const,
-                cursor: 'pointer',
-                minHeight: isCompassMap ? compassNavTargetHeight : isKbOrSpatial ? keyboardNavTargetHeight : standardNavTargetHeight,
-                ...(isKbOrSpatial ? { height: keyboardNavTargetHeight } : {}),
-                ...(isCompassMap ? { height: compassNavTargetHeight } : {}),
-                minWidth: isCompassMap
-                    ? 'clamp(140px, 14vw, 220px)'
-                    : (compact
-                        ? 'clamp(160px, 17vw, 220px)'
-                        : 'clamp(210px, 22vw, 320px)'),
-                boxShadow: theme === 'light' ? '0 2px 8px rgba(122, 54, 58, 0.16), 0 1px 2px rgba(122, 54, 58, 0.10)' : '0 4px 16px rgba(0,0,0,0.30)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'clamp(8px, 1vw, 12px)',
-                justifyContent: 'center',
-                flexDirection: 'row' as const,
-                letterSpacing: '0.05em',
-                fontFamily: emergencyFontFamily,
-                textTransform: 'none' as const,
-                transition: 'all 0.2s ease',
-            };
-        }
 
         return {
             padding: isCompassMap
@@ -314,7 +184,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     display: 'grid',
                     gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
                     alignItems: 'center',
-                    // Compass map: extra-wide gap between columns so Emergency, the
+                    // Compass map: extra-wide gap between columns so the reserved cell, the
                     // center pill, and the gaze toggle each get a clear breathing zone.
                     columnGap: isCompassMap
                         ? 'clamp(48px, 5vw, 96px)'
@@ -339,38 +209,15 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 }}>
 
 
-                <div style={{ display: 'flex', justifyContent: 'flex-start', minWidth: 0, paddingLeft: currentPage === 'keyboard' ? 'clamp(8px, 1.4vw, 24px)' : currentPage === 'home' ? 'clamp(96px, 12vw, 200px)' : 'clamp(72px, 9vw, 148px)' }}>
-                    {/* EMERGENCY — rounded rect with icon + text label (AAC compliant) */}
-                    <button
-                        onClick={handleEmergency}
-                        className="gaze-button emergency-help-btn"
-                        data-gaze="true"
-                        data-gaze-always="true"
-                        data-gaze-context="emergency"
-                        style={getButtonStyle('__emergency__', true)}
-                    >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'clamp(28px, 3.55vh, 40px)', height: 'clamp(28px, 3.55vh, 40px)', flexShrink: 0 }}>
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="7" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        <span style={{
-                            fontFamily: emergencyFontFamily,
-                            fontSize: 'clamp(20px, 2.6vh, 28px)',
-                            fontWeight: 900,
-                            letterSpacing: '0.08em',
-                            lineHeight: 1,
-                            whiteSpace: 'nowrap',
-                        }}>
-                            Emergency
-                        </span>
-                    </button>
+                <div className="nav-reserved-cell" style={{ display: 'flex', justifyContent: 'flex-start', minWidth: 0, paddingLeft: currentPage === 'keyboard' ? 'clamp(8px, 1.4vw, 24px)' : currentPage === 'home' ? 'clamp(96px, 12vw, 200px)' : 'clamp(72px, 9vw, 148px)' }}>
+                    {currentPage === 'home' && <LiveClock placement="navigation" />}
                 </div>
 
                 {/* CENTER CELL - Navigation Pill */}
-                <div style={{ display: 'flex', justifyContent: 'center', minWidth: 0, ...(currentPage === 'keyboard' ? { marginLeft: 'clamp(-96px, -6vw, -64px)' } : currentPage === 'spatial' ? { marginLeft: 'clamp(-42px, -3vw, -22px)' } : isCompassMap ? { marginLeft: 'clamp(-72px, -4vw, -36px)' } : {}) }}>
+                <div className="nav-center-cell" style={{ display: 'flex', justifyContent: 'center', minWidth: 0, ...(currentPage === 'keyboard' ? { marginLeft: 'clamp(-96px, -6vw, -64px)' } : currentPage === 'spatial' ? { marginLeft: 'clamp(-42px, -3vw, -22px)' } : isCompassMap ? { marginLeft: 'clamp(-72px, -4vw, -36px)' } : {}) }}>
                     {currentPage === 'home' ? (
                         <div
+                            className="app-wordmark"
                             aria-hidden="true"
                             style={{
                                 minHeight: compact ? 'clamp(50px, 7vh, 72px)' : 'clamp(82px, 12vh, 120px)',
@@ -380,17 +227,21 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 justifyContent: 'center',
                                 gap: 'clamp(10px, 1.1vw, 18px)',
                                 transform: 'translateX(clamp(6px, 0.9vw, 16px))',
-                                color: theme === 'light' ? '#5A4530' : theme === 'warm' ? '#5A4530' : theme === 'mix' ? '#B49362' : '#B4AB96',
+                                color: 'var(--ui-brand)',
                                 fontFamily: navFontFamily,
-                                fontSize: (theme === 'light' || theme === 'warm') ? 'clamp(28px, 4vh, 48px)' : 'clamp(30px, 4.4vh, 54px)',
+                                fontSize: (theme === 'warm') ? 'clamp(28px, 4vh, 48px)' : 'clamp(30px, 4.4vh, 54px)',
                                 fontWeight: 850,
-                                letterSpacing: (theme === 'light' || theme === 'warm') ? '0.14em' : '0.18em',
+                                letterSpacing: (theme === 'warm') ? '0.14em' : '0.18em',
                                 textTransform: 'uppercase',
                                 lineHeight: 1,
                                 userSelect: 'none',
                                 textShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.26)' : 'none',
                             }}
                         >
+                            <svg aria-hidden="true" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ width: 'clamp(30px, 4vh, 44px)', height: 'clamp(30px, 4vh, 44px)', flexShrink: 0 }}>
+                                <circle cx="24" cy="24" r="21" />
+                                <path d="M24 35V22m0 6c-8 0-12-5-12-12 8 0 12 4 12 12Zm0-4c0-7 4-11 12-12 0 8-4 12-12 12Z" />
+                            </svg>
                             <span>GAZE</span>
                             <span>CONNECT</span>
                         </div>
@@ -576,7 +427,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 </div>
 
                 {/* RIGHT CELL - Gaze Toggle (left) + HIDE NAV (far right, below 123) */}
-                <div style={{
+                <div className="nav-control-cell" style={{
                     display: 'flex',
                     justifyContent: showMoreToggle ? 'flex-end' : 'center',
                     alignItems: 'center',
@@ -605,7 +456,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 data-gaze-always="true"
                                 data-snap-priority="3"
                                 data-gaze-context="gazetoggle"
-                                data-gaze-dwell-ms={String(isGazeEnabled ? (gazeFlags.toggleCalmFrontend ? 1450 : 1150) : 850)}
+                                data-gaze-dwell-ms={String(DWELL_GROUPS.deliberate.ms)}
                                 style={{
                                     flex: 1, height: '100%', display: 'flex',
                                     alignItems: 'center', justifyContent: 'center',
@@ -673,7 +524,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             data-gaze-always="true"
                             data-snap-priority="3"
                             data-gaze-context="gazetoggle"
-                            data-gaze-dwell-ms={String(isGazeEnabled ? (gazeFlags.toggleCalmFrontend ? 1450 : 1150) : 850)}
+                            data-gaze-dwell-ms={String(DWELL_GROUPS.deliberate.ms)}
                             style={{
                                 padding: '0',
                                 backgroundColor: isGazeEnabled ? navigationColors.gazeBackgroundOn : navigationColors.gazeBackgroundOff,
@@ -792,47 +643,6 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
             {/* Bottom-center gaze hub REMOVED — unified to top-right circle only.
                Smart Pause mode handles gaze persistence across screen transitions. */}
 
-            {/* EMERGENCY magnify overlay — same pattern as HomeScreen quick words */}
-            {emergencyActivated && (
-                <div
-                    key={'emergency-flash-' + Date.now()}
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100vw',
-                        height: '100vh',
-                        zIndex: 9999,
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        animation: 'navbar-emergency-magnify 3.2s ease-out forwards',
-                    }}
-                >
-                    <div style={{
-                        padding: 'clamp(28px, 4.5vh, 52px) clamp(56px, 9vw, 130px)',
-                        borderRadius: '28px',
-                        background: isDarkMode ? 'rgba(30, 8, 8, 0.96)' : lightColors.background.elevated,
-                        border: isDarkMode ? '2px solid rgba(210, 80, 80, 0.50)' : `2px solid ${lightColors.emergency.hover}`,
-                        boxShadow: isDarkMode ? '0 12px 80px rgba(0, 0, 0, 0.75), 0 0 40px rgba(210, 80, 80, 0.18)' : '0 8px 24px rgba(139, 121, 104, 0.12), 0 2px 6px rgba(139, 121, 104, 0.08)',
-                    }}>
-                        <span style={{
-                            fontSize: 'clamp(48px, 8vh, 96px)',
-                            fontWeight: 900,
-                            color: isDarkMode ? '#E07070' : lightColors.emergency.main,
-                            fontFamily: emergencyFontFamily,
-                            letterSpacing: isDarkMode ? '0.16em' : '0.08em',
-                            textAlign: 'center',
-                            textTransform: isDarkMode ? 'uppercase' : 'none',
-                            lineHeight: 1,
-                        }}>
-                            {isDarkMode ? 'EMERGENCY' : 'Emergency'}
-                        </span>
-                    </div>
-                </div>
-            )}
-
             <style>{`
                 .nav-btn-home > span:first-of-type,
                 .nav-btn-keyboard > span:first-of-type {
@@ -849,19 +659,6 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 .nav-pill-dark .nav-btn.nav-btn-back:hover {
                     background: ${navigationColors.backHoverBackground} !important;
                     border-color: ${navigationColors.backBorder} !important;
-                }
-                @keyframes navbar-emergency-magnify {
-                    0% { opacity: 0; transform: scale(0.7); }
-                    8% { opacity: 1; transform: scale(1.02); }
-                    14% { transform: scale(1); }
-                    75% { opacity: 1; transform: scale(1); }
-                    100% { opacity: 0; transform: scale(1.06); }
-                }
-                .emergency-help-btn:hover {
-                    background: rgba(160, 55, 55, 0.45) !important;
-                    border-color: rgba(210, 90, 90, 0.65) !important;
-                    box-shadow: 0 0 20px rgba(200, 70, 70, 0.25) !important;
-                    transform: scale(1.04);
                 }
             `}</style>
         </>

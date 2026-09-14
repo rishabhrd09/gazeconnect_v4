@@ -1,55 +1,39 @@
 # TobiiGazeHelper
 
-.NET 6.0 bridge between the Tobii Eye Tracker 5 hardware and the GazeConnect Pro Python backend.
+A Windows x64 bridge from the legacy Tobii.Interaction SDK to GazeConnect's Python backend over loopback TCP port 5555. It receives SDK callbacks at the rate delivered by the hardware/driver; the application must not assume every tracker always delivers a fixed sample rate.
 
-## How It Works
+The project targets **.NET 8**, publishes its own runtime and deliberately disables trimming and single-file publishing for compatibility with vendor reflection/native loading. Microsoft's .NET 8 support ends on **10 November 2026**; a supported successor and hardware verification are required before shipping beyond that date. The change from .NET 6 still needs a native Windows build and Tobii smoke test.
 
-1. Connects to the Tobii Eye Tracker 5 via the Tobii.Interaction SDK
-2. Receives raw gaze data at 133Hz
-3. Normalizes coordinates to 0.0-1.0 range
-4. Filters frozen/invalid gaze frames
-5. Sends gaze data to Python backend via TCP on port 5555
+## Local build inputs
 
-## Tobii DLLs
+The six DLLs currently under `TobiiGazeHelper/lib/` are vendor build inputs:
 
-All required Tobii DLLs are bundled in the `lib/` folder:
+- `Tobii.Interaction.Net.dll`
+- `Tobii.Interaction.Model.dll`
+- `Tobii.EyeX.Client.dll`
+- `Tobii.EyeX.Common.dll`
+- `tobii_stream_engine.dll`
+- `Tobii.Tech.NETCommon.ClrExtensions.dll`
 
-| DLL | Purpose |
-|-----|---------|
-| `Tobii.Interaction.Net.dll` | Managed SDK for gaze streams |
-| `Tobii.Interaction.Model.dll` | Data model types |
-| `Tobii.EyeX.Client.dll` | Native EyeX client library |
-| `Tobii.EyeX.Common.dll` | Common types |
-| `tobii_stream_engine.dll` | Low-level stream engine |
-| `Tobii.Tech.NETCommon.ClrExtensions.dll` | CLR extension utilities |
+Their presence in Git does **not** establish permission for public GitHub hosting, redistribution, or AAC use. Do not obtain replacement binaries from OptiKey or another application's installation. Obtain the approved package from Tobii and retain its license and provenance. See [the release audit](../docs/windows-release-audit.md).
 
-These DLLs are referenced locally in `TobiiGazeHelper.csproj` — **no hardcoded system paths**.
-
-To refresh DLLs from a Tobii Experience installation:
-```powershell
-# From the project root:
-.\copy-tobii-dlls.bat
-```
-
-## Building
+For an authorized local SDK package, from the repository root:
 
 ```powershell
-cd tobii-helper\TobiiGazeHelper
-dotnet build -c Release
+.\copy-tobii-dlls.bat -SourceDirectory "C:\Path\To\Approved\Tobii\Package"
 ```
 
-Output: `bin/Release/net6.0-windows/TobiiGazeHelper.exe`
+The script checks that the full expected set exists and that native libraries are x64 before replacing local inputs. It does not register DLLs, alter PATH, install drivers, or grant redistribution rights. Version compatibility and transitive native dependencies still require Windows testing; architecture/hash checks alone do not prove authenticity or compatibility.
 
-## Self-Contained Build (for installer)
+## Build and publish
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true
+dotnet build tobii-helper\TobiiGazeHelper\TobiiGazeHelper.csproj -c Release -r win-x64
+dotnet publish tobii-helper\TobiiGazeHelper\TobiiGazeHelper.csproj -c Release -r win-x64 --self-contained true -o tobii-dist
 ```
 
-This includes the .NET runtime — no .NET SDK required on the target machine.
+Development output: `TobiiGazeHelper/bin/Release/net8.0-windows/win-x64/TobiiGazeHelper.exe`.
 
-## Prerequisites
+Use `build-installer.bat` for a complete installer candidate, including Python and frontend assets. End users of a validated installer should not need Node, Python or a separately installed .NET runtime. They still need the compatible Tobii device driver/Experience installation and successful display setup/calibration. A development machine's successful build does not verify those clean-machine requirements.
 
-- Tobii Experience must be installed and running
-- Eye Tracker must be calibrated
-- USB connection to Tobii Eye Tracker 5
+Avoid competing gaze-to-mouse software during app-owned gaze selection. Plug/unplug, tracking loss, screen scaling, sleep/resume and reconnect must be included in native acceptance tests.

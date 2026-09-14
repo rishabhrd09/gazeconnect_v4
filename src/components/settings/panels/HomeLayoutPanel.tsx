@@ -274,14 +274,7 @@ const WordRow: React.FC<{
             style={{ flex: 1 }}
             onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(editEn, editHi); if (e.key === 'Escape') onCancelEdit(); }}
           />
-          <input
-            className="hl-input"
-            value={editHi}
-            onChange={e => setEditHi(e.target.value)}
-            placeholder="Hindi (optional)"
-            style={{ flex: 1 }}
-            onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(editEn, editHi); if (e.key === 'Escape') onCancelEdit(); }}
-          />
+
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="hl-btn" onClick={onCancelEdit} style={{ fontSize: 13, padding: '5px 12px' }}>Cancel</button>
@@ -317,14 +310,7 @@ const WordRow: React.FC<{
         }}>
           {word.en}
         </div>
-        {word.hi && (
-          <div style={{
-            fontSize: 12, color: colors.text.tertiary, marginTop: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {word.hi}
-          </div>
-        )}
+
       </div>
 
       {/* Priority toggle */}
@@ -932,14 +918,7 @@ const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
               style={{ flex: 1 }}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
             />
-            <input
-              className="hl-input"
-              value={newHi}
-              onChange={e => setNewHi(e.target.value)}
-              placeholder="Hindi (optional)"
-              style={{ flex: 1 }}
-              onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-            />
+
             {/* Priority selector */}
             <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: `1px solid ${colors.border.main}` }}>
               {(['high', 'medium'] as QuickWordPriority[]).map(p => {

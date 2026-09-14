@@ -1,14 +1,14 @@
 {
   "name": "gazeconnect-pro",
   "version": "4.8.0",
-  "description": "Medical-grade eye-gaze AAC application for ALS patients",
+  "description": "Eye-gaze communication and everyday activities for Windows",
   "main": "dist-electron/main.js",
   "author": "GazeConnect Team",
   "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "vite",
-    "dev:electron": "npm-run-all --parallel dev electron:dev",
+    "dev:electron": "npm-run-all --parallel --race dev electron:dev",
     "build": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
     "electron:dev": "node dev-wait.js && tsc -p tsconfig.electron.json && electron .",
@@ -20,7 +20,10 @@
     "floorplan:sample": "python tools/gazeconnect_floorplan_v5.py --sample --all-styles -o ./output",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "check:browser-cursor": "node scripts/check-injected-script.js && node scripts/browser-cursor-replay.js"
+    "check:browser-cursor": "node scripts/check-injected-script.js && node scripts/browser-cursor-replay.js",
+    "check:dwell-groups": "node scripts/check-dwell-groups.cjs",
+    "check:gaze-safety": "node scripts/check-gaze-safety.cjs",
+    "check:browser-gaze-safety": "node scripts/check-browser-gaze-safety.cjs"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -46,7 +49,7 @@
   "build": {
     "appId": "com.gazeconnect.pro",
     "productName": "GazeConnect Pro",
-    "copyright": "Copyright © 2025 GazeConnect Team",
+    "copyright": "Copyright \u00a9 2025 GazeConnect Team",
     "directories": {
       "output": "release",
       "buildResources": "build"

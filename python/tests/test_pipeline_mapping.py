@@ -118,34 +118,20 @@ class PipelineMappingTests(unittest.TestCase):
         self.assertAlmostEqual(captured[0][1], expected_y, delta=0.02)
         self.assertAlmostEqual(captured[0][2], 0.95, delta=1e-6)
 
-    def test_stale_blink_guard_cancels_backend_dwell_progress(self):
+    def test_invalid_samples_clear_target_without_any_backend_selection(self):
         backend = self._backend()
-        backend.BACKEND_DWELL_ENABLED = True
+        sent = []
+        backend._broadcast = lambda kind, data: sent.append((kind, data))
         backend._register_targets([{
-            "id": "center",
-            "x": 960,
-            "y": 540,
-            "width": 280,
-            "height": 180,
-            "size": "md",
-            "context": "navigation",
-            "enabled": True,
+            "id": "center", "x": 960, "y": 540, "width": 280, "height": 180,
+            "size": "md", "context": "navigation", "enabled": True,
         }])
-
-        detector = backend.dwell_manager.detectors[backend.current_screen]
-
-        backend._on_gaze_data(GazePoint(
-            x=0.5, y=0.5, timestamp=time.time(),
-            left_valid=True, right_valid=True, confidence=1.0,
-        ))
-        self.assertIsNotNone(detector.state.target)
-
-        backend._on_gaze_data(GazePoint(
-            x=0.5, y=0.5, timestamp=time.time(),
-            left_valid=False, right_valid=False, confidence=0.0,
-        ))
-        self.assertIsNone(detector.state.target)
-        self.assertEqual(detector.selections_count, 0)
+        backend._on_gaze_data(GazePoint(.5, .5, time.time()))
+        self.assertEqual(backend._on_key_target_id, 'center')
+        backend._on_gaze_data(GazePoint(.5, .5, time.time(), False, False, 0))
+        self.assertIsNone(backend._on_key_target_id)
+        self.assertFalse(backend._last_gaze_payload['is_valid'])
+        self.assertFalse(any(kind.startswith('dwell_') for kind, _ in sent))
 
     def test_classifier_basis_uses_screen_dimensions(self):
         backend = self._backend()

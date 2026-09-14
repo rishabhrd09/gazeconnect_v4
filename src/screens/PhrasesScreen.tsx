@@ -135,25 +135,7 @@ const PhrasesCategoryButton: React.FC<{
           }}>
             {category.name}
           </span>
-          {showHindi && category.nameHi && (
-            <>
-              <div style={{
-                width: '24px', height: '1px',
-                background: isSelected ? `${selectedColor}55` : (isDarkMode ? 'rgba(255,255,255,0.18)' : lightColors.border.light),
-                borderRadius: '1px', margin: '4px 0 2px',
-              }} />
-              <span style={{
-                fontSize: 'clamp(20px, 1.8vw, 28px)',
-                fontWeight: 700,
-                color: isSelected ? (isDarkMode ? 'rgba(255, 210, 140, 0.95)' : lightColors.text.secondary) : (isDarkMode ? 'rgba(255, 210, 140, 0.70)' : lightColors.text.tertiary),
-                fontFamily: "'Noto Sans Devanagari', sans-serif",
-                lineHeight: 1.5,
-                letterSpacing: '0.02em',
-              }}>
-                {category.nameHi}
-              </span>
-            </>
-          )}
+
         </div>
       </div>
     </GazeButton>
@@ -236,7 +218,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
       <GlobalNavBar
         currentPage="phrases"
         onNavigate={onNavigate}
-        onSpeak={onSpeak}
+
         isDarkMode={isDarkMode}
       />
 
@@ -326,17 +308,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                   }}>
                     Recent
                   </span>
-                  {showHindi && (
-                    <span style={{
-                      fontSize: 'clamp(15px, 1.5vw, 20px)',
-                      fontWeight: 700,
-                      color: isRecentSelected ? (isWarmMode ? SELECTED_COLOR : lightColors.warning.main) : inactiveIcon,
-                      fontFamily: HINDI_UI_FONT,
-                      lineHeight: 1.15,
-                    }}>
-                      हाल के
-                    </span>
-                  )}
+
                 </div>
               </div>
             </GazeButton>
@@ -488,21 +460,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
                     {phrase.en}
                   </span>
                   {/* Hindi text - Beautiful, clear Devanagari font */}
-                  {showHindi && phrase.hi && (
-                    <>
-                      <div style={{ width: '36px', height: '1.5px', background: isMix ? 'rgba(122,99,71,0.30)' : isWarm ? 'rgba(73,119,117,0.30)' : 'rgba(255,255,255,0.18)', borderRadius: '1px', margin: '7px auto 4px' }} />
-                      <span style={{
-                        fontSize: 'clamp(22px, 2.6vh, 34px)',
-                        fontWeight: 700,
-                        color: isMix ? mixColors.home.subtleText : isWarm ? warmScreenTokens.phrases.hindiText : 'rgba(255, 210, 140, 0.95)',
-                        lineHeight: 1.5,
-                        fontFamily: "'Noto Sans Devanagari', sans-serif",
-                        letterSpacing: '0.02em',
-                      }}>
-                        {phrase.hi}
-                      </span>
-                    </>
-                  )}
+
                 </div>
               </GazeButton>
             ))}

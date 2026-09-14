@@ -1,252 +1,202 @@
 using System;
-using System.IO;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
-using Tobii.Interaction; // Core namespace for Interaction Library
+using Tobii.Interaction;
 using Tobii.Interaction.Framework;
 
 namespace TobiiGazeHelper
 {
-    class Program
+    // The SDK callback only publishes to a single replaceable mailbox. All
+    // networking/serialization occurs on our worker, never on Tobii's callback.
+    internal static class Program
     {
-        // TCP connection to Python backend
-        static TcpClient? _tcpClient;
-        static NetworkStream? _stream;
-        static bool _isConnected = false;
-        static long _gazeDataCount = 0;
+        private const int Port = 5555;
+        private const long SilenceTimeoutMs = 150;
+        private static readonly Stopwatch Clock = Stopwatch.StartNew();
+        private static volatile bool _running = true;
+        private static bool _verbose;
+        private static object? _latestSample;
+        private static long _lastCallbackMs;
+        private static long _frame;
+        private static long _trackingEpoch;
+        private static double _lastDeviceTimestamp = double.NegativeInfinity;
+        private static Host? _host;
+        private static GazePointDataStream? _gazeStream;
+        private static readonly AutoResetEvent SampleReady = new AutoResetEvent(false);
 
-        // Frame timing for quality tracking
-        static long _frameCounter = 0;
-        static long _lastFrameTimeMs = 0;
-        static long _maxGapMs = 0;
-        static int _gapWarningCount = 0;
-
-        // Configuration
-        static int Port = 5555;
-        static bool Verbose = false;
-
-        // Interaction Library Host
-        static Host? _host;
-        static GazePointDataStream? _gazeStream;
-
-        static void Main(string[] args)
+        private static int Main(string[] args)
         {
-            Console.WriteLine();
-            Console.WriteLine("============================================");
-            Console.WriteLine("  GazeConnect Pro - Tobii Helper v5.0");
-            Console.WriteLine("  Interaction Library Integration");
-            Console.WriteLine("============================================");
-
-            foreach (var arg in args)
-            {
-                if (arg == "--verbose" || arg == "-v") Verbose = true;
-            }
-
+            _verbose = Array.Exists(args, a => a == "--verbose" || a == "-v") ||
+                       Environment.GetEnvironmentVariable("GAZE_DEBUG") == "1";
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; _running = false; };
+            EnableDpiAwareness();
+            Thread? worker = null;
             try
             {
-                // 0. Set DPI Aware
-                SetProcessDPIAware();
-                Console.WriteLine("[TOBII] Set Process DPI Aware.");
-
-                // 1. Create Host
-                // The Host represents the connection to the Tobii Engine
-                Console.WriteLine("[TOBII] Initializing Host...");
                 _host = new Host();
-                
-                // 2. Create Gaze Stream — use LightlyFiltered for built-in Tobii noise reduction
-                // Unfiltered raw data has too much jitter that amplifies through our pipeline,
-                // causing systematic drift when magnetism locks onto the wrong key.
-                Console.WriteLine("[TOBII] Creating Gaze Point Data Stream (LightlyFiltered)...");
                 _gazeStream = _host.Streams.CreateGazePointDataStream(GazePointDataMode.LightlyFiltered);
-
-                // 3. Subscribe to Data
-                _gazeStream.GazePoint((x, y, timestamp) =>
-                {
-                    OnGazeData(x, y, timestamp);
-                });
-
-                Console.WriteLine("[TOBII] Subscribed to gaze data.");
-                Console.WriteLine("[TOBII] Gaze tracking is ACTIVE.");
+                _gazeStream.GazePoint(OnGazeData);
+                worker = new Thread(RunTcpServer) { IsBackground = true, Name = "Gaze transport" };
+                worker.Start();
+                Console.WriteLine("[TOBII] Interaction stream initialized. Waiting for valid samples.");
+                while (_running) Thread.Sleep(50);
+                return Environment.ExitCode;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] Tobii Initialization Failed: {ex.Message}");
-                Console.WriteLine("  Ensure Tobii Experience / Eye Tracking Core is running.");
-                Console.WriteLine("  Try restarting the app.");
-                return;
-            }
-
-            // 4. Start TCP Server (to talk to Python)
-            bool running = true;
-            var serverThread = new Thread(() => RunTcpServer(ref running));
-            serverThread.IsBackground = true;
-            serverThread.Start();
-
-            // 5. Main Loop
-            Console.WriteLine("[INFO] Running... Press Ctrl+C to exit.");
-            Console.CancelKeyPress += (s, e) => { 
-                running = false; 
-                e.Cancel = true; 
-                Console.WriteLine("\n[INFO] Shutting down...");
-            };
-
-            while (running)
-            {
-                Thread.Sleep(100);
-            }
-
-            // Cleanup
-            try { _host?.DisableConnection(); } catch { }
-            try { _host?.Dispose(); } catch { }
-            Console.WriteLine("[INFO] Stopped.");
-        }
-
-        static void OnGazeData(double x, double y, double timestamp)
-        {
-            if (!_isConnected || _stream == null) return;
-
-            // Filter out Invalid/NaN data (Eyes lost)
-            if (double.IsNaN(x) || double.IsNaN(y))
-            {
-                return;
-            }
-
-            // Tobii Interaction Library returns (x,y) in pixels (screen coordinates)
-            // But verify if they are pixels or normalized. 
-            // Usually CreateGazePointDataStream returns pixels.
-            
-            double screenW = GetSystemMetrics(0); // CXSCREEN
-            double screenH = GetSystemMetrics(1); // CYSCREEN
-            
-            if (screenW <= 0 || screenH <= 0) return;
-
-            // NEW: Filter out "Frozen" gaze (repeated identical coordinates)
-            // Tobii driver sometimes emits last valid point continuously when eyes are lost
-            // FIX: Allow up to 60 frames (approx 0.5s-1s) of identical data before dropping
-            // Use epsilon to catch micro-variations if driver adds noise to frozen data
-            if (Math.Abs(x - _lastX) < EPSILON && Math.Abs(y - _lastY) < EPSILON)
-            {
-                _frozenFrameCount++;
-                if (_frozenFrameCount > 60) return;
-            }
-            else
-            {
-                _frozenFrameCount = 0;
-            }
-            _lastX = x;
-            _lastY = y;
-
-            double normX = x / screenW;
-            double normY = y / screenH;
-            
-            // Clamp
-            normX = Math.Max(0, Math.Min(1, normX));
-            normY = Math.Max(0, Math.Min(1, normY));
-
-            // Precise wall-clock timestamp and frame counter
-            long wallClockMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            _frameCounter++;
-
-            // Track frame timing gaps for quality monitoring
-            if (_lastFrameTimeMs > 0)
-            {
-                long gapMs = wallClockMs - _lastFrameTimeMs;
-                if (gapMs > _maxGapMs) _maxGapMs = gapMs;
-                // Warn on gaps > 50ms (missed frames at 133Hz ~= 7.5ms/frame)
-                if (gapMs > 50)
-                {
-                    _gapWarningCount++;
-                    if (_gapWarningCount <= 10 || _gapWarningCount % 100 == 0)
-                    {
-                        Console.WriteLine($"[QUALITY] Frame gap: {gapMs}ms (frame #{_frameCounter})");
-                    }
-                }
-            }
-            _lastFrameTimeMs = wallClockMs;
-
-            SendJson(new
-            {
-                type = "gaze",
-                timestamp = wallClockMs,
-                tobii_timestamp = (long)timestamp,
-                x = normX,
-                y = normY,
-                is_valid = true,
-                confidence = 1.0,
-                screen_x = x,
-                screen_y = y,
-                frame = _frameCounter
-            });
-            _gazeDataCount++;
-            if (_gazeDataCount % 60 == 0) // Log 1/sec approx
-            {
-               Console.WriteLine($"[GAZE DEBUG] Raw: ({x:F1}, {y:F1}) Screen: {screenW}x{screenH} Norm: ({normX:F3}, {normY:F3}) Frame: {_frameCounter} MaxGap: {_maxGapMs}ms");
-            }
-        }
-
-        static double _lastX = -1;
-        static double _lastY = -1;
-        static int _frozenFrameCount = 0;
-        const double EPSILON = 0.00001; // Tolerance for float equality (approx 0.02 pixels)
-
-        static void SendJson(object data)
-        {
-            if (_stream == null || !_isConnected) return;
-            try
-            {
-                string json = JsonSerializer.Serialize(data);
-                byte[] bytes = Encoding.UTF8.GetBytes(json + "\n");
-                _stream.Write(bytes, 0, bytes.Length);
-            }
-            catch
-            {
-                _isConnected = false;
-            }
-        }
-
-        static void RunTcpServer(ref bool running)
-        {
-            TcpListener? listener = null;
-            try
-            {
-                listener = new TcpListener(IPAddress.Loopback, Port);
-                listener.Start();
-                Console.WriteLine($"[TCP] Listening on {Port}...");
-
-                while (running)
-                {
-                    if (listener.Pending())
-                    {
-                        var client = listener.AcceptTcpClient();
-                        client.NoDelay = true;
-                        _tcpClient = client;
-                        _stream = client.GetStream();
-                        _isConnected = true;
-                        Console.WriteLine("[TCP] Connected!");
-                    }
-                    else
-                    {
-                        Thread.Sleep(100);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[TCP ERROR] {ex.Message}");
+                Console.Error.WriteLine($"[TOBII] Could not initialize: {ex.Message}");
+                Console.Error.WriteLine("Ensure Tobii Experience and its eye tracking service are installed and running.");
+                return 1;
             }
             finally
             {
-                listener?.Stop();
+                _running = false;
+                worker?.Join(500);
+                try { _host?.DisableConnection(); } catch { }
+                try { _host?.Dispose(); } catch { }
             }
         }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern int GetSystemMetrics(int nIndex);
+        private static void OnGazeData(double x, double y, double deviceTimestamp)
+        {
+            long now = Clock.ElapsedMilliseconds;
+            long previousCallback = Interlocked.Exchange(ref _lastCallbackMs, now);
+            long frame = Interlocked.Increment(ref _frame);
+            int width = GetSystemMetrics(0);
+            int height = GetSystemMetrics(1);
+            // Interaction uses primary-screen pixel coordinates. Do not stretch
+            // edges or clamp off-screen gaze onto an actionable border.
+            bool valid = double.IsFinite(x) && double.IsFinite(y) &&
+                         double.IsFinite(deviceTimestamp) && width > 0 && height > 0;
+            // Identical positions are allowed: a steady fixation is not a lost
+            // sample. Repeated/regressed source time is not a new measurement.
+            if (valid)
+            {
+                double previous = _lastDeviceTimestamp;
+                valid = deviceTimestamp > previous || now - previousCallback > SilenceTimeoutMs;
+                if (valid) Interlocked.Exchange(ref _lastDeviceTimestamp, deviceTimestamp);
+            }
+            if (!valid) Interlocked.Increment(ref _trackingEpoch);
+            object sample = new
+            {
+                type = "gaze",
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                tobii_timestamp = double.IsFinite(deviceTimestamp) ? deviceTimestamp : 0,
+                helper_monotonic_ms = now,
+                tracking_epoch = Interlocked.Read(ref _trackingEpoch),
+                x = valid ? x / width : 0.5,
+                y = valid ? y / height : 0.5,
+                is_valid = valid,
+                // The combined stream has no per-eye confidence measurement.
+                confidence = valid ? 0.75 : 0.0,
+                validity_source = "combined",
+                coord_space = "primary_screen_normalized",
+                screen_width_px = width,
+                screen_height_px = height,
+                frame
+            };
+            Interlocked.Exchange(ref _latestSample, sample);
+            SampleReady.Set();
+        }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern bool SetProcessDPIAware();
+        private static void RunTcpServer()
+        {
+            TcpClient? client = null;
+            NetworkStream? stream = null;
+            var listener = new TcpListener(IPAddress.Loopback, Port);
+            bool silenceReported = false;
+            try
+            {
+                listener.Start();
+                Console.WriteLine($"[TCP] Listening on 127.0.0.1:{Port}");
+                while (_running)
+                {
+                    if (listener.Pending())
+                    {
+                        stream?.Dispose();
+                        client?.Dispose();
+                        client = listener.AcceptTcpClient();
+                        client.NoDelay = true;
+                        client.SendBufferSize = 4096;
+                        client.SendTimeout = 100;
+                        stream = client.GetStream();
+                        stream.WriteTimeout = 100;
+                        silenceReported = false;
+                        Console.WriteLine("[TCP] Backend connected");
+                    }
+                    var sample = Interlocked.Exchange(ref _latestSample, null);
+                    long sinceCallback = Clock.ElapsedMilliseconds - Interlocked.Read(ref _lastCallbackMs);
+                    if (sinceCallback > SilenceTimeoutMs)
+                    {
+                        sample = null; // Never emit an old queued measurement after a stall.
+                        if (!silenceReported)
+                        {
+                            Interlocked.Increment(ref _trackingEpoch);
+                            sample = new { type = "gaze", timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                                           x = 0.5, y = 0.5, is_valid = false, confidence = 0.0,
+                                           validity_source = "timeout" };
+                            silenceReported = true;
+                        }
+                    }
+                    else if (sample != null)
+                    {
+                        silenceReported = false;
+                    }
+                    if (stream != null && sample != null)
+                    {
+                        try
+                        {
+                            byte[] bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(sample) + "\n");
+                            stream.Write(bytes, 0, bytes.Length);
+                            if (_verbose && Interlocked.Read(ref _frame) % 120 == 0)
+                                Console.WriteLine($"[GAZE] frame={Interlocked.Read(ref _frame)} callbackAgeMs={sinceCallback}");
+                        }
+                        catch (Exception ex) when (ex is System.IO.IOException || ex is SocketException || ex is ObjectDisposedException)
+                        {
+                            stream.Dispose();
+                            client?.Dispose();
+                            stream = null;
+                            client = null;
+                        }
+                    }
+                    SampleReady.WaitOne(20); // Wake on data; timeout services accept/silence checks.
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[TCP] Transport failed: {ex.Message}");
+                Environment.ExitCode = 1;
+                _running = false;
+            }
+            finally
+            {
+                stream?.Dispose();
+                client?.Dispose();
+                listener.Stop();
+            }
+        }
+
+        private static void EnableDpiAwareness()
+        {
+            try
+            {
+                // PER_MONITOR_AWARE_V2; available on supported modern Windows 10/11.
+                if (SetProcessDpiAwarenessContext(new IntPtr(-4))) return;
+            }
+            catch (EntryPointNotFoundException) { }
+            SetProcessDPIAware();
+        }
+
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int index);
+        [DllImport("user32.dll")]
+        private static extern bool SetProcessDPIAware();
+        [DllImport("user32.dll")]
+        private static extern bool SetProcessDpiAwarenessContext(IntPtr awareness);
     }
 }

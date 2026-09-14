@@ -13,6 +13,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { GazeFreshness } from '../utils/gazeSafety';
 
 const DEBUG_GAZE_LOGS = false;
 
@@ -23,6 +24,12 @@ const DEBUG_GAZE_LOGS = false;
 export interface GazeData {
   x: number;
   y: number;
+  signal_state?: string;
+  t_helper_ms?: number;
+  t_sent_wall_ms?: number;
+  sample_age_ms?: number;
+  intent_x?: number;
+  intent_y?: number;
   /** Coordinate space of x/y from backend ('window' preferred) */
   coord_space?: 'window' | 'screen';
   /** Backend filter zone label (lock/fixation/free/edge/etc.) */
@@ -275,6 +282,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     }
   }, []);
 
+  const metricsInFlightRef = useRef(false);
+  const sendScreenMetrics = useCallback(async (width = window.innerWidth, height = window.innerHeight) => {
+    if (metricsInFlightRef.current) return;
+    metricsInFlightRef.current = true;
+    try {
+      const api = (window as any).electronAPI;
+      const bounds = api?.getWindowBounds ? await api.getWindowBounds() : null;
+      if (api?.getWindowBounds && !bounds) return;
+      send('set_screen_size', {
+        width, height, screenUnits: 'css', gazeActive: bounds?.gazeActive ?? true,
+        // These legacy field names now explicitly carry DIP/CSS screen units.
+        physicalWidth: bounds?.screenWidth ?? window.screen.width,
+        physicalHeight: bounds?.screenHeight ?? window.screen.height,
+        screenX: bounds?.screenX ?? 0, screenY: bounds?.screenY ?? 0,
+        windowX: bounds?.x ?? window.screenX ?? 0,
+        windowY: bounds?.y ?? window.screenY ?? 0,
+        contentWidth: bounds?.width ?? width,
+        contentHeight: bounds?.height ?? height,
+        dpr: window.devicePixelRatio || 1,
+      });
+    } catch { /* Retry next metrics tick; never send guessed Electron bounds. */ }
+    finally { metricsInFlightRef.current = false; }
+  }, [send]);
+
   // DevTools tuning hook — the on-rig A/B protocols (B1-BE etc.) need a way
   // to send backend messages like set_magnet_params without a rebuild:
   //   window.__gazeWs.send('set_magnet_params', { context: 'gazetoggle',
@@ -301,6 +332,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   // FIX v4.7: Store handleMessage in a ref so it never causes reconnection
   const handleMessageRef = useRef<(event: MessageEvent) => void>(() => { });
+  const freshnessRef = useRef(new GazeFreshness());
 
   // Handle incoming messages
   const handleMessage = useCallback((event: MessageEvent) => {
@@ -310,9 +342,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
       // Handle Gaze separately for speed
       if (msgType === 'gaze') {
+        if (!freshnessRef.current.receive(data, Date.now(), performance.now())) {
+          window.dispatchEvent(new CustomEvent('gaze_lost', { detail: { reason: 'invalid_or_repeated' } }));
+          return;
+        }
         const gazeData: GazeData = {
           x: data.x,
           y: data.y,
+          signal_state: data.signal_state,
+          t_helper_ms: data.t_helper_ms,
+          t_sent_wall_ms: data.t_sent_wall_ms,
+          sample_age_ms: data.sample_age_ms,
+          intent_x: data.intent_x,
+          intent_y: data.intent_y,
           coord_space: data.coord_space,
           backend_zone: data.backend_zone,
           is_valid: data.is_valid,
@@ -363,6 +405,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
       // v17: Broadcast gaze_lost events for blink/stale/gap detection
       if (msgType === 'gaze_lost') {
+        freshnessRef.current.lose();
         window.dispatchEvent(new CustomEvent('gaze_lost', {
           detail: { reason: data.reason, age_ms: data.age_ms, gap_ms: data.gap_ms },
         }));
@@ -521,20 +564,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         console.log('WebSocket connected');
         setIsConnected(true);
         reconnectAttempts.current = 0;
-        send('set_screen_size', {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          physicalWidth: window.screen.width,
-          physicalHeight: window.screen.height,
-          dpr: window.devicePixelRatio || 1,
-          windowX: window.screenX || 0,
-          windowY: window.screenY || 0,
-        });
+        void sendScreenMetrics();
       };
 
       wsRef.current.onclose = () => {
         console.log('WebSocket disconnected');
         setIsConnected(false);
+        setTobiiConnected(false);
+        freshnessRef.current.lose();
+        window.dispatchEvent(new CustomEvent('gaze_lost', { detail: { reason: 'disconnected' } }));
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
         reconnectAttempts.current++;
         reconnectTimeoutRef.current = setTimeout(() => {
@@ -564,21 +602,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [url, send]); // NOTE: handleMessage removed from deps — uses ref instead
+  }, [url, sendScreenMetrics]); // NOTE: handleMessage removed from deps — uses ref instead
 
   useEffect(() => {
     connect();
-    const syncScreenMetrics = () => {
-      send('set_screen_size', {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        physicalWidth: window.screen.width,
-        physicalHeight: window.screen.height,
-        dpr: window.devicePixelRatio || 1,
-        windowX: window.screenX || 0,
-        windowY: window.screenY || 0,
-      });
-    };
+    const syncScreenMetrics = () => { void sendScreenMetrics(); };
 
     // FIX v4.7: Debounce resize to prevent "Screen size set to" spam
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -589,16 +617,27 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       }, 500);
     };
     // Keep backend window offsets fresh even when window moves without resize.
-    const metricsInterval = setInterval(syncScreenMetrics, 2000);
+    const metricsInterval = setInterval(syncScreenMetrics, 250);
     window.addEventListener('resize', handleResize);
+    window.addEventListener('blur', syncScreenMetrics);
+    window.addEventListener('focus', syncScreenMetrics);
+    document.addEventListener('visibilitychange', syncScreenMetrics);
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('blur', syncScreenMetrics);
+      window.removeEventListener('focus', syncScreenMetrics);
+      document.removeEventListener('visibilitychange', syncScreenMetrics);
       clearInterval(metricsInterval);
       if (resizeTimer) clearTimeout(resizeTimer);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      wsRef.current?.close();
+      if (wsRef.current) {
+        // A teardown close must not schedule another connection after unmount.
+        wsRef.current.onclose = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.close();
+      }
     };
-  }, [connect, send]);
+  }, [connect, sendScreenMetrics]);
 
   useEffect(() => {
     const interval = setInterval(() => { if (isConnected) send('ping'); }, 30000);
@@ -613,14 +652,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     ttsAvailable,
     setGazeEnabled: (enabled) => send('set_gaze_enabled', { enabled }),
     setScreen: (screen) => send('set_screen', { screen }),
-    setScreenSize: (width, height) => send('set_screen_size', {
-      width, height,
-      physicalWidth: window.screen.width,
-      physicalHeight: window.screen.height,
-      dpr: window.devicePixelRatio || 1,
-      windowX: window.screenX || 0,
-      windowY: window.screenY || 0,
-    }),
+    setScreenSize: (width, height) => { void sendScreenMetrics(width, height); },
     registerTargets: (targets) => send('register_targets', { targets }),
     getPredictions: (text, length_hint, lang) => {
       const requestId = predictionRequestIdRef.current + 1;
@@ -712,4 +744,3 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 };
 
 export default WebSocketProvider;
-

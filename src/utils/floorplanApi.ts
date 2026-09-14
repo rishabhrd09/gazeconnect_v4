@@ -18,6 +18,19 @@ const runtimeApiBase =
 const API_BASE = runtimeApiBase || 'http://127.0.0.1:5050';
 let floorplanBootPromise: Promise<void> | null = null;
 
+// The packaged renderer uses file:// and has no web origin. Let the main
+// process call only its fixed loopback API; do not allow null origins or disable CORS.
+async function floorplanFetch(endpoint: string, init?: RequestInit): Promise<Response> {
+  const request = (window as any).electronAPI?.floorplan?.request;
+  if (request && !runtimeApiBase) {
+    const reply = await request({ endpoint, body: init?.body });
+    return new Response(new Uint8Array(reply.bytes), {
+      status: reply.status, headers: { 'Content-Type': reply.contentType },
+    });
+  }
+  return fetch(`${API_BASE}${endpoint}`, init);
+}
+
 async function ensureFloorplanServerReady(): Promise<void> {
   if (floorplanBootPromise) {
     return floorplanBootPromise;
@@ -101,7 +114,7 @@ export interface AllStylesResult {
 export async function checkBackendHealth(): Promise<boolean> {
   try {
     await ensureFloorplanServerReady();
-    const resp = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
+    const resp = await floorplanFetch('/api/health', { signal: AbortSignal.timeout(3000) });
     return resp.ok;
   } catch {
     return false;
@@ -138,7 +151,7 @@ export async function generateFloorPlan(
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       console.log(`[FloorPlanAPI] Attempt ${attempt}/${MAX_RETRIES}: POST ${API_BASE}${endpoint}`);
-      const resp = await fetch(`${API_BASE}${endpoint}`, {
+      const resp = await floorplanFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
@@ -181,7 +194,7 @@ export async function generateAllStyles(
 ): Promise<AllStylesResult | GenerateError> {
   try {
     await ensureFloorplanServerReady();
-    const resp = await fetch(`${API_BASE}/api/floorplan/generate-all`, {
+    const resp = await floorplanFetch('/api/floorplan/generate-all', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -212,7 +225,7 @@ export async function generatePreview(
 ): Promise<GenerateResult | GenerateError> {
   try {
     await ensureFloorplanServerReady();
-    const resp = await fetch(`${API_BASE}/api/floorplan/preview`, {
+    const resp = await floorplanFetch('/api/floorplan/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

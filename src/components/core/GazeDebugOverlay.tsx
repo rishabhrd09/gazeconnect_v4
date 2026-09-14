@@ -59,8 +59,8 @@ export const GazeDebugOverlay: React.FC = () => {
     const unsub = ws.subscribeGaze((gazeData: any) => {
       if (!gazeData || typeof gazeData.x !== 'number') return;
 
-      const rawX = (gazeData.raw_x ?? gazeData.x) * window.innerWidth;
-      const rawY = (gazeData.raw_y ?? gazeData.y) * window.innerHeight;
+      const rawX = (gazeData.intent_x ?? gazeData.mapped_x ?? gazeData.x) * window.innerWidth;
+      const rawY = (gazeData.intent_y ?? gazeData.mapped_y ?? gazeData.y) * window.innerHeight;
       const smoothedX = gazeData.x * window.innerWidth;
       const smoothedY = gazeData.y * window.innerHeight;
 
@@ -84,7 +84,7 @@ export const GazeDebugOverlay: React.FC = () => {
         const cols = Math.ceil(window.innerWidth / HEATMAP_CELL_SIZE);
         const rows = Math.ceil(window.innerHeight / HEATMAP_CELL_SIZE);
 
-        if (heatmapRef.current.length !== rows) {
+        if (heatmapRef.current.length !== rows || heatmapRef.current[0]?.length !== cols) {
           heatmapRef.current = Array.from({ length: rows }, () => new Array(cols).fill(0));
         }
 

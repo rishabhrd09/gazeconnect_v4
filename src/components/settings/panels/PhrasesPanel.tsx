@@ -501,7 +501,7 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
                     display: 'flex', gap: 10, padding: '10px 0 6px 0', alignItems: 'center',
                   }}>
                     <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>English *</span>
-                    <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Hindi (optional)</span>
+
                     <span style={{ width: 30 }} />
                   </div>
 
@@ -522,13 +522,7 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
                         placeholder="English phrase"
                         style={{ flex: 1 }}
                       />
-                      <input
-                        className="pp-input"
-                        value={phrase.hi}
-                        onChange={e => updatePhrase(cat.id, phIdx, 'hi', e.target.value)}
-                        placeholder="Hindi translation"
-                        style={{ flex: 1 }}
-                      />
+
                       <button
                         className="pp-phrase-del"
                         onClick={() => deletePhrase(cat.id, phIdx)}

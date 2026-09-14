@@ -7,7 +7,7 @@
  *   ROW 3: Left question text (22%) | Right action bar + options (78%)
  *
  * Action bar: ← BACK | ✓ CONFIRM (multi) | SKIP → | ··· | 👁 GAZE
- * Options: Adaptive grid (2/3/4 cols), scrollable if overflow
+ * Options: Large 2/3-column grids, six choices per page
  * sessionStorage + WebSocket auto-save
  */
 
@@ -77,24 +77,24 @@ function getGridBasis(count: number): string {
 // ─── SummaryPanel (for Summary Modal) — Beautiful, well-formatted ────
 
 const SummaryPanel = ({
-    answers, questions, currentPhase, isLight = false,
+    answers, questions, currentPhase, scrollRef, isLight = false,
 }: {
-    answers: Record<string, any>; questions: SurveyQuestion[]; currentPhase: string; isLight?: boolean;
+    answers: Record<string, any>; questions: SurveyQuestion[]; currentPhase: string; scrollRef: React.RefObject<HTMLDivElement>; isLight?: boolean;
 }) => {
     const completeness = useMemo(() => computeCompleteness(answers, questions), [answers, questions]);
     const answeredCount = Object.keys(answers).filter(k => answers[k] !== undefined && answers[k] !== 'SKIPPED').length;
     const skippedCount = Object.values(answers).filter(v => v === 'SKIPPED').length;
 
     // Theme tokens — fall back to dark THEME when light mode is off
-    const tMain = isLight ? lightColors.text.primary : THEME.textMain;
-    const tSub = isLight ? lightColors.text.secondary : THEME.textSub;
-    const tDim = isLight ? lightColors.text.tertiary : THEME.textDim;
-    const tAccent = isLight ? '#1F6B7E' : THEME.accent;
-    const tWarn = isLight ? lightColors.warning.main : THEME.warning;
-    const tBarTrack = isLight ? 'rgba(82, 66, 45, 0.12)' : 'rgba(255,255,255,0.08)';
-    const tDivider = isLight ? lightColors.border.light : 'rgba(100,116,139,0.12)';
-    const tCardBg = isLight ? 'rgba(82, 66, 45, 0.05)' : 'rgba(255,255,255,0.03)';
-    const tSkippedBg = isLight ? 'rgba(168, 120, 56, 0.10)' : 'rgba(245, 158, 11, 0.06)';
+    const tMain = 'var(--ui-ink)';
+    const tSub = 'var(--ui-muted)';
+    const tDim = 'var(--ui-muted)';
+    const tAccent = 'var(--ui-accent-ink)';
+    const tWarn = 'var(--ui-muted)';
+    const tBarTrack = 'var(--ui-border)';
+    const tDivider = 'var(--ui-border)';
+    const tCardBg = 'var(--ui-surface)';
+    const tSkippedBg = 'var(--ui-inset)';
 
     // Group answers by phase
     const phaseGroups = useMemo(() => {
@@ -115,7 +115,7 @@ const SummaryPanel = ({
     }, [answers, questions]);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="survey-summary-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Header stats */}
             <div style={{ padding: 'clamp(16px, 2vh, 24px) clamp(20px, 2.5vw, 32px)', borderBottom: `1px solid ${tDivider}`, flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -145,7 +145,7 @@ const SummaryPanel = ({
                 </div>
             </div>
             {/* Per-phase answers */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(12px, 1.5vh, 20px) clamp(20px, 2.5vw, 32px)' }}>
+            <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'clamp(12px, 1.5vh, 20px) clamp(20px, 2.5vw, 32px)' }}>
                 {phaseGroups.length === 0 ? (
                     <div style={{ color: tDim, fontStyle: 'italic', padding: '40px 0', textAlign: 'center', fontSize: 'clamp(15px, 1.8vh, 19px)' }}>
                         No answers recorded yet. Start answering questions to see your summary here.
@@ -202,9 +202,9 @@ const SummaryPanel = ({
 const SaveConfirmModal = ({ mode, onClose, isLight = false }: { mode: 'generate' | 'save'; onClose: () => void; isLight?: boolean }) => {
     const tBg = isLight ? lightColors.background.elevated : THEME.panelBg;
     const tBorder = isLight ? lightColors.border.main : THEME.border;
-    const tMain = isLight ? lightColors.text.primary : THEME.textMain;
-    const tSub = isLight ? lightColors.text.secondary : THEME.textSub;
-    const tAccent = isLight ? '#1F6B7E' : THEME.accent;
+    const tMain = 'var(--ui-ink)';
+    const tSub = 'var(--ui-muted)';
+    const tAccent = 'var(--ui-accent-ink)';
     return (
         <div style={{
             position: 'fixed', inset: 0, zIndex: 9999,
@@ -243,30 +243,38 @@ const SaveConfirmModal = ({ mode, onClose, isLight = false }: { mode: 'generate'
 function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeEnabled }: any) {
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [qIndex, setQIndex] = useState(0);
+    const pendingAdvance = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelPendingAdvance = () => {
+        if (pendingAdvance.current !== null) clearTimeout(pendingAdvance.current);
+        pendingAdvance.current = null;
+    };
+    useEffect(() => cancelPendingAdvance, [qIndex]);
+    const [choicePage, setChoicePage] = useState({ question: '', page: 0 });
     const [sessionLoaded, setSessionLoaded] = useState(false);
-    const [isDarkMode] = useState(true);
     const [showModal, setShowModal] = useState<'generate' | 'save' | null>(null);
     const [showSummary, setShowSummary] = useState(false);
+    const summaryScrollRef = useRef<HTMLDivElement>(null);
     const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
 
     const { isGazeEnabled } = useGazeControl();
     const { isLight, isWarm } = useTheme();
+    const isDarkMode = !isWarm;
 
     // Theme-aware text + accent tokens. THEME.* is dark-only (light text, dark
     // bg). When isLight=true, override text colors to dark warm-brown so they
     // read clearly on the cream surface. Accent stays cyan but switches to a
     // deeper variant for adequate contrast on light bg.
-    const T_textMain = isLight ? lightColors.text.primary : THEME.textMain;
-    const T_textSub = isLight ? lightColors.text.secondary : THEME.textSub;
-    const T_textDim = isLight ? lightColors.text.tertiary : THEME.textDim;
-    const T_accent = isLight ? '#1F6B7E' : THEME.accent;            // deeper teal for light bg
-    const T_accentSoft = isLight ? 'rgba(31, 107, 126, 0.12)' : 'rgba(100, 181, 246, 0.08)';
-    const T_accentBorder = isLight ? 'rgba(31, 107, 126, 0.42)' : `${THEME.accent}40`;
-    const T_warning = isLight ? lightColors.warning.main : THEME.warning;     // antique amber on light
-    const T_warningSoft = isLight ? 'rgba(168, 120, 56, 0.10)' : 'rgba(245, 158, 11, 0.06)';
-    const T_warningBorder = isLight ? 'rgba(168, 120, 56, 0.36)' : 'rgba(245, 158, 11, 0.25)';
-    const T_optionBg = isLight ? lightColors.background.elevated : THEME.panelBg;
-    const T_optionBorder = isLight ? `1.5px solid ${lightColors.border.main}` : '1px solid rgba(100, 116, 139, 0.2)';
+    const T_textMain = 'var(--ui-ink)';
+    const T_textSub = 'var(--ui-muted)';
+    const T_textDim = 'var(--ui-muted)';
+    const T_accent = 'var(--ui-accent-ink)';
+    const T_accentSoft = 'var(--ui-selected)';
+    const T_accentBorder = 'var(--ui-accent-ink)';
+    const T_warning = 'var(--ui-muted)';
+    const T_warningSoft = 'var(--ui-surface)';
+    const T_warningBorder = 'var(--ui-border)';
+    const T_optionBg = 'var(--ui-surface)';
+    const T_optionBorder = '1px solid var(--ui-border)';
     const { saveSurvey, compileSurvey, snapshotSurvey, surveyData } = useWS();
     const scrollViewRef = useRef<HTMLDivElement>(null);
     const snapshotSurveyRef = useRef(snapshotSurvey);
@@ -285,10 +293,10 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     //   trips the GazeButton's built-in 1.5s cooldown (GAZE_ENABLE_COOLDOWN_MS) —
     //   options become inert for ~1.5s while the user reads the question, then
     //   activate automatically with no extra click required.
-    //   Combined with `dwellCategory="surveyOption"` (1300ms dwell) on option
+    //   Combined with `dwellCategory="surveyOption"` (2000ms dwell) on option
     //   buttons, this gives a strong margin against accidental selections without
     //   the friction of a per-question "ready" gate.
-    //   BACK / VIEW SUMMARY / SKIP / Emergency keep their standard fast dwell.
+    //   BACK / VIEW SUMMARY / SKIP use the Navigation group.
     const [surveyGazeTimestamp, setSurveyGazeTimestamp] = useState(0);
 
     // Bump timestamp on every question change → triggers settling cooldown for options
@@ -433,18 +441,26 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     // ── Derived: current phase index, options, grid basis ──
     const currentPhaseIndex = UNIQUE_PHASES.indexOf(currentQ.phase);
     const currentOptions = getQuestionOptions(currentQ, answers);
-    const gridBasis = getGridBasis(currentOptions.length);
+    const pageCount = Math.max(1, Math.ceil(currentOptions.length / 6));
+    const currentPage = choicePage.question === currentQ.id ? Math.min(choicePage.page, pageCount - 1) : 0;
+    const visibleOptions = currentOptions.slice(currentPage * 6, (currentPage + 1) * 6);
+    const gridBasis = getGridBasis(visibleOptions.length);
+    const changeChoicePage = (page: number) => {
+        setChoicePage({ question: currentQ.id, page });
+        setSurveyGazeTimestamp(Date.now());
+    };
 
     // ── Handlers ──
     // qIndex change triggers the settling-cooldown effect automatically — no
     // manual gaze lock needed.
     const advanceQuestion = () => {
+        cancelPendingAdvance();
         if (isLast) return;
         setQIndex(prev => prev + 1);
     };
 
     const handleAnswer = (ans: any) => {
-        if (!currentQ) return;
+        if (!currentQ || pendingAdvance.current !== null) return;
         const key = currentQ.dataKey || currentQ.id;
 
         if (key === 'submit_action') {
@@ -471,7 +487,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             onSpeak('Survey Complete.');
             compileSurvey({ answers: newAnswers });
         } else {
-            setTimeout(() => advanceQuestion(), 400);
+            pendingAdvance.current = setTimeout(() => advanceQuestion(), 400);
         }
     };
 
@@ -483,6 +499,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     };
 
     const handleSkip = () => {
+        cancelPendingAdvance();
         setAnswers(prev => ({ ...prev, [currentQ.dataKey || currentQ.id]: 'SKIPPED' }));
         if (!isLast) advanceQuestion();
     };
@@ -493,11 +510,13 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
     };
 
     const handleBack = () => {
+        cancelPendingAdvance();
         setQIndex(prev => Math.max(0, prev - 1));
     };
 
     // ── Jump to first question of a clicked phase ──
     const handlePhaseClick = (phase: string) => {
+        cancelPendingAdvance();
         const firstIdx = activeQuestions.findIndex(q => q.phase === phase);
         if (firstIdx >= 0) {
             setQIndex(firstIdx);
@@ -543,12 +562,12 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             <GlobalNavBar
                 currentPage="floor-plan"
                 onNavigate={onNavigate}
-                onSpeak={onSpeak}
+
                 isDarkMode={isDarkMode}
             />
 
             {/* ═══ ROW 2: Phase Tabs + Progress (HORIZONTAL, CLICKABLE) ═══ */}
-            <div style={{
+            <div className="survey-phase-strip" style={{
                 flexShrink: 0,
                 borderBottom: `1px solid ${isLight ? lightColors.border.light : 'rgba(148, 163, 184, 0.12)'}`,
                 background: isLight ? lightColors.background.elevated : 'rgba(0, 0, 0, 0.15)',
@@ -578,6 +597,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             <GazeButton
                                 key={phase}
                                 id={`phase-tab-${phase}`}
+                                selected={isCurrent}
                                 onClick={() => handlePhaseClick(phase)}
                                 gazeEnabled={effectiveGazeActive}
                                 gazeEnabledTimestamp={navGazeTimestamp}
@@ -654,14 +674,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
             </div>
 
             {/* ═══ ROW 3: Two-Column Content ═══ */}
-            <div style={{
+            <div className="survey-body" style={{
                 flex: 1,
                 display: 'flex',
                 overflow: 'hidden',
             }}>
 
                 {/* ─── LEFT: Question Text (24%) ─── */}
-                <div style={{
+                <div className="survey-question-panel" style={{
                     width: 'clamp(220px, 24%, 380px)',
                     flexShrink: 0,
                     display: 'flex',
@@ -733,16 +753,17 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                 </div>
 
                 {/* ─── RIGHT: Options (top) + Action Bar (bottom) ─── */}
-                <div style={{
+                <div className="survey-workspace" style={{
                     flex: 1,
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
                 }}>
 
-                    {/* OPTIONS AREA — Scrollable, bottom-padded to clear the fixed Command Bar */}
+                    {/* OPTIONS AREA — Separate from the in-flow command bar */}
                     <div
                         ref={scrollViewRef}
+                        className="survey-options-area"
                         style={{
                             flex: 1,
                             overflowY: 'auto',
@@ -753,22 +774,24 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         }}
                     >
                         {/* Options Grid */}
-                        <div style={{
+                        <div className="survey-choice-grid" style={{
+                            '--choice-columns': ['text', 'scrollable-display', 'display', 'action'].includes(currentQ.type) ? 1 : visibleOptions.length <= 4 ? 2 : 3,
                             display: 'flex',
                             flexWrap: 'wrap',
                             gap: 'clamp(14px, 1.8vh, 24px)',
                             justifyContent: currentOptions.length <= 4 ? 'center' : 'flex-start',
                             alignContent: 'flex-start',
-                        }}>
+                        } as React.CSSProperties}>
 
                             {/* ── GRID / COORDINATE-INPUT ── */}
                             {(currentQ.type === 'grid' || currentQ.type === 'coordinate-input') &&
-                                currentOptions.map((opt: string) => {
+                                visibleOptions.map((opt: string) => {
                                     const isFewCards = currentOptions.length <= 4;
                                     return (
                                     <GazeButton
                                         key={opt}
                                         id={`opt-${opt}`}
+                                        selected={answers[currentQ.dataKey || currentQ.id] === opt}
                                         onClick={() => handleAnswer(opt)}
                                         gazeEnabled={effectiveGazeActive}
                                         gazeEnabledTimestamp={effectiveGazeTimestamp}
@@ -802,13 +825,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
 
                             {/* ── MULTI-SELECT ── */}
                             {currentQ.type === 'multi' &&
-                                currentOptions.map((opt: string) => {
+                                visibleOptions.map((opt: string) => {
                                     const key = currentQ.dataKey || currentQ.id;
                                     const selected = ((answers[key] as string[]) || []).includes(opt);
                                     return (
                                         <GazeButton
                                             key={opt}
                                             id={`multi-${opt}`}
+                                            selected={selected}
                                             onClick={() => handleMultiToggle(opt)}
                                             gazeEnabled={effectiveGazeActive}
                                             gazeEnabledTimestamp={effectiveGazeTimestamp}
@@ -842,7 +866,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
 
                             {/* ── ACTION / DISPLAY ── */}
                             {(currentQ.type === 'action' || currentQ.type === 'display') &&
-                                currentOptions.map((opt: string) => (
+                                visibleOptions.map((opt: string) => (
                                     <GazeButton
                                         key={opt}
                                         id={`act-${opt}`}
@@ -1034,39 +1058,14 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                         </div>
                     </div>
 
-                </div>
-            </div>
-
-            {/* ═══ COMMAND BAR — Fixed single-row, gaze-centered ═══
-                Layout: [ BACK ] ←40px→ [ ◉ GAZE ] ←40px→ [ SUMMARY ] [ CONFIRM? ] [ SKIP ]
-                Vertical Stack (top→bottom): Content → Command Bar → Dead Zone
-            */}
-            {/* Fade overlay above shelf — only over the options (right) area; never over the question (left) column */}
-            <div style={{
-                position: 'fixed',
-                left: 'clamp(220px, 24%, 380px)',
-                right: 0,
-                bottom: 0,
-                height: 'clamp(180px, 22vh, 260px)',
-                pointerEvents: 'none',
-                zIndex: 1998,
-                background: isLight
-                    ? `linear-gradient(180deg, ${lightColors.background.primary}00 0%, ${lightColors.background.primary}d8 28%, ${lightColors.background.primary} 60%, ${lightColors.background.primary} 100%)`
-                    : `linear-gradient(180deg, ${THEME.bg}00 0%, ${THEME.bg}cc 28%, ${THEME.bg} 60%, ${THEME.bg} 100%)`,
-            }} />
-
-            <div style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 'clamp(220px, 24%, 380px)',
-                right: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                zIndex: 1999,
-                background: isLight ? lightColors.background.primary : THEME.bg,
-                paddingBottom: 'clamp(28px, 4vh, 52px)',
-            }}>
+                    {pageCount > 1 && <div className="survey-choice-pager">
+                        <GazeButton id="choices-previous" disabled={currentPage === 0} onClick={() => changeChoicePage(currentPage - 1)}
+                            gazeEnabled={effectiveGazeActive} dwellCategory="navigationButton">← Previous options</GazeButton>
+                        <span aria-live="polite">{currentPage + 1} / {pageCount}</span>
+                        <GazeButton id="choices-next" disabled={currentPage === pageCount - 1} onClick={() => changeChoicePage(currentPage + 1)}
+                            gazeEnabled={effectiveGazeActive} dwellCategory="navigationButton">More options →</GazeButton>
+                    </div>}
+                    <div className="survey-command-bar">
                 {/* Subtle horizontal divider that visually connects the row */}
                 <div style={{
                     height: '1px',
@@ -1139,11 +1138,12 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     {Object.keys(answers).filter(k => answers[k] && answers[k] !== 'SKIPPED').length >= 5 && (
                         <GazeButton
                             id="gen-fp-survey"
+                            className="survey-primary-action"
                             onClick={handleGenerateFromSurvey}
                             gazeEnabled={effectiveGazeActive}
                             gazeEnabledTimestamp={navGazeTimestamp}
                             isDarkMode={isDarkMode}
-                            dwellCategory="compassMapAction"
+                            dwellCategory="deliberateAction"
                             style={{
                                 padding: 'clamp(26px, 3.2vh, 40px) clamp(32px, 3.6vw, 52px)',
                                 background: isLight ? 'rgba(31, 107, 126, 0.16)' : 'rgba(100, 181, 246, 0.12)',
@@ -1168,6 +1168,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     {currentQ.type === 'multi' && (
                         <GazeButton
                             id="multi-done"
+                            className="survey-primary-action"
                             onClick={advanceQuestion}
                             gazeEnabled={effectiveGazeActive}
                             gazeEnabledTimestamp={navGazeTimestamp}
@@ -1221,6 +1222,9 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                 </div>
             </div>
 
+                </div>
+            </div>
+
             {/* ════ SUMMARY MODAL — Full-screen, beautifully formatted ════ */}
             {showSummary && (
                 <div style={{
@@ -1228,8 +1232,8 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isLight ? 'rgba(74, 58, 42, 0.55)' : 'rgba(0,0,0,0.84)',
                 }}>
-                    <div style={{
-                        background: isLight ? lightColors.background.elevated : THEME.panelBg,
+                    <div className="survey-summary-dialog" role="dialog" aria-modal="true" aria-label="Design Survey Summary" style={{
+                        background: 'var(--ui-panel)',
                         border: `1px solid ${isLight ? lightColors.border.main : THEME.border}`, borderRadius: '20px',
                         width: '92%', maxWidth: '850px', maxHeight: '88vh',
                         display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -1271,15 +1275,21 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                             </div>
                         </div>
                         {/* Modal Body */}
-                        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                            <SummaryPanel answers={answers} questions={SURVEY_QUESTIONS} currentPhase={currentPhaseId} isLight={isLight} />
+                        <div className="survey-summary-content" style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+                            <SummaryPanel answers={answers} questions={SURVEY_QUESTIONS} currentPhase={currentPhaseId} scrollRef={summaryScrollRef} isLight={isWarm} />
+                        </div>
+                        <div className="survey-summary-pager">
+                            <GazeButton id="summary-previous" gazeEnabled alwaysActive dwellCategory="navigationButton"
+                                onClick={() => { const el = summaryScrollRef.current; if (el) el.scrollBy({ top: -el.clientHeight * .8 }); }}>↑ Previous answers</GazeButton>
+                            <GazeButton id="summary-next" gazeEnabled alwaysActive dwellCategory="navigationButton"
+                                onClick={() => { const el = summaryScrollRef.current; if (el) el.scrollBy({ top: el.clientHeight * .8 }); }}>More answers ↓</GazeButton>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* ════ SAVE/GENERATE MODAL ════ */}
-            {showModal && <SaveConfirmModal mode={showModal} onClose={handleModalClose} isLight={isLight} />}
+            {showModal && <SaveConfirmModal mode={showModal} onClose={handleModalClose} isLight={isWarm} />}
 
             {showFloorPlanViewer && surveyData?.compass_map && (
                 <FloorPlanViewerModal

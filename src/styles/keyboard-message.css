@@ -1,0 +1,37 @@
+/* Shared geometry and typography prevent the two keyboards drifting apart. */
+:root[data-theme] .keyboard-message {
+  display: flex;
+  width: 100%;
+  height: clamp(112px, 12.8vh, 138px);
+  min-height: clamp(112px, 12.8vh, 138px);
+  flex-shrink: 0;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px;
+  overflow: hidden;
+  color: var(--ui-ink) !important;
+  font-family: var(--ui-font);
+}
+:root[data-theme] .keyboard-message-expanded { flex: 1; height: 100%; min-height: 0; }
+.keyboard-message-scroll { flex: 1; min-width: 0; padding: 0 clamp(18px, 1.9vw, 28px); overflow-y: auto; overflow-x: hidden; }
+.keyboard-message-text { color: var(--ui-ink); font: 650 clamp(45px, 5.25vh, 62px)/1.18 var(--ui-font); white-space: pre-wrap; overflow-wrap: anywhere; }
+.keyboard-message-caret { display: inline-block; width: 3px; height: 0.75em; margin-left: 6px; background: var(--ui-accent-ink); vertical-align: baseline; }
+:root[data-theme] .keyboard-message .message-display-action {
+  width: clamp(138px, 9vw, 180px) !important;
+  height: 100% !important;
+  min-height: 80px !important;
+  flex-shrink: 0;
+  border: 0 !important;
+  border-left: 1px solid var(--ui-border) !important;
+  border-radius: 0 !important;
+  padding: 10px !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-muted) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: none !important;
+  font: 600 clamp(18px, 2vh, 22px)/1.2 var(--ui-font) !important;
+}
+:root[data-theme] .keyboard-message .message-display-speak { width: clamp(166px, 10vw, 214px) !important; background: var(--ui-selected) !important; color: var(--ui-accent-ink) !important; }
+.message-action-content { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+:root[data-theme] .keyboard-message .message-display-action:hover { background: var(--ui-hover) !important; }
+:root[data-theme] .keyboard-message .message-display-action:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -3px; }

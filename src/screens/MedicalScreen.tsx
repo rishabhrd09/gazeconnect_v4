@@ -280,20 +280,7 @@ const PhraseButton: React.FC<{
     }}>
       {item.en}
     </span>
-    {showHindi && item.hi && (
-      <>
-        <div style={{ width: '36px', height: '1.5px', background: dividerColor, borderRadius: '1px', margin: '5px auto 2px' }} />
-        <span style={{
-          fontSize: 'clamp(22px, 2.7vh, 34px)',
-          fontWeight: 800,
-          color: hindiColor,
-          fontFamily: "'Noto Sans Devanagari', sans-serif",
-          lineHeight: 1.25,
-        }}>
-          {item.hi}
-        </span>
-      </>
-    )}
+
   </GazeButton>
 );
 
@@ -302,6 +289,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
 }) => {
   const colors = isDarkMode ? darkColors : lightColors;
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
+  const [sectionPage, setSectionPage] = useState(0);
   const [lastSpoken, setLastSpoken] = useState('');
   const lastSpokenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
@@ -332,6 +320,12 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   const backIconColor = isMix ? '#9BA76D' : isWarm ? warmScreenTokens.medical.backIconColor : isWarmMode ? '#879464' : '#5C6B47';
 
   const activeSection = activeSectionIndex === null ? null : medicalSections[activeSectionIndex];
+  const isPaged = (activeSection?.items.length ?? 0) > 8;
+  const pageSize = isPaged ? 6 : 8;
+  const pageCount = Math.max(1, Math.ceil((activeSection?.items.length ?? 0) / pageSize));
+  const currentPage = Math.min(sectionPage, pageCount - 1);
+  const visibleItems = activeSection?.items.slice(currentPage * pageSize, (currentPage + 1) * pageSize) ?? [];
+  useEffect(() => setSectionPage(0), [activeSectionIndex]);
 
   useEffect(() => () => {
     if (lastSpokenTimerRef.current) clearTimeout(lastSpokenTimerRef.current);
@@ -353,7 +347,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
       overflow: 'hidden',
       padding: '4px 20px 6px 20px',
     }}>
-      <GlobalNavBar currentPage="medical" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="medical" onNavigate={onNavigate} isDarkMode={isDarkMode} />
 
       {lastSpoken && (
         <div style={{
@@ -520,17 +514,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                       }}>
                         {landingTitleEn(sec)}
                       </span>
-                      {showHindi && (
-                        <span style={{
-                          color: hindiColor,
-                          fontFamily: "'Noto Sans Devanagari', sans-serif",
-                          fontSize: 'clamp(24px, 3vh, 34px)',
-                          fontWeight: 800,
-                          lineHeight: 1.2,
-                        }}>
-                          {sec.titleHi}
-                        </span>
-                      )}
+
                     </div>
                   </GazeButton>
                 );
@@ -557,6 +541,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
               }}>
                 {titleEn(activeSection)}
               </h2>
+              {isPaged && <span role="status" style={{ color: hindiColor, fontSize: 'clamp(18px, 2vh, 24px)' }}>{currentPage + 1} / {pageCount}</span>}
             </div>
 
             <div style={{
@@ -609,9 +594,9 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                 </div>
               </GazeButton>
 
-              {activeSection.items.slice(0, 8).map((item) => (
+              {visibleItems.map((item) => (
                 <PhraseButton
-                  key={item.en}
+                  key={`${activeSection.id}-${currentPage}-${item.en}`}
                   item={item}
                   isDarkMode={isDarkMode}
                   showHindi={showHindi}
@@ -626,6 +611,21 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
                   hindiColor={hindiColor}
                 />
               ))}
+              {isPaged && <>
+                {Array.from({ length: pageSize - visibleItems.length }, (_, index) => <div key={`empty-${index}`} aria-hidden="true" />)}
+                {(['previous', 'next'] as const).map(direction => (
+                  <GazeButton key={`${currentPage}-${direction}`} id={`assist-${direction}`}
+                    onClick={() => setSectionPage(currentPage + (direction === 'previous' ? -1 : 1))}
+                    disabled={direction === 'previous' ? currentPage === 0 : currentPage === pageCount - 1}
+                    gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+                    isDarkMode={isDarkMode} dwellCategory="navigationButton"
+                    style={{ width: '100%', height: '100%', minHeight: 80, background: sectionBackCardBg,
+                      border: sectionCardBorder, borderRadius: 18, color: cardText,
+                      fontFamily: ACCESSIBLE_FONT, fontSize: 'clamp(24px, 2.7vh, 32px)', fontWeight: 650 }}>
+                    {direction === 'previous' ? '← Previous' : 'More →'}
+                  </GazeButton>
+                ))}
+              </>}
             </div>
           </>
         )}

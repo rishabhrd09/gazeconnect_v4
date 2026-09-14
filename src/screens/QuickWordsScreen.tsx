@@ -117,7 +117,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
         padding: '4px 20px 12px 20px',
       }}
     >
-      <GlobalNavBar currentPage="quickwords" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="quickwords" onNavigate={onNavigate} isDarkMode={isDarkMode} />
 
       <QuickWordPhraseOverlay
         isOpen={Boolean(activeWord)}
@@ -164,25 +164,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
             }}>
               {lastSpoken.en}
             </div>
-            {showHindi && lastSpoken.hi && (
-              <>
-                <div style={{
-                  width: '28px',
-                  height: '1px',
-                  borderRadius: '999px',
-                  background: shellAccent,
-                }} />
-                <div style={{
-                  fontSize: 'clamp(22px, 3vh, 30px)',
-                  fontWeight: 700,
-                  lineHeight: 1.1,
-                  fontFamily: HINDI_FONT,
-                  color: isLight ? lightColors.text.secondary : isMix ? '#86654A' : '#D7C7B7',
-                }}>
-                  {lastSpoken.hi}
-                </div>
-              </>
-            )}
+
           </div>
         </div>
       )}

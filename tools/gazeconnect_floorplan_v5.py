@@ -457,13 +457,14 @@ def parse(data):
                 c=p.get("coords",{})
                 rooms.append(Rm(name,rid,c.get("x1",0),c.get("y1",0),c.get("x2",0),c.get("y2",0),
                                p.get("area_sqft",0),m["d"],m["w"],m["h"],m["fur"],m["c"]))
-        floors.append(Fl(W,D,facing,pt,rooms,R,C,lb))
-
-    # Apply refinements
-    adv = cm.get("advanced_refinements", {})
-    if adv:
-        for fl in floors:
+        fl = Fl(W,D,facing,pt,rooms,R,C,lb)
+        # Cell keys repeat on each floor. Prefer that floor's own refinements,
+        # including an explicit empty set, while retaining older payloads that
+        # stored a shared top-level set.
+        adv = fd.get("advanced_refinements", cm.get("advanced_refinements", {}))
+        if adv:
             fl.rooms, fl.no_wall_edges = _apply_refinements(fl.rooms, adv, W, D, R, C)
+        floors.append(fl)
 
     return floors or [Fl(W,D,facing,pt)]
 

@@ -23,9 +23,17 @@ import {
   CARE_MEDICAL_SECTIONS,
   CARE_PHRASE_CATEGORIES,
   CARE_QUICK_WORDS,
+  FOOD_CONTENT_VERSION,
+  FOOD_PHRASES,
+  FOOD_QUICK_WORD,
 } from './careContentPresets';
 
 const DEBOUNCE_MS = 500;
+// English-only release. Legacy translation data stays in saved profiles, but old
+// flags and imports cannot enable a bilingual interface or a Hindi voice mode.
+const englishOnlySettings = (settings: AppSettings): AppSettings => ({
+  ...settings, showHindi: false, ttsLanguage: 'english',
+});
 const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
 
 const isPersonActive = (person: Person) => person.isActive !== false;
@@ -125,8 +133,8 @@ const POSITION_WORD_UPDATES: Record<string, { en: string; hi: string; phrases: P
   },
 };
 const DIRECT_QUICK_WORD_UPDATES: Record<string, { en: string; hi: string }> = {
-  position_turn_left: { en: 'Turn Left / Left Karvat', hi: '' },
-  position_turn_right: { en: 'Turn Right / Right Karvat', hi: '' },
+  position_turn_left: { en: 'Turn Left', hi: '' },
+  position_turn_right: { en: 'Turn Right', hi: '' },
   daily_water: { en: 'Water', hi: 'पानी' },
 };
 
@@ -183,6 +191,8 @@ export class CustomizationService {
       this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true)
     )));
     this.data = { ...this.data, people: normalizePeople(this.data.people) };
+    this.data = this.applyFoodContent(this.data);
+    this.data = { ...this.data, settings: englishOnlySettings(this.data.settings) };
   }
 
   // ============================================
@@ -197,10 +207,6 @@ export class CustomizationService {
         if (saved) {
           // Merge saved data over defaults (preserves new fields added in updates)
           this.data = this.mergeWithDefaults(saved);
-          // Force showHindi to false on startup per user request
-          if (this.data.settings) {
-            this.data.settings.showHindi = false;
-          }
         }
       }
     } catch (err) {
@@ -238,7 +244,7 @@ export class CustomizationService {
       ...defaults,
       ...saved,
       // Deep merge settings to preserve new settings keys
-      settings: { ...defaults.settings, ...(saved.settings || {}) },
+      settings: englishOnlySettings({ ...defaults.settings, ...(saved.settings || {}) }),
       // Deep merge quickWords to preserve coreWords and other new fields
       quickWords: mergedQuickWords,
       // Ensure arrays default to defaults if not present in saved data
@@ -255,9 +261,24 @@ export class CustomizationService {
       version: saved.version ?? defaults.version,
     };
 
-    return this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
+    return this.applyFoodContent(this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
       this.applyCareContentArchitecture(merged, (saved.version ?? 1) < CARE_CONTENT_ARCHITECTURE_VERSION)
-    )));
+    ))));
+  }
+
+  // Add the food vocabulary once without replacing saved phrases or disabled words.
+  private applyFoodContent(data: CustomizationData): CustomizationData {
+    if (data.version >= FOOD_CONTENT_VERSION) return data;
+    const medicalSections = data.medicalSections.map(section => {
+      if (section.id !== 'daily') return section;
+      const missing = FOOD_PHRASES.filter(phrase => !section.items.some(item => item.en.toLowerCase() === phrase.en.toLowerCase()));
+      return missing.length ? { ...section, items: [...structuredClone(missing), ...section.items] } : section;
+    });
+    const categories = data.quickWords.categories.map(category => {
+      if (category.id !== 'daily' || category.words.some(word => word.id === FOOD_QUICK_WORD.id)) return category;
+      return { ...category, words: [...category.words.slice(0, 6), structuredClone(FOOD_QUICK_WORD), ...category.words.slice(6)] };
+    });
+    return { ...data, medicalSections, quickWords: { ...data.quickWords, categories }, version: FOOD_CONTENT_VERSION };
   }
 
   private applyMedicalLabelUpdates(data: CustomizationData): CustomizationData {
@@ -668,13 +689,13 @@ export class CustomizationService {
   }
   // --- Settings ---
   updateSettings(partial: Partial<AppSettings>): void {
-    this.data = { ...this.data, settings: { ...this.data.settings, ...partial } };
+    this.data = { ...this.data, settings: englishOnlySettings({ ...this.data.settings, ...partial }) };
     this.scheduleSave();
     this.notify();
   }
 
   updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
-    this.data = { ...this.data, settings: { ...this.data.settings, [key]: value } };
+    this.data = { ...this.data, settings: englishOnlySettings({ ...this.data.settings, [key]: value }) };
     this.scheduleSave();
     this.notify();
   }
@@ -700,8 +721,9 @@ export class CustomizationService {
   }
 
   resetToDefaults(): void {
-    this.data = this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true);
+    this.data = this.applyFoodContent(this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true));
     this.data = { ...this.data, people: normalizePeople(this.data.people) };
+    this.data = { ...this.data, settings: englishOnlySettings(this.data.settings) };
     this.scheduleSave();
     this.notify();
   }

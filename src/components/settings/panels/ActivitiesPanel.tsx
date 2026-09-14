@@ -180,7 +180,7 @@ const YouTubeItemEditor: React.FC<{
     <>
       <div style={{ display: 'flex', gap: 10, padding: '10px 0 6px 0', alignItems: 'center' }}>
         <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Label *</span>
-        <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Hindi Sub</span>
+
         <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Speak Text (auto)</span>
         <span style={{ width: 30 }} />
       </div>
@@ -193,9 +193,7 @@ const YouTubeItemEditor: React.FC<{
           <input className="ap-input" value={item.label}
             onChange={e => updateField(idx, 'label', e.target.value)}
             placeholder="e.g. Play old songs" style={{ flex: 1 }} />
-          <input className="ap-input" value={item.sub || ''}
-            onChange={e => updateField(idx, 'sub', e.target.value)}
-            placeholder="पुराने गाने" style={{ flex: 1 }} />
+
           <input className="ap-input" value={item.speak}
             onChange={e => updateField(idx, 'speak', e.target.value)}
             placeholder="Auto from label" style={{ flex: 1, color: item.speak === item.label ? colors.text.tertiary : colors.text.primary }} />
@@ -245,7 +243,7 @@ const AlexaItemEditor: React.FC<{
     <>
       <div style={{ display: 'flex', gap: 10, padding: '10px 0 6px 0', alignItems: 'center' }}>
         <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Label *</span>
-        <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Hindi Sub</span>
+
         <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Speak Text (auto: "Alexa play...")</span>
         <span style={{ width: 30 }} />
       </div>
@@ -258,9 +256,7 @@ const AlexaItemEditor: React.FC<{
           <input className="ap-input" value={item.label}
             onChange={e => updateField(idx, 'label', e.target.value)}
             placeholder="e.g. Hanuman Chalisa" style={{ flex: 1 }} />
-          <input className="ap-input" value={item.sub || ''}
-            onChange={e => updateField(idx, 'sub', e.target.value)}
-            placeholder="हनुमान चालीसा" style={{ flex: 1 }} />
+
           <input className="ap-input" value={item.speak}
             onChange={e => updateField(idx, 'speak', e.target.value)}
             placeholder="Alexa play ..."

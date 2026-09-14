@@ -1,21 +1,22 @@
 # GazeConnect Pro - Project Context
 
 ## What This Is
-Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND patients using Tobii Eye Tracker 5. Built for Papa — and for every ALS patient who deserves to communicate freely.
+AAC (Augmentative & Alternative Communication) app for ALS/MND patients using Tobii Eye Tracker 5. Built for Papa — and for every ALS patient who deserves to communicate freely.
 
 ## Architecture
 - **Frontend**: Electron 28 + React 18 + TypeScript + Vite 5
 - **Backend**: Python 3.10+ (asyncio WebSocket server on port 8765)
-- **Eye Tracking**: .NET 6.0 TobiiGazeHelper (TCP port 5555)
+- **Eye Tracking**: .NET 8 x64 self-contained TobiiGazeHelper (TCP port 5555)
 - **TTS**: pyttsx3 (SAPI5) + browser SpeechSynthesis fallback
 
 ## Key Constraints
 - ALL UI must work with eye-gaze (dwell-based selection, NO drag/drop)
-- Minimum button size: 80px (2° visual angle at 60cm viewing distance)
+- Minimum primary gaze target: 80 CSS pixels; physical size depends on display density and scaling.
 - Must support 13" to 27" screens (use clamp() and viewport units, NOT fixed px)
 - Dark mode is primary (reduces eye strain for ALS patients)
-- Bilingual: English + Hindi
-- Emergency buttons must ALWAYS be accessible. Current code keeps urgent controls always-active in key contexts; default dwell values come from `src/config/dwellTimeConfig.ts` (`medicalUrgent: 900ms`, `emergencyButton: 2000ms`) to reduce accidental activation.
+- English-only UI for this release. Do not add Hindi translations, language toggles or dual-language fields; Hindi support is a separate future task.
+- Product scope: communication and activities, not a reliable alert system. Do not reintroduce global emergency buttons. Keep existing care phrases and the separate Alert Mode board.
+- Exactly five fixed selection durations live in `src/config/dwellTimeConfig.ts`: Typing 500ms, Words/suggestions 1000ms, Communication 1250ms, Navigation/choices 1500ms, Deliberate actions 2000ms. Do not add per-button sliders, multipliers or repeat-key acceleration. Onset/cooldown and tracking safeguards are separate internal controls.
 - No scrolling on main screens (everything must fit within viewport)
 - overflow:hidden is intentional — content must fit, not scroll
 
@@ -24,6 +25,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `.\start-dev.bat` — Full app (Electron + Python + Tobii)
 - `.\start-dev.bat --simulate` — Without eye tracker (mouse-as-gaze mode)
 - `.\build-installer.bat` — Build production .exe installer
+- `.\check-windows.bat` — Finite Windows dependency, DLL and port readiness checks after setup
 
 ## Runtime Logging Safety
 - Never run the live gaze app directly in Codex with continuous stdout logs.
@@ -57,4 +59,4 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 3. Use `clamp(min, preferred, max)` for responsive sizing
 4. Test that all content fits within viewport on both 768px and 1080px heights
 5. Keep the dark theme aesthetic (warm/dark surfaces, strong contrast, gaze accent around #2DD4BF)
-6. Emergency elements must remain visually prominent and always accessible
+6. Keep Warm and Dark only. Preserve content and question/option order. Survey options and room choices use large paged grids; navigation must not overlap active choices.

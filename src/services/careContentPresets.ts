@@ -3,9 +3,22 @@ import type {
   MedicalSection,
   PhraseCategory,
   QuickWordsConfig,
+  QuickWord,
+  Phrase,
 } from '../types/customization';
 
 export const CARE_CONTENT_ARCHITECTURE_VERSION = 4;
+
+export const FOOD_CONTENT_VERSION = 5;
+export const FOOD_PHRASES: Phrase[] = [
+  { en: 'I want food', hi: 'मुझे खाना चाहिए' },
+  { en: 'I am hungry', hi: 'मुझे भूख लगी है' },
+  { en: 'I need my diet', hi: 'मुझे मेरी डाइट चाहिए' },
+];
+export const FOOD_QUICK_WORD: QuickWord = {
+  id: 'daily_food', en: 'Food / Diet', hi: 'खाना / डाइट',
+  enabled: true, priority: 'medium', phrases: FOOD_PHRASES,
+};
 
 export const CARE_PHRASE_CATEGORIES: PhraseCategory[] = [
   {
@@ -93,6 +106,7 @@ export const CARE_MEDICAL_SECTIONS: MedicalSection[] = [
     title: 'DAILY CARE',
     titleHi: 'रोज़ देखभाल',
     items: [
+      ...FOOD_PHRASES,
       { en: 'I need Water', hi: 'पानी चाहिए' },
       { en: 'Oral Care / Clean Teeth', hi: 'मुंह / दांत साफ करो' },
       { en: 'Clean Face / Eyes', hi: 'चेहरा / आंखें साफ करो' },
@@ -235,7 +249,7 @@ export const CARE_QUICK_WORDS: QuickWordsConfig = {
       words: [
         {
           id: 'position_turn_left',
-          en: 'Turn Left / Left Karvat',
+          en: 'Turn Left',
           hi: '',
           enabled: true,
           priority: 'medium',
@@ -243,7 +257,7 @@ export const CARE_QUICK_WORDS: QuickWordsConfig = {
         },
         {
           id: 'position_turn_right',
-          en: 'Turn Right / Right Karvat',
+          en: 'Turn Right',
           hi: '',
           enabled: true,
           priority: 'medium',
@@ -393,6 +407,7 @@ export const CARE_QUICK_WORDS: QuickWordsConfig = {
             { en: 'Reduce AC cooling', hi: 'एसी कूलिंग कम करें' },
           ],
         },
+        FOOD_QUICK_WORD,
       ],
     },
   ],

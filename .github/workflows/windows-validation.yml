@@ -1,0 +1,66 @@
+name: Windows source validation
+
+# No installer upload, release publication, secrets, or hardware access.
+# Publishing the repository itself still requires the vendor-license review.
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-checks:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+          dotnet-quality: ga
+      - name: Parse Windows PowerShell 5.1 scripts
+        run: .\scripts\windows\Test-Scripts.ps1
+      - name: Validate vendor build inputs and release failure cases
+        run: |
+          . .\scripts\windows\Common.ps1
+          Invoke-Checked 'python.exe' @('scripts/windows/test_verify_windows_bundle.py')
+          Invoke-Checked 'python.exe' @('scripts/verify_windows_bundle.py', 'source', '--root', '.')
+      - name: Publish self-contained helper without starting hardware
+        run: |
+          . .\scripts\windows\Common.ps1
+          Invoke-Checked 'dotnet.exe' @('publish', $TobiiProject, '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-p:PublishTrimmed=false', '-o', (Join-Path $env:RUNNER_TEMP 'gazeconnect-helper'), '--nologo')
+          Require-File (Join-Path $env:RUNNER_TEMP 'gazeconnect-helper\TobiiGazeHelper.exe')
+          Require-File (Join-Path $env:RUNNER_TEMP 'gazeconnect-helper\coreclr.dll')
+      - name: Install locked Node dependencies and validate frontend/Electron
+        run: |
+          . .\scripts\windows\Common.ps1
+          Invoke-Checked 'npm.cmd' @('ci')
+          Invoke-Checked 'npm.cmd' @('run', 'build')
+          Invoke-Checked 'npm.cmd' @('run', 'build:electron')
+          Invoke-Checked 'npm.cmd' @('run', 'check:dwell-groups')
+          Invoke-Checked 'npm.cmd' @('run', 'check:browser-cursor')
+          Invoke-Checked 'npm.cmd' @('run', 'check:gaze-safety')
+          Invoke-Checked 'npm.cmd' @('run', 'check:browser-gaze-safety')
+          Invoke-Checked 'node.exe' @('scripts/check-zone-board.cjs')
+          Invoke-Checked 'node.exe' @('scripts/check-dev-startup.cjs')
+          Invoke-Checked 'node.exe' @('scripts/check-floorplan-transport.cjs')
+      - name: Check Windows Python dependencies and finite runtime probes
+        run: |
+          & .\scripts\windows\Setup.ps1 -Simulate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\scripts\windows\Test-Environment.ps1 -Simulate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

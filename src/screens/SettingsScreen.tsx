@@ -276,7 +276,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <GlobalNavBar
           currentPage="settings"
           onNavigate={onNavigate}
-          onSpeak={onSpeak}
+
           isDarkMode={isDarkMode}
         />
       </div>

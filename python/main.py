@@ -5,9 +5,9 @@ Complete Python backend orchestrating all services.
 
 Components:
 - WebSocket server for Electron communication
-- Tobii Eye Tracker 5 integration (133Hz)
-- One Euro Filter for gaze stabilization
-- Adaptive dwell detection
+- Tobii Eye Tracker 5 integration (measured source rate)
+- Elapsed-time adaptive cursor stabilization
+- Renderer-owned dwell selection with a target geometry registry
 - Word prediction engine
 - Fatigue monitoring
 - Text-to-speech
@@ -19,6 +19,7 @@ Architecture:
 """
 
 import asyncio
+import os
 import datetime
 import json
 import time
@@ -34,7 +35,7 @@ from collections import deque
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if os.environ.get('GAZE_DEBUG') == '1' else logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%H:%M:%S'
 )
@@ -69,18 +70,14 @@ except ImportError:
     TTS_AVAILABLE = False
 
 # Our services
-from services.one_euro_filter import (
-    GazeFilter2D, FilterConfig, FilterPreset, GazePoint, FixationStabilizer,
-    GravityWell, AntiRecoilFilter, AdaptiveKalmanFilter, OptiKeyGazeFilter
-)
-from services.gaze_classifier import GazeClassifier, GazeState, ScreenParams
+from services.gaze_sample import GazePoint
+from services.adaptive_cursor_filter import AdaptiveCursorFilter, FILTER_PROFILES, normalize_filter_preset
+from services.gaze_classifier import GazeClassifier
 from services.signal_conditioner import SignalConditioner, GazeValidity
 from services.calibration import (
     CalibrationSession, CalibrationStorage, GazeCalibrationCorrector
 )
-from services.dwell_detector import (
-    DwellManager, DwellTarget, ButtonSize, DwellState
-)
+from services.gaze_targets import TargetRegistry, GazeTarget, ButtonSize
 from services.word_prediction import (
     WordPredictionEngine, AAC_PHRASES, ABBREVIATIONS
 )
@@ -91,7 +88,6 @@ from prediction_guardrails import (
     tokenize_prediction_text,
 )
 import threading
-import os
 import queue
 from services.fatigue_monitor import (
     FatigueDetector, BreakReminderManager, DryEyeMonitor, FatigueLevel
@@ -384,11 +380,14 @@ class TobiiReceiver:
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
         self._receive_task: Optional[asyncio.Task] = None
+        self._stopping = False
+        self._loss_reported = False
+        self._tracking_epoch = None
 
         # Device info (from TobiiHelper)
         self.device_name = ""
         self.serial_number = ""
-        self.sampling_rate = 133
+        self.sampling_rate = 0  # Unknown until measured/reported
 
         # Callbacks
         self.on_gaze: Optional[callable] = None
@@ -398,79 +397,80 @@ class TobiiReceiver:
         # Simulation
         self._sim_task: Optional[asyncio.Task] = None
 
+    MAX_MESSAGE_BYTES = 16384
+    SILENCE_TIMEOUT_SECONDS = 0.150
+
     async def connect(self) -> bool:
-        """Connect to TobiiHelper or start simulation."""
+        """Start one receiver supervisor; it recovers until explicitly stopped."""
+        self._stopping = False
         if self.simulated:
-            logger.info("Starting Tobii simulation mode (no hardware)")
+            if self._sim_task is None or self._sim_task.done():
+                self._sim_task = asyncio.create_task(self._simulate_gaze())
             self.is_connected = True
-            self._sim_task = asyncio.create_task(self._simulate_gaze())
             return True
+        if self._receive_task is not None and not self._receive_task.done():
+            return self.is_connected
+        connected = await self._open_connection()
+        self._receive_task = asyncio.create_task(self._receive_loop())
+        return connected
 
-        # Connect to TobiiHelper.exe via TCP
-        logger.info(f"Connecting to TobiiHelper at {self.helper_host}:{self.helper_port}...")
+    async def _open_connection(self):
+        try:
+            self._reader, self._writer = await asyncio.wait_for(
+                asyncio.open_connection(self.helper_host, self.helper_port,
+                                        limit=self.MAX_MESSAGE_BYTES), timeout=2.0)
+            self.is_connected = True
+            self._loss_reported = False
+            self._tracking_epoch = None
+            logger.info("Connected to TobiiHelper")
+            return True
+        except (OSError, asyncio.TimeoutError):
+            self.is_connected = False
+            return False
 
-        retry_count = 0
-        max_retries = 10
-
-        while retry_count < max_retries:
-            try:
-                self._reader, self._writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.helper_host, self.helper_port),
-                    timeout=2.0
-                )
-
-                self.is_connected = True
-                logger.info("Connected to TobiiHelper")
-
-                # Start receiving data
-                self._receive_task = asyncio.create_task(self._receive_loop())
-                return True
-
-            except (ConnectionRefusedError, asyncio.TimeoutError):
-                retry_count += 1
-                logger.warning(f"TobiiHelper not ready, retrying... ({retry_count}/{max_retries})")
-                logger.info("Make sure TobiiHelper.exe is running")
-                await asyncio.sleep(1)
-            except Exception as e:
-                logger.error(f"Connection error: {e}")
-                retry_count += 1
-                await asyncio.sleep(1)
-
-        logger.error("Failed to connect to TobiiHelper")
-        logger.info("Please ensure TobiiHelper.exe is running:")
-        logger.info("  cd TobiiHelper && dotnet run")
-        logger.info("Or run with --simulate for testing without hardware")
-        return False
+    def _report_loss(self):
+        if self._loss_reported:
+            return
+        self._loss_reported = True
+        if self.on_gaze:
+            self.on_gaze(GazePoint(x=0.5, y=0.5, timestamp=time.time(),
+                                  left_valid=False, right_valid=False,
+                                  confidence=0.0, validity_source='transport'))
 
     async def _receive_loop(self):
-        """Receive gaze data from TobiiHelper."""
-        buffer = ""
-
-        while self.is_connected and self._reader:
-            try:
-                data = await self._reader.read(4096)
-                if not data:
-                    logger.warning("TobiiHelper connection closed")
+        """Bounded framing, disconnect recovery, and a silent-source watchdog."""
+        try:
+            while not self._stopping:
+                if not self.is_connected:
+                    self._report_loss()
+                    await asyncio.sleep(1.0)
+                    if self._stopping or not await self._open_connection():
+                        continue
+                try:
+                    line = await asyncio.wait_for(self._reader.readline(),
+                                                  self.SILENCE_TIMEOUT_SECONDS)
+                    if not line:
+                        raise ConnectionError('TobiiHelper closed the connection')
+                    if len(line) > self.MAX_MESSAGE_BYTES:
+                        raise ValueError('TobiiHelper message exceeds protocol limit')
+                    await self._process_message(line.decode('utf-8'))
+                except asyncio.TimeoutError:
+                    self._report_loss()
+                except (OSError, ValueError, UnicodeError):
+                    self._report_loss()
                     self.is_connected = False
-                    break
-
-                buffer += data.decode('utf-8')
-
-                # Process newline-delimited JSON messages
-                while '\n' in buffer:
-                    line, buffer = buffer.split('\n', 1)
-                    if line.strip():
-                        await self._process_message(line)
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Receive error: {e}")
-                await asyncio.sleep(0.1)
-
-        # Attempt reconnection
-        if not self.is_connected:
-            asyncio.create_task(self._reconnect())
+                    if self._writer:
+                        self._writer.close()
+                        self._writer = None
+                    self._reader = None
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self.is_connected = False
+            if self._writer:
+                self._writer.close()
+                self._writer = None
+            self._reader = None
 
     async def _process_message(self, message: str):
         """Process a JSON message from TobiiHelper."""
@@ -479,74 +479,54 @@ class TobiiReceiver:
             msg_type = data.get('type', '')
 
             if msg_type == 'gaze':
-                # Convert to GazePoint
-                # Fix: Look for 'x'/'y' first (sent by C# helper), then fallback to 'combined_x'
-                p_x = data.get('x')
-                if p_x is None: p_x = data.get('combined_x', 0.5)
-
-                p_y = data.get('y')
-                if p_y is None: p_y = data.get('combined_y', 0.5)
-
-                # Tobii Eye Tracker 5 range expansion
-                # The sensor's usable tracking range is ~0.03-0.97 on each axis.
-                # Even with good calibration, values at screen edges don't reach 0.0/1.0.
-                # Remap [MARGIN, 1-MARGIN] â†’ [0, 1] so cursor can reach ALL screen corners.
-                # 0.05 = 5% per side â€” aggressive but safe (clamped to [0,1])
-                TOBII_MARGIN_X = 0.025
-                TOBII_MARGIN_Y = 0.035
-                p_x = max(0.0, min(1.0, (float(p_x) - TOBII_MARGIN_X) / (1.0 - 2 * TOBII_MARGIN_X)))
-                p_y = max(0.0, min(1.0, (float(p_y) - TOBII_MARGIN_Y) / (1.0 - 2 * TOBII_MARGIN_Y)))
-
-                # Fix timestamp normalization
-                # TobiiHelper sends wallClockMs (milliseconds since epoch, ~1.739e12)
-                # Old code divided by 1e6 (treating as microseconds) â€” made dt 1000x too small
-                # This broke the One Euro Filter: dx/dt became huge -> alpha~1.0 -> no filtering
-                raw_ts = data.get('timestamp', None)
-                if raw_ts is not None:
-                    raw_ts_f = float(raw_ts)
-                    if raw_ts_f > 1e15:
-                        ts_seconds = raw_ts_f / 1e9       # nanoseconds -> seconds
-                    elif raw_ts_f > 1e12:
-                        ts_seconds = raw_ts_f / 1e3       # milliseconds -> seconds (TobiiHelper sends this)
-                    elif raw_ts_f > 1e9:
-                        ts_seconds = raw_ts_f             # already seconds
-                    else:
-                        ts_seconds = time.time()
+                # Keep the calibrated vendor coordinate geometry unchanged.
+                # Missing/nonfinite positions never default to a valid center.
+                p_x = float(data.get('x', data.get('combined_x', float('nan'))))
+                p_y = float(data.get('y', data.get('combined_y', float('nan'))))
+                stamp = SignalConditioner._normalize_timestamp(data.get('timestamp'))
+                left = data.get('left') if isinstance(data.get('left'), dict) else {}
+                right = data.get('right') if isinstance(data.get('right'), dict) else {}
+                has_eyes = ('left_valid' in data or 'right_valid' in data or
+                            'valid' in left or 'valid' in right)
+                explicit_valid = data.get('is_valid')
+                if has_eyes:
+                    left_valid = data.get('left_valid', left.get('valid')) is True
+                    right_valid = data.get('right_valid', right.get('valid')) is True
+                    if explicit_valid is False:
+                        left_valid = right_valid = False
+                    source = 'reported'
                 else:
-                    ts_seconds = time.time()
-
-                has_left_valid = 'left_valid' in data or isinstance(data.get('left'), dict) and 'valid' in data.get('left', {})
-                has_right_valid = 'right_valid' in data or isinstance(data.get('right'), dict) and 'valid' in data.get('right', {})
-                has_eye_validity = has_left_valid or has_right_valid
-                raw_confidence = float(data.get('confidence', 1.0))
-                if not has_eye_validity:
-                    raw_confidence = min(raw_confidence, 0.75)
-
-                point = GazePoint(
-                    x=p_x,
-                    y=p_y,
-                    timestamp=ts_seconds,
-                    left_valid=data.get('left_valid', data.get('left', {}).get('valid', True)),
-                    right_valid=data.get('right_valid', data.get('right', {}).get('valid', True)),
-                    confidence=raw_confidence,
-                    validity_source='reported' if has_eye_validity else 'missing',
-                )
-
+                    # Interaction supplies combined gaze validity, not two eye
+                    # validity values or a measured accuracy/confidence score.
+                    left_valid = right_valid = explicit_valid is True
+                    source = 'combined' if explicit_valid is not None else 'missing'
+                confidence = float(data.get('confidence', 0.75 if explicit_valid is True else 0.0))
+                if not has_eyes and math.isfinite(confidence):
+                    confidence = min(confidence, 0.75)
+                if not all(math.isfinite(v) for v in (p_x, p_y, stamp, confidence)):
+                    left_valid = right_valid = False
+                    confidence = 0.0
+                point = GazePoint(x=p_x, y=p_y, timestamp=stamp,
+                                  left_valid=left_valid, right_valid=right_valid,
+                                  confidence=confidence, validity_source=source)
+                epoch = data.get('tracking_epoch')
+                if epoch is not None:
+                    if (self._tracking_epoch is not None and epoch != self._tracking_epoch
+                            and point.is_valid and self.on_gaze):
+                        # A capacity-one source mailbox may supersede an invalid
+                        # point; its epoch preserves the loss edge for selectors.
+                        self.on_gaze(GazePoint(.5, .5, stamp - .000001,
+                                              False, False, 0.0, 'interrupted'))
+                    self._tracking_epoch = epoch
                 self.last_gaze = point
-
+                self._loss_reported = not point.is_valid
                 if self.on_gaze:
                     self.on_gaze(point)
-
-                # Debug log every 60 frames (~0.5s)
-                if not hasattr(self, '_log_counter'): self._log_counter = 0
-                self._log_counter += 1
-                if self._log_counter % 60 == 0:
-                    logger.info(f"Gaze input: ({point.x:.3f}, {point.y:.3f})")
 
             elif msg_type == 'status':
                 self.device_name = data.get('device_name', '')
                 self.serial_number = data.get('serial_number', '')
-                self.sampling_rate = data.get('sampling_rate', 133)
+                self.sampling_rate = data.get('sampling_rate', 0)
                 logger.info(f"Tobii device: {self.device_name} (S/N: {self.serial_number})")
 
                 if self.on_status:
@@ -556,37 +536,20 @@ class TobiiReceiver:
                 if self.on_presence:
                     self.on_presence(data.get('is_present', True))
 
-        except json.JSONDecodeError as e:
-            logger.debug(f"Invalid JSON from TobiiHelper: {e}")
-        except Exception as e:
-            logger.error(f"Message processing error: {e}")
-
-    async def _reconnect(self):
-        """Attempt to reconnect to TobiiHelper."""
-        logger.info("Attempting to reconnect to TobiiHelper...")
-        await asyncio.sleep(2)
-
-        if not self.simulated:
-            await self.connect()
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError):
+            self._report_loss()
+            logger.debug('Rejected malformed TobiiHelper message')
 
     def disconnect(self):
-        """Disconnect from TobiiHelper."""
-        if self._sim_task:
-            self._sim_task.cancel()
-            self._sim_task = None
-
-        if self._receive_task:
-            self._receive_task.cancel()
-            self._receive_task = None
-
+        """Cancel the supervisor, including any pending retry; close the socket."""
+        self._stopping = True
+        for task in (self._sim_task, self._receive_task):
+            if task:
+                task.cancel()
+        self._sim_task = self._receive_task = None
         if self._writer:
-            try:
-                self._writer.close()
-            except:
-                pass
-            self._writer = None
-            self._reader = None
-
+            self._writer.close()
+        self._writer = self._reader = None
         self.is_connected = False
         logger.info("Disconnected from TobiiHelper")
 
@@ -865,16 +828,6 @@ class GazeConnectBackend:
     """
     POINT_TTL_SECONDS = 0.150
     FRAME_GAP_HOLD_SECONDS = 0.150
-    # Gap-hold rebroadcast used to re-send the previous payload VERBATIM —
-    # including signal_state:'valid' — which defeated the frontend's
-    # dwellPauseOnGap (it pauses on staleness OR signal_state != 'valid',
-    # but a rebroadcast is a fresh WS message carrying a 'valid' state).
-    # With this flag on, held frames are re-sent as a copy marked
-    # signal_state:'gap_hold' (is_valid stays true so the cursor remains
-    # visible; only dwell pauses). Default OFF until on-rig verified;
-    # enable with GAZECONNECT_GAP_HOLD_MARK=1 before start-dev.bat.
-    ENABLE_GAP_HOLD_STALE_MARK = os.environ.get('GAZECONNECT_GAP_HOLD_MARK', '0') == '1'
-    BACKEND_DWELL_ENABLED = False
     ENABLE_STALE_BLINK_DWELL_GUARD = True
     DWELL_GUARD_ALLOWED_STATES = (GazeValidity.VALID,)
     ENABLE_CLASSIFIER_SCREEN_BASIS = True
@@ -885,56 +838,10 @@ class GazeConnectBackend:
     ON_KEY_HOLD_SECONDS = 0.120
     ENABLE_MAGNET_STICKY_HANDOFF = True
     MAGNET_HANDOFF_BIAS_PX = 8.0   # v15: reduced from 14 — faster key-to-key handoff on keyboard
-    ACTIVE_PIPELINE_NAME = "optikey_kalman_v1"
+    ACTIVE_PIPELINE_NAME = "adaptive_cursor_v1"
     SAMPLE_RATE_WINDOW = 120
 
-    ACTIVE_FILTER_PROFILES = {
-        'responsive': {
-            'classifier': {'fixation_threshold': 55.0, 'saccade_threshold': 135.0,
-                           'saccade_onset_count': 1, 'fixation_onset_count': 3, 'velocity_window': 3},
-            'kalman': {'state_noise': {'fixation': 2400.0, 'saccade': 120.0, 'glissade': 650.0},
-                       'smoothing_level': 1, 'wma_weights': (0.62, 0.25, 0.13)},
-            'optikey': {'damping': 0.26, 'fixation_radius': 0.034, 'lock_radius': 0.014,
-                        'hysteresis_multiplier': 1.25, 'min_lock_duration': 0.050,
-                        'fixation_min_multiplier': 0.16},
-        },
-        'balanced': {
-            'classifier': {'fixation_threshold': 65.0, 'saccade_threshold': 150.0,
-                           'saccade_onset_count': 2, 'fixation_onset_count': 4, 'velocity_window': 5},
-            'kalman': {'state_noise': {'fixation': 3500.0, 'saccade': 200.0, 'glissade': 1000.0},
-                       'smoothing_level': 1, 'wma_weights': (0.45, 0.30, 0.25)},
-            'optikey': {'damping': 0.36, 'fixation_radius': 0.040, 'lock_radius': 0.016,
-                        'hysteresis_multiplier': 1.35, 'min_lock_duration': 0.060,
-                        'fixation_min_multiplier': 0.12},
-        },
-        'als_early': {
-            'classifier': {'fixation_threshold': 72.0, 'saccade_threshold': 165.0,
-                           'saccade_onset_count': 2, 'fixation_onset_count': 5, 'velocity_window': 5},
-            'kalman': {'state_noise': {'fixation': 4300.0, 'saccade': 250.0, 'glissade': 1250.0},
-                       'smoothing_level': 1, 'wma_weights': (0.42, 0.32, 0.26)},
-            'optikey': {'damping': 0.42, 'fixation_radius': 0.044, 'lock_radius': 0.018,
-                        'hysteresis_multiplier': 1.55, 'min_lock_duration': 0.075,
-                        'fixation_min_multiplier': 0.10},
-        },
-        'als_late': {
-            'classifier': {'fixation_threshold': 82.0, 'saccade_threshold': 185.0,
-                           'saccade_onset_count': 3, 'fixation_onset_count': 6, 'velocity_window': 7},
-            'kalman': {'state_noise': {'fixation': 5600.0, 'saccade': 320.0, 'glissade': 1650.0},
-                       'smoothing_level': 2, 'wma_weights': (0.38, 0.34, 0.28)},
-            'optikey': {'damping': 0.50, 'fixation_radius': 0.050, 'lock_radius': 0.021,
-                        'hysteresis_multiplier': 1.75, 'min_lock_duration': 0.095,
-                        'fixation_min_multiplier': 0.08},
-        },
-        'stable': {
-            'classifier': {'fixation_threshold': 88.0, 'saccade_threshold': 195.0,
-                           'saccade_onset_count': 3, 'fixation_onset_count': 7, 'velocity_window': 7},
-            'kalman': {'state_noise': {'fixation': 6200.0, 'saccade': 360.0, 'glissade': 1800.0},
-                       'smoothing_level': 2, 'wma_weights': (0.36, 0.35, 0.29)},
-            'optikey': {'damping': 0.55, 'fixation_radius': 0.055, 'lock_radius': 0.023,
-                        'hysteresis_multiplier': 1.9, 'min_lock_duration': 0.110,
-                        'fixation_min_multiplier': 0.07},
-        },
-    }
+    ACTIVE_FILTER_PROFILES = FILTER_PROFILES
 
     def __init__(self, config: Optional[ServerConfig] = None):
         self.config = config or ServerConfig()
@@ -952,29 +859,19 @@ class GazeConnectBackend:
         # Core services
         self.tobii = TobiiReceiver(simulated=self.config.tobii_simulated)
 
-        # OptiKey-style pipeline (v9): Kalman â†’ 4-zone GazeFilter
-        # Replaces: One Euro â†’ AntiRecoil â†’ GravityWell
-        # v12: Full pipeline with state-adaptive filtering
+        # Single elapsed-time filter after validity + coordinate mapping.
         self.signal_conditioner = SignalConditioner()
         self.calibration_corrector = GazeCalibrationCorrector()
         self.calibration_session: Optional[CalibrationSession] = None
         self.calibration_active = False
-        self.gaze_classifier = GazeClassifier()
-        self.kalman_filter = AdaptiveKalmanFilter(smoothing_level=1)
-        self.optikey_gaze_filter = OptiKeyGazeFilter(damping_level=0.4)
-
-        # Legacy pipeline (kept as fallback, not used in main path)
-        self.gaze_filter = GazeFilter2D(FilterConfig.from_preset(FilterPreset.BALANCED))
-        self.anti_recoil = AntiRecoilFilter()
-        self.gravity_well = GravityWell()
-        self.RAW_MODE = False
-        self.USE_OPTIKEY_PIPELINE = True  # Set False to revert to legacy pipeline
+        self.gaze_classifier = GazeClassifier()  # Diagnostics, not selection gating.
+        self.cursor_filter = AdaptiveCursorFilter('balanced')
         self.active_filter_preset = 'balanced'
         self.active_pipeline_name = self.ACTIVE_PIPELINE_NAME
         self._sample_dt_history = deque(maxlen=self.SAMPLE_RATE_WINDOW)
         self._last_sample_rate_ts: Optional[float] = None
         self._measured_sample_rate_hz = 0.0
-        self.dwell_manager = DwellManager()
+        self.target_registry = TargetRegistry()
         self.prediction = WordPredictionEngine()
         self.sentence_predictor = SentencePredictor(
             data_dir=Path(self.config.data_dir) / 'patient_data'
@@ -1005,15 +902,27 @@ class GazeConnectBackend:
         self.connected_clients: Set[WebSocketServerProtocol] = set()
         self.current_text = ""
 
-        # Screen dimensions (will be set by client)
+        # Explicit mapping: primary-screen normalized -> native content DIP ->
+        # viewport CSS coordinates. Legacy clients retain their former fallback.
         self.screen_width = 1920
         self.screen_height = 1080
-        # v8: Physical screen info for coordinate remapping
-        self.physical_width = 1920   # CSS screen width (window.screen.width)
-        self.physical_height = 1080  # CSS screen height (window.screen.height)
-        self.dpr = 1.0               # Device pixel ratio
-        self.window_x = 0            # Window outer X on screen (CSS pixels)
-        self.window_y = 0            # Window outer Y on screen (CSS pixels)
+        self.physical_width = 1920
+        self.physical_height = 1080
+        self.dpr = 1.0
+        self.window_x = 0
+        self.window_y = 0
+        self.screen_origin_x = 0
+        self.screen_origin_y = 0
+        self.content_width = None
+        self.content_height = None
+        self.screen_units = None
+        # Live hardware waits for foreground content geometry. Headless/offline
+        # tests explicitly disable the Tobii service and exercise the pipeline.
+        self.gaze_active = not self.config.tobii_enabled
+        self._last_sample_timestamp = None
+        self._last_sample_received = None
+        self._tracking_lost = False
+        self._gaze_send_tasks = {}
         self._gaze_offset_x = 0     # Manual gaze X offset in CSS pixels (from Settings)
         self._gaze_offset_y = 0     # Manual gaze Y offset in CSS pixels (from Settings)
         self._content_chrome = 0     # v13: chrome height in CSS px (title bar + taskbar)
@@ -1029,16 +938,6 @@ class GazeConnectBackend:
         # Tobii gaze callback
         self.tobii.on_gaze = self._on_gaze_data
 
-        # Dwell callbacks
-        for screen in self.dwell_manager.detectors:
-            detector = self.dwell_manager.detectors[screen]
-            detector.on_dwell_start = lambda t: self._broadcast('dwell_start', {'target_id': t.id})
-            detector.on_dwell_progress = lambda t, p, e: self._broadcast('dwell_progress', {
-                'target_id': t.id, 'progress': p, 'elapsed_ms': e
-            })
-            detector.on_dwell_complete = self._on_dwell_complete
-            detector.on_dwell_cancel = lambda t: self._broadcast('dwell_cancel', {'target_id': t.id})
-
         # Break callbacks
         self.breaks.on_warning = lambda: self._broadcast('break_warning', {
             'seconds_until_break': self.breaks.get_time_until_break()
@@ -1051,8 +950,11 @@ class GazeConnectBackend:
         """Load persisted calibration profile, if present."""
         try:
             profile = CalibrationStorage.load()
-            if profile and profile.is_valid:
+            if profile and profile.is_valid and profile.coordinate_space == 'window_normalized_v2':
                 self.calibration_corrector.load_profile(profile)
+            elif profile and profile.is_valid:
+                self.calibration_corrector.disable()
+                logger.warning('[CALIB] Legacy correction ignored: rerun calibration after coordinate pipeline upgrade')
             else:
                 logger.info("[CALIB] No valid saved profile found")
         except Exception as e:
@@ -1076,26 +978,14 @@ class GazeConnectBackend:
         return self._measured_sample_rate_hz
 
     def _apply_active_filter_profile(self, preset: str):
-        """Route UI filter/stage presets into the live Kalman + OptiKey path."""
-        profile = self.ACTIVE_FILTER_PROFILES.get(preset)
-        if not profile:
+        canonical = normalize_filter_preset(preset)
+        if canonical not in self.ACTIVE_FILTER_PROFILES:
             logger.warning(f"Invalid active filter preset: {preset}")
             return False
-
-        self.active_filter_preset = preset
-        self.gaze_classifier.configure(**profile.get('classifier', {}))
-        self.kalman_filter.configure(**profile.get('kalman', {}))
-        self.optikey_gaze_filter.set_screen_mode(self.current_screen)
-        self.optikey_gaze_filter.configure(**profile.get('optikey', {}))
-
-        logger.info(
-            f"[PIPELINE] Active preset={preset} classifier="
-            f"{self.gaze_classifier.FIXATION_THRESHOLD:.0f}/"
-            f"{self.gaze_classifier.SACCADE_THRESHOLD:.0f}dps "
-            f"kalmanR={self.kalman_filter.STATE_NOISE} "
-            f"lock={self.optikey_gaze_filter.lock_radius:.3f} "
-            f"damping={self.optikey_gaze_filter.damping:.2f}"
-        )
+        self.active_filter_preset = canonical
+        self.cursor_filter.configure(canonical)
+        self._clear_gaze_target_state()
+        logger.info(f"[PIPELINE] Active preset={canonical}, pipeline={self.ACTIVE_PIPELINE_NAME}")
         return True
 
     def _start_calibration(self):
@@ -1181,7 +1071,7 @@ class GazeConnectBackend:
         self._load_calibration_profile()
         logger.info("[CALIB] Calibration session cancelled")
 
-    def _screen_to_window_normalized(self, x_norm: float, y_norm: float) -> tuple:
+    def _screen_to_window_normalized(self, x_norm: float, y_norm: float, clamp: bool = True) -> tuple:
         """
         Convert full-screen normalized gaze coordinates into window-content normalized space.
         Also applies manual gaze offset correction if configured.
@@ -1197,22 +1087,22 @@ class GazeConnectBackend:
         css_screen_height = float(self.physical_height)
         width_ratio = (self.physical_width / self.screen_width) if self.screen_width else 1.0
         reports_physical_px = (
-            dpr_val > 1.01 and
+            self.screen_units != 'css' and dpr_val > 1.01 and
             abs(width_ratio - dpr_val) < 0.20
         )
         if reports_physical_px:
             css_screen_width = css_screen_width / dpr_val
             css_screen_height = css_screen_height / dpr_val
 
-        screen_x_css = x_norm * css_screen_width
-        screen_y_css = y_norm * css_screen_height
+        screen_x_css = x_norm * css_screen_width + self.screen_origin_x
+        screen_y_css = y_norm * css_screen_height + self.screen_origin_y
 
         win_x = screen_x_css - self.window_x
         win_y = screen_y_css - self.window_y
 
         # Normalize by content area (screen_width = window.innerWidth)
-        content_w = float(self.screen_width)
-        content_h = float(self.screen_height)
+        content_w = float(self.content_width or self.screen_width)
+        content_h = float(self.content_height or self.screen_height)
 
         out_x = win_x / content_w
         out_y = win_y / content_h
@@ -1221,332 +1111,123 @@ class GazeConnectBackend:
         offset_x = getattr(self, '_gaze_offset_x', 0)
         offset_y = getattr(self, '_gaze_offset_y', 0)
         if offset_x != 0 and content_w > 0:
-            out_x += offset_x / content_w
+            out_x += offset_x / self.screen_width
         if offset_y != 0 and content_h > 0:
-            out_y += offset_y / content_h
+            out_y += offset_y / self.screen_height
 
-        out_x = max(0.0, min(1.0, out_x))
-        out_y = max(0.0, min(1.0, out_y))
+        if clamp:
+            out_x = max(0.0, min(1.0, out_x))
+            out_y = max(0.0, min(1.0, out_y))
         return out_x, out_y
 
-    @staticmethod
-    def _gap_hold_payload(last_payload: dict, mark_stale: bool) -> dict:
-        """Payload to re-send while holding through a tracking gap.
+    def _clear_gaze_target_state(self):
+        self._sticky_magnet_target = None
+        self._on_key_target_id = None
+        self._cursor_on_target = False
+        self._on_key_last_true = 0
+        if hasattr(self, '_last_magnet_raw'):
+            del self._last_magnet_raw
 
-        mark_stale=False: the previous payload verbatim (legacy — carries
-        its original signal_state, which for a pre-blink frame is 'valid'
-        and lets frontend dwell advance on the held coordinates).
-        mark_stale=True (ENABLE_GAP_HOLD_STALE_MARK): a COPY marked
-        signal_state='gap_hold' — is_valid untouched so the cursor stays
-        visible, but dwellPauseOnGap freezes dwell clocks.
-        """
-        if not mark_stale:
-            return last_payload
-        held = dict(last_payload)
-        held['signal_state'] = 'gap_hold'
-        return held
+    def _invalidate_gaze(self, reason: str, timestamp: Optional[float] = None):
+        """A held display position is never a fresh, selectable measurement."""
+        first_loss = not self._tracking_lost
+        self._tracking_lost = True
+        self.cursor_filter.reset()
+        self.gaze_classifier.mark_tracking_lost()
+        self._clear_gaze_target_state()
+        payload = dict(self._last_gaze_payload or {'x': 0.5, 'y': 0.5, 'coord_space': 'window'})
+        payload.update(is_valid=False, signal_state=reason, confidence=0.0,
+                       is_fixation=False, backend_on_key=False, backend_magnet_px=0.0,
+                       backend_zone='free', gaze_state='unknown', classifier_state='unknown',
+                       t_sent_wall_ms=round(time.time() * 1000, 1))
+        # Retain the original acquisition stamp on display holds; a new send
+        # timestamp must never make the previous position appear newly sampled.
+        payload.pop('intent_x', None)
+        payload.pop('intent_y', None)
+        self._last_gaze_payload = payload
+        if first_loss:
+            self._broadcast('gaze_lost', {'reason': reason})
+        self._broadcast('gaze', payload)
 
     def _on_gaze_data(self, point: GazePoint):
-        """Primary gaze pipeline: conditioning -> calibration -> classify/filter -> magnetism."""
-        t_start = time.perf_counter()
-        now_wall = time.time()
-
-        if not hasattr(self, '_pipeline_log_count'):
-            self._pipeline_log_count = 0
-        self._pipeline_log_count += 1
-
+        """Validate -> map -> optional calibration -> one filter -> target assistance."""
+        now = time.time()
+        if not self.gaze_active:
+            if not self._tracking_lost:
+                self._invalidate_gaze('inactive_window')
+            return
+        stamp = SignalConditioner._normalize_timestamp(point.timestamp)
+        if not math.isfinite(stamp) or abs(now - stamp) > self.POINT_TTL_SECONDS:
+            self._invalidate_gaze('stale')
+            return
+        if self._last_sample_timestamp is not None and stamp <= self._last_sample_timestamp:
+            self._invalidate_gaze('out_of_order')
+            return
+        gap = stamp - self._last_sample_timestamp if self._last_sample_timestamp is not None else 0
+        self._last_sample_timestamp = stamp
+        self._last_sample_received = time.monotonic()
         conditioned = self.signal_conditioner.process({
-            'x': point.x,
-            'y': point.y,
-            'timestamp': point.timestamp,
-            'left_valid': point.left_valid,
-            'right_valid': point.right_valid,
-            'confidence': point.confidence,
-            'is_valid': point.is_valid,
-            'validity_source': getattr(point, 'validity_source', 'reported'),
+            'x': point.x, 'y': point.y, 'timestamp': stamp,
+            'left_valid': point.left_valid, 'right_valid': point.right_valid,
+            'confidence': point.confidence, 'is_valid': point.is_valid,
+            'validity_source': point.validity_source,
         })
-        if conditioned is None:
+        if conditioned.state != GazeValidity.VALID:
+            self._invalidate_gaze(conditioned.state.value, stamp)
+            self.fatigue.update_gaze(conditioned.x, conditioned.y, False, stamp)
             return
-        t_conditioned = time.perf_counter()
-        measured_sample_rate_hz = self._update_sample_rate(conditioned.t)
-
-        sample_age = max(0.0, now_wall - conditioned.t)
-        if sample_age > self.POINT_TTL_SECONDS:
-            if self._pipeline_log_count % 200 == 0:
-                logger.warning(f"[POINT-TTL] Dropping stale sample age={sample_age*1000:.1f}ms")
-            # v17: Notify classifier and frontend of tracking loss
-            self.gaze_classifier.mark_tracking_lost()
-            self._broadcast('gaze_lost', {'reason': 'stale', 'age_ms': round(sample_age * 1000, 1)})
+        if gap > self.FRAME_GAP_HOLD_SECONDS:
+            self.cursor_filter.reset()
+            self.gaze_classifier.reset()
+            self._clear_gaze_target_state()
+        raw_x, raw_y = self._screen_to_window_normalized(conditioned.x, conditioned.y, clamp=False)
+        # Looking at the title bar, another window, or off-screen must never
+        # collapse onto a selectable border target.
+        if not (0 <= raw_x <= 1 and 0 <= raw_y <= 1):
+            self._invalidate_gaze('outside_window', stamp)
             return
-
-        if not hasattr(self, '_last_gaze_ts'):
-            self._last_gaze_ts = conditioned.t
-        gap = conditioned.t - self._last_gaze_ts
-        self._last_gaze_ts = conditioned.t
-
-        if (
-            gap > self.FRAME_GAP_HOLD_SECONDS
-            and self._last_gaze_payload is not None
-            and conditioned.state != GazeValidity.VALID
-        ):
-            # v17: Notify classifier and frontend of tracking gap (likely blink)
-            self.gaze_classifier.mark_tracking_lost()
-            self._broadcast('gaze_lost', {'reason': 'gap', 'gap_ms': round(gap * 1000, 1)})
-            self._broadcast('gaze', self._gap_hold_payload(
-                self._last_gaze_payload, self.ENABLE_GAP_HOLD_STALE_MARK))
-            if self._pipeline_log_count % 120 == 0:
-                logger.info(f"[GAP-HOLD] gap={gap*1000:.1f}ms, holding last gaze frame")
-            return
-
-        work_x = conditioned.x
-        work_y = conditioned.y
-        conditioned_x = work_x
-        conditioned_y = work_y
-
         if self.calibration_active and self.calibration_session:
-            calib_x, calib_y = self._screen_to_window_normalized(work_x, work_y)
-            self.calibration_session.update(calib_x, calib_y, point.confidence)
-        t_calibrated = time.perf_counter()
-
-        zone = 'free'
-        is_locked = False
-        gaze_state = 'saccade'
-        kalman_x = work_x
-        kalman_y = work_y
-        fx = work_x
-        fy = work_y
-        raw_win_x, raw_win_y = self._screen_to_window_normalized(work_x, work_y)
-        if (not self.calibration_active) and self.calibration_corrector.enabled:
-            raw_win_x, raw_win_y = self.calibration_corrector.correct(raw_win_x, raw_win_y)
-        raw_px = raw_win_x * self.screen_width
-        raw_py = raw_win_y * self.screen_height
-        pre_filter_on_key = False
-        if self.USE_OPTIKEY_PIPELINE:
-            pre_filter_on_key = self._update_on_key_state_impl(raw_px, raw_py)
-
-        if self.USE_OPTIKEY_PIPELINE:
-            if self._pipeline_log_count == 1:
-                logger.info("Using OptiKey-style pipeline: Classifier -> Kalman -> 4-zone filter")
-
-            gaze_class = self.gaze_classifier.classify(work_x, work_y, conditioned.t)
-            classifier_state = gaze_class.value
-            self.kalman_filter.set_gaze_state(gaze_class.value)
-            t_classified = time.perf_counter()
-
-            kalman_x, kalman_y = self.kalman_filter.update(work_x, work_y)
-            fx, fy = kalman_x, kalman_y
-            t_kalman = time.perf_counter()
-
-            skip_filter = False
-            if gap > 0.10 and self.optikey_gaze_filter._initialized:
-                if self.optikey_gaze_filter._current_zone in ('lock', 'fixation'):
-                    skip_filter = True
-
-            if skip_filter:
-                stable_x = self.optikey_gaze_filter._last_x
-                stable_y = self.optikey_gaze_filter._last_y
-            else:
-                stable_x, stable_y = self.optikey_gaze_filter.update(
-                    kalman_x, kalman_y, on_key=pre_filter_on_key
-                )
-
-            zone = self.optikey_gaze_filter._current_zone
-            is_locked = zone == 'lock'
-            gaze_state = zone if zone != 'free' else 'saccade'
-            t_filtered = time.perf_counter()
-        else:
-            if self._pipeline_log_count == 1:
-                logger.info("Using legacy pipeline: OneEuro -> AntiRecoil -> GravityWell")
-
-            if self.RAW_MODE:
-                filtered = GazePoint(
-                    x=work_x, y=work_y, timestamp=conditioned.t,
-                    left_valid=point.left_valid, right_valid=point.right_valid,
-                    confidence=point.confidence
-                )
-            else:
-                filtered = self.gaze_filter.filter(GazePoint(
-                    x=work_x, y=work_y, timestamp=conditioned.t,
-                    left_valid=point.left_valid, right_valid=point.right_valid,
-                    confidence=point.confidence
-                ))
-
-            fx, fy = filtered.x, filtered.y
-            ar_x, ar_y = self.anti_recoil.update(fx, fy)
-
-            skip_gravity = False
-            if gap > 0.10 and self.gravity_well._initialized:
-                if self.gravity_well._current_zone in ('lock', 'fixation'):
-                    skip_gravity = True
-
-            if skip_gravity:
-                stable_x = self.gravity_well._last_x
-                stable_y = self.gravity_well._last_y
-            else:
-                stable_x, stable_y = self.gravity_well.update(ar_x, ar_y)
-
-            zone = self.gravity_well._current_zone
-            is_locked = zone == 'lock'
-            gaze_state = zone if zone != 'free' else 'saccade'
-            t_classified = t_calibrated
-            t_kalman = t_calibrated
-            t_filtered = time.perf_counter()
-            classifier_state = gaze_state
-
-        if self.USE_OPTIKEY_PIPELINE and self.ENABLE_ZONE_LOCK_SEMANTICS:
-            is_locked = zone in self.LOCK_ZONES
-
-        stable_x, stable_y = self._screen_to_window_normalized(stable_x, stable_y)
-        mapped_x = stable_x
-        mapped_y = stable_y
-        calibration_applied = False
-        if (not self.calibration_active) and self.calibration_corrector.enabled:
-            stable_x, stable_y = self.calibration_corrector.correct(stable_x, stable_y)
-            calibration_applied = True
-        t_mapped = time.perf_counter()
-
-        is_valid = (
-            conditioned.state in (
-                GazeValidity.VALID, GazeValidity.BLINK,
-                GazeValidity.OUT_OF_BOUNDS, GazeValidity.FROZEN
-            )
-            and conditioned.confidence > 0.3
-        )
-
-        pre_mag_x = stable_x * self.screen_width
-        pre_mag_y = stable_y * self.screen_height
-        screen_x = pre_mag_x
-        screen_y = pre_mag_y
-        backend_magnet_px = 0.0
-
-        if is_valid and self.screen_width > 0 and self.screen_height > 0:
-            screen_x, screen_y = self._apply_magnetism(screen_x, screen_y)
-            backend_magnet_px = math.hypot(screen_x - pre_mag_x, screen_y - pre_mag_y)
-            stable_x = max(0.0, min(1.0, screen_x / self.screen_width))
-            stable_y = max(0.0, min(1.0, screen_y / self.screen_height))
-        t_magnetized = time.perf_counter()
-
-        current_on_key = pre_filter_on_key
-        if is_valid and self.USE_OPTIKEY_PIPELINE:
-            # v15: Use post-filter pixel coords (pre_mag_x/y) instead of pre-filter Kalman coords.
-            # Kalman coords are less stable and lag behind the 4-zone filtered position,
-            # causing on_key to detect the wrong key (right-biased from Kalman prediction).
-            raw_to_stable_px = math.hypot(raw_px - pre_mag_x, raw_py - pre_mag_y)
-            if pre_filter_on_key or raw_to_stable_px < 96:
-                current_on_key = self._update_on_key_state_px(pre_mag_x, pre_mag_y)
-            else:
-                self._cursor_on_target = False
-                self._on_key_target_id = None
-                current_on_key = False
-        else:
-            self._cursor_on_target = False
-            self._on_key_target_id = None
-            current_on_key = False
-
+            self.calibration_session.update(raw_x, raw_y, conditioned.confidence)
+        calibration_applied = not self.calibration_active and self.calibration_corrector.enabled
+        if calibration_applied:
+            raw_x, raw_y = self.calibration_corrector.correct(raw_x, raw_y)
+        self._tracking_lost = False
+        measured_rate = self._update_sample_rate(stamp)
+        gaze_class = self.gaze_classifier.classify(conditioned.x, conditioned.y, stamp)
+        raw_px, raw_py = raw_x * self.screen_width, raw_y * self.screen_height
+        on_key = self._update_on_key_state_impl(raw_px, raw_py)
+        filtered_x, filtered_y = self.cursor_filter.update(
+            raw_px, raw_py, stamp, self._on_key_target_id if on_key else None)
+        screen_x, screen_y = self._apply_magnetism(filtered_x, filtered_y)
+        magnet_px = math.hypot(screen_x - filtered_x, screen_y - filtered_y)
+        x = max(0.0, min(1.0, screen_x / self.screen_width))
+        y = max(0.0, min(1.0, screen_y / self.screen_height))
         payload = {
-            'x': stable_x,
-            'y': stable_y,
-            # Explicit coordinate contract for renderer:
-            # x/y are already normalized to the app window content area.
-            'coord_space': 'window',
-            'is_valid': is_valid,
-            'is_fixation': is_locked,
-            'confidence': conditioned.confidence,
-            'gaze_state': gaze_state,
-            'raw_x': point.x,
-            'raw_y': point.y,
-            'conditioned_x': conditioned_x,
-            'conditioned_y': conditioned_y,
-            'mapped_x': mapped_x,
-            'mapped_y': mapped_y,
-            'kalman_x': kalman_x,
-            'kalman_y': kalman_y,
-            'signal_state': conditioned.state.value,
-            'classifier_state': classifier_state,
-            'active_pipeline': self.active_pipeline_name if self.USE_OPTIKEY_PIPELINE else 'legacy_one_euro_v1',
+            'x': x, 'y': y, 'coord_space': 'window', 'is_valid': True,
+            'intent_x': raw_x, 'intent_y': raw_y,
+            'is_fixation': self.cursor_filter.zone == 'lock',
+            'confidence': conditioned.confidence, 'signal_state': 'valid',
+            'gaze_state': self.cursor_filter.zone, 'classifier_state': gaze_class.value,
+            'raw_x': point.x, 'raw_y': point.y,
+            'conditioned_x': conditioned.x, 'conditioned_y': conditioned.y,
+            'mapped_x': raw_x, 'mapped_y': raw_y,
+            'active_pipeline': self.active_pipeline_name,
             'active_filter_preset': self.active_filter_preset,
-            'sample_rate_hz': measured_sample_rate_hz,
-            'sample_age_ms': round(sample_age * 1000.0, 2),
-            'backend_zone': zone,
+            'sample_rate_hz': measured_rate,
+            'sample_age_ms': round(max(0, now - stamp) * 1000, 2),
+            'backend_zone': self.cursor_filter.zone,
+            'backend_on_key': bool(on_key), 'backend_magnet_px': round(magnet_px, 3),
             'calibration_applied': calibration_applied,
             'validity_source': conditioned.validity_source,
-            # Latency instrumentation (measurement only): t_helper_ms is the
-            # C# helper's wall-clock receive stamp for THIS sample; the
-            # renderer compares both stamps against Date.now() (same machine,
-            # same Unix-ms clock) to derive ingest/pipeline/ws/e2e latency
-            # percentiles in window.__gazeTelemetry.snapshot().latency.
-            't_helper_ms': round(conditioned.t * 1000.0, 1),
+            't_helper_ms': round(stamp * 1000, 1),
+            't_sent_wall_ms': round(time.time() * 1000, 1),
         }
-        if self.ENABLE_DUAL_PULL_COORDINATION_SIGNAL:
-            payload['backend_on_key'] = bool(current_on_key)
-            payload['backend_magnet_px'] = round(backend_magnet_px, 3)
-        # Stamped as late as possible before the broadcast queue so
-        # (t_sent_wall_ms - t_helper_ms - sample_age_ms) isolates pipeline
-        # cost and (Date.now() - t_sent_wall_ms) isolates WS transport.
-        payload['t_sent_wall_ms'] = round(time.time() * 1000.0, 1)
         self._last_gaze_payload = payload
         self._broadcast('gaze', payload)
-        t_sent = time.perf_counter()
-
-        self.fatigue.update_gaze(
-            stable_x, stable_y,
-            is_valid,
-            conditioned.t
-        )
-
-        dwell_is_valid = is_valid
-        dwell_is_blink = False
-        if self.ENABLE_STALE_BLINK_DWELL_GUARD:
-            dwell_is_valid = (
-                is_valid
-                and conditioned.state in self.DWELL_GUARD_ALLOWED_STATES
-                and sample_age <= self.POINT_TTL_SECONDS
-            )
-            # v17: Detect blink specifically — pause dwell instead of cancelling
-            dwell_is_blink = (
-                is_valid
-                and conditioned.state == GazeValidity.BLINK
-            )
-            if is_valid and not dwell_is_valid and self._pipeline_log_count % 200 == 0:
-                logger.info(
-                    f"[DWELL-GUARD] state={conditioned.state.value} "
-                    f"age={sample_age*1000:.1f}ms -> dwell invalid"
-                    f"{' (blink-pause)' if dwell_is_blink else ''}"
-                )
-
-        if self.BACKEND_DWELL_ENABLED:
-            self.dwell_manager.update(
-                screen_x, screen_y,
-                point.confidence,
-                is_valid=dwell_is_valid,
-                is_blink=dwell_is_blink,
-            )
-
-        if self._pipeline_log_count % 266 == 1:
-            pipeline_name = "OPTIKEY" if self.USE_OPTIKEY_PIPELINE else "LEGACY"
-            logger.info(
-                f"[{pipeline_name}] zone={zone} locked={is_locked} "
-                f"raw=({point.x:.3f},{point.y:.3f}) "
-                f"kalman=({fx:.3f},{fy:.3f}) "
-                f"stable=({stable_x:.3f},{stable_y:.3f}) "
-                f"on_key={getattr(self, '_cursor_on_target', False)}"
-            )
-
-        if self._pipeline_log_count % 266 == 0:
-            logger.info(
-                f"[LATENCY] conditioner={1000*(t_conditioned-t_start):.2f}ms "
-                f"calib={1000*(t_calibrated-t_conditioned):.2f}ms "
-                f"classifier={1000*(t_classified-t_calibrated):.2f}ms "
-                f"kalman={1000*(t_kalman-t_classified):.2f}ms "
-                f"filter={1000*(t_filtered-t_kalman):.2f}ms "
-                f"map={1000*(t_mapped-t_filtered):.2f}ms "
-                f"magnet={1000*(t_magnetized-t_mapped):.2f}ms "
-                f"send={1000*(t_sent-t_magnetized):.2f}ms "
-                f"total={1000*(t_sent-t_start):.2f}ms"
-            )
+        self.fatigue.update_gaze(x, y, True, stamp)
 
     @staticmethod
-    def _target_contains_expanded(target: DwellTarget, px: float, py: float, expand: float) -> bool:
+    def _target_contains_expanded(target: GazeTarget, px: float, py: float, expand: float) -> bool:
         half_w = max(1.0, (target.width * 0.5) * max(0.1, float(expand)))
         half_h = max(1.0, (target.height * 0.5) * max(0.1, float(expand)))
         return (
@@ -1554,7 +1235,7 @@ class GazeConnectBackend:
             (target.y - half_h) <= py <= (target.y + half_h)
         )
 
-    def _get_on_key_expand(self, target: DwellTarget, is_exit: bool = False) -> float:
+    def _get_on_key_expand(self, target: GazeTarget, is_exit: bool = False) -> float:
         ctx = str(getattr(target, 'context', '') or '').lower()
         if ctx == 'gazetoggle':
             return 1.80 if is_exit else 1.45
@@ -1587,7 +1268,7 @@ class GazeConnectBackend:
     def _update_on_key_state_impl(self, kalman_px: float, kalman_py: float) -> bool:
         """Core on_key detection logic using window pixel coordinates."""
         try:
-            detector = self.dwell_manager.detectors.get(self.current_screen)
+            detector = self.target_registry.screens.get(self.current_screen)
             if not detector or not hasattr(detector, 'targets'):
                 self._cursor_on_target = False
                 self._on_key_target_id = None
@@ -1599,8 +1280,8 @@ class GazeConnectBackend:
                 self._on_key_target_id = None
                 return False
 
-            now = time.time()
-            candidate: Optional[DwellTarget] = None
+            now = time.monotonic()
+            candidate: Optional[GazeTarget] = None
 
             if self.ENABLE_ON_KEY_TARGET_HYSTERESIS and self._on_key_target_id:
                 sticky = detector.targets.get(self._on_key_target_id)
@@ -1683,7 +1364,7 @@ class GazeConnectBackend:
                 f = float(value)
             except (TypeError, ValueError):
                 return current
-            return max(lo, min(hi, f))
+            return max(lo, min(hi, f)) if math.isfinite(f) else current
 
         if 'radius' in data:
             entry['radius'] = _clampf(data['radius'], 20.0, 300.0, entry['radius'])
@@ -1716,7 +1397,7 @@ class GazeConnectBackend:
         CONTEXT_PARAMS, DEFAULT_PARAMS = self._get_magnet_params()
 
         try:
-            detector = self.dwell_manager.detectors.get(self.current_screen)
+            detector = self.target_registry.screens.get(self.current_screen)
             if not detector or not hasattr(detector, 'targets'):
                 return screen_x, screen_y
 
@@ -1831,17 +1512,6 @@ class GazeConnectBackend:
         except Exception:
             return screen_x, screen_y
 
-    def _on_dwell_complete(self, target: DwellTarget):
-        """Handle completed dwell selection."""
-        if not self.BACKEND_DWELL_ENABLED:
-            return
-
-        self._broadcast('dwell_complete', {'target_id': target.id})
-        self.fatigue.report_selection()
-
-        if self.logger:
-            self.logger.log_selection(target.id)
-
     def _broadcast(self, msg_type: str, data: Dict = None):
         """
         Broadcast message to all connected WebSocket clients.
@@ -1863,6 +1533,7 @@ class GazeConnectBackend:
         # For gaze: store latest, let broadcast loop handle it
         if msg_type == 'gaze':
             self._latest_gaze_msg = message
+            self._latest_gaze_stamp = (data or {}).get('t_helper_ms') if (data or {}).get('is_valid') else None
             # v17.19 push mode: wake the broadcast loop NOW instead of
             # letting the frame wait for the next paced tick (0-15.2ms,
             # mean ~7.6ms of avoidable glass-to-glass latency per frame).
@@ -1879,93 +1550,57 @@ class GazeConnectBackend:
                 logger.warning(f"Failed to send to client: {e}")
                 self.connected_clients.discard(client)
 
-    async def _gaze_broadcast_loop(self):
-        """
-        Dedicated loop that sends the latest gaze data to clients.
-
-        v17.19 push mode (default): waits on an asyncio.Event that the
-        gaze path sets the moment a frame is stored, so each frame is
-        sent immediately on arrival instead of waiting for the next
-        paced tick. The ET5 delivers ~33Hz, so the old fixed 66Hz pacing
-        added 0-15.2ms (mean ~7.6ms) to every frame for no benefit.
-        Set GAZECONNECT_GAZE_PUSH=0 to revert to the paced loop.
-        """
-        push_mode = os.environ.get('GAZECONNECT_GAZE_PUSH', '1').strip().lower() not in ('0', 'false', 'no', 'off')
-        self._gaze_push_event = asyncio.Event() if push_mode else None
-        if push_mode:
-            logger.info("Gaze broadcast loop started (push-on-frame mode; set GAZECONNECT_GAZE_PUSH=0 for the paced loop)")
-        else:
-            logger.info("Gaze broadcast loop started (paced mode, ~66Hz tick / ~33Hz effective; GAZECONNECT_GAZE_PUSH=0)")
-        self._latest_gaze_msg = None
-        send_count = 0
-        last_log = time.time()
-
-        while True:
+    async def _send_gaze_frame(self, client, message):
+        try:
+            await asyncio.wait_for(client.send(message), timeout=self.POINT_TTL_SECONDS)
+        except (Exception, asyncio.CancelledError):
+            self.connected_clients.discard(client)
             try:
-                if push_mode:
-                    # Wake on frame arrival; 50ms timeout keeps the loop
-                    # alive (rate logging, dead-client sweeps) across
-                    # tracker gaps/blinks without busy-waiting.
-                    try:
-                        await asyncio.wait_for(self._gaze_push_event.wait(), timeout=0.05)
-                    except asyncio.TimeoutError:
-                        pass
-                    self._gaze_push_event.clear()
-                else:
-                    # v9: High-precision broadcast timing
-                    # asyncio.sleep(1/66) has 15.6ms resolution on Windows â†’ ~32Hz actual
-                    # Hybrid: sleep most of the interval, then yield rapidly for precision
-                    target_interval = 1/66
-                    if not hasattr(self, '_next_broadcast'):
-                        self._next_broadcast = time.perf_counter()
-                    self._next_broadcast += target_interval
+                await asyncio.wait_for(client.close(code=1013, reason='Gaze consumer too slow'), timeout=0.2)
+            except (Exception, asyncio.CancelledError):
+                pass
+        finally:
+            self._gaze_send_tasks.pop(client, None)
 
-                    now = time.perf_counter()
-                    wait = self._next_broadcast - now
-                    if wait < -0.05 or wait > 0.05:
-                        # Timing drifted too far, reset
-                        self._next_broadcast = now + target_interval
-                        await asyncio.sleep(0)
-                    elif wait > 0.005:
-                        await asyncio.sleep(wait - 0.003)
-                        # Yield rapidly until target time (sub-ms precision)
-                        while time.perf_counter() < self._next_broadcast:
-                            await asyncio.sleep(0)
-                    else:
-                        await asyncio.sleep(0)
+    async def _gaze_broadcast_loop(self):
+        """Push current data with at most one in-flight gaze send per client.
 
-                msg = self._latest_gaze_msg
-                if not msg or not self.connected_clients:
+        Busy clients skip superseded samples. A blocked consumer can never
+        create an unbounded task queue or delay another consumer's gaze stream.
+        """
+        self._gaze_push_event = asyncio.Event()
+        self._latest_gaze_msg = getattr(self, '_latest_gaze_msg', None)
+        try:
+            while True:
+                try:
+                    await asyncio.wait_for(self._gaze_push_event.wait(), timeout=0.05)
+                except asyncio.TimeoutError:
+                    pass
+                self._gaze_push_event.clear()
+                if (self._last_sample_received is not None and not self._tracking_lost and
+                        time.monotonic() - self._last_sample_received > self.POINT_TTL_SECONDS):
+                    self._invalidate_gaze('stale')
+                source_stamp = getattr(self, '_latest_gaze_stamp', None)
+                if source_stamp is not None and time.time() * 1000 - source_stamp > self.POINT_TTL_SECONDS * 1000:
+                    self._invalidate_gaze('stale')
+                message = self._latest_gaze_msg
+                self._latest_gaze_msg = None
+                self._latest_gaze_stamp = None
+                if not message:
                     continue
-
-                self._latest_gaze_msg = None  # Consume
-
-                # Fire-and-forget sends â€” don't block broadcast loop waiting for completion.
-                # Previous await-based sends limited rate to ~30Hz on Windows due to
-                # 15.6ms timer resolution + send completion time.
-                dead = []
-                for client in list(self.connected_clients):
-                    try:
-                        asyncio.create_task(client.send(msg))
-                        send_count += 1
-                    except Exception:
-                        dead.append(client)
-
-                for c in dead:
-                    self.connected_clients.discard(c)
-
-                now = time.time()
-                if now - last_log >= 10.0:
-                    rate = send_count / (now - last_log)
-                    logger.info(f"Gaze broadcast: {rate:.0f} msgs/s to {len(self.connected_clients)} clients")
-                    send_count = 0
-                    last_log = now
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Broadcast loop error: {e}")
-                await asyncio.sleep(0.1)
+                for client in tuple(self.connected_clients):
+                    if client not in self._gaze_send_tasks:
+                        self._gaze_send_tasks[client] = asyncio.create_task(
+                            self._send_gaze_frame(client, message))
+        except asyncio.CancelledError:
+            pass
+        finally:
+            pending = tuple(self._gaze_send_tasks.values())
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            self._gaze_push_event = None
 
     async def _handle_message(self, websocket: WebSocketServerProtocol, message: str):
         """Handle incoming WebSocket message."""
@@ -2085,18 +1720,16 @@ class GazeConnectBackend:
         self._cursor_on_target = False
         self._on_key_last_true = 0
         self.current_screen = screen
-        self.dwell_manager.set_screen(screen)
-        # v11: Adapt filter parameters for screen context
-        if self.USE_OPTIKEY_PIPELINE:
-            self.optikey_gaze_filter.set_screen_mode(screen)
-            profile = self.ACTIVE_FILTER_PROFILES.get(self.active_filter_preset, {})
-            self.optikey_gaze_filter.configure(**profile.get('optikey', {}))
-            logger.info(f"[PIPELINE] Screen={screen} lock_radius={self.optikey_gaze_filter.lock_radius:.3f} "
-                        f"hysteresis={self.optikey_gaze_filter.hysteresis_multiplier:.1f}Ã—")
+        self.target_registry.set_screen(screen)
+        self.cursor_filter.reset()
         self._broadcast('screen_changed', {'screen': screen})
 
     def _set_screen_size(self, data: Dict):
         """Set screen dimensions and physical screen info for coordinate remapping."""
+        previous_geometry = (self.screen_width, self.screen_height, self.physical_width,
+                             self.physical_height, self.window_x, self.window_y, self.dpr,
+                             self.content_width, self.content_height, self.screen_units,
+                             self.screen_origin_x, self.screen_origin_y)
         width = data.get('width')
         height = data.get('height')
         if width and height:
@@ -2117,6 +1750,32 @@ class GazeConnectBackend:
             self.window_x = data['windowX']
         if 'windowY' in data:
             self.window_y = data['windowY']
+
+        self.screen_units = data.get('screenUnits', self.screen_units)
+        if 'gazeActive' in data:
+            was_active = self.gaze_active
+            self.gaze_active = data['gazeActive'] is True
+            if not self.gaze_active and was_active:
+                self._invalidate_gaze('inactive_window')
+        for field, key in (('screen_origin_x', 'screenX'), ('screen_origin_y', 'screenY'),
+                           ('content_width', 'contentWidth'), ('content_height', 'contentHeight')):
+            if key in data:
+                value = float(data[key])
+                if math.isfinite(value) and (not key.startswith('content') or value > 0):
+                    setattr(self, field, value)
+        current_geometry = (self.screen_width, self.screen_height, self.physical_width,
+                            self.physical_height, self.window_x, self.window_y, self.dpr,
+                            self.content_width, self.content_height, self.screen_units,
+                            self.screen_origin_x, self.screen_origin_y)
+        if current_geometry == previous_geometry:
+            return
+        if current_geometry != previous_geometry:
+            profile = self.calibration_corrector.profile
+            if profile and (profile.screen_width != self.screen_width or profile.screen_height != self.screen_height):
+                self.calibration_corrector.disable()
+                logger.info('[CALIB] Correction disabled after content geometry changed')
+            self.cursor_filter.reset()
+            self._clear_gaze_target_state()
 
         logger.info(
             f"Screen: {self.screen_width}x{self.screen_height}, "
@@ -2160,8 +1819,12 @@ class GazeConnectBackend:
     def _register_targets(self, targets: List[Dict]):
         """Register dwell targets."""
         dwell_targets = []
-        for t in targets:
-            target = DwellTarget(
+        for t in targets[:self.target_registry.MAX_TARGETS_PER_SCREEN]:
+            if not all(math.isfinite(float(t[k])) for k in ('x', 'y', 'width', 'height')):
+                continue
+            if float(t['width']) <= 0 or float(t['height']) <= 0:
+                continue
+            target = GazeTarget(
                 id=t['id'],
                 x=t['x'],
                 y=t['y'],
@@ -2169,13 +1832,26 @@ class GazeConnectBackend:
                 height=t['height'],
                 size=ButtonSize(t.get('size', 'md')),
                 context=t.get('context', 'navigation'),
-                custom_dwell_ms=t.get('custom_dwell_ms'),
                 priority=t.get('priority', 0),
                 enabled=t.get('enabled', True)
             )
             dwell_targets.append(target)
 
-        self.dwell_manager.set_targets(dwell_targets)
+        self.target_registry.set_targets(dwell_targets)
+        current_targets = self.target_registry.screens[self.current_screen].targets
+        sticky = self._sticky_magnet_target
+        if sticky is not None:
+            replacement = current_targets.get(sticky.id)
+            if replacement is None or not replacement.enabled or replacement != sticky:
+                self._clear_gaze_target_state()
+                self.cursor_filter.reset()
+            else:
+                self._sticky_magnet_target = replacement
+        if self._on_key_target_id:
+            active = current_targets.get(self._on_key_target_id)
+            if active is None or not active.enabled:
+                self._clear_gaze_target_state()
+                self.cursor_filter.reset()
         logger.debug(f"Registered {len(dwell_targets)} targets")
 
     async def _fetch_datamuse_suggestions(self, word: str) -> List[Dict]:
@@ -2723,15 +2399,7 @@ class GazeConnectBackend:
         })
 
     def _set_filter_preset(self, preset: str):
-        try:
-            """Set gaze filter preset."""
-            preset_enum = FilterPreset(preset)
-            config = FilterConfig.from_preset(preset_enum)
-            self.gaze_filter = GazeFilter2D(config)
-            self._apply_active_filter_profile(preset)
-            logger.info(f"Gaze filter set to {preset}")
-        except ValueError:
-            logger.warning(f"Invalid filter preset: {preset}")
+        self._apply_active_filter_profile(preset)
 
     def _handle_automation_execute(self, websocket: WebSocketServerProtocol, data: Dict):
         """Safely execute a tiny allowlist of PyAutoGUI fallback actions."""
@@ -2787,25 +2455,7 @@ class GazeConnectBackend:
                 self._set_filter_preset(preset)
                 return
 
-            # Custom params
-            min_cutoff = data.get('min_cutoff')
-            beta = data.get('beta')
-            d_cutoff = data.get('d_cutoff')
-
-            if min_cutoff is not None:
-                self.gaze_filter.config.min_cutoff = float(min_cutoff)
-                self.gaze_filter.x_filter.config.min_cutoff = float(min_cutoff)
-                self.gaze_filter.y_filter.config.min_cutoff = float(min_cutoff)
-            if beta is not None:
-                self.gaze_filter.config.beta = float(beta)
-                self.gaze_filter.x_filter.config.beta = float(beta)
-                self.gaze_filter.y_filter.config.beta = float(beta)
-            if d_cutoff is not None:
-                self.gaze_filter.config.d_cutoff = float(d_cutoff)
-                self.gaze_filter.x_filter.config.d_cutoff = float(d_cutoff)
-                self.gaze_filter.y_filter.config.d_cutoff = float(d_cutoff)
-
-            logger.info(f"Filter params updated: min_cutoff={min_cutoff}, beta={beta}")
+            logger.warning("Direct filter coefficients are unsupported; choose a named preset")
         except Exception as e:
             logger.error(f"Failed to set filter params: {e}")
 
@@ -3413,13 +3063,6 @@ class GazeConnectBackend:
                     self._broadcast('dry_eye_reminder', {
                         'message': 'Consider using artificial tears to keep your eyes comfortable.'
                     })
-
-                # Log pipeline stats periodically
-                if hasattr(self, 'gravity_well') and self.gravity_well._initialized:
-                    logger.debug(
-                        f"[GRAVITY_WELL] zone={self.gravity_well._current_zone} "
-                        f"mult={self.gravity_well._current_multiplier:.3f}"
-                    )
 
                 # Periodically save prediction data (every 60s)
                 if time.time() - self._last_prediction_save > 60:

@@ -60,7 +60,7 @@ const FeelingScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true
       <GlobalNavBar
         currentPage="feelings"
         onNavigate={onNavigate}
-        onSpeak={onSpeak}
+
         isDarkMode={isDarkMode}
       />
       <div
@@ -104,16 +104,7 @@ const FeelingScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true
             }}>
               {f.en}
             </span>
-            {showHindi && (
-              <span style={{
-                fontSize: 'clamp(20px, 2.4vh, 30px)', fontWeight: 600,
-                color: tileTextHi, textAlign: 'center', marginTop: '8px',
-                fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif",
-                lineHeight: 1.3,
-              }}>
-                {f.hi}
-              </span>
-            )}
+
           </GazeButton>
         ))}
       </div>

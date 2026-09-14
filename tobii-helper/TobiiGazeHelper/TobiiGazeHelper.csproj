@@ -2,7 +2,13 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <SelfContained>true</SelfContained>
+    <!-- The legacy vendor SDK uses reflection/PInvoke; do not trim or single-file it. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishSingleFile>false</PublishSingleFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>TobiiGazeHelper</AssemblyName>
@@ -13,16 +19,14 @@
   </PropertyGroup>
 
   <!--
-  Tobii DLLs are bundled locally in the lib/ folder.
-  This makes the project machine-independent — no hardcoded system paths.
-  
-  To update DLLs: Copy from C:\Program Files\Tobii\Tobii EyeX\ into lib/
-  Or run: copy-tobii-dlls.bat
+  Local vendor DLLs are build inputs, not evidence of redistribution permission.
+  Verify their origin and distribution rights before publishing source or installers.
+  See docs/windows-release-audit.md. copy-tobii-dlls.bat validates a supplied source.
   
   Prerequisites:
   1. Install Tobii Experience: https://gaming.tobii.com/getstarted
   2. Calibrate the eye tracker in Tobii Experience
-  3. Tobii Experience's gaze/mouse control should be active
+  3. Avoid competing mouse-control software while using app-owned gaze selection.
   -->
 
   <!-- Managed DLLs: Referenced at compile time, copied to output -->
@@ -42,18 +46,22 @@
     <Content Include="lib\Tobii.EyeX.Client.dll">
       <Link>Tobii.EyeX.Client.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="lib\Tobii.EyeX.Common.dll">
       <Link>Tobii.EyeX.Common.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="lib\tobii_stream_engine.dll">
       <Link>tobii_stream_engine.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="lib\Tobii.Tech.NETCommon.ClrExtensions.dll">
       <Link>Tobii.Tech.NETCommon.ClrExtensions.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 

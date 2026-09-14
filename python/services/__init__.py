@@ -4,29 +4,10 @@ GazeConnect Pro - Python Services
 Core services for eye-gaze AAC.
 """
 
-from .one_euro_filter import (
-    OneEuroFilter,
-    GazeFilter2D,
-    FilterConfig,
-    FilterPreset,
-    GazePoint,
-    FilteredGaze,
-    FixationStabilizer,
-    GravityWell,
-    AntiRecoilFilter,
-    AdaptiveKalmanFilter,
-    OptiKeyGazeFilter,
-)
+from .gaze_sample import GazePoint
+from .adaptive_cursor_filter import AdaptiveCursorFilter
 
-from .dwell_detector import (
-    AdaptiveDwellDetector,
-    DwellManager,
-    DwellTarget,
-    DwellState,
-    DwellConfig,
-    ButtonSize,
-    DwellStage,
-)
+from .gaze_targets import TargetRegistry, GazeTarget, ButtonSize
 
 from .word_prediction import (
     WordPredictionEngine,
@@ -48,26 +29,13 @@ from .fatigue_monitor import (
 )
 
 __all__ = [
-    # Filters
-    'OneEuroFilter',
-    'GazeFilter2D',
-    'FilterConfig',
-    'FilterPreset',
+    # Acquisition and filtering
     'GazePoint',
-    'FilteredGaze',
-    'FixationStabilizer',
-    'GravityWell',
-    'AntiRecoilFilter',
-    'AdaptiveKalmanFilter',
-    'OptiKeyGazeFilter',
-    # Dwell
-    'AdaptiveDwellDetector',
-    'DwellManager',
-    'DwellTarget',
-    'DwellState',
-    'DwellConfig',
+    'AdaptiveCursorFilter',
+    # Gaze target geometry (no backend selection clocks)
+    'TargetRegistry',
+    'GazeTarget',
     'ButtonSize',
-    'DwellStage',
     # Prediction
     'WordPredictionEngine',
     'PredictionResult',

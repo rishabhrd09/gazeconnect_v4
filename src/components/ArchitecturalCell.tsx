@@ -56,8 +56,8 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
   const isExtLeft = col === 1;
   const isExtRight = col === totalCols;
 
-  const extWall = '3px solid #2F4A38';
-  const intWall = '1.5px solid rgba(255,255,255,0.95)';
+  const extWall = '3px solid var(--ui-border)';
+  const intWall = '1.5px solid var(--ui-border)';
 
   const wallBreakN = isOccupied && neighborN !== roomId;
   const wallBreakS = isOccupied && neighborS !== roomId;
@@ -70,10 +70,10 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
   const borderRight = isExtRight ? extWall : (!wallBreakE && isOccupied ? 'none' : intWall);
 
   const roomFill = isOccupied
-    ? `${roomColor}C8`
+    ? `color-mix(in srgb, ${roomColor} 18%, var(--ui-surface))`
     : isExpTarget
-      ? `${pendingRoomColor || '#FBBF24'}70`
-      : '#F9F6EC';
+      ? `color-mix(in srgb, ${pendingRoomColor || '#FBBF24'} 22%, var(--ui-surface))`
+      : 'var(--ui-surface)';
 
   const displayLabel = isOccupied && !hideText
     ? (roomLabel && roomLabel.length <= 24 ? roomLabel : (shortLabel || roomId || ''))
@@ -111,18 +111,18 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.18) 0%, rgba(15,23,42,0.08) 100%)',
-        ...(stairsOnLeft ? { borderRight: '2px solid rgba(18,33,44,0.25)' } : {}),
-        ...(stairsOnRight ? { borderLeft: '2px solid rgba(18,33,44,0.25)' } : {}),
-        ...(stairsOnTop ? { borderBottom: '2px solid rgba(18,33,44,0.25)' } : {}),
-        ...(stairsOnBottom ? { borderTop: '2px solid rgba(18,33,44,0.25)' } : {}),
+        background: 'var(--ui-inset)',
+        ...(stairsOnLeft ? { borderRight: '2px solid var(--ui-border)' } : {}),
+        ...(stairsOnRight ? { borderLeft: '2px solid var(--ui-border)' } : {}),
+        ...(stairsOnTop ? { borderBottom: '2px solid var(--ui-border)' } : {}),
+        ...(stairsOnBottom ? { borderTop: '2px solid var(--ui-border)' } : {}),
       }}
     >
       <div
         style={{
           position: 'absolute',
           inset: '10% 16%',
-          border: '1.5px solid rgba(18,33,44,0.28)',
+          border: '1.5px solid var(--ui-border)',
           borderRadius: '4px',
         }}
       />
@@ -142,7 +142,7 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
               left: `${topPct}%`,
               width: '1.5px',
             }),
-            background: 'rgba(18,33,44,0.45)',
+            background: 'var(--ui-muted)',
           }}
         />
       ))}
@@ -151,8 +151,8 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
           position: 'absolute',
           ...(isVerticalStairs ? { top: '8%', left: '50%', transform: 'translateX(-50%)' } : { right: '8%', top: '50%', transform: 'translateY(-50%)' }),
           fontSize: 'clamp(10px, 1.2vh, 14px)',
-          fontWeight: 900,
-          color: '#12212C',
+          fontWeight: 650,
+          color: 'var(--ui-ink)',
         }}
       >
         {isVerticalStairs ? '↑' : '→'}
@@ -163,9 +163,9 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
             position: 'absolute',
             left: '6%',
             bottom: '6%',
-            fontSize: 'clamp(8px, 0.9vh, 11px)',
-            fontWeight: 900,
-            color: '#12212C',
+            fontSize: 'clamp(11px, 1.4vh, 15px)',
+            fontWeight: 650,
+            color: 'var(--ui-ink)',
             letterSpacing: '0.35px',
           }}
         >
@@ -177,9 +177,9 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
           style={{
             position: 'absolute',
             bottom: '6%',
-            fontSize: 'clamp(8px, 0.9vh, 11px)',
-            fontWeight: 900,
-            color: '#12212C',
+            fontSize: 'clamp(11px, 1.4vh, 15px)',
+            fontWeight: 650,
+            color: 'var(--ui-ink)',
             letterSpacing: '0.35px',
           }}
         >
@@ -205,12 +205,12 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
         style={{
           width: '96%',
           textAlign: 'center',
-          lineHeight: 1.02,
-          fontSize: 'clamp(12px, 1.7vh, 22px)',
-          fontWeight: 900,
+          lineHeight: 1.2,
+          fontSize: 'clamp(16px, 2vh, 24px)',
+          fontWeight: 650,
           letterSpacing: '0.3px',
-          color: '#12212C',
-          textShadow: '0 1px 0 rgba(255,255,255,0.55)',
+          color: 'var(--ui-ink)',
+          textShadow: 'none',
         }}
       >
         {comboMainLabel}
@@ -218,9 +218,9 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
       <span
         style={{
           marginTop: '2px',
-          fontSize: 'clamp(9px, 1.05vh, 12px)',
+          fontSize: 'clamp(12px, 1.5vh, 16px)',
           fontWeight: 700,
-          color: '#25394A',
+          color: 'var(--ui-muted)',
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
         }}
       >
@@ -231,7 +231,9 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
 
   return (
     <div
+      className="architectural-cell-surface"
       style={{
+        fontFamily: 'var(--ui-font)',
         position: 'relative',
         width: '100%',
         height: '100%',
@@ -285,12 +287,12 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
                 width: '96%',
                 textAlign: 'center',
                 whiteSpace: 'pre-line',
-                lineHeight: 1.02,
-                fontSize: 'clamp(13px, 1.95vh, 24px)',
-                fontWeight: 900,
+                lineHeight: 1.2,
+                fontSize: 'clamp(18px, 2.4vh, 28px)',
+                fontWeight: 650,
                 letterSpacing: '0.35px',
-                color: '#12212C',
-                textShadow: '0 1px 0 rgba(255,255,255,0.55)',
+                color: 'var(--ui-ink)',
+                textShadow: 'none',
               }}
             >
               {labelText}
@@ -298,9 +300,9 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
             <span
               style={{
                 marginTop: '2px',
-                fontSize: 'clamp(9px, 1.1vh, 12px)',
+                fontSize: 'clamp(12px, 1.5vh, 16px)',
                 fontWeight: 700,
-                color: '#25394A',
+                color: 'var(--ui-muted)',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontVariantNumeric: 'tabular-nums',
               }}
@@ -310,19 +312,19 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
           </>
         )
       ) : isExpTarget ? (
-        <span style={{ fontSize: 'clamp(20px, 2.3vh, 30px)', fontWeight: 900, color: pendingRoomColor || '#FBBF24' }}>
+        <span style={{ fontSize: 'clamp(20px, 2.3vh, 30px)', fontWeight: 650, color: 'var(--ui-accent-ink)' }}>
           {expDirection === 'right' ? '->' : 'v'}
         </span>
       ) : (
         <>
-          {/* Ghost zone label — italic + lighter weight = "guidance hint", not active label */}
+          {/* Readable zone label remains a stable gaze anchor before placement. */}
           <span
             style={{
-              fontSize: 'clamp(10px, 1.2vh, 14px)',
+              fontSize: 'clamp(20px, 2.5vh, 29px)',
               fontWeight: 600,
-              fontStyle: 'italic',
-              color: '#6F7F79',
-              opacity: 0.78,
+              fontStyle: 'normal',
+              color: 'var(--ui-muted)',
+              opacity: 1,
               textAlign: 'center',
               lineHeight: 1.1,
               whiteSpace: 'pre-line',
@@ -338,9 +340,9 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
               position: 'absolute',
               right: '3px',
               bottom: '2px',
-              fontSize: '7px',
-              color: '#7E8F8A',
-              opacity: 0.45,
+              fontSize: 'clamp(11px, 1.3vh, 14px)',
+              color: 'var(--ui-muted)',
+              opacity: 1,
               fontWeight: 600,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
               fontVariantNumeric: 'tabular-nums',

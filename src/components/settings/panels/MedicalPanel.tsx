@@ -457,21 +457,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
               autoFocus
             />
           </div>
-          <div style={{ flex: 1, minWidth: 150 }}>
-            <label style={{ display: 'block', fontSize: 12, color: colors.text.tertiary, marginBottom: 4 }}>
-              Title (Hindi)
-            </label>
-            <input
-              className="mp-input"
-              value={newSecHi}
-              onChange={e => setNewSecHi(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddSection();
-                if (e.key === 'Escape') { setShowNewSection(false); setNewSecEn(''); setNewSecHi(''); }
-              }}
-              placeholder="Hindi title..."
-            />
-          </div>
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="mp-btn mp-btn-success" onClick={handleAddSection}>Create</button>
             <button className="mp-btn" onClick={() => { setShowNewSection(false); setNewSecEn(''); setNewSecHi(''); }}>Cancel</button>
@@ -521,18 +507,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
                       autoFocus
                       style={{ flex: 1, maxWidth: 180 }}
                     />
-                    <input
-                      className="mp-input"
-                      value={renameHi}
-                      onChange={e => setRenameHi(e.target.value)}
-                      onKeyDown={e => {
-                        e.stopPropagation();
-                        if (e.key === 'Enter') commitRename(sec.id);
-                        if (e.key === 'Escape') setRenamingId(null);
-                      }}
-                      placeholder="Hindi title"
-                      style={{ flex: 1, maxWidth: 180 }}
-                    />
+
                   </div>
                 ) : (
                   <span style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -542,11 +517,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
                     }}>
                       {sec.title}
                     </span>
-                    {sec.titleHi && sec.titleHi !== sec.title && (
-                      <span style={{ fontSize: 13, color: colors.text.tertiary }}>
-                        ({sec.titleHi})
-                      </span>
-                    )}
+
                   </span>
                 )}
 
@@ -637,7 +608,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
                   }}>
                     <span style={{ width: 26 }} /> {/* urgent toggle space */}
                     <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>English *</span>
-                    <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary, fontWeight: 600 }}>Hindi (optional)</span>
+
                     <span style={{ width: 30 }} /> {/* delete btn space */}
                   </div>
 
@@ -685,14 +656,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
                           style={{ flex: 1 }}
                         />
 
-                        {/* Hindi input */}
-                        <input
-                          className="mp-input"
-                          value={item.hi}
-                          onChange={e => updateItem(sec.id, idx, 'hi', e.target.value)}
-                          placeholder="Hindi text"
-                          style={{ flex: 1 }}
-                        />
+
 
                         {/* Urgent badge (inline label) */}
                         {isUrgent && (

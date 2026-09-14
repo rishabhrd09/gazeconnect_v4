@@ -166,7 +166,7 @@ export function buildBrowserCursorInjectionScript(): string {
       };
 
       window.gcConfig = Object.assign({
-        dwellMs: 1100,                       // v17: 1200 → 1100, slightly faster select
+        dwellMs: 1500,                       // Fixed Navigation group
         onsetMs: 280,                        // v17: 300 → 280
         stabilityRadiusPx: 60,               // v17: 50 → 60 — base tolerates more ALS noise
         postClickCooldownMs: 900,
@@ -219,10 +219,8 @@ export function buildBrowserCursorInjectionScript(): string {
         // Rollback: window.gcConfig.progressBankEnabled = false (or the
         // persistent gazeFlag 'browserProgressBank').
         progressBankEnabled: false,
-        // v17.17 — pause dwell clocks across gaze-stream gaps longer
-        // than gapPauseMs (matches the app-side 150ms stale threshold
-        // and the backend POINT_TTL). Rollback:
-        //   window.gcConfig.gapPauseEnabled = false
+        // Legacy settings fields. Freshness protection is mandatory and
+        // cannot be disabled or lengthened by a smoothing preference.
         gapPauseEnabled: true,
         gapPauseMs: 150,
         // v17.19 — small-target probe snap: when the gaze point itself
@@ -813,7 +811,7 @@ export function buildBrowserCursorInjectionScript(): string {
         const bank = state.progressBank;
         let keys = Object.keys(bank);
         for (let i = 0; i < keys.length; i++) {
-          if ((nowMs - bank[keys[i]].at) >= ttlMs) delete bank[keys[i]];
+          if (nowMs < bank[keys[i]].at || (nowMs - bank[keys[i]].at) >= ttlMs) delete bank[keys[i]];
         }
         keys = Object.keys(bank);
         while (keys.length > 8) {
@@ -824,6 +822,19 @@ export function buildBrowserCursorInjectionScript(): string {
           delete bank[oldestKey];
           keys = Object.keys(bank);
         }
+      };
+
+      // Action durations are shared with the app. Onset is a separate
+      // intent guard and must never shorten the selected action duration.
+      const selectionDurationMs = () => {
+        const requested = Number((window.gcConfig || {}).dwellMs);
+        return [500, 1000, 1250, 1500, 2000].includes(requested) ? requested : 1500;
+      };
+
+      // Saved progress expires in wall time, including tracking gaps.
+      const retentionTtlMs = () => {
+        const requested = Number((window.gcConfig || {}).progressRetentionMs);
+        return Number.isFinite(requested) && requested > 0 ? Math.min(1000, requested) : 1000;
       };
 
       const stableKeyFor = (target, kind, href, label, rect) => [
@@ -1607,7 +1618,7 @@ export function buildBrowserCursorInjectionScript(): string {
         const cardUnsnapPx = Number(cfg.youtubeCardUnsnapPx || 180) / _rs;
         const skipSnapPx = Number(cfg.youtubeSkipSnapPx || 130) / _rs;
         const skipUnsnapPx = Number(cfg.youtubeSkipUnsnapPx || 200) / _rs;
-        const dwellMs = Number(cfg.dwellMs || 1200);
+        const dwellMs = selectionDurationMs();
         const onsetMs = Number(cfg.onsetMs || 300);
         const postClickCooldownMs = Number(cfg.postClickCooldownMs || 900);
         const targetRegionSlackPx = Number(cfg.targetRegionSlackPx || 24) / _rs;
@@ -1795,7 +1806,7 @@ export function buildBrowserCursorInjectionScript(): string {
               state.lastOnTargetAt >= state.start) {
             const onTargetElapsed = state.lastOnTargetAt - state.start;
             if (onTargetElapsed > onsetMs) {
-              const frac = (onTargetElapsed - onsetMs) / Math.max(1, dwellMs - onsetMs);
+              const frac = (onTargetElapsed - onsetMs) / dwellMs;
               if (frac >= 0.05 && frac < 1) {
                 if (cfg.progressBankEnabled === true) {
                   // v17.23 — bank mode: progress is stored PER identity so
@@ -1810,7 +1821,7 @@ export function buildBrowserCursorInjectionScript(): string {
                     frac: prior && prior.frac > frac ? prior.frac : frac,
                     at: now
                   };
-                  bankPrune(now, Number(cfg.progressRetentionMs || 1000));
+                  bankPrune(now, retentionTtlMs());
                 } else {
                   state.savedProgress = frac;
                   state.savedProgressKey = retentionKeyOf(state.targetKey);
@@ -1821,7 +1832,7 @@ export function buildBrowserCursorInjectionScript(): string {
           }
           // TTL expiry — a save that was never resumed dies here.
           if (state.savedProgressKey &&
-              (now - state.savedProgressAt) >= Number(cfg.progressRetentionMs || 1000)) {
+              (now - state.savedProgressAt) >= retentionTtlMs()) {
             state.savedProgress = 0;
             state.savedProgressKey = '';
             state.savedProgressAt = 0;
@@ -1902,8 +1913,8 @@ export function buildBrowserCursorInjectionScript(): string {
             const bankId = identityKeyOf(clickReq.key || '');
             const entry = state.progressBank[bankId];
             if (entry) {
-              if ((now - entry.at) < Number(cfg.progressRetentionMs || 1000)) {
-                const resumeElapsed = entry.frac * Math.max(1, dwellMs - onsetMs) + onsetMs;
+              if ((now - entry.at) < retentionTtlMs()) {
+                const resumeElapsed = entry.frac * dwellMs + onsetMs;
                 // Backward-only: a resume must never SHRINK live progress.
                 if (now - resumeElapsed < state.start) {
                   state.start = now - resumeElapsed;
@@ -1922,8 +1933,8 @@ export function buildBrowserCursorInjectionScript(): string {
             !state.clicked &&
             clickReq && clickReq.kind !== 'sticky_resume' &&
             retentionKeyOf(clickReq.key || '') === state.savedProgressKey) {
-          if ((now - state.savedProgressAt) < Number(cfg.progressRetentionMs || 1000)) {
-            const resumeElapsed = state.savedProgress * Math.max(1, dwellMs - onsetMs) + onsetMs;
+          if ((now - state.savedProgressAt) < retentionTtlMs()) {
+            const resumeElapsed = state.savedProgress * dwellMs + onsetMs;
             state.start = now - resumeElapsed;
             state.lastOnTargetAt = now;
             gcEmit('dwellResumed', {
@@ -2045,7 +2056,7 @@ export function buildBrowserCursorInjectionScript(): string {
         // v17.22 — commit requires the committing element to BE the tracked
         // target (identity-compared, so kind flips / reflows still commit).
         // Belt-and-braces below the acquisition-level identity restart.
-        if (elapsed > dwellMs && !state.clicked && clickReq &&
+        if (elapsed >= onsetMs + dwellMs && !state.clicked && clickReq &&
             (!emptyGuardOn || identityKeyOf(clickReq.key) === identityKeyOf(state.targetKey))) {
           // Per-target cooldown — if the same target was just clicked,
           // hold off so we don't immediately re-fire.
@@ -2179,46 +2190,32 @@ export function buildBrowserCursorInjectionScript(): string {
         if (dtMs > 100 && lastFrameTs > 0) {
           gcEmit('trackingLost', { gapMs: dtMs });
         }
-        // v17.17 — gap pause: dwell must not advance across gaps in the
-        // incoming gaze stream (blink, look-away, renderer stall). The
-        // dwell timer is wall-clock (now - state.start), so a gap would
-        // otherwise count toward the dwell and can jump-commit the
-        // moment frames resume — the same mid-blink misfire the main
-        // app's dwellPauseOnGap flag eliminates (on-rig validated
-        // 2026-06-11: worst click residual 480px → 109px). Shifting the
-        // clocks forward by the gap freezes progress without resetting.
-        // Rollback: window.gcConfig.gapPauseEnabled = false
-        const cfgGap = window.gcConfig || {};
-        if (cfgGap.gapPauseEnabled !== false && lastFrameTs > 0 &&
-            dtMs > Number(cfgGap.gapPauseMs || 150)) {
-          // v17.18 — shift only clocks that PREdate the gap, and never past
-          // the wall clock. gcResetDwell / gcBlockDwell / the post-click
-          // timer all write start = Date.now() BETWEEN frames (navigation
-          // events and the 900ms cooldown timer routinely fire mid-blink);
-          // blindly adding dtMs pushed such a start up to ~2s into the
-          // future, silently deadening dwell after click+blink with zero
-          // visual feedback (review-confirmed). dwellingExpiryAt is
-          // future-dated by design (visual grace) — extend it across the
-          // gap but cap at one fresh grace window.
-          const nowWall = Date.now();
+        // Do not count unavailable gaze time. Long gaps discard every
+        // pending target; short gaps pause onset/dwell without extending TTL.
+        const nowWall = Date.now();
+        if (lastFrameTs > 0 && (dtMs > 1000 || dtMs < 0)) {
+          window.gcHide();
+        } else if (lastFrameTs > 0 && dtMs > 150) {
           const gapStartWall = nowWall - dtMs;
           if (state.start > 0 && state.start <= gapStartWall) {
             state.start = Math.min(state.start + dtMs, nowWall);
           }
-          if (state.savedProgressAt > 0 && state.savedProgressAt <= gapStartWall) {
-            state.savedProgressAt = Math.min(state.savedProgressAt + dtMs, nowWall);
-          }
-          if (state.dwellingExpiryAt > 0) {
-            state.dwellingExpiryAt = Math.min(state.dwellingExpiryAt + dtMs, nowWall + 600);
-          }
         }
+        const ttl = retentionTtlMs();
+        if (state.savedProgressKey && (nowWall - state.savedProgressAt >= ttl ||
+            nowWall < state.savedProgressAt)) {
+          state.savedProgress = 0;
+          state.savedProgressKey = '';
+          state.savedProgressAt = 0;
+        }
+        bankPrune(nowWall, ttl);
         let result = null;
         try {
           result = _gcUpdateAndPollInner(x, y, cursorEnabled);
         } catch (_err) { /* never throw from the gaze loop */ }
         try {
           const cfg = window.gcConfig || {};
-          const dwellMs2 = Number(cfg.dwellMs || 1200);
+          const dwellMs2 = selectionDurationMs();
           const onsetMs2 = Number(cfg.onsetMs || 300);
           const nowMs = Date.now();
           let dwellState = 'idle';
@@ -2230,7 +2227,7 @@ export function buildBrowserCursorInjectionScript(): string {
             // pause armed edge-scrolling indefinitely while gaze rested
             // on blank page space (reading!). Guard-off restores legacy.
             const el2 = nowMs - state.start;
-            if (el2 > dwellMs2) dwellState = 'commit';
+            if (el2 >= onsetMs2 + dwellMs2) dwellState = 'commit';
             else if (el2 > onsetMs2) dwellState = 'dwell';
             else dwellState = 'onset';
           }
@@ -2242,7 +2239,7 @@ export function buildBrowserCursorInjectionScript(): string {
             let frac = 0;
             if (dwellState === 'dwell' && state.start > 0) {
               frac = Math.max(0, Math.min(1,
-                ((nowMs - state.start) - onsetMs2) / Math.max(1, dwellMs2 - onsetMs2)));
+                ((nowMs - state.start) - onsetMs2) / dwellMs2));
             } else if (dwellState === 'commit') {
               frac = 1;
             }
@@ -2499,7 +2496,8 @@ export function buildGazeUpdateAndPollScript(
   x: number,
   y: number,
   cursorEnabled: boolean,
-  pageZoom = 1
+  pageZoom = 1,
+  emittedAtWallMs = Date.now()
 ): string {
   // v17.20 — the poll now ALWAYS returns a JSON envelope:
   //   { c: <click request | null>, s: <dwellState string> }
@@ -2511,9 +2509,15 @@ export function buildGazeUpdateAndPollScript(
   // raw pageZoom is passed too so the script can keep snap/hold radii a
   // constant on-screen size (radiusScale). Guarded to a finite positive.
   const z = Number.isFinite(pageZoom) && pageZoom > 0 ? pageZoom : 1;
+  const issuedAt = Number.isFinite(emittedAtWallMs) ? emittedAtWallMs : 0;
   return `
     (function() {
       if (!window.gcUpdateAndPoll) return null;
+      var age = Date.now() - ${issuedAt};
+      if (age < -150 || age > 150 || ${!Number.isFinite(x) || !Number.isFinite(y)}) {
+        if (window.gcHide) window.gcHide();
+        return null;
+      }
       var r = window.gcUpdateAndPoll(${Math.round(x)}, ${Math.round(y)}, ${cursorEnabled ? 'true' : 'false'}, ${z});
       var s = (window.gcState && window.gcState.dwellState) || 'idle';
       return JSON.stringify({ c: r || null, s: s });

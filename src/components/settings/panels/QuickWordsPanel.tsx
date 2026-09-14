@@ -537,14 +537,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
                           }}>
                             {word.en}
                           </div>
-                          {word.hi && (
-                            <div style={{
-                              fontSize: 12, color: colors.text.tertiary, marginTop: 1,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>
-                              {word.hi}
-                            </div>
-                          )}
+
                         </div>
 
                         {/* Edit */}
@@ -590,14 +583,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
                       style={{ flex: 1 }}
                       onKeyDown={e => { if (e.key === 'Enter') handleAddWord(cat.id); }}
                     />
-                    <input
-                      className="qwp-input"
-                      value={form.hi}
-                      onChange={e => setNewWordText(prev => ({ ...prev, [cat.id]: { ...form, hi: e.target.value } }))}
-                      placeholder="Hindi (optional)"
-                      style={{ flex: 1 }}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddWord(cat.id); }}
-                    />
+
                     <button
                       className="qwp-btn qwp-btn-success"
                       onClick={() => handleAddWord(cat.id)}
@@ -656,14 +642,7 @@ const WordEditRow: React.FC<{
           style={{ flex: 1 }}
           onKeyDown={e => { if (e.key === 'Enter') onSave(editEn, editHi); if (e.key === 'Escape') onCancel(); }}
         />
-        <input
-          className="qwp-input"
-          value={editHi}
-          onChange={e => setEditHi(e.target.value)}
-          placeholder="Hindi (optional)"
-          style={{ flex: 1 }}
-          onKeyDown={e => { if (e.key === 'Enter') onSave(editEn, editHi); if (e.key === 'Escape') onCancel(); }}
-        />
+
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button className="qwp-btn" onClick={onCancel} style={{ fontSize: 13, padding: '5px 12px' }}>Cancel</button>

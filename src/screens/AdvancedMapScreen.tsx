@@ -17,6 +17,9 @@ import {
 } from '../utils/floorplanApi';
 import {
   RENDER_ORDER,
+  ALL_CELL_KEYS,
+  GridCellKey,
+  GridCellState,
   GRID_ROWS,
   GRID_COLS,
 } from '../types/compass';
@@ -35,9 +38,133 @@ import type {
   AccessibilityMarker,
 } from '../types/advancedMap';
 import { useTheme } from '../contexts/ThemeContext';
+import '../styles/home-design-refinement.css';
 
 const COMPASS_DRAFT_KEY = 'gazeconnect_compass_progress_v1';
-const EMERGENCY_FONT = `'Arial Black', ${typography.fontFamily.primary}`;
+
+type AdvancedFloorKey = 'gnd' | '1f';
+type AdvancedRoomGrid = Record<string, { roomId: string; roomLabel: string }>;
+interface AdvancedFloorEditor {
+  grid: AdvancedRoomGrid;
+  refinements: AdvancedRefinements;
+  cellLayouts: Record<string, string>;
+}
+type AdvancedFloors = Record<AdvancedFloorKey, AdvancedFloorEditor>;
+
+export function createAdvancedFloor(): AdvancedFloorEditor {
+  return { grid: {}, cellLayouts: {}, refinements: {
+    version: 2, subCellSplits: [], customEdges: [], voidMarkers: [], cellRotations: [],
+    cellExpansions: [], caregiverAnnotations: [], vastuFlags: [], accessibilityMarkers: [],
+  } };
+}
+
+export function readAdvancedFloors(map: any): AdvancedFloors {
+  const result = { gnd: createAdvancedFloor(), '1f': createAdvancedFloor() };
+  for (const [key, payloadKey] of [['gnd', 'ground_floor'], ['1f', 'first_floor']] as const) {
+    const floor = map?.[payloadKey];
+    for (const placement of floor?.placements || []) {
+      const roomId = placement.roomId || placement.room;
+      if (!roomId) continue;
+      for (const cell of placement.occupiedCells || placement.cells || []) {
+        if (/^r[1-4]_c[1-4]$/.test(cell)) result[key].grid[cell] = { roomId, roomLabel: placement.roomLabel || placement.room || roomId };
+      }
+    }
+    const saved = floor?.advanced_refinements || (key === 'gnd' ? map?.advanced_refinements : null);
+    if (saved) {
+      for (const field of Object.keys(result[key].refinements) as (keyof AdvancedRefinements)[]) {
+        if (field !== 'version' && field !== 'cellLayouts' && Array.isArray(saved[field])) {
+          (result[key].refinements as any)[field] = saved[field];
+        }
+      }
+    }
+    result[key].cellLayouts = floor?.cell_layouts || saved?.cellLayouts || (key === 'gnd' ? map?.cell_layouts : null) || {};
+  }
+  return result;
+}
+
+export function serializeAdvancedFloors(floors: AdvancedFloors, previous: any, width: number, depth: number, facing: string) {
+  const output: any = {
+    ...(previous || {}), grid_size: { rows: GRID_ROWS, cols: GRID_COLS },
+    plot: { ...(previous?.plot || {}), width_ft: width, depth_ft: depth, facing, type: previous?.plot?.type || 'Middle Plot' },
+    cell_size_ft: { width: width / GRID_COLS, depth: depth / GRID_ROWS },
+    advanced_refinements: floors.gnd.refinements, cell_layouts: floors.gnd.cellLayouts,
+  };
+  for (const [key, payloadKey] of [['gnd', 'ground_floor'], ['1f', 'first_floor']] as const) {
+    const floor = floors[key];
+    const rooms: Record<string, { roomId: string; roomLabel: string; cells: GridCellKey[] }> = Object.create(null);
+    for (const [cell, info] of Object.entries(floor.grid)) {
+      if (!rooms[info.roomId]) rooms[info.roomId] = { ...info, cells: [] };
+      rooms[info.roomId].cells.push(cell as GridCellKey);
+    }
+    output[payloadKey] = {
+      ...(previous?.[payloadKey] || {}),
+      placements: Object.values(rooms).map(room => ({
+        room: room.roomLabel, roomId: room.roomId, roomLabel: room.roomLabel,
+        cells: room.cells, occupiedCells: room.cells,
+        coords: cellsToBoundingRect(room.cells, width, depth),
+        cellRects: Object.fromEntries(room.cells.map(cell => [cell, cellToRect(cell, width, depth)])),
+        area_sqft: Math.round(room.cells.length * width * depth / (GRID_ROWS * GRID_COLS)),
+      })),
+      coverage_percent: Math.round(Object.keys(floor.grid).length / (GRID_ROWS * GRID_COLS) * 100),
+      empty_cells: ALL_CELL_KEYS.filter(cell => !floor.grid[cell]),
+      advanced_refinements: floor.refinements, cell_layouts: floor.cellLayouts,
+    };
+  }
+  if (output.first_floor.placements.length > 0) output.plot.num_floors = 'Multi-Floor';
+  return output;
+}
+
+export function advancedMapFromDraft(parsed: any): any | null {
+  const state = parsed?.state || parsed;
+  if (!state?.grid || !Array.isArray(state.placements)) return null;
+  const convert = (snapshot: any) => ({
+    placements: (snapshot?.placements || []).map((p: any) => ({ ...p, room: p.roomLabel || p.roomId, cells: p.occupiedCells || p.cells || [] })),
+    coverage_percent: snapshot?.coveragePercent || 0,
+  });
+  const firstActive = state.currentFloor === 'first';
+  const floorExtras = parsed?.advancedFloorMetadata || {};
+  return {
+    grid_size: { rows: GRID_ROWS, cols: GRID_COLS },
+    plot: { width_ft: state.foundation?.plotWidth || 40, depth_ft: state.foundation?.plotDepth || 60,
+      facing: state.foundation?.facing || 'South', type: state.foundation?.plotType || 'Middle Plot', num_floors: state.numFloors },
+    ground_floor: { ...convert(firstActive ? state.groundFloorData : state), ...floorExtras.gnd },
+    first_floor: { ...convert(firstActive ? state : state.firstFloorData), ...floorExtras['1f'],
+      advanced_refinements: floorExtras['1f']?.advanced_refinements || (firstActive ? parsed?.refinements : undefined) },
+    advanced_refinements: firstActive ? undefined : parsed?.refinements,
+    editor_active_floor: firstActive ? '1f' : 'gnd',
+  };
+}
+
+export function syncAdvancedCompassDraft(parsed: any, payload: ReturnType<typeof serializeAdvancedFloors>) {
+  const original = parsed?.state || parsed;
+  const snapshot = (floor: any, key: string) => {
+    const grid: Record<string, GridCellState> = Object.fromEntries(ALL_CELL_KEYS.map(cell => [cell, { roomId: null, anchorPlacementId: null, isExpandedChild: false }]));
+    const placements = floor.placements.map((p: any) => {
+      const placementId = `advanced-${key}-${p.roomId}`;
+      p.cells.forEach((cell: string, index: number) => { grid[cell] = { roomId: p.roomId, anchorPlacementId: placementId, isExpandedChild: index > 0 }; });
+      return { placementId, roomId: p.roomId, roomLabel: p.roomLabel, anchorCell: p.cells[0], occupiedCells: p.cells, coords: p.coords, cellRects: p.cellRects };
+    });
+    return { grid, placements, coveragePercent: floor.coverage_percent };
+  };
+  const ground = snapshot(payload.ground_floor, 'gnd');
+  const first = snapshot(payload.first_floor, '1f');
+  const firstActive = original.currentFloor === 'first';
+  const active = firstActive ? first : ground;
+  const numFloors = payload.first_floor.placements.length > 0 ? 'Multi-Floor' : original.numFloors;
+  const state = {
+    ...original, numFloors, foundation: { ...original.foundation, numFloors }, grid: active.grid, placements: active.placements,
+    groundFloorData: firstActive ? ground : null, firstFloorData: firstActive ? null : first,
+    armed: false, pendingExpansion: null, history: [],
+  };
+  const metadata = {
+    gnd: { advanced_refinements: payload.ground_floor.advanced_refinements, cell_layouts: payload.ground_floor.cell_layouts },
+    '1f': { advanced_refinements: payload.first_floor.advanced_refinements, cell_layouts: payload.first_floor.cell_layouts },
+  };
+  return parsed?.state ? { ...parsed, state, advancedFloorMetadata: metadata, refinements: (firstActive ? payload.first_floor : payload.ground_floor).advanced_refinements }
+    : { ...state, advancedFloorMetadata: metadata };
+}
+
+
 
 const THEME = {
   bg: '#07111E',
@@ -208,16 +335,16 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const ws = useWS();
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
-  const T_pageBg = isLight ? '#EBE0CC' : isWarm ? '#F5EEDF' : isMix ? '#1A1611' : THEME.bg;
-  const T_panelBg = isLight ? '#FAF5E8' : isWarm ? '#F8F1DF' : isMix ? '#241F18' : THEME.panel;
-  const T_panelBorder = isLight ? '#3F6864' : isWarm ? '#CBBCA9' : isMix ? 'rgba(180, 147, 98, 0.42)' : THEME.border2;
-  const T_panelBorderSoft = isLight ? '#D6CAB7' : isWarm ? '#DED2C2' : isMix ? 'rgba(180, 147, 98, 0.28)' : THEME.border;
-  const T_textMain = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : THEME.text;
-  const T_textSub = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : THEME.sub;
-  const T_textDim = isLight ? '#9A8568' : isWarm ? '#8A7C6B' : isMix ? '#8E7E62' : THEME.dim;
+  const T_pageBg = 'var(--ui-page)';
+  const T_panelBg = 'var(--ui-panel)';
+  const T_panelBorder = 'var(--ui-border)';
+  const T_panelBorderSoft = 'var(--ui-border)';
+  const T_textMain = 'var(--ui-ink)';
+  const T_textSub = 'var(--ui-muted)';
+  const T_textDim = 'var(--ui-muted)';
   const T_textInverse = isLight ? '#FBE9DE' : isWarm ? '#FBF5E5' : isMix ? '#FFFCF1' : '#FFFFFF';
-  const T_cellEmpty = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241E16' : THEME.bg;
-  const T_cellBorder = isLight ? '#D6CAB7' : isWarm ? '#DED2C2' : isMix ? 'rgba(180, 147, 98, 0.32)' : THEME.border2;
+  const T_cellEmpty = 'var(--ui-surface)';
+  const T_cellBorder = 'var(--ui-border)';
   const T_subSurface = isLight
     ? 'rgba(168, 148, 120, 0.18)'
     : isMix
@@ -239,14 +366,14 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const T_rotateFill = isLight ? '#8C5A1E' : isMix ? '#6E4520' : THEME.amber;
   const T_expandFill = isLight ? '#3D7853' : isMix ? '#324F3D' : THEME.success;
   // Generate plan / refine accents
-  const T_generatePlanBg = isLight ? '#497775' : isWarm ? '#3F6968' : isMix ? '#3A6770' : `${THEME.teal}15`;
-  const T_generatePlanBorder = isLight ? '#497775' : isWarm ? '#3F6968' : isMix ? '#5E9CA8' : THEME.teal;
-  const T_generatePlanText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : THEME.teal;
-  const T_refineMapBg = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#5A4878' : 'rgba(139,92,246,0.08)';
-  const T_refineMapBorder = isLight ? '#8A3B38' : isWarm ? '#7A312E' : isMix ? '#8B7AB8' : 'rgba(139,92,246,0.4)';
-  const T_refineMapText = isLight ? '#FFF7EF' : isWarm ? '#FFF7EF' : isMix ? '#FFFCF1' : THEME.violet;
+  const T_generatePlanBg = 'var(--ui-selected)';
+  const T_generatePlanBorder = 'var(--ui-accent-ink)';
+  const T_generatePlanText = 'var(--ui-accent-ink)';
+  const T_refineMapBg = 'var(--ui-surface)';
+  const T_refineMapBorder = 'var(--ui-border)';
+  const T_refineMapText = 'var(--ui-ink)';
   // Right plot canvas bg (slightly cooler than panel)
-  const T_canvasBg = isLight ? '#E5DAC2' : isMix ? '#15110C' : '#08131F';
+  const T_canvasBg = 'var(--ui-page)';
 
   // Phase starts at room_selection (Phase 1)
   const [phase, setPhase] = useState<AdvancedPhase>('room_selection');
@@ -257,6 +384,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   // Arm-before-fire safety state
   const [isGridArmed, setIsGridArmed] = useState(false);
   const [roomPickerOpen, setRoomPickerOpen] = useState(false);
+  const [roomChoicePage, setRoomChoicePage] = useState(0);
   const [activeFloor, setActiveFloor] = useState<'gnd' | '1f'>('gnd');
   const [navHidden, setNavHidden] = useState(false);
   const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
@@ -264,99 +392,57 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   const placementCooldownRef = useRef(false);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [refinements, setRefinements] = useState<AdvancedRefinements>({
-    version: 2,
-    subCellSplits: [],
-    customEdges: [],
-    voidMarkers: [],
-    cellRotations: [],
-    cellExpansions: [],
-    caregiverAnnotations: [],
-    vastuFlags: [],
-    accessibilityMarkers: [],
-  });
-
-  // Cell layouts for combo stair rooms (which side is stairs)
-  const [cellLayouts, setCellLayouts] = useState<Record<string, string>>({});
-
-  // Local grid for room_selection phase — tracks cell→room assignments
-  const [localGrid, setLocalGrid] = useState<Record<string, { roomId: string; roomLabel: string }>>({});
-
+  const [floorEditors, setFloorEditors] = useState<AdvancedFloors>(() => ({ gnd: createAdvancedFloor(), '1f': createAdvancedFloor() }));
+  const { grid: localGrid, refinements, cellLayouts } = floorEditors[activeFloor];
+  const setLocalGrid = useCallback((update: React.SetStateAction<AdvancedRoomGrid>) => {
+    setFloorEditors(previous => ({ ...previous, [activeFloor]: { ...previous[activeFloor], grid: typeof update === 'function' ? update(previous[activeFloor].grid) : update } }));
+  }, [activeFloor]);
+  const setRefinements = useCallback((update: React.SetStateAction<AdvancedRefinements>) => {
+    setFloorEditors(previous => ({ ...previous, [activeFloor]: { ...previous[activeFloor], refinements: typeof update === 'function' ? update(previous[activeFloor].refinements) : update } }));
+  }, [activeFloor]);
+  const setCellLayouts = useCallback((update: React.SetStateAction<Record<string, string>>) => {
+    setFloorEditors(previous => ({ ...previous, [activeFloor]: { ...previous[activeFloor], cellLayouts: typeof update === 'function' ? update(previous[activeFloor].cellLayouts) : update } }));
+  }, [activeFloor]);
   const dataLoaded = useRef(false);
 
-  // ─── Helper: build compass_map from session draft ───
   const buildMapFromDraft = (): any | null => {
     try {
       const raw = sessionStorage.getItem(COMPASS_DRAFT_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const draftState = parsed?.state || parsed;
-      if (!draftState?.grid || !Array.isArray(draftState.placements)) return null;
-      const placements = draftState.placements.map((p: any) => ({
-        roomId: p.roomId, room: p.roomId,
-        roomLabel: p.roomLabel || p.roomId,
-        cells: p.occupiedCells || [], occupiedCells: p.occupiedCells || [],
-      }));
-      return {
-        grid_size: { rows: 4, cols: 4 },
-        plot: {
-          width_ft: draftState.foundation?.plotWidth || 40,
-          depth_ft: draftState.foundation?.plotDepth || 60,
-          facing: draftState.foundation?.facing || 'South',
-          type: draftState.foundation?.plotType || 'Middle Plot',
-        },
-        ground_floor: { placements },
-      };
+      return raw ? advancedMapFromDraft(JSON.parse(raw)) : null;
     } catch { return null; }
   };
 
   const loadMap = (map: any) => {
     dataLoaded.current = true;
     setCompassMap(map);
-    if (map.advanced_refinements) setRefinements(map.advanced_refinements);
-    if (map.cell_layouts) setCellLayouts(map.cell_layouts);
-
-    // Populate localGrid from placements
-    const grid: Record<string, { roomId: string; roomLabel: string }> = {};
-    (map.ground_floor?.placements || []).forEach((pl: any) => {
-      (pl.occupiedCells || pl.cells || []).forEach((c: string) => {
-        grid[c] = { roomId: pl.roomId || pl.room, roomLabel: pl.roomLabel || pl.room };
-      });
-    });
-    setLocalGrid(grid);
-
-    const facing = map.plot?.facing || 'North';
-    const placements = map.ground_floor?.placements || [];
-
-    // AUTO VASTU CHECK
-    const kitchenPl = placements.find((p: any) => p.roomId === 'kitchen');
-    if (kitchenPl) {
-      const badCells = facing === 'North' ? ['r1_c3', 'r1_c4'] : ['r4_c1', 'r4_c2'];
-      const cells = kitchenPl.occupiedCells || kitchenPl.cells || [];
-      if (cells.some((c: string) => badCells.includes(c))) {
-        setRefinements(prev => ({
-          ...prev,
-          vastuFlags: [...prev.vastuFlags, {
-            cell: cells[0], roomId: 'kitchen',
-            issue: 'Kitchen in unfavorable Vastu zone',
-            suggestion: 'Consider South-East quadrant',
-          }],
-        }));
+    const floors = readAdvancedFloors(map);
+    for (const key of ['gnd', '1f'] as const) {
+      const current = floors[key];
+      const badKitchenCells = map.plot?.facing === 'North' ? ['r1_c3', 'r1_c4'] : ['r4_c1', 'r4_c2'];
+      const kitchenCell = badKitchenCells.find(cell => current.grid[cell]?.roomId === 'kitchen');
+      if (kitchenCell && !current.refinements.vastuFlags.some(flag => flag.roomId === 'kitchen')) {
+        current.refinements = { ...current.refinements, vastuFlags: [...current.refinements.vastuFlags, {
+          cell: kitchenCell, roomId: 'kitchen', issue: 'Kitchen in unfavorable Vastu zone', suggestion: 'Consider South-East quadrant',
+        }] };
       }
+      const markers: AccessibilityMarker[] = Object.entries(current.grid)
+        .filter(([, room]) => ['icu', 'bathroom', 'masterBed'].includes(room.roomId))
+        .map(([cell]) => ({ cell, type: 'wheelchair_turning_circle' }));
+      current.refinements = { ...current.refinements, accessibilityMarkers: [
+        ...current.refinements.accessibilityMarkers,
+        ...markers.filter(marker => !current.refinements.accessibilityMarkers.some(saved => saved.cell === marker.cell && saved.type === marker.type)),
+      ] };
     }
+    setFloorEditors(floors);
+    if (map.editor_active_floor === '1f') setActiveFloor('1f');
+  };
 
-    // AUTO ACCESSIBILITY CHECK
-    const newMarkers: AccessibilityMarker[] = [];
-    placements.forEach((p: any) => {
-      if (['icu', 'bathroom', 'masterBed'].includes(p.roomId)) {
-        (p.occupiedCells || p.cells || []).forEach((cell: string) => {
-          newMarkers.push({ cell, type: 'wheelchair_turning_circle' });
-        });
-      }
-    });
-    if (newMarkers.length > 0) {
-      setRefinements(prev => ({ ...prev, accessibilityMarkers: newMarkers }));
-    }
+  const switchFloor = (floor: AdvancedFloorKey) => {
+    setActiveFloor(floor);
+    setSelectedCell(null);
+    setIsGridArmed(false);
+    setRoomPickerOpen(false);
+    setRoomChoicePage(0);
   };
 
   useEffect(() => {
@@ -495,7 +581,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       // Refinement phase: select/deselect cell
       setSelectedCell(prev => prev === cellKey ? null : cellKey);
     }
-  }, [isRoomPhase, selectedRoomId, isGridArmed, onSpeak]);
+  }, [isRoomPhase, selectedRoomId, isGridArmed, onSpeak, setLocalGrid]);
 
   const handleSplit = (direction: SplitDirection) => {
     if (!selectedCell) return;
@@ -511,104 +597,31 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   };
 
   const handleSave = useCallback(() => {
-    // Rebuild placements from localGrid
-    const roomCells: Record<string, { roomId: string; roomLabel: string; cells: string[] }> = {};
-    Object.entries(localGrid).forEach(([cell, info]) => {
-      if (!roomCells[info.roomId]) {
-        roomCells[info.roomId] = { roomId: info.roomId, roomLabel: info.roomLabel, cells: [] };
-      }
-      roomCells[info.roomId].cells.push(cell);
-    });
-    const placements = Object.values(roomCells).map(r => ({
-      roomId: r.roomId, room: r.roomId, roomLabel: r.roomLabel,
-      cells: r.cells, occupiedCells: r.cells,
-    }));
-
-    // Update compassMap and save
-    const updatedMap = {
-      ...(compassMap || {}),
-      ground_floor: { ...(compassMap?.ground_floor || {}), placements },
-      advanced_refinements: refinements,
-      cell_layouts: cellLayouts,
-    };
+    const updatedMap = { ...serializeAdvancedFloors(floorEditors, compassMap, pw, pd, facing), editor_active_floor: activeFloor };
     setCompassMap(updatedMap);
-
     const existing = (ws.surveyData || {}) as any;
     ws.saveSurvey({ ...existing, compass_map: updatedMap });
-
-    // Also persist back to sessionStorage draft for CompassMapScreen consistency
     try {
-      const raw = sessionStorage.getItem(COMPASS_DRAFT_KEY);
+      const raw = sessionStorage.getItem(COMPASS_DRAFT_KEY) || localStorage.getItem('compass_persistent_backup');
       if (raw) {
-        const parsed = JSON.parse(raw);
-        const draftState = parsed?.state || parsed;
-        if (draftState) {
-          // Update grid and placements in draft
-          const newGrid: Record<string, string> = {};
-          Object.entries(localGrid).forEach(([cell, info]) => {
-            newGrid[cell] = info.roomId;
-          });
-          draftState.grid = newGrid;
-          draftState.placements = placements;
-          sessionStorage.setItem(COMPASS_DRAFT_KEY, JSON.stringify(parsed));
-        }
+        const saved = JSON.stringify(syncAdvancedCompassDraft(JSON.parse(raw), updatedMap));
+        sessionStorage.setItem(COMPASS_DRAFT_KEY, saved);
+        const previousPrimary = localStorage.getItem('compass_persistent_backup');
+        if (previousPrimary && previousPrimary !== saved) localStorage.setItem('compass_last_session_backup', previousPrimary);
+        // Compass chooses its strongest session/primary draft on return. Both
+        // must reflect deletions too, or the older, fuller map can win.
+        localStorage.setItem('compass_persistent_backup', saved);
       }
-    } catch { /* silent */ }
-
+    } catch { /* Local storage can be unavailable; backend save remains available. */ }
     onSpeak('Saved.');
-  }, [localGrid, refinements, compassMap, ws, onSpeak, cellLayouts]);
+    return updatedMap;
+  }, [floorEditors, compassMap, pw, pd, facing, activeFloor, ws, onSpeak]);
 
   const handleGenerate = useCallback(() => {
-    handleSave();
-
-    // Build proper CompassMapPayload from localGrid
-    const roomCells: Record<string, { roomId: string; roomLabel: string; cells: string[] }> = {};
-    Object.entries(localGrid).forEach(([cell, info]) => {
-      if (!roomCells[info.roomId]) {
-        roomCells[info.roomId] = { roomId: info.roomId, roomLabel: info.roomLabel, cells: [] };
-      }
-      roomCells[info.roomId].cells.push(cell);
-    });
-
-    const placements = Object.values(roomCells).map(r => {
-      const typedCells = r.cells as any[];
-      const coords = cellsToBoundingRect(typedCells, pw, pd);
-      const cellRects = Object.fromEntries(typedCells.map(c => [c, cellToRect(c, pw, pd)]));
-      const area = Math.round((coords.x2 - coords.x1) * (coords.y2 - coords.y1));
-      return {
-        room: r.roomLabel || r.roomId,
-        roomId: r.roomId,
-        cells: r.cells,
-        coords,
-        cellRects,
-        area_sqft: area,
-      };
-    });
-
-    const totalCells = Object.keys(localGrid).length;
-    const coverage = Math.round((totalCells / (GRID_ROWS * GRID_COLS)) * 100);
-
-    const payload: CompassMapPayload = {
-      grid_size: { rows: GRID_ROWS, cols: GRID_COLS },
-      plot: {
-        width_ft: pw,
-        depth_ft: pd,
-        facing: facing,
-        type: compassMap?.plot?.type || 'Middle Plot',
-      },
-      cell_size_ft: { width: cellWFt, depth: cellDFt },
-      ground_floor: {
-        placements: placements as any,
-        coverage_percent: coverage,
-      },
-    };
-
-    // Attach advanced refinements
-    const enriched = { ...payload, advanced_refinements: refinements } as any;
-    setCompiledPayload(enriched);
+    setCompiledPayload(handleSave());
     setShowFloorPlanViewer(true);
     onSpeak('Generating architectural floor plan...');
-  }, [handleSave, localGrid, pw, pd, facing, compassMap, cellWFt, cellDFt, refinements, onSpeak]);
+  }, [handleSave, onSpeak]);
 
   const switchToRefinement = () => {
     setPhase('overview');
@@ -628,7 +641,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  SIDEBAR HEADER — thin label only (nav moved to floating panel)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderSidebarHeader = () => (
-    <div style={{ padding: '10px 14px 8px', borderBottom: `1px solid ${T_panelBorderSoft}`, flexShrink: 0 }}>
+    <div className="advanced-sidebar-heading" style={{ padding: '10px 14px 8px', borderBottom: `1px solid ${T_panelBorderSoft}`, flexShrink: 0 }}>
       <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>
         GAZECONNECT · ADVANCED MAP
       </span>
@@ -679,7 +692,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
     // Full nav panel — floating top-right
     return (
-      <div style={{
+      <div className="advanced-floating-nav" style={{
         position: 'fixed', top: 24, right: 58, zIndex: 100,
         display: 'flex', flexDirection: 'column', gap: 8,
         background: navPanelBg,
@@ -719,13 +732,6 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
           </GazeButton>
         </div>
 
-        {/* Emergency — preserved as-is for safety/visibility */}
-        <GazeButton id="adv-emergency" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-          alwaysActive dwellCategory="medicalUrgent" onClick={() => onSpeak('I need help immediately!')}
-          style={{ minHeight: 'clamp(88px, 10vh, 112px)', width: '100%', borderRadius: 10, background: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.5)', color: '#F87171', fontSize: 'clamp(16px, 1.9vh, 20px)', fontWeight: 900, letterSpacing: '0.12em', fontFamily: EMERGENCY_FONT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          EMERGENCY
-        </GazeButton>
-
         {/* Hide Nav */}
         <GazeButton id="hide-nav-btn" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
           dwellCategory="navigationButton"
@@ -749,6 +755,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderRoomSidebar = () => {
     const roomKeys = Object.keys(ROOM_LIBRARY);
+    const roomPageCount = Math.ceil(roomKeys.length / 6);
     const activeLib = selectedRoomId ? ROOM_LIBRARY[selectedRoomId] : null;
     const activeCellCount = selectedRoomId ? (placedRooms[selectedRoomId]?.length || 0) : 0;
 
@@ -761,9 +768,9 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         {roomPickerOpen ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <div style={{ padding: '10px 14px 4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>SELECT A ROOM:</span>
+              <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>SELECT A ROOM:</span><span style={{ color: T_textSub, fontSize: 15 }}>{roomChoicePage + 1} / {roomPageCount}</span>
             </div>
-            <div style={{
+            <div className="advanced-room-grid" style={{
               flex: 1, overflowY: 'auto', minHeight: 0,
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
@@ -771,12 +778,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               padding: '12px 16px',
               alignItems: 'stretch',
             }}>
-              {roomKeys.map(key => {
+              {roomKeys.slice(roomChoicePage * 6, roomChoicePage * 6 + 6).map(key => {
                 const lib = ROOM_LIBRARY[key];
                 const isSelected = selectedRoomId === key;
                 const cellCount = placedRooms[key]?.length || 0;
                 return (
-                  <GazeButton key={key} id={`room-${key}`}
+                  <GazeButton key={key} id={`room-${key}`} aria-pressed={isSelected}
                     gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                     dwellCategory="compassMapAction"
                     onClick={() => selectRoom(key)}
@@ -804,7 +811,10 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                   </GazeButton>
                 );
               })}
-              {/* CLOSE LIST button */}
+            </div>
+            <div className="advanced-room-pager">
+              <GazeButton id="room-previous-page" disabled={roomChoicePage === 0} gazeEnabled={isGazeEnabled}
+                dwellCategory="navigationButton" onClick={() => setRoomChoicePage(page => page - 1)}>← Previous</GazeButton>
               <GazeButton id="room-close-list" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => setRoomPickerOpen(false)}
                 style={{
@@ -815,11 +825,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                 }}>
                 CLOSE LIST
               </GazeButton>
+              <GazeButton id="room-next-page" disabled={roomChoicePage === roomPageCount - 1} gazeEnabled={isGazeEnabled}
+                dwellCategory="navigationButton" onClick={() => setRoomChoicePage(page => page + 1)}>More →</GazeButton>
             </div>
           </div>
         ) : (
           /* ── Default State (Picker Collapsed) ── */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 14px' }}>
+          <div className="advanced-room-controls" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 14px' }}>
             {/* Current Room Label */}
             <span style={{ fontSize: 9, fontWeight: 800, color: T_textDim, letterSpacing: 2 }}>CURRENT ROOM</span>
 
@@ -834,7 +846,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                 <>
                   <div style={{ width: 20, height: 20, borderRadius: 4, background: activeLib.color, flexShrink: 0 }} />
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: activeLib.color }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: T_textMain }}>
                       {activeLib.shortLabel}
                     </span>
                     <span style={{ fontSize: 10, color: T_textSub }}>
@@ -849,7 +861,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
             {/* CHANGE ROOM + NEXT ROOM buttons */}
             <GazeButton id="room-change" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-              onClick={() => { setRoomPickerOpen(true); setIsGridArmed(false); }}
+              onClick={() => { setRoomChoicePage(Math.max(0, Math.floor(Object.keys(ROOM_LIBRARY).indexOf(selectedRoomId || '') / 6))); setRoomPickerOpen(true); setIsGridArmed(false); }}
               style={{
                 height: 80, width: '100%', borderRadius: 10,
                 background: T_subSurface, border: `1px solid ${T_panelBorder}`,
@@ -897,8 +909,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
         {/* ── Floor selectors ── */}
         <div style={{ display: 'flex', gap: 6, padding: '0 14px', flexShrink: 0 }}>
-          <GazeButton id="floor-gnd" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-            onClick={() => setActiveFloor('gnd')}
+          <GazeButton id="floor-gnd" aria-pressed={activeFloor === 'gnd'} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+            onClick={() => switchFloor('gnd')}
             style={{
               height: 60, flex: 1, borderRadius: 8,
               background: activeFloor === 'gnd'
@@ -911,8 +923,8 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             }}>
             GND {activeFloor === 'gnd' && '✓'}
           </GazeButton>
-          <GazeButton id="floor-1f" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
-            onClick={() => setActiveFloor('1f')}
+          <GazeButton id="floor-1f" aria-pressed={activeFloor === '1f'} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+            onClick={() => switchFloor('1f')}
             style={{
               height: 60, flex: 1, borderRadius: 8,
               background: activeFloor === '1f'
@@ -928,10 +940,10 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         </div>
 
         {/* spacer to push action buttons down */}
-        <div style={{ flex: 1, minHeight: 4 }} />
+        <div style={{ flex: roomPickerOpen ? 0 : 1, minHeight: 4 }} />
 
         {/* ── Bottom action buttons ── */}
-        <div style={{ padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, borderTop: `1px solid ${T_panelBorderSoft}` }}>
+        <div className="advanced-room-actions" style={{ padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, borderTop: `1px solid ${T_panelBorderSoft}` }}>
           <GazeButton id="adv-save" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={handleSave}
             style={{
@@ -969,18 +981,22 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
     );
   };
 
+  const [flagPage, setFlagPage] = useState(0);
+  const flagPageCount = Math.max(1, Math.ceil((refinements.vastuFlags.length + refinements.accessibilityMarkers.length) / 2));
+  useEffect(() => setFlagPage(page => Math.min(page, flagPageCount - 1)), [flagPageCount]);
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   //  REFINEMENT PANEL — Phase 2 sidebar content
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderRefinementPanel = () => (
-    <div style={{
+    <div className="advanced-refinement-panel" data-cell-selected={!!selectedCell} data-flags-paged={phase === 'overview' && flagPageCount > 1} style={{
       flex: 1, display: 'flex', flexDirection: 'column', gap: 8,
       padding: '12px 14px', minHeight: 0,
     }}>
       <span style={{ fontSize: 8, fontWeight: 800, color: T_textDim, letterSpacing: 2, textTransform: 'uppercase', flexShrink: 0 }}>
         Refinement Phase
       </span>
-      {([
+      {!selectedCell && <div className="advanced-phase-grid">{([
         { key: 'overview' as AdvancedPhase, icon: '📐', label: 'Overview' },
         { key: 'split' as AdvancedPhase, icon: '✂', label: 'Split Cells' },
         { key: 'walls' as AdvancedPhase, icon: '⬛', label: 'Wall Logic' },
@@ -998,7 +1014,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             : T_textSub)
           : darkPc;
         return (
-          <GazeButton key={p.key} id={`phase-${p.key}`} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+          <GazeButton key={p.key} id={`phase-${p.key}`} aria-pressed={isActive} gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
             onClick={() => { setPhase(p.key); setSelectedCell(null); }}
             style={{
               flex: 1, minHeight: 'clamp(80px, 8.5vh, 100px)', borderRadius: 10,
@@ -1013,11 +1029,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
             <span style={{ fontSize: 16 }}>{p.icon}</span> {p.label}
           </GazeButton>
         );
-      })}
+      })}</div>}
 
       {/* SPLIT TOOLS */}
       {phase === 'split' && selectedCell && (
-        <div style={{ flexShrink: 0, background: isLight ? `${T_splitFill}14` : isMix ? `${T_splitFill}22` : 'rgba(139,92,246,0.07)', border: `1px solid ${T_splitFill}33`, borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div className="advanced-context-tools" style={{ flexShrink: 0, background: isLight ? `${T_splitFill}14` : isMix ? `${T_splitFill}22` : 'rgba(139,92,246,0.07)', border: `1px solid ${T_splitFill}33`, borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: T_splitFill }}>
             {gridState[selectedCell]?.roomLabel?.toUpperCase() || selectedCell}
           </div>
@@ -1043,7 +1059,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
       {/* WALL TOOLS */}
       {phase === 'walls' && selectedCell && (
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="advanced-context-tools" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: T_wallsFill }}>
             {gridState[selectedCell]?.roomLabel?.toUpperCase() || selectedCell}
           </div>
@@ -1087,7 +1103,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
       {/* VOID TOOL */}
       {phase === 'void' && selectedCell && (
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="advanced-context-tools" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: T_wallsFill }}>
             {gridState[selectedCell]?.roomLabel?.toUpperCase() || selectedCell}
           </div>
@@ -1125,13 +1141,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         if (isCombo) {
           // Combo stair+room: show layout picker (which side is stairs)
           return (
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="advanced-context-tools" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#A1887F' }}>
                 {cellInfo?.roomLabel?.toUpperCase() || selectedCell} — LAYOUT
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {COMBO_LAYOUTS.map(opt => (
-                  <GazeButton key={opt.id} id={`combo-${opt.id}`}
+                  <GazeButton key={opt.id} id={`combo-${opt.id}`} aria-pressed={cellLayouts[selectedCell!] === opt.stairSide}
                     gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                     onClick={() => {
                       setCellLayouts(prev => ({ ...prev, [selectedCell!]: opt.stairSide }));
@@ -1143,7 +1159,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                       background: cellLayouts[selectedCell!] === opt.stairSide ? 'rgba(161,136,127,0.25)' : 'rgba(161,136,127,0.08)',
                       border: `1.5px solid ${cellLayouts[selectedCell!] === opt.stairSide ? '#A1887F' : 'rgba(161,136,127,0.25)'}`,
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', gap: 4, color: '#D7CCC8',
+                      justifyContent: 'center', gap: 4, color: T_textMain,
                     }}>
                     <div style={{
                       width: 40, height: 40, display: 'flex',
@@ -1168,7 +1184,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
               <span style={{ fontSize: 9, fontWeight: 700, color: '#A1887F', marginTop: 4 }}>STAIR DIRECTION:</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {STAIR_ORIENTATIONS.map(opt => (
-                  <GazeButton key={opt.rotation} id={`stair-combo-${opt.rotation}`}
+                  <GazeButton key={opt.rotation} id={`stair-combo-${opt.rotation}`} aria-pressed={currentRotation === opt.rotation}
                     gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                     onClick={() => {
                       setRefinements(prev => ({
@@ -1181,11 +1197,11 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                       onSpeak(`${opt.label} set.`);
                     }}
                     style={{
-                      height: 70, borderRadius: 10,
+                      height: 88, borderRadius: 10,
                       background: currentRotation === opt.rotation ? 'rgba(161,136,127,0.25)' : 'rgba(161,136,127,0.08)',
                       border: `1.5px solid ${currentRotation === opt.rotation ? '#A1887F' : 'rgba(161,136,127,0.2)'}`,
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', gap: 4, color: '#D7CCC8',
+                      justifyContent: 'center', gap: 4, color: T_textMain,
                     }}>
                     <div style={{ width: 32, height: 32 }}>
                       <StairDrawing rotation={opt.rotation} />
@@ -1206,13 +1222,13 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         if (isStair) {
           // Pure staircase: show 4 orientation buttons in 2×2 grid
           return (
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="advanced-context-tools" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#A1887F' }}>
                 {cellInfo?.roomLabel?.toUpperCase() || selectedCell} — ORIENTATION
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {STAIR_ORIENTATIONS.map(opt => (
-                  <GazeButton key={opt.rotation} id={`stair-${opt.rotation}`}
+                  <GazeButton key={opt.rotation} id={`stair-${opt.rotation}`} aria-pressed={currentRotation === opt.rotation}
                     gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                     onClick={() => {
                       setRefinements(prev => ({
@@ -1230,14 +1246,14 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                       background: currentRotation === opt.rotation ? 'rgba(161,136,127,0.3)' : 'rgba(161,136,127,0.1)',
                       border: `2px solid ${currentRotation === opt.rotation ? '#A1887F' : 'rgba(161,136,127,0.3)'}`,
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', gap: 8, color: '#D7CCC8',
+                      justifyContent: 'center', gap: 8, color: T_textMain,
                       position: 'relative', overflow: 'hidden',
                     }}>
                     <div style={{ width: 64, height: 64 }}>
                       <StairDrawing rotation={opt.rotation} />
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 800 }}>{opt.label}</span>
-                    <span style={{ fontSize: 10, color: 'rgba(215,204,200,0.5)' }}>{opt.desc}</span>
+                    <span style={{ fontSize: 10, color: T_textSub }}>{opt.desc}</span>
                   </GazeButton>
                 ))}
               </div>
@@ -1252,12 +1268,12 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
         // Non-stair cell in rotate phase: generic rotation
         return (
-          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="advanced-context-tools" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: T_textSub }}>
               {cellInfo?.roomLabel?.toUpperCase() || selectedCell} — ROTATE
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <GazeButton id="rotate-ccw" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+              <GazeButton id="rotate-ccw" aria-label="Rotate counterclockwise" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => {
                   const cur = refinements.cellRotations.find(cr => cr.cell === selectedCell)?.degrees || 0;
                   const next = ((cur - 90 + 360) % 360) as 0 | 90 | 180 | 270;
@@ -1270,10 +1286,10 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                   }));
                   onSpeak(`Rotated to ${next}°.`);
                 }}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorder}`, color: T_textMain, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ flex: 1, height: 88, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorder}`, color: T_textMain, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 ↺
               </GazeButton>
-              <GazeButton id="rotate-cw" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
+              <GazeButton id="rotate-cw" aria-label="Rotate clockwise" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
                 onClick={() => {
                   const cur = refinements.cellRotations.find(cr => cr.cell === selectedCell)?.degrees || 0;
                   const next = ((cur + 90) % 360) as 0 | 90 | 180 | 270;
@@ -1286,7 +1302,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                   }));
                   onSpeak(`Rotated to ${next}°.`);
                 }}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorder}`, color: T_textMain, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ flex: 1, height: 88, borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorder}`, color: T_textMain, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 ↻
               </GazeButton>
             </div>
@@ -1301,7 +1317,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
       {/* OVERVIEW COUNTS */}
       {phase === 'overview' && (
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="advanced-overview-counts" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {([
             { label: 'Splits', count: refinements.subCellSplits.length, color: T_splitFill },
             { label: 'Walls', count: refinements.customEdges.length, color: T_wallsFill },
@@ -1324,21 +1340,25 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
       )}
 
       {/* AUTO FLAGS */}
-      {(refinements.vastuFlags.length > 0 || refinements.accessibilityMarkers.length > 0) && (
-        <div style={{ flexShrink: 0, borderTop: `1px solid ${T_panelBorderSoft}`, paddingTop: 8, marginTop: 'auto' }}>
+      {phase === 'overview' && (refinements.vastuFlags.length > 0 || refinements.accessibilityMarkers.length > 0) && (
+        <div className="advanced-auto-flags" style={{ flexShrink: 0, borderTop: `1px solid ${T_panelBorderSoft}`, paddingTop: 8, marginTop: 'auto' }}>
           <span style={{ fontSize: 8, fontWeight: 800, color: T_textDim, letterSpacing: 2, textTransform: 'uppercase' }}>
             Auto Flags
           </span>
-          {refinements.vastuFlags.map((flag, i) => (
+          {refinements.vastuFlags.slice(flagPage * 2, flagPage * 2 + 2).map((flag, i) => (
             <div key={`v-${i}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', borderRadius: 6, marginTop: 4, background: isLight ? `${T_rotateFill}18` : isMix ? `${T_rotateFill}26` : 'rgba(245,158,11,0.1)', border: `1px solid ${T_rotateFill}40`, color: T_rotateFill, fontSize: 10, fontWeight: 600 }}>
               {flag.issue}
             </div>
           ))}
-          {refinements.accessibilityMarkers.map((marker, i) => (
+          {refinements.accessibilityMarkers.slice(Math.max(0, flagPage * 2 - refinements.vastuFlags.length), Math.max(0, flagPage * 2 + 2 - refinements.vastuFlags.length)).map((marker, i) => (
             <div key={`a-${i}`} style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 8px', borderRadius: 6, marginTop: 4, background: isLight ? `${T_wallsFill}18` : isMix ? `${T_wallsFill}26` : 'rgba(45,212,191,0.1)', border: `1px solid ${T_wallsFill}40`, color: T_wallsFill, fontSize: 10, fontWeight: 600 }}>
               {marker.cell} — {marker.type.replace(/_/g, ' ')}
             </div>
           ))}
+          {flagPageCount > 1 && <div className="advanced-flag-pager">
+            <GazeButton id="flags-previous" disabled={flagPage === 0} gazeEnabled={isGazeEnabled} dwellCategory="navigationButton" onClick={() => setFlagPage(page => page - 1)}>← Previous flags</GazeButton>
+            <GazeButton id="flags-more" disabled={flagPage >= flagPageCount - 1} gazeEnabled={isGazeEnabled} dwellCategory="navigationButton" onClick={() => setFlagPage(page => page + 1)}>More flags →</GazeButton>
+          </div>}
         </div>
       )}
     </div>
@@ -1348,7 +1368,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  LEFT COLUMN
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderLeftColumn = () => (
-    <div style={{
+    <div className="advanced-sidebar" style={{
       width: '40%', height: '100%', flexShrink: 0,
       background: T_panelBg,
       borderRight: `1px solid ${T_panelBorder}`,
@@ -1362,7 +1382,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
         <>
           {renderRefinementPanel()}
           {/* Refinement bottom actions */}
-          <div style={{ padding: '12px 14px', borderTop: `1px solid ${T_panelBorderSoft}`, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+          <div className="advanced-refinement-actions" style={{ padding: '12px 14px', borderTop: `1px solid ${T_panelBorderSoft}`, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
             <GazeButton id="adv-back-rooms" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode
               onClick={switchToRooms}
               style={{ minHeight: 'clamp(84px, 9vh, 104px)', width: '100%', borderRadius: 8, background: T_subSurface, border: `1px solid ${T_panelBorderSoft}`, color: T_textSub, fontSize: 'clamp(13px, 1.5vh, 16px)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -1383,7 +1403,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
   //  RIGHT COLUMN — the plot grid
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const renderRightColumn = () => (
-    <div style={{
+    <div className="advanced-canvas" data-nav-open={!navHidden} style={{
       flex: 1, height: '100%',
       display: 'flex', flexDirection: 'column',
       background: T_canvasBg,
@@ -1483,6 +1503,7 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
 
           return (
             <GazeButton key={cellKey} id={`cell-${cellKey}`}
+              className="architectural-cell"
               gazeEnabled={isGazeEnabled && cellClickable}
               gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => handleCellClick(cellKey)}
@@ -1515,10 +1536,10 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                     borderStyle: 'dashed',
                   }} />
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `${lib?.color || '#A1887F'}12` }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: lib?.color || '#fff' }}>
+                    <span style={{ fontSize: 'clamp(16px, 1.9vh, 22px)', fontWeight: 600, color: T_textMain }}>
                       {lib?.shortLabel?.replace(/\+?Stairs?/i, '').trim() || lib?.shortLabel}
                     </span>
-                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{cellWFt}×{cellDFt}ft</span>
+                    <span style={{ fontSize: 'clamp(12px, 1.4vh, 16px)', color: T_textSub }}>{cellWFt}×{cellDFt}ft</span>
                   </div>
                   {(comboLayout === 'right' || comboLayout === 'bottom') && (
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${lib?.color || '#A1887F'}18` }}>
@@ -1536,10 +1557,10 @@ function AdvancedMapScreen({ onNavigate, onSpeak }: AdvancedMapScreenProps) {
                   <div style={{ width: '60%', height: '60%' }}>
                     <StairDrawing rotation={stairRotation} />
                   </div>
-                  <span style={{ fontSize: 9, fontWeight: 800, color: lib?.color || '#A1887F', marginTop: 2 }}>
+                  <span style={{ fontSize: 'clamp(16px, 1.9vh, 22px)', fontWeight: 600, color: T_textMain, marginTop: 2 }}>
                     {lib?.shortLabel || 'Stairs'}
                   </span>
-                  <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{cellWFt}×{cellDFt}ft</span>
+                  <span style={{ fontSize: 'clamp(12px, 1.4vh, 16px)', color: T_textSub }}>{cellWFt}×{cellDFt}ft</span>
                 </div>
               ) : (
                 /* Normal cell rendering via ArchitecturalCell */

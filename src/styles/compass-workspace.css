@@ -1,0 +1,69 @@
+/* Stationary gaze targets and consistent paper / night surfaces. */
+.compass-screen { --compass-rail: clamp(224px, 16vw, 296px); font-family: var(--ui-font) !important; }
+.compass-screen button { font-family: var(--ui-font) !important; font-weight: 650 !important; transform: none !important; text-shadow: none !important; }
+.compass-screen button:focus-visible { outline: 3px solid var(--ui-accent-ink) !important; outline-offset: -4px; }
+.compass-plot { padding-right: calc(var(--compass-rail) + 64px) !important; min-height: 0; }
+.compass-plot > div:last-child { min-height: 0; }
+.compass-plot-frame { background: var(--ui-border) !important; border: 3px solid var(--ui-border) !important; box-shadow: none !important; transition: none !important; min-height: 0; }
+.compass-plot-frame[data-armed='true'] { border-color: var(--ui-accent-ink) !important; }
+.compass-cell-grid { background: var(--ui-border) !important; padding: 0 !important; }
+.compass-cell-grid > button { min-width: 80px; min-height: 80px; border-radius: 8px !important; box-shadow: none !important; }
+.compass-cell-grid > button:hover { outline: 2px solid var(--ui-accent-ink); outline-offset: -3px; }
+.compass-direction { background: var(--ui-panel) !important; color: var(--ui-ink) !important; box-shadow: none !important; font: 650 clamp(14px, 1.7vh, 18px)/1.3 var(--ui-font) !important; letter-spacing: .035em !important; }
+.compass-action-strip { width: var(--compass-rail) !important; top: clamp(118px, 14vh, 152px) !important; bottom: 20px; height: auto !important; box-shadow: none !important; border-radius: 16px !important; }
+.compass-action-strip > div { min-height: 0; }
+.compass-action-strip button { min-height: 80px !important; height: auto !important; flex: 1 1 0 !important; padding: clamp(8px, 1.3vh, 16px) 12px !important; background: var(--ui-surface) !important; color: var(--ui-ink) !important; border: 0 !important; border-bottom: 1px solid var(--ui-border) !important; letter-spacing: .01em !important; }
+.compass-action-strip button div, .compass-action-strip button span { color: inherit !important; font-weight: 650 !important; letter-spacing: .01em !important; }
+.compass-action-strip button[data-gaze='false'] { color: var(--ui-muted) !important; }
+.compass-action-strip button:hover { background: var(--ui-hover) !important; }
+.compass-action-strip #strip-refine-map { color: var(--ui-accent-ink) !important; }
+.compass-screen :is(#nav-restore, #hide-nav-btn) { width: var(--compass-rail) !important; min-height: 80px !important; height: clamp(86px, 10vh, 108px) !important; background: var(--ui-surface) !important; color: var(--ui-accent-ink) !important; border: 1px solid var(--ui-border) !important; box-shadow: none !important; }
+.compass-screen[data-nav-hidden='false'] .compass-action-strip { top: 108px !important; }
+.compass-screen #hide-nav-btn { top: clamp(146px, 17vh, 175px) !important; }
+.compass-road { display: grid !important; grid-template-columns: 25% minmax(0, 1fr) 28%; gap: 8px; height: clamp(112px, 14vh, 158px) !important; margin-bottom: 0 !important; padding: 8px; box-sizing: border-box; background: var(--ui-panel) !important; color: var(--ui-ink) !important; border: 1px solid var(--ui-border) !important; border-radius: 0 0 12px 12px !important; box-shadow: none !important; }
+.compass-road-ready { position: static !important; grid-column: 1; width: 100% !important; padding: 0 !important; align-self: stretch; }
+.compass-road #ready-road-left { min-height: 80px !important; background: var(--ui-surface) !important; color: var(--ui-accent-ink) !important; border: 1px solid var(--ui-accent-ink) !important; box-shadow: none !important; letter-spacing: .015em !important; }
+.compass-road #ready-road-left[aria-pressed='true'] { background: var(--ui-selected) !important; border-width: 3px !important; }
+.compass-road-info { grid-column: 2; text-align: center; min-width: 0; }
+.compass-road-info > span { color: var(--ui-ink) !important; font-size: clamp(18px, 2.2vh, 25px) !important; font-weight: 650 !important; letter-spacing: 0 !important; }
+.compass-road-info > span + span { color: var(--ui-muted) !important; font-size: clamp(14px, 1.6vh, 18px) !important; }
+.compass-current-room { position: static !important; grid-column: 3; width: 100% !important; padding: 0 !important; align-self: stretch; min-width: 0; }
+.compass-current-room > div { background: var(--ui-surface) !important; border: 1px solid var(--ui-border) !important; box-shadow: none !important; padding: 8px; gap: 10px !important; }
+.compass-current-room > div > div { min-width: 0; box-shadow: none !important; }
+.compass-current-room span { color: var(--ui-ink) !important; font-size: clamp(17px, 2vh, 24px) !important; font-weight: 650 !important; letter-spacing: 0 !important; overflow-wrap: break-word; }
+.compass-current-room span + span { color: var(--ui-muted) !important; font-size: clamp(14px, 1.6vh, 18px) !important; }
+
+.compass-room-menu { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; background: var(--ui-page); color: var(--ui-ink); padding: clamp(16px, 2vh, 24px) clamp(24px, 3vw, 48px); gap: clamp(14px, 2vh, 22px); }
+.compass-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-shrink: 0; }
+.compass-menu-header h1 { font-size: clamp(25px, 3.2vh, 36px); line-height: 1.3; font-weight: 650; margin: 0 0 8px; letter-spacing: -.02em; }
+.compass-menu-header p { display: flex; align-items: center; gap: 20px; margin: 0; color: var(--ui-muted); font-size: clamp(16px, 1.8vh, 20px); }
+.compass-menu-header p span { color: var(--ui-accent-ink); }
+.compass-menu-header button, .compass-menu-footer button, .compass-menu-confirm button { width: auto !important; min-width: 100px !important; height: clamp(80px, 10vh, 108px) !important; padding: 12px 20px !important; color: var(--ui-ink) !important; background: var(--ui-surface) !important; border: 1px solid var(--ui-border) !important; border-radius: 14px !important; font-size: clamp(17px, 2vh, 23px) !important; box-shadow: none !important; }
+.compass-menu-instruction { display: flex; justify-content: space-between; gap: 20px; font-size: clamp(16px, 1.9vh, 21px); color: var(--ui-muted); }
+.compass-menu-instruction > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.compass-room-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(80px, 1fr)); gap: clamp(14px, 1.8vh, 22px); }
+.compass-room-grid .compass-room-choice { width: 100% !important; height: 100% !important; min-width: 80px !important; min-height: 80px !important; background: var(--ui-surface) !important; border: 1px solid var(--ui-border) !important; border-radius: 16px !important; padding: clamp(14px, 2vh, 24px) !important; color: var(--ui-ink) !important; box-shadow: none !important; }
+.compass-room-choice > div:last-child { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(12px, 1.7vh, 20px); width: 100%; }
+.compass-room-choice[aria-pressed='true'] { background: var(--ui-selected) !important; border: 2px solid var(--ui-accent-ink) !important; }
+.compass-room-choice:hover, .compass-menu-footer button:not(:disabled):hover { background: var(--ui-hover) !important; border-color: var(--ui-accent-ink) !important; }
+.compass-room-dot { width: 16px; height: 16px; border-radius: 5px; }
+.compass-room-name { font-size: clamp(23px, 2.8vh, 32px); line-height: 1.3; font-weight: 650; letter-spacing: -.02em; }
+.compass-room-status { color: var(--ui-muted); font-size: clamp(15px, 1.8vh, 20px); font-weight: 600; line-height: 1.4; }
+.compass-room-choice[aria-pressed='true'] .compass-room-status { color: var(--ui-accent-ink); }
+.compass-menu-footer { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(12px, 1.5vw, 24px); flex-shrink: 0; }
+.compass-menu-footer button:disabled { opacity: 1 !important; color: var(--ui-muted) !important; border-style: dashed !important; background: var(--ui-page) !important; }
+.compass-menu-footer .compass-primary { border-color: var(--ui-accent-ink) !important; color: var(--ui-accent-ink) !important; }
+.compass-menu-footer button[aria-pressed='true'] { background: var(--ui-selected) !important; }
+.compass-menu-confirm { display: flex; align-items: center; gap: 20px; font-size: 22px; }
+.compass-menu-confirm > span { flex: 1; }
+.compass-confirmation { padding: 24px; box-sizing: border-box; }
+.compass-confirmation > div { width: min(100%, 1000px); max-height: calc(100vh - 48px); padding: clamp(24px, 4vh, 48px) !important; border: 1px solid var(--ui-border) !important; border-radius: 20px !important; background: var(--ui-panel) !important; box-shadow: 0 12px 40px #0004 !important; }
+.compass-confirmation > div > div { font-family: var(--ui-font); color: var(--ui-ink) !important; font-size: clamp(22px, 3vh, 34px) !important; margin-bottom: clamp(18px, 3vh, 32px) !important; line-height: 1.4 !important; }
+.compass-confirmation > div > div:last-child { display: flex; gap: 24px !important; margin-bottom: 0 !important; }
+.compass-confirmation button { flex: 1; width: auto !important; min-width: 80px !important; height: clamp(96px, 12vh, 136px) !important; min-height: 80px !important; padding: 16px 24px !important; border: 1px solid var(--ui-border) !important; border-radius: 14px !important; background: var(--ui-surface) !important; color: var(--ui-ink) !important; font-size: clamp(23px, 3vh, 32px) !important; }
+.compass-confirmation button[id$='yes'] { background: var(--ui-selected) !important; border-color: var(--ui-accent-ink) !important; color: var(--ui-accent-ink) !important; }
+@media (max-height: 800px) {
+  .compass-plot { padding-left: 24px !important; padding-top: 16px !important; }
+  .compass-action-strip button { gap: 6px !important; }
+  .compass-room-menu { gap: 14px; }
+}

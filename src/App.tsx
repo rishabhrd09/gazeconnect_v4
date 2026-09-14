@@ -4,19 +4,18 @@
  * Root component with ALL screens connected.
  * 
  * Key improvements:
- * - Persistent Emergency button visible from ALL screens (fixed position)
  * - Gaze resets to OFF on each screen navigation (calm experience)
  * - GazeControlProvider properly resets on navigation
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { normalizeFilterPreset } from './config/gazeFilterConfig';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { darkColors, lightColors } from './utils/design';
 import { browserRateFromWpm, chooseSpeechRoute, splitSpeechSegments } from './utils/ttsRouting';
 import { WebSocketProvider, useWS } from './hooks/useWebSocket';
 import { GazeControlProvider, useGazeControl } from './components/core/GazeControlToggle';
 import { RealGazeProvider } from './contexts/RealGazeContext';
 import { GazeCursor } from './components/core/GazeCursor';
-import GazeButton from './components/core/GazeButton';
 import ErrorBoundary from './components/core/ErrorBoundary';
 import DevDebugOverlay from './components/core/DebugOverlay';
 import { GazeDebugOverlay } from './components/core/GazeDebugOverlay';
@@ -28,8 +27,8 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { useTheme } from './contexts/ThemeContext';
 import SarvamBloom from './components/SarvamBloom';
 import SvgDefs from './components/SvgDefs';
-import './lightmode.css';
 import './warmmode.css';
+import './refinement.css';
 
 import HomeScreen from './screens/HomeScreen';
 import KeyboardScreen from './screens/KeyboardScreen';
@@ -94,53 +93,6 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
   );
 };
 
-/**
- * Persistent Emergency Button — visible on ALL screens
- * Fixed position, bottom-right corner, always accessible
- */
-const PersistentEmergencyButton: React.FC<{
-  onSpeak: (text: string) => void; isDarkMode: boolean;
-}> = ({ onSpeak, isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
-
-  return (
-    <GazeButton
-      id="persistent-emergency"
-      variant="emergency"
-      alwaysActive
-      gazeEnabled
-      dwellCategory="medicalUrgent"
-      onClick={() => onSpeak("I need help immediately! This is an emergency!")}
-      isDarkMode={isDarkMode}
-      ariaLabel="Emergency help"
-      style={{
-        position: 'fixed',
-        bottom: 'clamp(14px, 2vh, 24px)',
-        left: 'clamp(14px, 2vw, 24px)',
-        width: 'clamp(88px, 10vh, 120px)',
-        height: 'clamp(88px, 10vh, 120px)',
-        minWidth: 'clamp(88px, 10vh, 120px)',
-        minHeight: 'clamp(88px, 10vh, 120px)',
-        padding: 0,
-        borderRadius: '50%',
-        backgroundColor: colors.emergency.subtle,
-        border: `2px solid ${colors.emergency.main}`,
-        color: colors.emergency.main,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 900,
-        boxShadow: `0 0 20px ${colors.emergency.main}40`,
-      }}
-    >
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
-    </GazeButton>
-  );
-};
-
 function speakText(text: string, rate = 1.0, volume = 1.0, language = 'english'): void {
   if (volume <= 0) return;
   if (!('speechSynthesis' in window)) return;
@@ -169,6 +121,14 @@ const InnerApp: React.FC = () => {
   const { isAlertMode, disableAlertMode } = useAlertMode();
   const { theme } = useTheme();
 
+  const sendFilterParamsRef = useRef(ws.sendFilterParams);
+  sendFilterParamsRef.current = ws.sendFilterParams;
+  useEffect(() => {
+    if (isLoaded && ws.isConnected && settings.filterPreset) {
+      sendFilterParamsRef.current({ preset: normalizeFilterPreset(settings.filterPreset) });
+    }
+  }, [isLoaded, ws.isConnected, settings.filterPreset]);
+
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isLiveClockSuppressed, setIsLiveClockSuppressed] = useState(false);
   const [globalText, setGlobalText] = useState(() => {
@@ -183,7 +143,9 @@ const InnerApp: React.FC = () => {
   const [quickWordsReturnScreen, setQuickWordsReturnScreen] = useState<string | null>(null);
 
   // Destructure settings for convenience
-  const { isDarkMode, showHindi, ttsRate, ttsVolume, ttsLanguage } = settings;
+  const { isDarkMode, ttsRate, ttsVolume } = settings;
+  const showHindi = false;
+  const ttsLanguage = 'english';
 
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -386,7 +348,7 @@ const InnerApp: React.FC = () => {
   }
 
   const isQuickWordsScreen = currentScreen === 'quickwords';
-  const isHomeWarmLight = currentScreen === 'home' && theme === 'light';
+  const isHomeWarmLight = currentScreen === 'home' && theme === 'warm';
   const connectionIndicatorStyle: React.CSSProperties = isHomeWarmLight ? {
     position: 'fixed',
     bottom: 10,
@@ -444,7 +406,7 @@ const InnerApp: React.FC = () => {
       display: 'flex', flexDirection: 'column',
     }}>
       {/* Live clock — hidden on screens where top-right is crowded */}
-      <LiveClock currentScreen={currentScreen} suppressed={isLiveClockSuppressed} />
+      <LiveClock currentScreen={currentScreen} suppressed={isLiveClockSuppressed || currentScreen === 'home'} />
 
       {/* Screen content */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
@@ -452,15 +414,6 @@ const InnerApp: React.FC = () => {
           {renderScreen()}
         </ErrorBoundary>
       </div>
-
-      {/* Persistent Emergency Button — hidden on screens with their own large emergency/nav affordance.
-          Web Browsing has its own EMERGENCY in GlobalNavBar + connected toolbar; the floating
-          fallback would be a duplicate at bottom-left.
-          Compass-map / advanced-map / floor-plan-survey: floating widget would overlap the road
-          bar / canvas area and break the "plot drawing" feel — Emergency is in the top NavBar. */}
-      {currentScreen !== 'home' && currentScreen !== 'quickwords' && currentScreen !== 'keyboard' && currentScreen !== 'web' && currentScreen !== 'compass-map' && currentScreen !== 'advanced-map' && currentScreen !== 'floor-plan-survey' && (
-        <PersistentEmergencyButton onSpeak={handleSpeak} isDarkMode={isDarkMode} />
-      )}
 
       {/* Connection indicator */}
       <div className="connection-indicator" style={connectionIndicatorStyle}>

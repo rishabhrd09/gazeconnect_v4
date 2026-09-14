@@ -12,8 +12,8 @@
 //
 // It asserts the dwell-safety invariants from docs/EYE_TRACKING_CHANGES.md:
 //   - fixation commits exactly once, at the target's center
-//   - blink/tracking gaps PAUSE dwell (no jump-commit on resume), and the
-//     gapPauseEnabled rollback flag genuinely restores old behavior
+//   - short tracking gaps pause dwell regardless of legacy flags;
+//     long gaps and stale queued execution discard pending selection
 //   - saved progress resumes only on the SAME target, never cross-target,
 //     never across a route change; progressRetentionEnabled=false disables
 //   - YouTube sidebar: incumbent stickiness bounds winner flips; the
@@ -306,6 +306,9 @@ function makeEnv({ viewW = 1585, viewH = 891, zoom = 1.0, host = 'www.youtube.co
 }
 
 function inject(env, seedConfig) {
+  // Existing gap/retention scenarios use an explicit allowed 2000ms hold.
+  // S18 covers every duration; S19 below covers the unconfigured default.
+  seedConfig = { dwellMs: 2000, ...seedConfig };
   if (seedConfig) {
     vm.runInContext(`window.gcConfig = ${JSON.stringify(seedConfig)};`, env.ctx);
   }
@@ -319,7 +322,8 @@ function frame(env, viewX, viewY, dtMs, opts = {}) {
   env.advance(dtMs);
   const cssX = viewX / env.zoom;
   const cssY = viewY / env.zoom;
-  const script = controller.buildGazeUpdateAndPollScript(cssX, cssY, opts.cursorEnabled !== false, env.zoom);
+  const script = controller.buildGazeUpdateAndPollScript(cssX, cssY, opts.cursorEnabled !== false, env.zoom,
+    env.clock.wall + env.clock.t);
   const json = vm.runInContext(script, env.ctx);
   if (!json) return { c: null, s: 'idle' };
   return JSON.parse(json);
@@ -481,47 +485,143 @@ scenario('S1 grid fixation commits once at card center', (t) => {
     t.expect(Math.abs(k.x - c.x) <= 2 && Math.abs(k.y - c.y) <= 2,
       `click at (${k.x},${k.y}) not at center (${c.x},${c.y})`);
     t.expect(/^youtube_/.test(k.kind), `unexpected kind ${k.kind}`);
-    // dwellMs (1100) counts from acquisition — onset is INSIDE it, not
-    // additive. At 30ms cadence: commit near frame 1100/30 ≈ 37.
-    t.expect(k.frameIndex >= 36 && k.frameIndex <= 50,
-      `commit at frame ${k.frameIndex}, expected ~37-50`);
+    // Configured dwell is 2000ms AFTER the 280ms intent onset.
+    // At 30ms cadence: commit near frame 2280/30 = 76.
+    t.expect(k.frameIndex >= 76 && k.frameIndex <= 80,
+      `commit at frame ${k.frameIndex}, expected ~76-80`);
   }
 });
 
-// === S2: blink gap pauses dwell; rollback flag restores wall-clock ========
-scenario('S2 blink gap pauses dwell (no jump-commit); flag rollback works', (t) => {
+// === S2: blink gap safety cannot be disabled =============================
+scenario('S2 blink gap pauses dwell even with legacy flag disabled', (t) => {
   // Phase A: gapPause ON (default) — gap must NOT count toward dwell.
   let env = makeEnv({ zoom: 1.0 });
   inject(env);
   let { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'bbb' });
   let c = centerOfRect(anchor.rect);
-  // 700ms of fixation (23 frames x 30ms) -> mid-dwell
-  let out = runTrace(env, Array(23).fill([c.x, c.y]));
+  // 1590ms of fixation (53 frames x 30ms) -> mid-dwell
+  let out = runTrace(env, Array(53).fill([c.x, c.y]));
   t.expect(out.clicks.length === 0, 'clicked before gap — dwell too fast');
   // 400ms gap (no frames), then resume. First post-gap frame must not commit.
   const res = frame(env, c.x, c.y, 400);
   t.expect(res.c === null, 'jump-committed on first frame after 400ms gap');
   // Continue fixating: commit should need the REMAINING on-frame time
-  // (1100 - 690 - 30 ≈ 380ms ≈ 13 frames), not fire early. If the gap
+  // (2000 + 280 - 1590 ≈ 690ms ≈ 23 frames), not fire early. If the gap
   // leaked into the dwell, the commit would land within the first frames.
   out = runTrace(env, Array(40).fill([c.x, c.y]));
   t.expect(out.clicks.length === 1, `expected 1 click after gap, got ${out.clicks.length}`);
   if (out.clicks.length === 1) {
-    t.expect(out.clicks[0].frameIndex >= 11,
+    t.expect(out.clicks[0].frameIndex >= 20,
       `committed only ${out.clicks[0].frameIndex} frames after gap — gap time leaked into dwell`);
   }
 
-  // Phase B: gapPauseEnabled=false — the gap COUNTS (old wall-clock behavior).
+  // Phase B: stale protection cannot be disabled or extended by old preferences.
   env = makeEnv({ zoom: 1.0 });
-  inject(env, { gapPauseEnabled: false });
+  inject(env, { gapPauseEnabled: false, gapPauseMs: 600 });
   ({ anchor } = addGridCard(env, { left: 200, top: 150, vid: 'ccc' }));
   c = centerOfRect(anchor.rect);
-  out = runTrace(env, Array(23).fill([c.x, c.y]));
+  out = runTrace(env, Array(53).fill([c.x, c.y]));
   t.expect(out.clicks.length === 0, 'flag-off: clicked before gap');
-  frame(env, c.x, c.y, 400); // gap counts toward dwell now
+  const resumed = frame(env, c.x, c.y, 400);
+  t.expect(resumed.c === null, 'flag-off: first resumed frame committed');
   out = runTrace(env, Array(10).fill([c.x, c.y]));
-  t.expect(out.clicks.length === 1 && out.clicks[0].frameIndex <= 5,
-    `flag-off: expected near-immediate commit after gap (wall clock), got ${JSON.stringify(out.clicks.map((k) => k.frameIndex))}`);
+  t.expect(out.clicks.length === 0, 'flag-off: gap leaked into dwell');
+  out = runTrace(env, Array(30).fill([c.x, c.y]));
+  t.expect(out.clicks.length === 1, 'flag-off: valid remaining dwell could not complete');
+});
+
+scenario('S14 long source loss resets onset and dwell', (t) => {
+  const env = makeEnv();
+  inject(env);
+  const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'long-loss' });
+  const c = centerOfRect(anchor.rect);
+  runTrace(env, Array(53).fill([c.x, c.y]));
+  const resumed = frame(env, c.x, c.y, 1200);
+  t.expect(resumed.c === null, 'source loss committed on resume');
+  const out = runTrace(env, Array(25).fill([c.x, c.y]));
+  t.expect(out.clicks.length === 0, 'source loss retained old progress');
+  t.expect(events2(env).every((e) => e.kind !== 'dwellResumed'), 'source loss resumed a saved target');
+});
+
+scenario('S15 progress TTL expires across short gaps even with a long preference', (t) => {
+  const env = makeEnv();
+  inject(env, { progressRetentionMs: 9000, progressBankEnabled: true });
+  const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'ttl' });
+  const c = centerOfRect(anchor.rect);
+  runTrace(env, Array(35).fill([c.x, c.y]));
+  // Synthetic saved entries exercise the wrapper's real-time expiry directly.
+  vm.runInContext(`window.gcState.savedProgress = 0.5;
+    window.gcState.savedProgressKey = 'saved';
+    window.gcState.savedProgressAt = Date.now();
+    window.gcState.progressBank = { saved: { frac: 0.5, at: Date.now() } };`, env.ctx);
+  const savedAt = gcState(env).savedProgressAt;
+  frame(env, c.x, c.y, 400);
+  t.expect(gcState(env).savedProgressAt === savedAt, 'short gap extended saved timestamp');
+  frame(env, c.x, c.y, 400);
+  frame(env, c.x, c.y, 400);
+  t.expect(gcState(env).savedProgressKey === '', 'single saved slot survived >1000ms');
+  t.expect(Object.keys(gcState(env).progressBank).length === 0, 'bank entry survived >1000ms');
+});
+
+scenario('S16 queued page execution rejects stale samples', (t) => {
+  const env = makeEnv();
+  inject(env);
+  const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'queue' });
+  const c = centerOfRect(anchor.rect);
+  runTrace(env, Array(53).fill([c.x, c.y]));
+  const script = controller.buildGazeUpdateAndPollScript(c.x, c.y, true, 1,
+    env.clock.wall + env.clock.t);
+  env.advance(400);
+  const result = vm.runInContext(script, env.ctx);
+  t.expect(result === null, 'stale queued script emitted a click envelope');
+  t.expect(gcState(env).targetKey === '' && gcState(env).start === 0,
+    'stale queued script retained a pending target');
+});
+
+scenario('S17 hide cancels pending dwell and all saved progress', (t) => {
+  const env = makeEnv();
+  inject(env, { progressBankEnabled: true });
+  const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'hide' });
+  const c = centerOfRect(anchor.rect);
+  runTrace(env, Array(53).fill([c.x, c.y]));
+  vm.runInContext(controller.BROWSER_CURSOR_HIDE_SCRIPT, env.ctx);
+  const state = gcState(env);
+  t.expect(state.targetKey === '' && state.start === 0 && state.savedProgressKey === '' &&
+    Object.keys(state.progressBank).length === 0, 'hide left selection state alive');
+  const out = runTrace(env, Array(30).fill([c.x, c.y]));
+  t.expect(out.clicks.length === 0, 'reappearance completed the old dwell');
+});
+
+scenario('S18 all five action durations exclude onset', (t) => {
+  for (const dwellMs of [500, 1000, 1250, 1500, 2000]) {
+    for (const onsetMs of [120, 320]) {
+      const env = makeEnv({ host: 'example.com' });
+      inject(env, { dwellMs, onsetMs });
+      addLink(env, { left: 200, top: 200, width: 300, height: 100 });
+      const frameMs = 10;
+      const out = runTrace(env, Array(Math.ceil((dwellMs + onsetMs) / frameMs) + 5)
+        .fill([350, 250]), frameMs);
+      t.expect(out.clicks.length === 1, `${dwellMs}/${onsetMs}: expected one selection`);
+      if (out.clicks.length) {
+        const elapsed = out.clicks[0].frameIndex * frameMs;
+        t.expect(elapsed >= dwellMs + onsetMs && elapsed <= dwellMs + onsetMs + frameMs,
+          `${dwellMs}/${onsetMs}: clicked after ${elapsed}ms including onset`);
+      }
+    }
+  }
+});
+
+scenario('S19 default and legacy browser durations use 1500ms navigation', (t) => {
+  for (const dwellMs of [undefined, 1800, 2800]) {
+    const env = makeEnv({ zoom: 1.0 });
+    inject(env, { dwellMs });
+    const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'default' });
+    const c = centerOfRect(anchor.rect);
+    const out = runTrace(env, Array(80).fill([c.x, c.y]));
+    t.expect(out.clicks.length === 1, 'expected exactly one navigation selection');
+    if (out.clicks.length) t.expect(out.clicks[0].frameIndex >= 59 && out.clicks[0].frameIndex <= 63,
+      'navigation did not use 1500ms plus onset');
+  }
 });
 
 // === S3: saved-progress resume — same target only, TTL + route guards =====
@@ -533,19 +633,19 @@ scenario('S3 dwell progress resumes on same target only', (t) => {
   const b = addGridCard(env, { left: 700, top: 150, width: 300, height: 200, vid: 'other' });
   const ca = centerOfRect(a.anchor.rect);
   const cb = centerOfRect(b.anchor.rect);
-  // ~64% of post-onset dwell: 280 + 0.64*820 ≈ 805ms ≈ 27 frames
-  let out = runTrace(env, Array(27).fill([ca.x, ca.y]));
+  // 1710ms of fixation: most of the configured 2000ms dwell.
+  let out = runTrace(env, Array(57).fill([ca.x, ca.y]));
   t.expect(out.clicks.length === 0, 'committed before excursion');
   // Excursion to empty space far from both cards (~10 frames = 300ms < 1000 TTL)
   runTrace(env, Array(10).fill([560, 700]));
   // Return to the SAME card: resume should commit much sooner than a
-  // fresh onset+dwell (which would need ~46 frames).
+  // fresh onset+dwell (which would need ~76 frames).
   out = runTrace(env, Array(30).fill([ca.x, ca.y]));
   const resumed = events2(env).filter((e) => e.kind === 'dwellResumed');
   t.expect(resumed.length === 1, `expected 1 dwellResumed, got ${resumed.length}`);
   t.expect(out.clicks.length === 1, `expected 1 click after resume, got ${out.clicks.length}`);
   if (out.clicks.length === 1) {
-    t.expect(out.clicks[0].frameIndex <= 20,
+    t.expect(out.clicks[0].frameIndex <= 25,
       `resume did not shorten dwell (commit at frame ${out.clicks[0].frameIndex})`);
   }
 
@@ -555,7 +655,7 @@ scenario('S3 dwell progress resumes on same target only', (t) => {
   const a2 = addGridCard(env, { left: 120, top: 150, width: 300, height: 200, vid: 'resume' });
   addGridCard(env, { left: 700, top: 150, width: 300, height: 200, vid: 'other' });
   const ca2 = centerOfRect(a2.anchor.rect);
-  runTrace(env, Array(27).fill([ca2.x, ca2.y]));
+  runTrace(env, Array(57).fill([ca2.x, ca2.y]));
   out = runTrace(env, Array(26).fill([cb.x, cb.y])); // 780ms on B < onset+dwell
   const resumedB = events2(env).filter((e) => e.kind === 'dwellResumed');
   t.expect(resumedB.length === 0, 'saved progress resumed on a DIFFERENT card');
@@ -566,7 +666,7 @@ scenario('S3 dwell progress resumes on same target only', (t) => {
   inject(env);
   const a3 = addGridCard(env, { left: 120, top: 150, width: 300, height: 200, vid: 'resume' });
   const ca3 = centerOfRect(a3.anchor.rect);
-  runTrace(env, Array(27).fill([ca3.x, ca3.y]));
+  runTrace(env, Array(57).fill([ca3.x, ca3.y]));
   runTrace(env, Array(3).fill([560, 700])); // break stability -> save
   env.ctx.location.href = 'https://www.youtube.com/watch?v=next';
   out = runTrace(env, Array(30).fill([ca3.x, ca3.y]));
@@ -578,7 +678,7 @@ scenario('S3 dwell progress resumes on same target only', (t) => {
   inject(env, { progressRetentionEnabled: false });
   const a4 = addGridCard(env, { left: 120, top: 150, width: 300, height: 200, vid: 'resume' });
   const ca4 = centerOfRect(a4.anchor.rect);
-  runTrace(env, Array(27).fill([ca4.x, ca4.y]));
+  runTrace(env, Array(57).fill([ca4.x, ca4.y]));
   runTrace(env, Array(10).fill([560, 700]));
   runTrace(env, Array(15).fill([ca4.x, ca4.y]));
   const resumedD = events2(env).filter((e) => e.kind === 'dwellResumed');
@@ -651,7 +751,7 @@ scenario('S6 stationary simulated gaze (33ms heartbeat) commits', (t) => {
   inject(env);
   const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'sim' });
   const c = centerOfRect(anchor.rect);
-  const { clicks } = runTrace(env, Array(60).fill([c.x, c.y]), 33);
+  const { clicks } = runTrace(env, Array(90).fill([c.x, c.y]), 33);
   t.expect(clicks.length === 1, `stationary sim: expected 1 click, got ${clicks.length}`);
 });
 
@@ -675,7 +775,7 @@ scenario('S7 playing video: no in-video clicks, skip-ad still works', (t) => {
   addVideoPlayer(env, { ...playerRect, playing: true });
   const skip = addSkipButton(env, playerRect);
   const sc = centerOfRect(skip.rect);
-  const { clicks } = runTrace(env, Array(70).fill([sc.x, sc.y]));
+  const { clicks } = runTrace(env, Array(110).fill([sc.x, sc.y]));
   t.expect(clicks.length === 1 && clicks[0].kind === 'youtube_skip_ad',
     `skip-ad not clickable during playback: ${JSON.stringify(clicks.map((k) => k.kind))}`);
 });
@@ -687,7 +787,7 @@ scenario('S8 probe snap radius behaves (hit inside, none outside)', (t) => {
   const link = addLink(env, { left: 400, top: 300 });
   const lc = centerOfRect(link.rect);
   // Gaze 19px below the link's bottom edge — inside the 36px probe radius.
-  let out = runTrace(env, Array(70).fill([lc.x, link.rect.top + link.rect.height + 19]));
+  let out = runTrace(env, Array(90).fill([lc.x, link.rect.top + link.rect.height + 19]));
   t.expect(out.clicks.length === 1 && out.clicks[0].kind === 'probe_snap',
     `probe snap missed a target 19px away: ${JSON.stringify(out.clicks.map((k) => k.kind))}`);
   if (out.clicks.length === 1) {
@@ -698,7 +798,7 @@ scenario('S8 probe snap radius behaves (hit inside, none outside)', (t) => {
   env = makeEnv({ zoom: 1.0, host: 'www.example.com' });
   inject(env);
   const link2 = addLink(env, { left: 400, top: 300 });
-  out = runTrace(env, Array(70).fill([lc.x, link2.rect.top + link2.rect.height + 60]));
+  out = runTrace(env, Array(90).fill([lc.x, link2.rect.top + link2.rect.height + 60]));
   t.expect(out.clicks.length === 0, 'probe snap fired on a target 60px away');
   t.expect(out.states.every((s) => s === 'idle'), 'dwell engaged with no target under gaze');
 });
@@ -725,7 +825,7 @@ scenario('S11 empty-space dwell cannot instant-click a drifted-onto link', (t) =
   t.expect(out.clicks.length === 0,
     `instant click ${JSON.stringify(out.clicks.map((k) => [k.kind, k.frameIndex]))} fired from empty-space dwell accumulation`);
   // The link must still be clickable with a PROPER full dwell.
-  out = runTrace(env, Array(45).fill([450, 303]));
+  out = runTrace(env, Array(80).fill([450, 303]));
   t.expect(out.clicks.length === 1, `link not clickable after guard (got ${out.clicks.length})`);
   if (out.clicks.length === 1) {
     t.expect(out.clicks[0].frameIndex >= 20,

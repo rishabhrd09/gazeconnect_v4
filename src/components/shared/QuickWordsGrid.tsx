@@ -49,7 +49,7 @@ const CATEGORY_ICON_ASSETS: Record<string, string> = {
 };
 
 const CATEGORY_ORDER = ['emergency', 'position', 'daily'];
-const MAX_WORDS = 6;
+const MAX_WORDS = 8;
 
 const OVERLAY_DARK: Record<string, OverlayPalette> = {
   emergency: {
@@ -319,7 +319,8 @@ const getWordFontSize = (text: string, presentation: 'overlay' | 'standalone') =
     return 'clamp(27px, 3.3vh, 38px)';
   }
   if (length >= 30) return 'clamp(26px, 2.85vh, 32px)';
-  if (length >= 20 || hasCompoundLabel) return 'clamp(28px, 3.15vh, 36px)';
+  if (length >= 20) return 'clamp(22px, 1.6vw, 30px)';
+  if (hasCompoundLabel) return 'clamp(24px, 1.8vw, 34px)';
   if (length >= 12 || text.includes(' ')) return 'clamp(30px, 3.45vh, 40px)';
   return 'clamp(34px, 3.85vh, 46px)';
 };
@@ -406,6 +407,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
     }}>
       {orderedCategories.map((category) => {
         const words = category.words.filter((word) => word.enabled).slice(0, MAX_WORDS);
+        const hasExtraRow = words.length > 6;
         const overlayPalette = getOverlayPalette(category.id, isMix, isDarkMode, isWarm);
         const standaloneTone = getStandaloneTone(category.id, isMix, isDarkMode, isWarm);
         const categoryName = category.heading || category.id.charAt(0).toUpperCase() + category.id.slice(1);
@@ -474,21 +476,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                   }}>
                     {categoryName}
                   </h3>
-                  {showHindi && (
-                    <>
-                      <div style={{ width: '40px', height: '1.5px', background: isDarkMode ? 'rgba(255,255,255,0.18)' : lightColors.border.light, borderRadius: '1px', margin: '2px 0' }} />
-                      <span style={{
-                        fontSize: getHindiFontSize(category.headingHi || categoryName, 'overlay'),
-                        fontWeight: 700,
-                        color: overlayPalette.hindiText,
-                        fontFamily: HINDI_FONT,
-                        lineHeight: 1.2,
-                        letterSpacing: '0.02em',
-                      }}>
-                        {{ emergency: 'इमरजेंसी', position: 'पोजीशन', daily: 'रोज़' }[category.id] || categoryName}
-                      </span>
-                    </>
-                  )}
+
                 </div>
               </div>
             ) : (
@@ -548,17 +536,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                   }}>
                     {getStandaloneHeading(category)}
                   </h3>
-                  {showHindi && category.headingHi && (
-                    <span style={{
-                      color: standaloneTone.hindiText,
-                      fontFamily: HINDI_FONT,
-                      fontSize: 'clamp(17px, 2vh, 23px)',
-                      fontWeight: 740,
-                      lineHeight: 1.12,
-                    }}>
-                      {category.headingHi}
-                    </span>
-                  )}
+
                 </div>
               </div>
             )}
@@ -568,7 +546,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
               minHeight: 0,
               display: 'grid',
               gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-              gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateRows: `repeat(${hasExtraRow ? 4 : 3}, minmax(0, 1fr))`,
               gap: presentation === 'standalone' ? 'clamp(18px, 2vh, 22px)' : 'clamp(16px, 2vh, 20px)',
               padding: presentation === 'standalone'
                 ? '0 clamp(14px, 1.6vw, 22px) clamp(10px, 1.1vh, 14px)'
@@ -590,7 +568,8 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                     style={{
                       width: '100%',
                       height: '100%',
-                      minHeight: presentation === 'standalone' ? 'clamp(152px, 17vh, 196px)' : 'clamp(120px, 14vh, 160px)',
+                      minHeight: hasExtraRow ? 80 : presentation === 'standalone' ? 'clamp(152px, 17vh, 196px)' : 'clamp(120px, 14vh, 160px)',
+                      gridColumn: hasExtraRow && words.length % 2 === 1 && index === words.length - 1 ? '1 / -1' : undefined,
                       backgroundColor: presentation === 'standalone' ? standaloneTone.cardBg : overlayPalette.cardBg,
                       borderRadius: presentation === 'standalone' ? '22px' : '18px',
                       border: isActivated
@@ -613,7 +592,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      padding: presentation === 'standalone'
+                      padding: hasExtraRow ? '8px 12px' : presentation === 'standalone'
                         ? 'clamp(16px, 1.9vh, 22px) clamp(14px, 1.4vw, 18px)'
                         : 'clamp(10px, 1.4vh, 18px) clamp(8px, 1vw, 14px)',
                       gap: presentation === 'standalone' ? '10px' : 'clamp(4px, 0.6vh, 8px)',
@@ -627,51 +606,23 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                         : 'transform 0.12s ease, box-shadow 0.12s ease, border 0.12s ease',
                     }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: presentation === 'standalone' ? '8px' : '8px', width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: hasExtraRow ? '4px' : '8px', width: '100%' }}>
                       <span style={{
-                        fontSize: getWordFontSize(word.en, presentation),
+                        fontSize: hasExtraRow ? 'clamp(22px, 2.8vh, 32px)' : getWordFontSize(word.en, presentation),
                         fontWeight: presentation === 'standalone' ? 760 : 800,
                         color: presentation === 'standalone' ? standaloneTone.cardText : overlayPalette.cardText,
                         fontFamily: presentation === 'standalone' ? MEDICAL_HEADER_FONT : UI_FONT,
                         textAlign: 'center',
                         lineHeight: presentation === 'standalone' ? 1.08 : 1.15,
                         letterSpacing: presentation === 'standalone' ? '0' : '0.02em',
-                        wordBreak: 'break-word',
+                        wordBreak: 'normal',
                         textShadow: 'none',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
+                        display: 'block',
                       }}>
                         {word.en}
                       </span>
 
-                      {showHindi && word.hi && (
-                        presentation === 'standalone' ? (
-                          <span style={{
-                            fontSize: getHindiFontSize(word.hi, presentation),
-                            fontWeight: 700,
-                            color: standaloneTone.hindiText,
-                            fontFamily: HINDI_FONT,
-                            lineHeight: 1.14,
-                            textAlign: 'center',
-                          }}>
-                            {word.hi}
-                          </span>
-                        ) : (
-                          <span style={{
-                            fontSize: getHindiFontSize(word.hi, presentation),
-                            fontWeight: 700,
-                            color: overlayPalette.hindiText,
-                            fontFamily: HINDI_FONT,
-                            textAlign: 'center',
-                            lineHeight: 1.2,
-                            textShadow: 'none',
-                          }}>
-                            {word.hi}
-                          </span>
-                        )
-                      )}
+
                     </div>
                   </GazeButton>
                 );

@@ -46,7 +46,7 @@ const BasicNeedsScreen: React.FC<Props> = ({
       <GlobalNavBar
         currentPage="needs"
         onNavigate={onNavigate}
-        onSpeak={onSpeak}
+
         isDarkMode={isDarkMode}
       />
 
@@ -95,19 +95,7 @@ const BasicNeedsScreen: React.FC<Props> = ({
             }}>
               {n.en}
             </span>
-            {showHindi && (
-              <span style={{
-                fontSize: 'clamp(22px, 2.6vh, 30px)',
-                fontWeight: 600,
-                color: isMix ? mixColors.home.subtleText : isWarm ? '#5C4F44' : 'rgba(200,215,230,0.85)',
-                textAlign: 'center',
-                lineHeight: 1.3,
-                marginTop: '8px',
-                fontFamily: "'Noto Sans Devanagari', 'Baloo 2', sans-serif",
-              }}>
-                {n.hi}
-              </span>
-            )}
+
           </GazeButton>
         ))}
       </div>

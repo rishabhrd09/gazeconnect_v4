@@ -76,6 +76,7 @@ class CalibrationPoint:
 @dataclass
 class CalibrationProfile:
     """Complete calibration data and correction model."""
+    coordinate_space: str = "window_normalized_v2"
     created_at: str = ""
     screen_width: int = 1536
     screen_height: int = 782
@@ -512,7 +513,7 @@ class GazeCalibrationCorrector:
         cx, cy = self._apply_idw(cx, cy)
         self._log_count += 1
         if self._log_count <= 5 or self._log_count % 2000 == 0:
-            logger.info(
+            logger.debug(
                 f"[CALIB-CORRECT] ({gaze_x:.4f},{gaze_y:.4f}) -> "
                 f"({cx:.4f},{cy:.4f}) d=({cx - gaze_x:+.4f},{cy - gaze_y:+.4f})"
             )
@@ -550,7 +551,8 @@ class CalibrationStorage:
         cls._ensure_dir()
         filepath = os.path.join(cls.DEFAULT_DIR, filename or cls.DEFAULT_FILE)
         data = {
-            'version': 1,
+            'version': 2,
+            'coordinate_space': profile.coordinate_space,
             'created_at': profile.created_at,
             'screen_width': profile.screen_width,
             'screen_height': profile.screen_height,
@@ -588,6 +590,7 @@ class CalibrationStorage:
             with open(filepath, 'r') as f:
                 data = json.load(f)
             profile = CalibrationProfile(
+                coordinate_space=data.get('coordinate_space', 'legacy'),
                 created_at=data.get('created_at', ''),
                 screen_width=data.get('screen_width', 1536),
                 screen_height=data.get('screen_height', 782),

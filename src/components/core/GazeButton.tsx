@@ -10,22 +10,11 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { darkColors, lightColors, buttonSizes, dwellTiming, layout, typography } from '../../utils/design';
+import { darkColors, lightColors, buttonSizes, layout, typography } from '../../utils/design';
 import { GAZE_ENABLE_COOLDOWN_MS, POST_NAVIGATION_COOLDOWN_MS, useGazeControl } from './GazeControlToggle';
+import { useRealGaze } from '../../contexts/RealGazeContext';
 import { useDwellTime } from '../../contexts/DwellTimeContext';
-import type { DwellTimeSettings } from '../../config/dwellTimeConfig';
-
-// ============================================
-// v17: REPEAT DWELL TRACKER (module-level singleton)
-// Tracks the last selected button to enable faster repeat presses.
-// OptiKey uses per-key completion time arrays: "1000,100,200"
-// We track globally since only one button can be selected at a time.
-// ============================================
-const _repeatDwell = {
-  lastButtonId: '' as string,
-  lastSelectTime: 0,
-  repeatIndex: 0,  // 0 = first press, 1 = second, etc.
-};
+import { dwellForAction, dwellForContext, type DwellAction, type DwellContext } from '../../config/dwellTimeConfig';
 
 // ============================================
 // TYPES
@@ -49,10 +38,9 @@ export interface GazeButtonProps {
   isDarkMode?: boolean;
 
   // Dwell timing
-  dwellTime?: number;
-  dwellCategory?: keyof Omit<DwellTimeSettings, 'cooldownAfterActivation' | 'onsetDelay' | 'ringAnimationSync'>;
-  context?: keyof typeof dwellTiming.contexts;
-  priority?: number; // Higher = faster dwell
+  dwellCategory?: DwellAction;
+  context?: DwellContext;
+  priority?: number; // Target registration priority; never changes dwell time
 
   // State
   disabled?: boolean;
@@ -217,7 +205,6 @@ const GazeButton: React.FC<GazeButtonProps> = ({
   height,
   variant = 'default',
   isDarkMode = true,
-  dwellTime,
   dwellCategory,
   context,
   priority = 0,
@@ -248,6 +235,8 @@ const GazeButton: React.FC<GazeButtonProps> = ({
     // GazeButton might render outside GazeControlProvider in edge cases
     isMouseOnlyMode = false;
   }
+
+  const { hasRealGaze } = useRealGaze();
 
   // Centralized dwell settings
   const { settings: dwellSettings } = useDwellTime();
@@ -299,35 +288,14 @@ const GazeButton: React.FC<GazeButtonProps> = ({
   const buttonWidth = width || sizeConfig.width;
   const buttonHeight = height || sizeConfig.height;
 
-  // Calculate dwell time — priority: explicit dwellTime > dwellCategory > context > size fallback
-  const categoryDwell = dwellCategory ? (dwellSettings as any)[dwellCategory] as number : undefined;
-  const baseDwell = dwellTime || categoryDwell || (context ? dwellTiming.contexts[context] : dwellTiming.bySize[size]);
-  const priorityReduction = priority * 50; // 50ms per priority level
-  const normalDwell = Math.max(dwellTiming.min, Math.min(dwellTiming.max, baseDwell - priorityReduction));
+  const effectiveDwell = dwellCategory ? dwellForAction(dwellCategory)
+    : dwellForContext(context || (variant === 'emergency' ? 'emergency' : variant === 'quickfire' ? 'quickfire' : 'standard'));
 
-  // v17: Variable repeat dwell — faster dwell for repeated presses of same key
-  // Only applies to keyboard keys (context='keyboard') to avoid affecting navigation buttons.
-  const isKeyboardContext = context === 'keyboard' || dwellCategory === 'keyboardKey';
-  const repeatEnabled = dwellSettings.repeatDwellEnabled && isKeyboardContext;
-  const repeatTimes = dwellSettings.repeatDwellTimes || [0, 250, 350];
-  const repeatWindow = dwellSettings.repeatWindowMs || 2000;
-
-  // Check if this is a repeat press
-  let effectiveDwell = normalDwell;
-  if (repeatEnabled && _repeatDwell.lastButtonId === id && Date.now() - _repeatDwell.lastSelectTime < repeatWindow) {
-    const idx = Math.min(_repeatDwell.repeatIndex, repeatTimes.length - 1);
-    const repeatTime = repeatTimes[idx];
-    if (repeatTime > 0) {
-      // Use repeat time (faster), clamped to minimum safety threshold
-      effectiveDwell = Math.max(dwellTiming.min, repeatTime);
-    }
-    // else repeatTime=0 means use normal dwell for first press
-  }
-
-  const onsetDelay = dwellSettings.onsetDelay ?? dwellTiming.onsetDelay;
+  const onsetDelay = dwellSettings.onsetDelay;
   // v16: Added 'quickWord' mapping — was unmapped, fell through to 'navigation' context
   const gazeContext = context
     || (dwellCategory === 'keyboardKey' ? 'keyboard'
+      : dwellCategory === 'predictionButton' ? 'prediction'
       : dwellCategory === 'quickfire' ? 'quickfire'
         : dwellCategory === 'quickWord' ? 'quickfire'
           : dwellCategory === 'emergencyButton' ? 'emergency'
@@ -416,10 +384,20 @@ const GazeButton: React.FC<GazeButtonProps> = ({
     isDecayingRef.current = false;
   }, []);
 
+  useEffect(() => {
+    if (hasRealGaze || isMouseOnlyMode || disabled || (!gazeEnabled && !alwaysActive)) {
+      clearTimers();
+      savedProgressRef.current = 0;
+      setIsHovered(false);
+      setIsInOnset(false);
+      setDwellProgress(0);
+    }
+  }, [hasRealGaze, isMouseOnlyMode, disabled, gazeEnabled, alwaysActive, clearTimers]);
+
   // Update progress animation
   const updateProgress = useCallback(() => {
     const elapsed = Date.now() - startTimeRef.current - onsetDelay;
-    const dwellDuration = effectiveDwell - onsetDelay;
+    const dwellDuration = effectiveDwell;
     const progress = Math.max(0, Math.min(1, elapsed / dwellDuration));
 
     setDwellProgress(progress);
@@ -436,7 +414,7 @@ const GazeButton: React.FC<GazeButtonProps> = ({
     if (disabled || (!gazeEnabled && !alwaysActive)) return;
 
     // Mouse Only Mode: block ALL dwell behavior — no exceptions
-    if (isMouseOnlyMode) return;
+    if (isMouseOnlyMode || hasRealGaze) return;
 
     // Cooldown: skip if gaze was just enabled (prevents overlap selection)
     if (gazeEnabledTimestamp && Date.now() - gazeEnabledTimestamp < GAZE_ENABLE_COOLDOWN_MS) return;
@@ -461,7 +439,7 @@ const GazeButton: React.FC<GazeButtonProps> = ({
       }
 
       // Resume: adjust start time to match saved progress
-      const dwellDuration = effectiveDwell - onsetDelay;
+      const dwellDuration = effectiveDwell;
       const elapsedEquiv = savedProgressRef.current * dwellDuration;
       startTimeRef.current = Date.now() - onsetDelay - elapsedEquiv;
 
@@ -476,15 +454,6 @@ const GazeButton: React.FC<GazeButtonProps> = ({
         setDwellProgress(0);
         setIsInOnset(false);
         savedProgressRef.current = 0;
-
-        // v17: Track repeat dwell state
-        if (_repeatDwell.lastButtonId === id && Date.now() - _repeatDwell.lastSelectTime < repeatWindow) {
-          _repeatDwell.repeatIndex++;
-        } else {
-          _repeatDwell.repeatIndex = 1; // Next press will be index 1 (second press)
-        }
-        _repeatDwell.lastButtonId = id;
-        _repeatDwell.lastSelectTime = Date.now();
 
         onDwellComplete?.();
         onClick?.();
@@ -518,15 +487,6 @@ const GazeButton: React.FC<GazeButtonProps> = ({
       setIsInOnset(false);
       savedProgressRef.current = 0;
 
-      // v17: Track repeat dwell state for faster subsequent presses
-      if (_repeatDwell.lastButtonId === id && Date.now() - _repeatDwell.lastSelectTime < repeatWindow) {
-        _repeatDwell.repeatIndex++;
-      } else {
-        _repeatDwell.repeatIndex = 1; // Next press will be index 1 (second press)
-      }
-      _repeatDwell.lastButtonId = id;
-      _repeatDwell.lastSelectTime = Date.now();
-
       onDwellComplete?.();
       onClick?.();
 
@@ -534,8 +494,8 @@ const GazeButton: React.FC<GazeButtonProps> = ({
       setTimeout(() => {
         setIsActivated(false);
       }, 150);
-    }, effectiveDwell);
-  }, [disabled, gazeEnabled, alwaysActive, isMouseOnlyMode, gazeEnabledTimestamp, lastNavigationTimestamp, onDwellStart, onDwellComplete, onClick, effectiveDwell, onsetDelay, updateProgress, id, repeatWindow]);
+    }, onsetDelay + effectiveDwell);
+  }, [disabled, gazeEnabled, alwaysActive, isMouseOnlyMode, hasRealGaze, gazeEnabledTimestamp, lastNavigationTimestamp, onDwellStart, onDwellComplete, onClick, effectiveDwell, onsetDelay, updateProgress, id]);
 
   // Handle hover leave — slow decay instead of instant cancel
   const handleLeave = useCallback(() => {
@@ -670,7 +630,17 @@ const GazeButton: React.FC<GazeButtonProps> = ({
       className={`gaze-button ${className || ''}`}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
-      onClick={() => !disabled && onClick?.()}
+      onClick={() => {
+        if (disabled) return;
+        // A pointer, keyboard or central-cursor click completes this interaction.
+        // Cancel mouse-hover dwell so it cannot activate the same control again.
+        clearTimers();
+        savedProgressRef.current = 0;
+        setIsHovered(false);
+        setIsInOnset(false);
+        setDwellProgress(0);
+        onClick?.();
+      }}
       disabled={disabled}
       aria-label={ariaLabel || (typeof children === 'string' ? children : undefined)}
       aria-pressed={selected}

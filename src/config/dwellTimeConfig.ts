@@ -1,226 +1,94 @@
-/**
- * GazeConnect Pro - Centralized Dwell Time Configuration
- * ======================================================
- * All dwell timings in one place. Values based on audit of existing codebase.
- * Each category maps to a specific UI context for fine-grained control.
- *
- * THIS IS THE AUTHORITATIVE DWELL TABLE. Two other tables exist and must
- * not be tuned: design.ts `dwellTiming` (deprecated GazeButton fallback for
- * elements with no dwellCategory) and any timing numbers quoted in docs —
- * when they disagree, this file wins. Per-element `data-gaze-dwell-ms`
- * attributes override these values for a single element (e.g. the gaze
- * toggle at 1150/850ms in GlobalNavBar).
+/** Five fixed selection durations shared by every gaze surface.
+ * Onset, cooldown and tracking stability are separate internal safeguards.
  */
-
-export interface DwellTimeSettings {
-  // Core button categories
-  standardButton: number;
-  navigationButton: number;
-  emergencyButton: number;
-  quickWord: number;
-  gazeToggle: number;
-  backSkipButton: number;
-
-  // Screen-specific overrides
-  homeScreenTile: number;
-  keyboardKey: number;
-  phraseButton: number;
-  surveyOption: number;
-  compassMapAction: number;
-  quickfire: number;
-  spatialZone: number;
-  settingsButton: number;
-  medicalUrgent: number;
-
-  // Timing controls
+export const DWELL_GROUPS = {
+  typing: { ms: 500, label: 'Typing', description: 'Individual letters and keyboard keys' },
+  words: { ms: 1000, label: 'Words & suggestions', description: 'Word suggestions and alphabet groups' },
+  communication: { ms: 1250, label: 'Communication', description: 'Phrases, care requests and quick replies' },
+  navigation: { ms: 1500, label: 'Navigation & choices', description: 'Pages, survey answers, map cells and browsing' },
+  deliberate: { ms: 2000, label: 'Deliberate actions', description: 'Gaze on/off, clearing text and confirmations' },
+} as const;
+export type DwellGroup = keyof typeof DWELL_GROUPS;
+export const DWELL_ACTION_GROUPS = {
+  standardButton: 'navigation', navigationButton: 'navigation',
+  emergencyButton: 'deliberate', quickWord: 'communication', gazeToggle: 'deliberate',
+  backSkipButton: 'navigation', homeScreenTile: 'navigation', keyboardKey: 'typing',
+  predictionButton: 'words', phraseButton: 'communication', surveyOption: 'navigation', compassMapAction: 'navigation',
+  quickfire: 'communication', spatialZone: 'words', settingsButton: 'navigation',
+  medicalUrgent: 'communication', deliberateAction: 'deliberate',
+} as const satisfies Record<string, DwellGroup>;
+export type DwellAction = keyof typeof DWELL_ACTION_GROUPS;
+export type DwellContext = DwellAction | 'keyboard' | 'prediction' | 'navigation' | 'phrases' | 'settings' | 'emergency' | 'calibration' | 'spatial';
+export type DwellTimeSettings = Record<DwellAction, number> & {
   cooldownAfterActivation: number;
   onsetDelay: number;
-
-  // Visual feedback
-  ringAnimationSync: boolean;
-
-  // v17: Progress indicator style
   progressStyle: 'ring' | 'shrink';
-
-  // v17: Variable repeat dwell times (OptiKey-style)
-  // When the same key is pressed again within repeatWindowMs, use faster dwell times.
-  // Array: [first_press, second_press, third_press, ...]. Last value repeats for subsequent presses.
-  // Example: [1100, 250, 350] → first=1100ms, second=250ms, third+=350ms
-  repeatDwellEnabled: boolean;
-  repeatDwellTimes: number[];
-  repeatWindowMs: number;
-}
-
-// Category metadata for the Settings UI
-export interface DwellCategoryMeta {
-  key: keyof DwellTimeSettings;
-  label: string;
-  description: string;
-  min: number;
-  max: number;
-  step: number;
-  group: 'core' | 'screen' | 'advanced';
-}
-
-export const DWELL_CATEGORIES: DwellCategoryMeta[] = [
-  { key: 'standardButton', label: 'Standard Button', description: 'Default for most buttons', min: 500, max: 2500, step: 50, group: 'core' },
-  { key: 'navigationButton', label: 'Navigation Button', description: 'Top nav bar buttons', min: 800, max: 3000, step: 50, group: 'core' },
-  { key: 'emergencyButton', label: 'Emergency Button', description: 'Emergency - longer prevents accidents', min: 1400, max: 4000, step: 50, group: 'core' },
-  { key: 'quickWord', label: 'Quick Word Button', description: 'Single-word quick communication buttons in overlay', min: 500, max: 2000, step: 50, group: 'core' },
-  { key: 'gazeToggle', label: 'Gaze Toggle', description: 'Enable/Disable gaze button', min: 500, max: 2500, step: 50, group: 'core' },
-  { key: 'backSkipButton', label: 'Back / Skip Button', description: 'Survey back and skip buttons', min: 600, max: 2500, step: 50, group: 'core' },
-
-  { key: 'homeScreenTile', label: 'Home Screen Tile', description: 'Large tiles on Home screen', min: 500, max: 2500, step: 50, group: 'screen' },
-  { key: 'keyboardKey', label: 'Keyboard Key', description: 'Keyboard screen keys', min: 500, max: 2200, step: 50, group: 'screen' },
-  { key: 'phraseButton', label: 'Phrase Button', description: 'Phrases, Feelings, Needs, People', min: 500, max: 2500, step: 50, group: 'screen' },
-  { key: 'surveyOption', label: 'Survey Option', description: 'Floor plan survey answers', min: 500, max: 2500, step: 50, group: 'screen' },
-  { key: 'compassMapAction', label: 'Compass Map Action', description: 'Compass map selection and refinement', min: 500, max: 3000, step: 50, group: 'screen' },
-  { key: 'quickfire', label: 'Quick Fire', description: 'Quick reply buttons (Yes/No/Help)', min: 500, max: 2000, step: 50, group: 'screen' },
-  { key: 'spatialZone', label: 'Spatial Keyboard Zone', description: 'Spatial keyboard zone selection', min: 500, max: 2500, step: 50, group: 'screen' },
-  { key: 'settingsButton', label: 'Settings Button', description: 'Settings navigation', min: 500, max: 2500, step: 50, group: 'screen' },
-  { key: 'medicalUrgent', label: 'Medical Urgent', description: 'Urgent medical items - faster access', min: 500, max: 1500, step: 50, group: 'screen' },
-
-  { key: 'cooldownAfterActivation', label: 'Cooldown After Activation', description: 'Pause after a button fires', min: 100, max: 1000, step: 50, group: 'advanced' },
-  { key: 'onsetDelay', label: 'Onset Delay', description: 'Silent phase before visual feedback', min: 100, max: 600, step: 25, group: 'advanced' },
-  { key: 'repeatWindowMs', label: 'Repeat Key Window', description: 'Time window for faster repeat key presses (ms)', min: 500, max: 5000, step: 250, group: 'advanced' },
-];
-
-export const DEFAULT_DWELL_TIMES: DwellTimeSettings = {
-  standardButton: 1300,
-  navigationButton: 1400,
-  emergencyButton: 2000,
-  quickWord: 1200,
-  gazeToggle: 1200,
-  backSkipButton: 1400,
-
-  homeScreenTile: 1200,
-  keyboardKey: 1100,
-  phraseButton: 1200,
-  surveyOption: 1300,
-  compassMapAction: 1200,
-  quickfire: 1000,
-  spatialZone: 1200,
-  settingsButton: 1300,
-  medicalUrgent: 900,
-
-  cooldownAfterActivation: 300,
-  onsetDelay: 250,
-
-  ringAnimationSync: true,
-
-  // v17: Shrinking circle draws gaze toward button center during dwell
-  progressStyle: 'ring',
-
-  // v17: Variable repeat dwell — dramatically speeds up repeated characters (ll, ss, ee, oo)
-  // OptiKey uses comma-separated completion times per key: "1000,100,200"
-  // First press uses normal dwell, subsequent presses within window use faster times.
-  repeatDwellEnabled: true,
-  repeatDwellTimes: [0, 250, 350],  // [first=normal, second=250ms, third+=350ms]
-  repeatWindowMs: 2000,             // Must re-select within 2s to get faster dwell
 };
 
-// Presets for quick configuration (multiplied on top of current base)
-export const DWELL_PRESETS = {
-  slow: {
-    label: 'Slow (Careful)',
-    description: 'Longer dwell times - fewer accidental activations',
-    multiplier: 1.4,
-  },
-  balanced: {
-    label: 'Balanced',
-    description: 'Default timing - good for most users',
-    multiplier: 1.0,
-  },
-  quick: {
-    label: 'Quick (Experienced)',
-    description: 'Shorter dwell times - faster interaction',
-    multiplier: 0.7,
-  },
-  responsive: {
-    label: 'Responsive (Caregiver)',
-    description: 'Very short dwell times - for non-ALS users',
-    multiplier: 0.55,
-  },
-} as const;
-
-// ALS Stage Dwell Profiles — research-backed presets
-// Based on Tobii Dynavox clinical guidelines, ISAAC AAC standards, Ball et al. 2010
-export const ALS_STAGE_PRESETS = {
-  caregiver: {
-    label: 'Caregiver / Normal',
-    description: 'Standard timing for caregivers and non-ALS users',
-    multiplier: 0.75,
-    cooldownMultiplier: 0.8,
-    onsetDelay: 150,
-    filterPreset: 'responsive',   // v15: fast tracking for non-ALS users
-  },
-  early_als: {
-    label: 'Early ALS',
-    description: 'Mild motor changes — slightly longer dwell, minimal fatigue compensation',
-    multiplier: 1.0,
-    cooldownMultiplier: 1.0,
-    onsetDelay: 250,
-    filterPreset: 'balanced',     // v15: balanced smoothing for early stage
-  },
-  mid_als: {
-    label: 'Mid ALS',
-    description: 'Moderate weakness — longer dwell, extended cooldowns, reduced accidental activations',
-    multiplier: 1.35,
-    cooldownMultiplier: 1.4,
-    onsetDelay: 350,
-    filterPreset: 'als_early',    // v15: moderate stability boost
-  },
-  late_als: {
-    label: 'Late / Advanced ALS',
-    description: 'Significant motor impairment — maximum dwell, maximum cooldowns, maximum stability',
-    multiplier: 1.8,
-    cooldownMultiplier: 2.0,
-    onsetDelay: 450,
-    filterPreset: 'als_late',     // v15: maximum cursor stability
-  },
-} as const;
-
-export const DWELL_SETTINGS_KEY = 'gazeconnect_dwell_settings';
-
-// ============================================================================
-// KEYBOARD CADENCE (flag: keyboardCadence, DEFAULT ON since 2026-07-07) —
-// cuts the DEAD TIME before the dwell ring appears. Consumed ONLY by
-// GazeCursor for keyboard/prediction targets; it never mutates the global
-// dwell settings, so every other surface (nav, home, emergency) is untouched.
-// With the flag OFF, typing timing is byte-for-byte as before this change.
-//
-// IMPORTANT: this override touches ONLY onset + cooldown — the accuracy-
-// critical letter DWELL is deliberately NOT overridden (patient request
-// 2026-07-07: "don't touch dwell/smoothing"). The dwell stays whatever
-// dwellSettings.keyboardKey resolves to.
-//
-// Why: after each keypress the dwell loop is blocked for the full post-click
-// cooldown (looking at the next key shows NO ring), then the onset (still no
-// ring), THEN the ring appears. At Mid that dead wait was ~1420 + 250 ≈ 1.67s
-// — dominated by the hidden +1000ms cooldown hardcode. These values cut it to
-// ~0.85s with ZERO accuracy cost (dwell + Kalman smoothing unchanged).
-//
-//   Stage      onset  cooldown   (was onset 250 / cooldown ~1240-1600)
-//   caregiver   120     450
-//   early       150     600
-//   mid         150     700
-//   late        200     850
-//
-// Onset grows slightly with stage (fixation stability drops); the cooldown
-// still leaves a real refractory period, backed by the repeatGuard continuity
-// guard. Emergency timings are never sourced from here.
-export interface KeyboardCadence {
-  onset: number;
-  cooldown: number;
+export function dwellForAction(action: DwellAction): number {
+  return DWELL_GROUPS[DWELL_ACTION_GROUPS[action]].ms;
 }
+const CONTEXT_ACTIONS: Record<string, DwellAction> = {
+  keyboard: 'keyboardKey', prediction: 'predictionButton', spatial: 'spatialZone',
+  phrases: 'phraseButton', quickfire: 'quickfire', quickword: 'quickWord',
+  emergency: 'emergencyButton', navigation: 'navigationButton',
+  compass: 'compassMapAction', 'compass-map': 'compassMapAction',
+  settings: 'settingsButton', standard: 'standardButton',
+  ...Object.fromEntries(Object.keys(DWELL_ACTION_GROUPS).map(key => [key.toLowerCase(), key])),
+};
+export function dwellForContext(context: string): number {
+  const key = context.toLowerCase();
+  return dwellForAction(Object.prototype.hasOwnProperty.call(CONTEXT_ACTIONS, key) ? CONTEXT_ACTIONS[key] : 'standardButton');
+}
+/** Old element overrides cannot introduce an extra duration. Round upward. */
+export function fixedDwell(ms: number, fallback: number = DWELL_GROUPS.navigation.ms): number {
+  if (!Number.isFinite(ms) || ms <= 0) return fallback;
+  return Object.values(DWELL_GROUPS).find(group => group.ms >= ms)?.ms ?? DWELL_GROUPS.deliberate.ms;
+}
+export const DEFAULT_DWELL_TIMES: DwellTimeSettings = {
+  ...Object.fromEntries(Object.keys(DWELL_ACTION_GROUPS).map(key => [key, dwellForAction(key as DwellAction)])) as Record<DwellAction, number>,
+  cooldownAfterActivation: 420,
+  onsetDelay: 350,
+  progressStyle: 'ring',
+};
 
-export const KEYBOARD_CADENCE_BY_STAGE: Record<keyof typeof ALS_STAGE_PRESETS, KeyboardCadence> = {
+// Read old preferences only for internal safeguards. Keep the old storage intact
+// for rollback; saved per-action durations no longer override the five groups.
+export const DWELL_SETTINGS_KEY = 'gazeconnect_dwell_settings';
+export type ALSStageKey = 'caregiver' | 'early_als' | 'mid_als' | 'late_als';
+export interface KeyboardCadence { onset: number; cooldown: number; }
+export const KEYBOARD_CADENCE_BY_STAGE: Record<ALSStageKey, KeyboardCadence> = {
   caregiver: { onset: 120, cooldown: 450 },
   early_als: { onset: 150, cooldown: 600 },
   mid_als: { onset: 150, cooldown: 700 },
   late_als: { onset: 200, cooldown: 850 },
 };
-
-// Fallback when the ALS stage has not been explicitly chosen yet — matches the
-// mid_als row (the app's DEFAULT_ALS_STAGE) so behaviour is consistent.
-export const KEYBOARD_CADENCE_DEFAULT: KeyboardCadence = KEYBOARD_CADENCE_BY_STAGE.mid_als;
+export const KEYBOARD_CADENCE_DEFAULT = KEYBOARD_CADENCE_BY_STAGE.mid_als;
+const LEGACY_GUARDS: Record<ALSStageKey, { onsetDelay: number; cooldownAfterActivation: number }> = {
+  caregiver: { onsetDelay: 150, cooldownAfterActivation: 240 },
+  early_als: { onsetDelay: 250, cooldownAfterActivation: 300 },
+  mid_als: { onsetDelay: 350, cooldownAfterActivation: 420 },
+  late_als: { onsetDelay: 450, cooldownAfterActivation: 600 },
+};
+export function loadDwellPreferences(storage: Pick<Storage, 'getItem'>) {
+  let currentStage: ALSStageKey = 'mid_als';
+  let saved: Record<string, unknown> = {};
+  try {
+    const stage = storage.getItem('gazeconnect_als_stage');
+    if (stage && Object.prototype.hasOwnProperty.call(LEGACY_GUARDS, stage)) currentStage = stage as ALSStageKey;
+    const parsed = JSON.parse(storage.getItem(DWELL_SETTINGS_KEY) || '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+  } catch { /* Unavailable or malformed storage uses fixed defaults. */ }
+  const guard = (key: 'onsetDelay' | 'cooldownAfterActivation', min: number, max: number) => {
+    const value = saved[key];
+    return typeof value === 'number' && Number.isFinite(value)
+      ? Math.max(min, Math.min(max, value)) : LEGACY_GUARDS[currentStage][key];
+  };
+  const settings: DwellTimeSettings = {
+    ...DEFAULT_DWELL_TIMES,
+    onsetDelay: guard('onsetDelay', 100, 600),
+    cooldownAfterActivation: guard('cooldownAfterActivation', 100, 1000),
+    progressStyle: saved.progressStyle === 'shrink' ? 'shrink' : 'ring',
+  };
+  return { settings, currentStage };
+}

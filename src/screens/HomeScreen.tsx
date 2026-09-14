@@ -583,7 +583,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       overflow: 'hidden',
       position: 'relative',
     }}>
-      <GlobalNavBar currentPage="home" onNavigate={onNavigate} onSpeak={onSpeak} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="home" onNavigate={onNavigate} isDarkMode={isDarkMode} />
 
       <div style={{
         flex: 1,
@@ -737,12 +737,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         if (item.spoken === '__alert_mode__') { handleEnableAlertMode(); return; }
                         handleQuickcall(item.spoken, btnId, bgShadow!);
                       }}
-                      className={`quickcall-btn${themeClass}`}
+                      className={`quickcall-btn${!isNav && !isAlertModeCard ? ' home-care-card' : ''}${themeClass}`}
                       isDarkMode={isDarkMode}
                       gazeEnabled={isGazeEnabled}
                       gazeEnabledTimestamp={lastEnabledTimestamp}
                       dwellCategory={!isNav ? 'emergencyButton' : 'homeScreenTile'}
                       style={{
+                        ...({ '--care-tone': bgShadow || THEME.emergencyText } as React.CSSProperties),
                         width: isNav ? '70%' : '100%',
                         height: isAlertModeCard ? 'clamp(150px, 24vh, 220px)' : '100%',
                         gridRow: isNav ? 4 : isAlertModeCard ? '1 / 3' : undefined,
@@ -798,26 +799,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           }}>
                             {item.text}
                           </span>
-                              {showHindi && item.textHi && (
-                            <>
-                              <div style={{
-                                width: '28px', height: '1px', background: isLight ? lightColors.emergency.soft : isMix ? THEME.emergencySoft : 'rgba(255,255,255,0.2)',
-                                borderRadius: '1px',
-                                margin: isNav ? '10px auto 6px' : '10px auto 6px'
-                              }} />
-                              <span style={{
-                                fontSize: !isNav ? 'clamp(24px, 3.2vh, 34px)' : 'clamp(24px, 3vh, 34px)',
-                                fontWeight: 700,
-                                color: isLight ? (isNav ? lightColors.text.secondary : lightColors.emergency.soft) : isMix ? (isNav ? THEME.subtleText : THEME.emergencySoft) : 'rgba(255, 210, 140, 0.95)',
-                                fontFamily: "'Noto Sans Devanagari', sans-serif",
-                                textAlign: 'center',
-                                lineHeight: 1.45,
-                                letterSpacing: '0.02em',
-                              }}>
-                                {item.textHi}
-                              </span>
-                            </>
-                          )}
+
                         </div>
                         {isNav && (
                           <span style={{
@@ -889,23 +871,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   <span className="grid-card-label" style={labelStyle}>
                     {tile.label}
                   </span>
-                  {showHindi && tile.labelHi ? (
-                    <>
-                      <div style={{ width: '32px', height: '1.5px', background: isLight ? lightColors.border.light : isMix ? mixColors.home.dockSeparator : 'rgba(255,255,255,0.18)', borderRadius: '2px', margin: '6px auto 4px' }} />
-                      <span style={{
-                        fontSize: 'clamp(22px, 3vh, 32px)',
-                        fontWeight: 700,
-                        color: isLight ? lightColors.text.secondary : isMix ? THEME.subtleText : 'rgba(255, 210, 140, 0.95)',
-                        fontFamily: "'Noto Sans Devanagari', sans-serif",
-                        textAlign: 'center',
-                        lineHeight: 1.4,
-                        letterSpacing: '0.02em',
-                        whiteSpace: 'pre-wrap',
-                      }}>
-                        {tile.labelHi}
-                      </span>
-                    </>
-                  ) : tile.subLabel ? (
+                  {tile.subLabel ? (
                     <span style={{
                       fontSize: 'clamp(13px, 1.75vh, 18px)',
                       fontWeight: 600,
@@ -970,23 +936,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   <span className="grid-card-label" style={labelStyle}>
                     {tile.label}
                   </span>
-                  {showHindi && tile.labelHi && (
-                    <>
-                      <div style={{ width: '32px', height: '1.5px', background: isLight ? lightColors.border.light : isMix ? mixColors.home.dockSeparator : 'rgba(255,255,255,0.18)', borderRadius: '2px', margin: '6px auto 4px' }} />
-                      <span style={{
-                        fontSize: 'clamp(22px, 3vh, 32px)',
-                        fontWeight: 700,
-                        color: isLight ? lightColors.text.secondary : isMix ? THEME.subtleText : 'rgba(255, 210, 140, 0.95)',
-                        fontFamily: "'Noto Sans Devanagari', sans-serif",
-                        textAlign: 'center',
-                        lineHeight: 1.4,
-                        letterSpacing: '0.02em',
-                        whiteSpace: 'pre-wrap',
-                      }}>
-                        {tile.labelHi}
-                      </span>
-                    </>
-                  )}
+
                 </div>
               </GazeButton>
             ))}

@@ -45,7 +45,7 @@ except Exception:
 # ── App Setup ──────────────────────────────────────────────
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:*", "http://127.0.0.1:*", "https://*.gazeconnect.*"])
+CORS(app, origins=[r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$"])
 
 TEMP_DIR = Path(tempfile.gettempdir()) / "gazeconnect_floorplans"
 TEMP_DIR.mkdir(exist_ok=True)
@@ -424,4 +424,3 @@ if __name__ == "__main__":
     # debug=False + use_reloader=False: prevents stat reloader from
     # spawning a child process that may crash silently in Electron
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-

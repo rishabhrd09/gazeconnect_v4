@@ -1,0 +1,123 @@
+/* Home planning: readable controls and bounded tool panels. Geometry lives in the map. */
+:root[data-theme] .advanced-sidebar { font-family: var(--ui-font); }
+:root[data-theme] .advanced-sidebar-heading > span {
+  font-size: clamp(13px, 1.5vh, 17px) !important; letter-spacing: .08em !important;
+  font-weight: 650 !important; color: var(--ui-muted) !important;
+}
+:root[data-theme] .advanced-sidebar :is(button, button > div > span) {
+  font-family: var(--ui-font) !important;
+}
+:root[data-theme] .advanced-map-screen .advanced-sidebar button:not(.architectural-cell) {
+  font-size: clamp(18px, 2.1vh, 24px) !important; line-height: 1.25;
+  min-width: 80px; flex-shrink: 0;
+}
+:root[data-theme] .advanced-map-screen button[aria-pressed='true']:not(.architectural-cell) {
+  background: var(--ui-selected) !important; border: 2px solid var(--ui-accent-ink) !important;
+  color: var(--ui-accent-ink) !important;
+}
+:root[data-theme] .advanced-map-screen button:disabled:not(.architectural-cell),
+:root[data-theme] .floor-plan-viewer button:disabled {
+  opacity: 1 !important; color: var(--ui-muted) !important; background: var(--ui-inset) !important;
+  border-style: dashed !important; cursor: default; box-shadow: none !important;
+}
+:root[data-theme] .advanced-map-screen button:not(.architectural-cell):not(:disabled):hover,
+:root[data-theme] .floor-plan-viewer button:not(:disabled):hover {
+  background: var(--ui-hover) !important; border-color: var(--ui-accent-ink) !important;
+}
+:root[data-theme] .advanced-map-screen button:focus-visible,
+:root[data-theme] .floor-plan-viewer :is(button, textarea):focus-visible {
+  outline: 3px solid var(--ui-accent-ink); outline-offset: -4px;
+}
+:root[data-theme] .advanced-refinement-panel {
+  gap: clamp(8px, 1.1vh, 12px) !important; overflow: hidden;
+}
+:root[data-theme] .advanced-refinement-panel > span,
+:root[data-theme] .advanced-context-tools > :is(div, span):first-child {
+  color: var(--ui-muted) !important; font-size: clamp(14px, 1.7vh, 19px) !important;
+  font-weight: 600 !important; line-height: 1.4; letter-spacing: .03em !important;
+}
+:root[data-theme] .advanced-phase-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 1.1vh, 12px); flex-shrink: 0;
+}
+:root[data-theme] .advanced-phase-grid button { width: 100% !important; height: clamp(80px, 9vh, 104px); }
+:root[data-theme] .advanced-context-tools {
+  background: transparent !important; border: none !important; padding: 0 !important;
+  gap: clamp(8px, 1.1vh, 12px) !important;
+}
+:root[data-theme] .advanced-context-tools > span { color: var(--ui-muted) !important; font-size: 15px !important; }
+:root[data-theme] .advanced-context-tools button > div > span {
+  color: var(--ui-ink) !important; font-size: clamp(18px, 2.1vh, 24px) !important;
+  font-weight: 600 !important; line-height: 1.25;
+}
+:root[data-theme] .advanced-context-tools button[id^='stair-'] > div > span:last-child {
+  color: var(--ui-muted) !important; font-size: clamp(14px, 1.6vh, 17px) !important;
+}
+:root[data-theme] .advanced-overview-counts { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+:root[data-theme] .advanced-overview-counts span { color: var(--ui-muted) !important; font-size: clamp(16px, 1.8vh, 20px) !important; }
+:root[data-theme] .advanced-refinement-actions { flex-direction: row !important; gap: 12px !important; }
+:root[data-theme] .advanced-refinement-actions button { flex: 1; width: auto !important; }
+:root[data-theme] .advanced-flag-pager { display: flex; gap: 10px; margin-top: 10px; }
+:root[data-theme] .advanced-flag-pager button { flex: 1; width: auto; }
+:root[data-theme] .advanced-room-controls > div span:first-child { color: var(--ui-ink) !important; font-size: clamp(19px, 2.2vh, 25px) !important; }
+:root[data-theme] .advanced-room-controls > div span:last-child { color: var(--ui-muted) !important; font-size: clamp(15px, 1.8vh, 20px) !important; }
+:root[data-theme] .advanced-sidebar #room-ready span { opacity: 1 !important; font-size: clamp(15px, 1.8vh, 19px) !important; }
+
+/* Viewer details are paged with gaze targets; the image never sits underneath its toolbar. */
+:root[data-theme] .floor-plan-viewer { color: var(--ui-ink); font-family: var(--ui-font) !important; }
+:root[data-theme] .floor-plan-viewer button {
+  min-height: 80px !important; min-width: 80px !important; border-radius: 12px !important;
+  background: var(--ui-surface) !important; color: var(--ui-ink) !important;
+  border: 1px solid var(--ui-border) !important; box-shadow: none !important;
+  font: 600 clamp(17px, 1.9vh, 22px)/1.25 var(--ui-font) !important;
+  letter-spacing: 0 !important; transform: none !important;
+}
+:root[data-theme] .floor-plan-viewer button[aria-pressed='true'] {
+  background: var(--ui-selected) !important; color: var(--ui-accent-ink) !important;
+  border: 2px solid var(--ui-accent-ink) !important;
+}
+:root[data-theme] .plan-viewer-title { max-width: clamp(240px, 21vw, 380px); }
+:root[data-theme] .plan-viewer-title > div:first-child { font-size: clamp(19px, 2.1vh, 26px) !important; font-weight: 650 !important; letter-spacing: .02em !important; }
+:root[data-theme] .plan-viewer-title > div:last-child { font-size: clamp(14px, 1.6vh, 18px) !important; line-height: 1.5; }
+:root[data-theme] .plan-details { gap: 14px !important; min-height: 0; }
+:root[data-theme] .plan-detail-page { flex: 1; min-height: 0; }
+:root[data-theme] .plan-detail-page > div { background: transparent !important; border: 0 !important; padding: 0 !important; }
+:root[data-theme] .plan-detail-page > div > div:first-child {
+  color: var(--ui-muted) !important; font-size: clamp(15px, 1.7vh, 19px) !important;
+  line-height: 1.4; font-weight: 650 !important; letter-spacing: .03em !important; margin-bottom: 18px !important;
+}
+:root[data-theme] .plan-detail-page span { font-size: clamp(16px, 1.8vh, 21px) !important; font-weight: 500 !important; line-height: 1.4 !important; }
+:root[data-theme] .plan-detail-page textarea { height: clamp(160px, 25vh, 240px); font-size: clamp(17px, 1.9vh, 21px) !important; }
+:root[data-theme] .plan-detail-page textarea::placeholder { color: var(--ui-muted); opacity: 1; }
+:root[data-theme] .plan-detail-page #apply-custom-notes { background: var(--ui-selected) !important; color: var(--ui-accent-ink) !important; }
+:root[data-theme] .plan-detail-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0; }
+:root[data-theme] .plan-detail-pager button { width: 100% !important; height: 80px; }
+:root[data-theme] .plan-detail-page-count { grid-column: 1 / -1; text-align: center; color: var(--ui-muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+:root[data-theme] .plan-details > div:last-child span { font-size: 14px !important; }
+:root[data-theme] .plan-image-area { min-width: 0; }
+:root[data-theme] .plan-image-layout { display: grid !important; grid-template-columns: minmax(0, 1fr) clamp(130px, 12vw, 200px); gap: 16px; }
+:root[data-theme] .plan-image-layout > img { width: 100%; max-height: 100%; min-height: 0; box-shadow: none !important; }
+:root[data-theme] .plan-actions {
+  position: static !important; width: auto !important; padding: 12px !important; gap: 12px !important;
+  box-shadow: none !important; align-self: center; border-width: 1px !important;
+}
+:root[data-theme] .plan-actions > div { font-size: clamp(14px, 1.6vh, 18px) !important; letter-spacing: .03em !important; font-weight: 600 !important; }
+:root[data-theme] .floor-plan-viewer #magnify-btn {
+  position: static !important; width: 100% !important; height: clamp(80px, 10vh, 108px) !important;
+  font-size: 42px !important; color: var(--ui-accent-ink) !important;
+}
+:root[data-theme] .floor-plan-viewer #minimize-btn { font-size: 56px !important; }
+:root[data-theme] .plan-image-area > div:not(.plan-image-layout) { max-width: 650px !important; }
+:root[data-theme] .plan-image-area > div:not(.plan-image-layout) > div { font-size: clamp(17px, 1.9vh, 22px) !important; }
+@media (max-height: 800px) {
+  :root[data-theme] .advanced-context-tools button[id^='combo-'] { height: 92px !important; }
+  :root[data-theme] .advanced-context-tools button[id^='stair-'] { height: 110px !important; }
+  :root[data-theme] .advanced-context-tools button[id^='stair-combo-'] { height: 88px !important; }
+  :root[data-theme] .advanced-refinement-actions button { height: 88px !important; min-height: 80px !important; }
+  :root[data-theme] .floor-plan-viewer .plan-viewer-header { min-height: 112px !important; }
+}
+:root[data-theme] .advanced-auto-flags > span { color: var(--ui-muted) !important; font-size: 14px !important; font-weight: 600 !important; }
+:root[data-theme] .advanced-auto-flags > div:not(.advanced-flag-pager) { color: var(--ui-muted) !important; background: var(--ui-surface) !important; border-color: var(--ui-border) !important; font-size: 15px !important; height: auto !important; min-height: 32px; line-height: 1.35; }
+@media (max-height: 800px) {
+  :root[data-theme] .advanced-refinement-panel[data-flags-paged='true'] .advanced-phase-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
