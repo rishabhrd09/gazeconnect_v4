@@ -1,0 +1,814 @@
+{
+  "schemaVersion": 1,
+  "engines": {
+    "legacy": {
+      "neuralReranker": false
+    },
+    "deterministic": {
+      "policy": "gazeconnect",
+      "householdContext": false
+    },
+    "production": {
+      "policy": "gazeconnect",
+      "householdContext": {
+        "phrases": 223,
+        "words": 16
+      }
+    }
+  },
+  "python": "3.11.15",
+  "positions": {
+    "development / evalSentences": {
+      "legacy": {
+        "queries": 3888,
+        "top1": 0.1993,
+        "top4": 0.3506,
+        "top5": 0.3693,
+        "top8": 0.409,
+        "top10": 0.4246,
+        "mrr10": 0.2704,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.62,
+        "underfilledRate": 0.0952
+      },
+      "deterministic": {
+        "queries": 3888,
+        "top1": 0.348,
+        "top5": 0.6219,
+        "top10": 0.6952,
+        "mrr10": 0.464,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.98,
+        "underfilledRate": 0.0028
+      },
+      "production": {
+        "queries": 3888,
+        "top1": 0.3364,
+        "top5": 0.6106,
+        "top10": 0.6896,
+        "mrr10": 0.4563,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.98,
+        "underfilledRate": 0.0028
+      }
+    },
+    "development / contextEvalSentences": {
+      "legacy": {
+        "queries": 667,
+        "top1": 0.2804,
+        "top4": 0.4513,
+        "top5": 0.4633,
+        "top8": 0.4993,
+        "top10": 0.5112,
+        "mrr10": 0.3607,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.61,
+        "underfilledRate": 0.099
+      },
+      "deterministic": {
+        "queries": 667,
+        "top1": 0.4453,
+        "top5": 0.7031,
+        "top10": 0.7781,
+        "mrr10": 0.5562,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 10.0,
+        "underfilledRate": 0.0
+      },
+      "production": {
+        "queries": 667,
+        "top1": 0.4468,
+        "top5": 0.6942,
+        "top10": 0.7781,
+        "mrr10": 0.5558,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 10.0,
+        "underfilledRate": 0.0
+      }
+    },
+    "development / ksrDrafts": {
+      "legacy": {
+        "queries": 759,
+        "top1": 0.2477,
+        "top4": 0.4071,
+        "top5": 0.4256,
+        "top8": 0.4769,
+        "top10": 0.5007,
+        "mrr10": 0.3282,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.7,
+        "underfilledRate": 0.0685
+      },
+      "deterministic": {
+        "queries": 759,
+        "top1": 0.4572,
+        "top5": 0.7299,
+        "top10": 0.7918,
+        "mrr10": 0.5722,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.98,
+        "underfilledRate": 0.0026
+      },
+      "production": {
+        "queries": 759,
+        "top1": 0.4532,
+        "top5": 0.7181,
+        "top10": 0.7866,
+        "mrr10": 0.5679,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.98,
+        "underfilledRate": 0.0026
+      }
+    },
+    "held-out / aacEvalSentences (Vertanen & Kristensson test)": {
+      "legacy": {
+        "queries": 12556,
+        "top1": 0.2255,
+        "top4": 0.3481,
+        "top5": 0.3637,
+        "top8": 0.393,
+        "top10": 0.4058,
+        "mrr10": 0.2854,
+        "prefixCompatible": 0.9984,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.5,
+        "underfilledRate": 0.1241
+      },
+      "deterministic": {
+        "queries": 12556,
+        "top1": 0.3511,
+        "top5": 0.6082,
+        "top10": 0.6874,
+        "mrr10": 0.4611,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.98,
+        "underfilledRate": 0.0033
+      },
+      "production": {
+        "queries": 12556,
+        "top1": 0.3364,
+        "top5": 0.5961,
+        "top10": 0.6784,
+        "mrr10": 0.449,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.98,
+        "underfilledRate": 0.0033
+      }
+    },
+    "held-out / independentTatoeba": {
+      "legacy": {
+        "queries": 5590,
+        "top1": 0.1572,
+        "top4": 0.2891,
+        "top5": 0.3068,
+        "top8": 0.3415,
+        "top10": 0.3589,
+        "mrr10": 0.2217,
+        "prefixCompatible": 0.9934,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.61,
+        "underfilledRate": 0.0975
+      },
+      "deterministic": {
+        "queries": 5590,
+        "top1": 0.2907,
+        "top5": 0.5896,
+        "top10": 0.6801,
+        "mrr10": 0.4211,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.95,
+        "underfilledRate": 0.0097
+      },
+      "production": {
+        "queries": 5590,
+        "top1": 0.2801,
+        "top5": 0.5719,
+        "top10": 0.6685,
+        "mrr10": 0.4093,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.95,
+        "underfilledRate": 0.0097
+      }
+    },
+    "held-out / secondIndependent": {
+      "legacy": {
+        "queries": 5615,
+        "top1": 0.1352,
+        "top4": 0.2301,
+        "top5": 0.2445,
+        "top8": 0.2725,
+        "top10": 0.2874,
+        "mrr10": 0.181,
+        "prefixCompatible": 0.9977,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.61,
+        "underfilledRate": 0.0912
+      },
+      "deterministic": {
+        "queries": 5615,
+        "top1": 0.2363,
+        "top5": 0.4638,
+        "top10": 0.5309,
+        "mrr10": 0.3322,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.97,
+        "underfilledRate": 0.0052
+      },
+      "production": {
+        "queries": 5615,
+        "top1": 0.2301,
+        "top5": 0.452,
+        "top10": 0.5224,
+        "mrr10": 0.325,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.97,
+        "underfilledRate": 0.0052
+      }
+    },
+    "in-domain / householdPhrases": {
+      "legacy": {
+        "queries": 1676,
+        "top1": 0.2971,
+        "top4": 0.4779,
+        "top5": 0.5018,
+        "top8": 0.54,
+        "top10": 0.5543,
+        "mrr10": 0.3834,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.24,
+        "underfilledRate": 0.182
+      },
+      "deterministic": {
+        "queries": 1676,
+        "top1": 0.3825,
+        "top5": 0.5752,
+        "top10": 0.6432,
+        "mrr10": 0.4642,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.94,
+        "underfilledRate": 0.0084
+      },
+      "production": {
+        "queries": 1676,
+        "top1": 0.5328,
+        "top5": 0.7226,
+        "top10": 0.7965,
+        "mrr10": 0.617,
+        "prefixCompatible": 1.0,
+        "duplicateRate": 0.0,
+        "meanFilledSlots": 9.95,
+        "underfilledRate": 0.0084
+      }
+    }
+  },
+  "probes": {
+    "development / nextWordProbes": {
+      "legacy": {
+        "probes": 50,
+        "want@1": 0.14,
+        "wantOrAlso@1": 0.24,
+        "want@5": 0.32,
+        "wantOrAlso@5": 0.48,
+        "want@10": 0.48,
+        "wantOrAlso@10": 0.6
+      },
+      "deterministic": {
+        "probes": 50,
+        "want@1": 0.26,
+        "wantOrAlso@1": 0.4,
+        "want@5": 0.5,
+        "wantOrAlso@5": 0.7,
+        "want@10": 0.68,
+        "wantOrAlso@10": 0.84
+      },
+      "production": {
+        "probes": 50,
+        "want@1": 0.22,
+        "wantOrAlso@1": 0.36,
+        "want@5": 0.5,
+        "wantOrAlso@5": 0.68,
+        "want@10": 0.62,
+        "wantOrAlso@10": 0.78
+      }
+    }
+  },
+  "ksr": {
+    "development / evalSentences": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 7227,
+        "actions": 4126,
+        "ksr": 0.4291
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 7227,
+        "actions": 3847,
+        "ksr": 0.4677
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 7227,
+        "actions": 2958,
+        "ksr": 0.5907
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 7227,
+        "actions": 2644,
+        "ksr": 0.6341
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 7227,
+        "actions": 2666,
+        "ksr": 0.6311
+      }
+    },
+    "development / contextEvalSentences": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 1270,
+        "actions": 638,
+        "ksr": 0.4976
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 1270,
+        "actions": 600,
+        "ksr": 0.5276
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 1270,
+        "actions": 459,
+        "ksr": 0.6386
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 1270,
+        "actions": 407,
+        "ksr": 0.6795
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 1270,
+        "actions": 408,
+        "ksr": 0.6787
+      }
+    },
+    "development / ksrDrafts": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 1379,
+        "actions": 733,
+        "ksr": 0.4685
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 1379,
+        "actions": 671,
+        "ksr": 0.5134
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 1379,
+        "actions": 491,
+        "ksr": 0.6439
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 1379,
+        "actions": 442,
+        "ksr": 0.6795
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 1379,
+        "actions": 446,
+        "ksr": 0.6766
+      }
+    },
+    "held-out / aacEvalSentences (Vertanen & Kristensson test)": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 22288,
+        "actions": 13952,
+        "ksr": 0.374
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 22288,
+        "actions": 13235,
+        "ksr": 0.4062
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 22288,
+        "actions": 10155,
+        "ksr": 0.5444
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 22288,
+        "actions": 9043,
+        "ksr": 0.5943
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 22288,
+        "actions": 9155,
+        "ksr": 0.5892
+      }
+    },
+    "held-out / independentTatoeba": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 10108,
+        "actions": 6527,
+        "ksr": 0.3543
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 10108,
+        "actions": 6153,
+        "ksr": 0.3913
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 10108,
+        "actions": 4529,
+        "ksr": 0.5519
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 10108,
+        "actions": 3962,
+        "ksr": 0.608
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 10108,
+        "actions": 4030,
+        "ksr": 0.6013
+      }
+    },
+    "held-out / secondIndependent": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 11361,
+        "actions": 7814,
+        "ksr": 0.3122
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 11361,
+        "actions": 7458,
+        "ksr": 0.3435
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 11361,
+        "actions": 5625,
+        "ksr": 0.5049
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 11361,
+        "actions": 5125,
+        "ksr": 0.5489
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 11361,
+        "actions": 5174,
+        "ksr": 0.5446
+      }
+    },
+    "in-domain / householdPhrases": {
+      "legacy@4": {
+        "visibleSlots": 4,
+        "characters": 3310,
+        "actions": 1513,
+        "ksr": 0.5429
+      },
+      "legacy@8": {
+        "visibleSlots": 8,
+        "characters": 3310,
+        "actions": 1411,
+        "ksr": 0.5737
+      },
+      "deterministic@5": {
+        "visibleSlots": 5,
+        "characters": 3310,
+        "actions": 1434,
+        "ksr": 0.5668
+      },
+      "deterministic@10": {
+        "visibleSlots": 10,
+        "characters": 3310,
+        "actions": 1295,
+        "ksr": 0.6088
+      },
+      "production@10": {
+        "visibleSlots": 10,
+        "characters": 3310,
+        "actions": 959,
+        "ksr": 0.7103
+      }
+    }
+  },
+  "phrases": {
+    "in-domain / householdPhrases": {
+      "legacy": {
+        "cases": 372,
+        "phraseCellTop1": 0.121,
+        "anySuggestion": 0.172
+      },
+      "deterministic": {
+        "cases": 372,
+        "phraseCellTop1": 0.1183,
+        "anySuggestion": 0.1962
+      },
+      "production": {
+        "cases": 372,
+        "phraseCellTop1": 0.1183,
+        "anySuggestion": 0.1962
+      }
+    }
+  },
+  "care": {
+    "development / evalSentences": {
+      "legacy@4 -> production@10": {
+        "careQueries": 213,
+        "regressions": 8,
+        "improvements": 44,
+        "regressionExamples": [
+          "'i want to ' -> sit",
+          "'please help me turn onto my other ' -> side",
+          "'can you lift my legs onto the cu' -> cushion",
+          "'my ' -> breathing",
+          "'my b' -> breathing",
+          "'the cu' -> cushion",
+          "'i would be better sitting slightly hi' -> higher",
+          "'can we do the ba' -> bath"
+        ]
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 213,
+        "regressions": 17,
+        "improvements": 32,
+        "regressionExamples": [
+          "'i want to ' -> sit",
+          "'please help me turn onto my other ' -> side",
+          "'please put a fresh cover on this ' -> pillow",
+          "'can you lift my legs onto the cu' -> cushion",
+          "'i feel a cr' -> cramp",
+          "'my stomach feels full and u' -> uncomfortable",
+          "'the nu' -> numbness",
+          "'my ' -> breathing",
+          "'my b' -> breathing",
+          "'i have a dull ac' -> ache",
+          "'the cu' -> cushion",
+          "'this ' -> pillow"
+        ]
+      }
+    },
+    "development / contextEvalSentences": {
+      "legacy@4 -> production@10": {
+        "careQueries": 57,
+        "regressions": 1,
+        "improvements": 10,
+        "regressionExamples": [
+          "'my mouth is very ' -> dry"
+        ]
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 57,
+        "regressions": 5,
+        "improvements": 7,
+        "regressionExamples": [
+          "'please check the v' -> ventilator",
+          "'my mouth is very ' -> dry",
+          "'the f' -> food",
+          "'when is the ' -> doctor",
+          "'can you please ' -> help"
+        ]
+      }
+    },
+    "development / ksrDrafts": {
+      "legacy@4 -> production@10": {
+        "careQueries": 72,
+        "regressions": 0,
+        "improvements": 22,
+        "regressionExamples": []
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 72,
+        "regressions": 1,
+        "improvements": 20,
+        "regressionExamples": [
+          "'my back is sore from lying in the same p' -> position"
+        ]
+      }
+    },
+    "held-out / aacEvalSentences (Vertanen & Kristensson test)": {
+      "legacy@4 -> production@10": {
+        "careQueries": 531,
+        "regressions": 7,
+        "improvements": 118,
+        "regressionExamples": [
+          "'please come to my home i am feeling l' -> lonely",
+          "'i am hungry give me some ' -> food",
+          "'how can you highlight a letter when you can touch nothing and cannot ' -> move",
+          "'i am so s' -> sad",
+          "'c' -> clean",
+          "'where is the ' -> remote",
+          "'i am tired and want to ' -> sit"
+        ]
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 531,
+        "regressions": 28,
+        "improvements": 86,
+        "regressionExamples": [
+          "'please apply some l' -> lotion",
+          "'please apply some lo' -> lotion",
+          "'could you ' -> turn",
+          "'h' -> happy",
+          "'please come to my home i am feeling l' -> lonely",
+          "'i get disoriented after my morning dosage please check with my d' -> doctor",
+          "'i am hungry give me some ' -> food",
+          "'t' -> turn",
+          "'how can you highlight a letter when you can touch nothing and cannot ' -> move",
+          "'will you ' -> turn",
+          "'i am so s' -> sad",
+          "'' -> help"
+        ]
+      }
+    },
+    "held-out / independentTatoeba": {
+      "legacy@4 -> production@10": {
+        "careQueries": 153,
+        "regressions": 1,
+        "improvements": 48,
+        "regressionExamples": [
+          "'i can give you some m' -> medicine"
+        ]
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 153,
+        "regressions": 5,
+        "improvements": 39,
+        "regressionExamples": [
+          "'what kind of f' -> food",
+          "'i can give you some m' -> medicine",
+          "'i can give you some medicine for the ' -> pain",
+          "\"i'm on my way to visit a friend who's in the ho\" -> hospital"
+        ]
+      }
+    },
+    "held-out / secondIndependent": {
+      "legacy@4 -> production@10": {
+        "careQueries": 210,
+        "regressions": 3,
+        "improvements": 55,
+        "regressionExamples": [
+          "'i folded the c' -> clean",
+          "'i folded the cl' -> clean",
+          "'the hallway mirror needs a ca' -> careful"
+        ]
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 210,
+        "regressions": 7,
+        "improvements": 40,
+        "regressionExamples": [
+          "'i need a slower ' -> turn",
+          "'i need a slower t' -> turn",
+          "\"i'm ready for m\" -> medicine",
+          "'i folded the c' -> clean",
+          "'i folded the cl' -> clean",
+          "'the hallway mirror needs a ca' -> careful",
+          "'i took m' -> medicine"
+        ]
+      }
+    },
+    "in-domain / householdPhrases": {
+      "legacy@4 -> production@10": {
+        "careQueries": 534,
+        "regressions": 14,
+        "improvements": 187,
+        "regressionExamples": [
+          "'breathing ' -> discomfort",
+          "'breathing d' -> discomfort",
+          "'breathing di' -> discomfort",
+          "'c' -> clean",
+          "'chest ' -> discomfort",
+          "'chest d' -> discomfort",
+          "'p' -> position",
+          "'s' -> sad",
+          "'remove ' -> urine",
+          "'remove u' -> urine"
+        ]
+      },
+      "legacy@5 -> production@5": {
+        "careQueries": 534,
+        "regressions": 43,
+        "improvements": 165,
+        "regressionExamples": [
+          "'breathing ' -> discomfort",
+          "'breathing d' -> discomfort",
+          "'breathing di' -> discomfort",
+          "'t' -> turn",
+          "'fix ' -> pillow",
+          "'a' -> adjust",
+          "'c' -> clean",
+          "'ch' -> chest",
+          "'chest ' -> discomfort",
+          "'chest d' -> discomfort",
+          "'su' -> support",
+          "'i feel ' -> cold"
+        ]
+      }
+    }
+  },
+  "composition": {
+    "development / evalSentences": {
+      "drafts": 2990,
+      "firstFiveViolationRate": 0.0602,
+      "rawTenTop10": 0.6947,
+      "anchoredTenTop10": 0.6952
+    },
+    "development / contextEvalSentences": {
+      "drafts": 537,
+      "firstFiveViolationRate": 0.0391,
+      "rawTenTop10": 0.7781,
+      "anchoredTenTop10": 0.7781
+    },
+    "development / ksrDrafts": {
+      "drafts": 673,
+      "firstFiveViolationRate": 0.0297,
+      "rawTenTop10": 0.7918,
+      "anchoredTenTop10": 0.7918
+    },
+    "held-out / aacEvalSentences (Vertanen & Kristensson test)": {
+      "drafts": 8144,
+      "firstFiveViolationRate": 0.0584,
+      "rawTenTop10": 0.6872,
+      "anchoredTenTop10": 0.6874
+    },
+    "held-out / independentTatoeba": {
+      "drafts": 4592,
+      "firstFiveViolationRate": 0.0658,
+      "rawTenTop10": 0.6796,
+      "anchoredTenTop10": 0.6801
+    },
+    "held-out / secondIndependent": {
+      "drafts": 4537,
+      "firstFiveViolationRate": 0.054,
+      "rawTenTop10": 0.5305,
+      "anchoredTenTop10": 0.5309
+    }
+  },
+  "latencyMs": {
+    "legacy": {
+      "calls": 25924,
+      "p50": 0.307,
+      "p95": 7.813,
+      "p99": 14.334,
+      "max": 65.329
+    },
+    "deterministic": {
+      "calls": 23597,
+      "p50": 1.147,
+      "p95": 2.932,
+      "p99": 3.503,
+      "max": 84.705
+    },
+    "production": {
+      "calls": 22788,
+      "p50": 1.53,
+      "p95": 3.129,
+      "p99": 3.74,
+      "max": 89.363
+    }
+  }
+}

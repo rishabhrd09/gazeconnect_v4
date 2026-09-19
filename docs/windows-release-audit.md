@@ -114,3 +114,26 @@ The current revision adds `check-windows.bat` for finite source/installed runtim
 Installed floor-plan calls now use a main-renderer-only Electron bridge with a fixed loopback host, an endpoint allowlist, request/response size bounds and deadlines. This resolves the installed file-origin CORS mismatch without allowing arbitrary origins or URLs. Native request routing, dependency self-tests and actual exported files still need Windows acceptance.
 
 Zone Board uses five existing alphabet groups, six suggestions, a central current-word display and a top message display. Length hints and their local word-length dictionary were removed. Full-screen requests are idempotent and existing toggle callers remain compatible. Quick Phrases keeps the existing shared-text return path.
+
+## Follow-up: deterministic word prediction (20 September 2026)
+
+The default word predictor is now the deterministic engine in `python/services/deterministic_prediction/`; see [its README](deterministic-prediction/README.md). The legacy n-gram/ONNX engine remains bundled as a rollback.
+
+- **Bundle contents.** The backend bundle adds `services/deterministic_prediction/assets` (six versioned tables, `manifest.json`, `licenses/`; 8.9 MB raw) and `english_only_policy.v1.json`.
+- **Verification.** `verify_windows_bundle.py` checks every table and licence file against the manifest hashes in `source`, `stage` and `packaged` modes. Failure-injection coverage rose from 9 to 12 tests.
+- **Self-test.** The frozen `--self-test` now also answers one prediction inline and one through a spawned worker process, and requires identical slots.
+- **A second backend process.** The predictor runs in a worker process that re-enters `GazeConnectBackend.exe`, so Task Manager shows two backend processes. `backend_entry.py` calls `multiprocessing.freeze_support()`, so the child never starts a second server. The worker exits when the backend exits, including after Electron's hard kill; before this change it was measured surviving as an orphan.
+- **Notices gate.** The distribution notices file must credit the prediction data sources listed in `python/services/deterministic_prediction/assets/licenses/`:
+  - NGSL 1.2 and NGSL-Spoken (CC BY-SA 4.0 data);
+  - SymSpell (MIT);
+  - the Vertanen & Kristensson AAC corpus and the ImagineVille AAC language models (CC BY 4.0);
+  - the context-prior dialogue corpora.
+
+  These notices ship inside the backend bundle, but a notices file that travels with the installer is still required.
+- **Native verification additions.** On Windows:
+  - run the deterministic self-test staged and from `win-unpacked`;
+  - confirm the worker process starts and exits with the app;
+  - measure worker cold start and memory (about 100 MB);
+  - exercise the ten-slot keyboard by gaze at 100–150 % scaling.
+
+  The full list is in the README's "Remaining Windows and Tobii hardware checks".

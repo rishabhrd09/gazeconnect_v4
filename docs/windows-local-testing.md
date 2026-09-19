@@ -34,6 +34,41 @@ Select the actual folder containing `GazeConnect Pro.exe`. The installed-runtime
 
 The installer bundles the Python backend, floor-plan service and self-contained .NET helper. Do not move individual executables away from their accompanying resources. The floor-plan renderer is called through a restricted Electron-to-loopback bridge so the installed `file://` UI does not depend on development CORS settings.
 
+## Word prediction and the ten keyboard slots
+
+This revision makes the deterministic word predictor the default and shows ten word slots on the traditional keyboard. See [the prediction README](deterministic-prediction/README.md). No new Python or npm dependencies were added, so an existing setup only needs the new commits.
+
+1. **Tests.** Run these after `setup.bat`:
+
+   ```powershell
+   python\.venv\Scripts\python.exe -m unittest discover -s python\tests -p "test_deterministic_*.py"
+   python\.venv\Scripts\python.exe -m unittest discover -s python\tests -p "test_prediction_pipeline.py"
+   npm run check:word-slots
+   .\check-windows.bat -Simulate
+   ```
+
+   The first command replays the reference parity fixture and spawns real prediction workers on Windows. `check-windows.bat` runs the backend `--self-test`, which now answers one prediction inline and one through the worker process.
+
+2. **Mouse run.** Start `.\start-dev.bat --simulate`, open Keyboard and type `i need wa`.
+   - Expect ten distinct words starting with `wa`, five per row, with a phrase such as `I need water` in the top-right cell.
+   - A fresh profile shows `water wasn't warm want wait` on top and `was walk watch wake way` below. Learned history migrated from the old engine can reorder them.
+   - Select `water`: the message reads `i need water ` exactly once.
+   - Press Word delete: it returns to `i need ` and undoes the learning.
+   - Toggle SHOW NAV and full screen, and switch between Warm and Dark. Both word rows stay visible with nothing overlapping.
+
+3. **Processes.** Task Manager shows a second backend Python process: the prediction worker, about 100 MB. Close the app. Both backend processes must exit, including after ending the backend from Task Manager.
+
+4. **Reconnect.** With the keyboard open, close the backend (or let it restart). The slots dim, and after reconnecting they return for the current draft without typing.
+
+5. **Gaze run.** Start `.\start-dev.bat` with the Tobii Eye Tracker 5.
+   - Every slot and the phrase cell select with the 1000 ms Words dwell.
+   - A word that changes while you look at it restarts its dwell.
+   - Slots 1, 5, 6 and 10 are reachable at your normal scaling.
+
+6. **Rollback.** Close the app, run `set GAZECONNECT_PREDICTION_ENGINE=legacy` in the same terminal, then `.\start-dev.bat --simulate`. The keyboard now shows the previous engine's words. Close the app and run `set GAZECONNECT_PREDICTION_ENGINE=` to return to the default.
+
+7. **Installer.** `.\build-installer.bat` runs the frozen self-test, including the prediction worker, staged and from `win-unpacked`. After installing, run `.\check-windows.bat -InstalledPath "C:\path\to\GazeConnect Pro"`.
+
 ## Acceptance on each laptop
 
 Record the OS build, display resolution/scaling, Tobii Experience version and exact installer hash with results:

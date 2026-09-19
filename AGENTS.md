@@ -38,20 +38,22 @@ AAC (Augmentative & Alternative Communication) app for ALS/MND patients using To
 - `src/components/GlobalNavBar.tsx` — Top nav bar on every screen
 - `src/utils/design.ts` — Design tokens, colors, typography, spacing
 - `python/` — Backend (WebSocket server, word prediction, filters)
-- `python/services/word_prediction.py` — Word prediction engine (n-gram + smart bigrams + CIFG-LSTM neural fusion)
-- `python/prediction_guardrails.py` — 158 blocked harmful word tokens + 8 blocked phrases (English + Hindi/Hinglish), enforced across all prediction paths
-- `python/data/smart_bigrams.json` — Pre-computed 1,339 word-pair frequencies (36KB)
-- `python/ml/` — CIFG-LSTM neural model (1.9MB ONNX) + inference + fusion
+- `python/services/deterministic_prediction/` — Default word predictor (deterministic GazeCompass port: engine, worker process, learning, policy)
+- `python/services/word_prediction.py` — Legacy word prediction engine (n-gram + smart bigrams + CIFG-LSTM neural fusion), kept as a rollback
+- `python/prediction_guardrails.py` — 226 blocked harmful word tokens (incl. inflections) + 8 blocked phrases (English + Hindi/Hinglish), enforced across all prediction paths
+- `python/data/smart_bigrams.json` — Legacy engine: pre-computed 1,339 word-pair frequencies (36KB)
+- `python/ml/` — Legacy engine: CIFG-LSTM neural model (1.9MB ONNX) + inference + fusion
 - `electron/` — Electron main process + preload
 - `tobii-helper/` — .NET 6.0 eye tracker bridge (C#)
 
-## Word Prediction System (v3)
-- **Core offline pipeline**: N-gram + Smart Bigrams + Neural Fusion + Patient Personalization
-- **Safety**: 158 blocked word tokens + 8 blocked phrases (violent, harmful, inappropriate; English + Hindi/Hinglish) — never surface as predictions
-- **Performance**: 13.5ms mean latency, 30ms neural timeout, zero impact on 66Hz gaze pipeline
-- **Neural model**: CIFG-LSTM, 1.9MB, 661 vocab — adds ~10-15% quality via semantic reranking
-- **Datamuse API**: Implemented but OFF by default (`enable_datamuse=False`); if explicitly enabled, it is optional online enrichment after local predictions, with a 300ms background timeout
-- **Patient priority**: Patient-learned words always rank highest (3x bigram boost, 2x vocab boost)
+## Word Prediction System (v4, deterministic)
+- **Default engine**: `python/services/deterministic_prediction/`, a port of the GazeCompass deterministic predictor (pinned `de33a95`, stage-level parity with 0 mismatches). No network, LLM, neural model, randomness or clock: the same draft, learned state and slot lineage always give the same slots. Details: `docs/deterministic-prediction/README.md`
+- **Ten word slots** on the traditional keyboard (5 top + phrase cell, 5 bottom). `word_slots` are fixed positions (`null` = deliberately empty); phrase suggestions travel separately in `sentences`
+- **Execution**: runs in a separate worker process (latest-only per client, stale results dropped) — no measured impact on the 66Hz gaze loop; warm round trip ~1ms p50, <4ms max
+- **Safety**: reference content policy + `python/prediction_guardrails.py` (every lexicon inflection of a blocked word is blocked too) + English-only display (`english_only_policy.v1.json`)
+- **Learning**: committed actions only (accepted words, spoken messages); local `patient_data/deterministic_prediction_state.v1.json`; Delete Word undoes an acceptance
+- **Tests**: `python -m unittest discover -s python/tests -p "test_deterministic_*.py"` (replays a reference parity fixture) and `npm run check:word-slots`
+- **Legacy rollback**: `--prediction-engine legacy` or `GAZECONNECT_PREDICTION_ENGINE=legacy` (n-gram + smart bigrams + CIFG-LSTM ONNX reranker). **Datamuse API**: implemented but OFF by default (`enable_datamuse=False`)
 
 ## When Making Changes
 1. NEVER break gaze functionality or dwell timings
