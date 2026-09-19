@@ -20,6 +20,7 @@ import ErrorBoundary from './components/core/ErrorBoundary';
 import DevDebugOverlay from './components/core/DebugOverlay';
 import { GazeDebugOverlay } from './components/core/GazeDebugOverlay';
 import { CustomizationProvider, useCustomization } from './contexts/CustomizationContext';
+import { collectPredictionContext, predictionContextKey } from './utils/predictionContext';
 import { DwellTimeProvider } from './contexts/DwellTimeContext';
 import { FocusModeProvider, useFocusMode } from './contexts/FocusModeContext';
 import { AlertModeProvider, useAlertMode } from './contexts/AlertModeContext';
@@ -116,7 +117,7 @@ function speakText(text: string, rate = 1.0, volume = 1.0, language = 'english')
 const InnerApp: React.FC = () => {
   const ws = useWS();
   const { isGazeEnabled, disableGaze, signalNavigation, isMouseMode } = useGazeControl();
-  const { settings, isLoaded } = useCustomization();
+  const { settings, isLoaded, data: customizationData } = useCustomization();
   const { isFocusMode } = useFocusMode();
   const { isAlertMode, disableAlertMode } = useAlertMode();
   const { theme } = useTheme();
@@ -128,6 +129,22 @@ const InnerApp: React.FC = () => {
       sendFilterParamsRef.current({ preset: normalizeFilterPreset(settings.filterPreset) });
     }
   }, [isLoaded, ws.isConnected, settings.filterPreset]);
+
+  // Household configuration for word prediction: resent on (re)connect and when
+  // the caregiver changes boards, never on every render or keystroke.
+  const setPredictionContextRef = useRef(ws.setPredictionContext);
+  setPredictionContextRef.current = ws.setPredictionContext;
+  const predictionContext = React.useMemo(
+    () => (isLoaded ? collectPredictionContext(customizationData) : null),
+    [isLoaded, customizationData],
+  );
+  const predictionContextSignature = predictionContext ? predictionContextKey(predictionContext) : '';
+  useEffect(() => {
+    if (predictionContext && ws.isConnected) {
+      setPredictionContextRef.current(predictionContext.phrases, predictionContext.words);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [predictionContextSignature, ws.isConnected]);
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isLiveClockSuppressed, setIsLiveClockSuppressed] = useState(false);
@@ -287,9 +304,11 @@ const InnerApp: React.FC = () => {
         return <KeyboardScreen {...common} onTextChange={handleTextChange} initialText={globalText}
           onNavHiddenChange={setIsLiveClockSuppressed}
           getPredictions={ws.getPredictions} predictions={ws.predictions}
+          wordSlots={ws.wordSlots} predictionMeta={ws.predictionMeta}
           sentencePredictions={ws.sentencePredictions}
           expandAbbreviation={ws.expandAbbreviation} abbreviationExpansion={ws.abbreviationExpansion}
           learnWord={ws.learnWord} learnSentence={ws.learnSentence}
+          undoWordLearning={ws.undoWordLearning} connected={ws.isConnected}
         />;
       case 'spatial':
         return <SpatialKeyboardScreen

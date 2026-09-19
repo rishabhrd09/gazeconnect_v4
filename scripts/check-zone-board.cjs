@@ -4,7 +4,8 @@ const ts = require('typescript');
 require.extensions['.ts'] = (mod, filename) => mod._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText, filename);
-const { currentZoneWord, commitZoneSuggestion, zoneSuggestions } = require('../src/utils/zoneBoardText.ts');
+const { currentZoneWord, commitZoneSuggestion, zoneSuggestions, ZONE_SUGGESTION_COUNT } = require('../src/utils/zoneBoardText.ts');
+assert.equal(ZONE_SUGGESTION_COUNT, 6);
 assert.equal(currentZoneWord('I want wa'), 'wa');
 assert.equal(currentZoneWord('I want water '), '');
 assert.equal(currentZoneWord('I want water\n'), '');
@@ -12,13 +13,23 @@ assert.equal(commitZoneSuggestion('I want wa', 'water'), 'I want water ');
 assert.equal(commitZoneSuggestion('I want ', 'food'), 'I want food ');
 assert.equal(commitZoneSuggestion('', 'hello'), 'hello ');
 assert.equal(commitZoneSuggestion('I\nwant\twa', 'water'), 'I\nwant\twater ');
+// Punctuation is a word boundary: only the unfinished word is replaced (c19bada
+// replaced the whole token and dropped "Hi,"), with the reference separator.
+assert.equal(commitZoneSuggestion('Hi,wa', 'water'), 'Hi, water ');
 assert.equal(zoneSuggestions('', []).length, 6);
 assert.equal(zoneSuggestions('wa', [])[0].word, 'water');
-const input = [{ word: 'Water', score: 0.8 }, { word: 'water', score: 0.5 }, { word: 'want', score: 0.9 }];
+// The backend order is final (diversity, fusion and the habit slot are not
+// score-monotonic): no re-sort by score, case-insensitive de-duplication.
+const input = [{ word: 'Water', score: 0.5 }, { word: 'water', score: 0.8 }, { word: 'want', score: 0.9 }];
 const unchanged = structuredClone(input);
 const result = zoneSuggestions('wa', input);
-assert.equal(result[0].word, 'want');
-assert.equal(new Set(result.map(x => x.word.toLowerCase())).size, 6);
+assert.deepEqual(result.map(x => x.word), ['Water', 'want']);
 assert.deepEqual(input, unchanged);
+// Never pads with words that do not complete the typed prefix: fewer cells are
+// better than a wrong word.
+assert.ok(zoneSuggestions('wa', [{ word: 'please', score: 1 }]).every(x => x.word.toLowerCase().startsWith('wa')));
+assert.equal(zoneSuggestions('xq', []).length, 0);
+assert.equal(zoneSuggestions('dont', [{ word: "don't", score: 1 }])[0].word, "don't");
 assert.equal(zoneSuggestions('water ', [{ word: 'please', score: 1 }])[0].word, 'please');
-console.log('Zone Board: 13 text, completion, whitespace and suggestion checks passed.');
+assert.ok(zoneSuggestions('', Array.from({ length: 9 }, (_, i) => ({ word: `w${i}`, score: 1 }))).length <= ZONE_SUGGESTION_COUNT);
+console.log('Zone Board: 18 text, completion, ordering, prefix and suggestion checks passed.');

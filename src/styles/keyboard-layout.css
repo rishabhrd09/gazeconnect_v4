@@ -39,3 +39,82 @@
   min-width: clamp(170px, 16vw, 280px) !important;
   padding-inline: clamp(10px, 1.4vw, 24px) !important;
 }
+
+/* ===== Ten word slots =====
+   Five slots and one phrase cell above the letters, five slots below the action
+   row, in both navigation states. Heights are variables so short viewports can
+   tighten non-letter rows while every gaze target stays at least 80 CSS px.
+   At 820 px and taller only the new lower row changes the layout. */
+.keyboard-screen {
+  --kb-top-row: clamp(112px, 12.5vh, 138px);
+  --kb-bottom-row: clamp(96px, 10vh, 108px);
+  --kb-action-row: 124px;
+}
+.keyboard-screen.keyboard-nav-visible {
+  --kb-top-row: clamp(84px, 10.5vh, 126px);
+  --kb-bottom-row: clamp(84px, 9.5vh, 112px);
+  --kb-action-row: clamp(96px, 12.2vh, 132px);
+}
+.keyboard-screen .keyboard-word-row {
+  display: grid;
+  gap: 4px;
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.keyboard-screen .keyboard-word-row-top {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.45fr);
+  height: var(--kb-top-row);
+  min-height: var(--kb-top-row);
+  border-radius: 14px;
+}
+.keyboard-screen .keyboard-word-row-bottom {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  height: var(--kb-bottom-row);
+  min-height: var(--kb-bottom-row);
+  margin: 0 -2px;
+  border-radius: 0 0 14px 14px;
+}
+.keyboard-screen .keyboard-word-row-bottom.with-show-nav {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(170px, 0.78fr);
+}
+.keyboard-screen .keyboard-word-slot-empty,
+.keyboard-screen .keyboard-phrase-slot-empty {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  opacity: 0.55;
+}
+.keyboard-screen .keyboard-word-slot-label { display: block; max-width: 100%; overflow: hidden; }
+/* Slots wait for the response to the latest keystroke before they can be
+   selected; the delay keeps that brief wait from flickering. */
+.keyboard-screen .keyboard-word-slot-stale { opacity: 0.55 !important; transition: opacity 120ms linear 300ms; }
+@media (max-height: 820px) {
+  :root[data-theme] .keyboard-screen.keyboard-nav-visible .keyboard-message:not(.keyboard-message-expanded) {
+    height: clamp(96px, 12.8vh, 138px);
+    min-height: clamp(96px, 12.8vh, 138px);
+  }
+  .keyboard-screen.keyboard-nav-visible .nav-bar-container[data-gaze-screen='keyboard'] {
+    --keyboard-nav-height: 90px;
+    padding: 4px 0 !important;
+  }
+}
+/* Below the 768 px design floor (for example 1920x1080 at 150% scaling, or a
+   window sharing the screen with a taskbar): tighten non-letter rows further. */
+@media (max-height: 760px) {
+  .keyboard-screen { --kb-top-row: 96px; --kb-bottom-row: 88px; --kb-action-row: 104px; }
+  .keyboard-screen.keyboard-nav-visible { --kb-top-row: 80px; --kb-bottom-row: 80px; --kb-action-row: 84px; }
+  :root[data-theme] .keyboard-screen .keyboard-message:not(.keyboard-message-expanded) {
+    height: 100px;
+    min-height: 100px;
+  }
+  :root[data-theme] .keyboard-screen.keyboard-nav-visible .keyboard-message:not(.keyboard-message-expanded) {
+    height: 84px;
+    min-height: 84px;
+  }
+  .keyboard-screen.keyboard-nav-visible .nav-bar-container[data-gaze-screen='keyboard'] {
+    --keyboard-nav-height: 84px;
+    padding: 2px 0 !important;
+  }
+}

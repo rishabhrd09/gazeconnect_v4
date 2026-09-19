@@ -5,7 +5,8 @@ import ZoneBoard from '../components/ZoneBoard';
 import KeyboardMessageDisplay from '../components/shared/KeyboardMessageDisplay';
 import { HomeIcon, KeyboardIcon, MessageIcon, FullscreenIcon, MinimizeIcon, EyeIcon, PauseIcon } from '../components/icons/Icons';
 import { useFocusMode } from '../contexts/FocusModeContext';
-import { commitZoneSuggestion, currentZoneWord, zoneSuggestions, ZoneSuggestion } from '../utils/zoneBoardText';
+import { commitZoneSuggestion, currentZoneWord, zoneSuggestions, ZoneSuggestion, ZONE_SUGGESTION_COUNT } from '../utils/zoneBoardText';
+import { wordFitsText } from '../utils/wordPredictionSlots';
 import '../styles/zone-board.css';
 
 const nativeWindow = () => (window as Window & { electronAPI?: { window: {
@@ -24,7 +25,7 @@ interface SpatialKeyboardProps {
   predictions?: ZoneSuggestion[];
   expandAbbreviation?: (abbrev: string) => void;
   abbreviationExpansion?: string | null;
-  learnWord?: (word: string) => void;
+  learnWord?: (word: string, textBefore?: string, textAfter?: string) => void;
   learnSentence?: (sentence: string) => void;
 }
 
@@ -73,8 +74,12 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
     onTextChange?.(next);
   }, [onTextChange]);
   const applySuggestion = (word: string) => {
-    updateText(commitZoneSuggestion(textRef.current, word));
-    learnWord?.(word);
+    const before = textRef.current;
+    // A (possibly stale) suggestion inserts only while it still completes the typed word.
+    if (!wordFitsText(before, word)) return;
+    const after = commitZoneSuggestion(before, word);
+    updateText(after);
+    learnWord?.(word, before, after);
   };
   const speak = () => {
     if (textRef.current.trim()) {
@@ -106,11 +111,13 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
         speakId="spatial-display-speak" expandId="spatial-display-expand" />
       {!isExpanded && <>
       <section className="zone-suggestions" aria-label="Word suggestions">
-        {suggestions.map((entry, index) => (
+        {Array.from({ length: ZONE_SUGGESTION_COUNT }, (_, index) => suggestions[index]).map((entry, index) => entry ? (
           <GazeButton key={`${index}-${entry.word}`} id={`spatial-suggestion-${index}`} {...gaze}
             className="zone-suggestion" dwellCategory="predictionButton" onClick={() => applySuggestion(entry.word)}>
             {entry.word}
           </GazeButton>
+        ) : (
+          <div key={`${index}-empty`} className="zone-suggestion zone-suggestion-empty" aria-hidden="true" />
         ))}
       </section>
       <ZoneBoard onLetterTyped={letter => updateText(textRef.current + letter)}

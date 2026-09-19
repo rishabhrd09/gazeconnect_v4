@@ -14,6 +14,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { GazeFreshness } from '../utils/gazeSafety';
+import type { SentenceSuggestion, WordPredictionMeta } from '../utils/wordPredictionSlots';
 
 const DEBUG_GAZE_LOGS = false;
 
@@ -75,6 +76,13 @@ export interface Prediction {
   source: string;
 }
 
+export interface PredictionRequestOptions {
+  /** Word slots the screen shows (the traditional keyboard shows ten). */
+  slotCount?: number;
+  /** Start a fresh board: first request after navigation or a restored draft. */
+  resetLineage?: boolean;
+}
+
 export interface FatigueMetrics {
   fatigue_level: string;
   fatigue_score: number;
@@ -111,10 +119,14 @@ export interface WebSocketContextValue {
   subscribeGaze: (callback: (data: GazeData) => void) => () => void;
 
   // NLP/TTS Methods
-  getPredictions: (text: string, length_hint?: number, lang?: string) => void;
+  getPredictions: (text: string, length_hint?: number, lang?: string, options?: PredictionRequestOptions) => void;
+  /** Household configuration for word prediction (board phrases, configured words). */
+  setPredictionContext: (phrases: string[], words: string[]) => void;
+  /** Explicit Delete Word: forget a just-accepted prediction the person removed. */
+  undoWordLearning: (textBefore: string, textAfter: string) => void;
   getPhrases: (category?: string) => void;
   expandAbbreviation: (abbrev: string) => void;
-  learnWord: (word: string) => void;
+  learnWord: (word: string, textBefore?: string, textAfter?: string) => void;
   addWord: (word: string) => void;
   learnSentence: (sentence: string) => void;
   getDictionaryData: () => void;
@@ -157,7 +169,11 @@ export interface WebSocketContextValue {
 
   // Data
   predictions: Prediction[];
-  sentencePredictions: Array<{text: string; score: number; source: string}>;
+  /** Fixed presentation positions from the deterministic engine (null = empty slot). */
+  wordSlots: Array<string | null> | null;
+  /** The draft the current predictions were computed for. */
+  predictionMeta: WordPredictionMeta | null;
+  sentencePredictions: SentenceSuggestion[];
   phrases: string[];
   sentenceHistory: Array<{text: string; count: number}>;
   abbreviationExpansion: string | null;
@@ -236,7 +252,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   // Data state
   const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [sentencePredictions, setSentencePredictions] = useState<Array<{text: string; score: number; source: string}>>([]);
+  const [wordSlots, setWordSlots] = useState<Array<string | null> | null>(null);
+  const [predictionMeta, setPredictionMeta] = useState<WordPredictionMeta | null>(null);
+  const [sentencePredictions, setSentencePredictions] = useState<SentenceSuggestion[]>([]);
   const [phrases, setPhrases] = useState<string[]>([]);
   const [sentenceHistory, setSentenceHistory] = useState<Array<{text: string; count: number}>>([]);
   const [abbreviationExpansion, setAbbreviationExpansion] = useState<string | null>(null);
@@ -268,6 +286,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const listenersRef = useRef<Set<(data: GazeData) => void>>(new Set());
   const predictionRequestIdRef = useRef(0);
   const latestPredictionRequestIdRef = useRef(0);
+  const predictionContextRef = useRef<{ phrases: string[]; words: string[] } | null>(null);
 
   // Subscribe Gaze
   const subscribeGaze = useCallback((callback: (data: GazeData) => void) => {
@@ -281,6 +300,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       wsRef.current.send(JSON.stringify({ type, ...data }));
     }
   }, []);
+
+  // Stable identities: screens list these in effect dependencies. A new function
+  // per render made the keyboard re-request predictions after every response,
+  // an unbounded request loop while the keyboard was open.
+  const getPredictions = useCallback((text: string, length_hint?: number, lang?: string, options?: PredictionRequestOptions) => {
+    const requestId = predictionRequestIdRef.current + 1;
+    predictionRequestIdRef.current = requestId;
+    latestPredictionRequestIdRef.current = requestId;
+    send('get_predictions', {
+      text, length_hint, lang, top_k: 12, request_id: requestId,
+      slot_count: options?.slotCount ?? 10,
+      reset_lineage: options?.resetLineage === true,
+    });
+  }, [send]);
+  const setPredictionContext = useCallback((phrases: string[], words: string[]) => {
+    predictionContextRef.current = { phrases, words };
+    send('set_prediction_context', { phrases, words });
+  }, [send]);
+  const undoWordLearning = useCallback((textBefore: string, textAfter: string) => {
+    send('undo_word_learning', { text_before: textBefore, text_after: textAfter });
+  }, [send]);
+  const learnWord = useCallback((word: string, textBefore?: string, textAfter?: string) => {
+    send('learn_word', { word, text_before: textBefore, text_after: textAfter });
+  }, [send]);
 
   const metricsInFlightRef = useRef(false);
   const sendScreenMetrics = useCallback(async (width = window.innerWidth, height = window.innerHeight) => {
@@ -456,11 +499,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           break;
 
         case 'predictions':
+          // Only the newest request may update the board; an older response
+          // (superseded, or from before a clear/navigation) is dropped.
           if (typeof data.request_id === 'number' && data.request_id < latestPredictionRequestIdRef.current) {
             break;
           }
           setPredictions(data.words || []);
+          setWordSlots(Array.isArray(data.word_slots) ? data.word_slots : null);
+          setPredictionMeta(data.prediction && typeof data.prediction.text === 'string' ? data.prediction : null);
           setSentencePredictions(data.sentences || []);
+          break;
+
+        case 'prediction_context_set':
+        case 'word_learning_reset':
           break;
 
         case 'builtin_data':
@@ -565,6 +616,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         setIsConnected(true);
         reconnectAttempts.current = 0;
         void sendScreenMetrics();
+        // A restarted backend has no household context; resend it with the connection.
+        if (predictionContextRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'set_prediction_context', ...predictionContextRef.current }));
+        }
       };
 
       wsRef.current.onclose = () => {
@@ -654,15 +709,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     setScreen: (screen) => send('set_screen', { screen }),
     setScreenSize: (width, height) => { void sendScreenMetrics(width, height); },
     registerTargets: (targets) => send('register_targets', { targets }),
-    getPredictions: (text, length_hint, lang) => {
-      const requestId = predictionRequestIdRef.current + 1;
-      predictionRequestIdRef.current = requestId;
-      latestPredictionRequestIdRef.current = requestId;
-      send('get_predictions', { text, length_hint, lang, top_k: 12, request_id: requestId });
-    },
+    getPredictions,
+    setPredictionContext,
+    undoWordLearning,
     getPhrases: (category) => send('get_phrases', { category }),
     expandAbbreviation: (abbrev) => send('expand_abbreviation', { abbrev }),
-    learnWord: (word) => send('learn_word', { word }),
+    learnWord,
     addWord: (word) => send('add_word', { word }),
     learnSentence: (sentence) => send('learn_sentence', { sentence }),
     getDictionaryData: () => send('get_dictionary_data'),
@@ -710,6 +762,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     getQuickSnapshot: (force = false) => send('get_quick_snapshot', { force }),
     subscribeGaze,
     predictions,
+    wordSlots,
+    predictionMeta,
     sentencePredictions,
     phrases,
     sentenceHistory,

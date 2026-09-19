@@ -26,6 +26,18 @@ import {
   loadPredictionTelemetry,
   persistPredictionTelemetry,
 } from '../utils/predictionTelemetry';
+import {
+  TOP_WORD_SLOTS,
+  WORD_SLOT_COUNT,
+  acceptSentenceSuggestion,
+  acceptWordPrediction,
+  isShortSentence,
+  predictionsAreFresh,
+  presentWordSlots,
+  wordFitsText,
+  type SentenceSuggestion,
+  type WordPredictionMeta,
+} from '../utils/wordPredictionSlots';
 
 // ── Hindi AAC Vocabulary ────────────────────────────────────────────────────
 // High-frequency words for ALS/MND patients — natural spoken Hindi only.
@@ -58,80 +70,6 @@ const HINDI_AAC_VOCABULARY: string[] = [
 ];
 // ────────────────────────────────────────────────────────────────────────────
 
-// AAC-prioritized vocabulary for fallback predictions
-// Words ordered by communication frequency in ALS/AAC contexts
-// Used when Python backend predictions don't fill all slots
-const AAC_FALLBACK_VOCABULARY: Record<number, string[]> = {
-  2: ['no', 'ok', 'hi', 'go', 'up', 'on', 'in', 'do', 'me', 'so', 'am', 'it'],
-  3: [
-    'yes', 'help', 'eat', 'bed', 'hot', 'fan', 'tea', 'leg', 'arm', 'eye',
-    'ear', 'wet', 'dry', 'sit', 'lay', 'try', 'now', 'off', 'out', 'air',
-    'ice', 'cup', 'not', 'can', 'all', 'get', 'put', 'see', 'let', 'had',
-    'use', 'way', 'day', 'for', 'has', 'you', 'mom', 'dad', 'son', 'car',
-    'too', 'who', 'why', 'how', 'new', 'old', 'big', 'own', 'say', 'run',
-    'ask', 'few', 'did', 'may', 'but', 'got', 'end', 'age',
-  ],
-  4: [
-    'help', 'pain', 'call', 'need', 'rest', 'wash', 'turn', 'cold', 'warm',
-    'stop', 'more', 'food', 'meal', 'milk', 'rice', 'soup', 'move', 'open',
-    'shut', 'slow', 'fast', 'home', 'come', 'back', 'want', 'feel', 'sick',
-    'good', 'well', 'done', 'wait', 'left', 'bath', 'read', 'talk', 'hear',
-    'hand', 'foot', 'head', 'neck', 'skin', 'nose', 'give', 'take', 'time',
-    'dark', 'okay', 'soon', 'stay', 'safe', 'soft', 'care', 'love', 'keep',
-    'just', 'like', 'know', 'make', 'look', 'long', 'many', 'some', 'been',
-    'will', 'each', 'have', 'your', 'into', 'from', 'here', 'them', 'very',
-    'when', 'than', 'also', 'much', 'only', 'then', 'they', 'what', 'this',
-    'that', 'with', 'work', 'life', 'live', 'find', 'tell', 'last', 'part',
-    'most', 'sure', 'real', 'best', 'easy', 'hard', 'goes', 'went', 'over',
-    'said', 'does', 'name', 'down', 'year', 'side',
-  ],
-  5: [
-    'water', 'nurse', 'sleep', 'chair', 'tired', 'happy', 'hurts', 'fever',
-    'mouth', 'chest', 'elbow', 'ankle', 'blood', 'cough', 'cream', 'clean',
-    'towel', 'light', 'music', 'phone', 'hello', 'thank', 'sorry', 'quiet',
-    'close', 'drink', 'juice', 'fruit', 'bread', 'sugar', 'spoon', 'plate',
-    'sheet', 'right', 'where', 'today', 'night', 'relax', 'later',
-    'about', 'after', 'again', 'would', 'could', 'might', 'still', 'never',
-    'every', 'other', 'their', 'there', 'being', 'going', 'which', 'think',
-    'first', 'start', 'place', 'thing', 'those', 'these', 'great', 'world',
-    'since', 'while', 'maybe', 'often', 'shall', 'bring', 'leave', 'point',
-    'young', 'small', 'three', 'under', 'along', 'watch', 'house', 'above',
-    'early', 'whole', 'began', 'money', 'story', 'power',
-  ],
-  6: [
-    'hungry', 'thirst', 'doctor', 'toilet', 'please', 'family', 'pillow',
-    'shower', 'supper', 'change', 'muscle', 'throat', 'oxygen', 'tablet',
-    'prayer', 'remote', 'window', 'temple', 'thanks', 'better', 'longer',
-    'gentle', 'warmth', 'listen', 'dinner', 'father', 'mother', 'sister',
-    'needle', 'breath', 'adjust', 'friend', 'enough',
-    'should', 'before', 'always', 'really', 'people', 'around', 'become',
-    'during', 'number', 'called', 'though', 'second', 'moment', 'little',
-    'almost', 'behind', 'either', 'myself', 'turned', 'rather', 'wanted',
-    'seemed', 'follow', 'inside', 'having', 'making', 'within', 'happen',
-    'course', 'saying', 'across', 'simple',
-  ],
-  7: [
-    'blanket', 'suction', 'support', 'morning', 'evening', 'therapy',
-    'swallow', 'stomach', 'painful', 'comfort', 'bedroom', 'kitchen',
-    'husband', 'medical', 'patient', 'careful', 'massage', 'stretch',
-    'symptom', 'vitamin', 'machine', 'brother', 'cushion', 'feeling',
-    'trouble', 'worried', 'weather', 'outside', 'healthy', 'sitting',
-    'because', 'through', 'between', 'another', 'however', 'already',
-    'nothing', 'without', 'believe', 'thought', 'working', 'looking',
-    'started', 'usually', 'hundred', 'finally', 'problem', 'teacher',
-    'company', 'himself', 'herself', 'country', 'history', 'service',
-    'someone', 'perhaps', 'program', 'against', 'brought', 'whether',
-    'instead', 'mention', 'imagine', 'million', 'special',
-  ],
-  8: [
-    'medicine', 'hospital', 'position', 'exercise', 'bathroom', 'shoulder',
-    'daughter', 'continue', 'probably', 'remember', 'together', 'children',
-    'suddenly', 'question', 'possible', 'everyone', 'business', 'actually',
-    'anything', 'national', 'complete', 'interest', 'required', 'happened',
-    'building', 'yourself', 'consider', 'research', 'personal',
-  ],
-};
-const ENGLISH_STARTER_FALLBACK = ['I need', 'Please', 'Can you', 'I am', 'Help'];
 const UI_FONT = typography.fontFamily.primary;
 // Light-mode keyboard palette — research-grounded AAC zoning.
 // Citations + rationale: see keyboard section in lightmode.css / warmmode.css.
@@ -171,8 +109,6 @@ const getKeyboardAccent = (isDarkMode: boolean) => (
   isDarkMode ? darkColors.accent.main : lightColors.warning.main
 );
 
-const TOP_PREDICTION_COUNT = 4;
-
 // Hierarchy colors — paper-mode values use the research-grounded prediction palette:
 // best prediction gets a slightly deeper amber accent so it's instantly identifiable
 // in eye-tracking scans (Schlosser 2015: visual hierarchy reduces fixation errors 24%).
@@ -198,13 +134,21 @@ interface KeyboardScreenProps {
   initialText?: string;
   isDarkMode?: boolean;
   showHindi?: boolean;
-  getPredictions?: (text: string, length_hint?: number, lang?: string) => void;
+  getPredictions?: (text: string, length_hint?: number, lang?: string,
+    options?: { slotCount?: number; resetLineage?: boolean }) => void;
   predictions?: Array<{ word: string; score: number }>;
+  /** Ten fixed word positions from the backend (null = deliberately empty). */
+  wordSlots?: Array<string | null> | null;
+  /** The draft the slots were computed for; slots are selectable only for it. */
+  predictionMeta?: WordPredictionMeta | null;
   expandAbbreviation?: (abbrev: string) => void;
   abbreviationExpansion?: string | null;
-  learnWord?: (word: string) => void;
+  learnWord?: (word: string, textBefore?: string, textAfter?: string) => void;
   learnSentence?: (sentence: string) => void;
-  sentencePredictions?: Array<{text: string; score: number; source: string}>;
+  undoWordLearning?: (textBefore: string, textAfter: string) => void;
+  sentencePredictions?: SentenceSuggestion[];
+  /** Backend connection; a request made while disconnected is repeated on reconnect. */
+  connected?: boolean;
 }
 
 interface KeyConfig {
@@ -535,187 +479,119 @@ const KeyBtn: React.FC<{
 };
 
 
-// Prediction Bar — compact, with LOCKING
-const Predictions: React.FC<{
-  predictions: Array<{ word: string; score: number; source?: string }>;
-  onSelect: (w: string, rank?: number) => void; isDarkMode: boolean;
-  gazeEnabled: boolean; lastEnabledTs: number; hasRealGaze: boolean;
-  compact?: boolean;
-  isHindiMode?: boolean;
-}> = ({ predictions, onSelect, isDarkMode: _isDarkMode, gazeEnabled, lastEnabledTs, hasRealGaze, compact = false, isHindiMode = false }) => {
-  const keyboardTheme = getKeyboardTheme(_isDarkMode);
-  const keyboardAccent = getKeyboardAccent(_isDarkMode);
-  const {
-    predictionBestBg,
-    predictionText,
-    predictionBestText,
-  } = getKeyboardHierarchyColors(_isDarkMode);
-  const predictionCount = TOP_PREDICTION_COUNT;
-  const predHintText = isHindiMode
-    ? 'टाइप करें — शब्द सुझाव यहाँ दिखेंगे...'
-    : 'Start typing for predictions...';
-
-  const predWordSize = isHindiMode
-    ? (compact ? 'clamp(34px, 3.5vw, 46px)' : 'clamp(36px, 3.75vw, 50px)')
-    : (compact ? 'clamp(38px, 3.9vw, 50px)' : 'clamp(42px, 4.4vw, 58px)');
-
-  const predWordFont = isHindiMode ? "'Noto Sans Devanagari', sans-serif" : UI_FONT;
-  const predWordColor = isHindiMode
-    ? (_isDarkMode ? '#EAC688' : lightColors.text.primary)
-    : predictionText;
-  const predDwellBar = isHindiMode ? (_isDarkMode ? '#D7A152' : lightColors.warning.main) : keyboardAccent;
-
-  const [hIdx, setHIdx] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [isLocked, setIsLocked] = useState(false);
-  const tRef = useRef<NodeJS.Timeout | null>(null);
-  const pRef = useRef<number | null>(null);
-  const sRef = useRef(0);
-
-  const clear = () => {
-    if (tRef.current) { clearTimeout(tRef.current); tRef.current = null; }
-    if (pRef.current) { cancelAnimationFrame(pRef.current); pRef.current = null; }
-  };
-
-  const tick = useCallback(() => {
-    const p = Math.min(1, (Date.now() - sRef.current) / DWELL_GROUPS.words.ms);
-    setProgress(p);
-    if (p < 1) pRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  const enter = (i: number, w: string) => {
-    if (hasRealGaze) { setHIdx(i); return; }
-    if (!gazeEnabled) return;
-    if (isLocked) return;
-    if (lastEnabledTs && Date.now() - lastEnabledTs < GAZE_ENABLE_COOLDOWN_MS) return;
-    setHIdx(i); sRef.current = Date.now();
-    pRef.current = requestAnimationFrame(tick);
-    tRef.current = setTimeout(() => {
-      onSelect(w, i);
-      setHIdx(null);
-      setProgress(0);
-      setIsLocked(true);
-    }, DWELL_GROUPS.words.ms);
-  };
-  const leaveItem = () => { setHIdx(null); setProgress(0); clear(); };
-  const leaveContainer = () => { setHIdx(null); setProgress(0); clear(); setIsLocked(false); };
-
+/**
+ * One word-suggestion slot. Keyed by slot AND word by its parent, so a slot whose
+ * word changes is a new button: dwell progress (mouse or gaze) never carries
+ * over to a different word. Empty slots stay in place, disabled.
+ */
+const WordSlotButton: React.FC<{
+  index: number;
+  word: string | null;
+  selectable: boolean;
+  best: boolean;
+  isDarkMode: boolean;
+  gazeEnabled: boolean;
+  gazeEnabledTimestamp: number;
+  onSelect: (index: number, word: string) => void;
+}> = React.memo(({ index, word, selectable, best, isDarkMode, gazeEnabled, gazeEnabledTimestamp, onSelect }) => {
+  const keyboardTheme = getKeyboardTheme(isDarkMode);
+  const { predictionBestBg, predictionText, predictionBestText } = getKeyboardHierarchyColors(isDarkMode);
+  if (!word) {
+    return (
+      <div className="keyboard-word-slot keyboard-word-slot-empty" data-slot-index={index} aria-hidden="true"
+        style={{ backgroundColor: keyboardTheme.predictionBg }} />
+    );
+  }
+  const letters = Math.max(1, word.length);
   return (
-    <div
-      className="keyboard-prediction-bar"
-      onMouseLeave={leaveContainer}
+    <GazeButton
+      id={`word-slot-${index}`}
+      className={`keyboard-word-slot${best ? ' keyboard-word-slot-best' : ''}${selectable ? '' : ' keyboard-word-slot-stale'}`}
+      ariaLabel={`Insert ${word}`}
+      dwellCategory="predictionButton"
+      gazeEnabled={gazeEnabled}
+      gazeEnabledTimestamp={gazeEnabledTimestamp}
+      disabled={!selectable}
+      onClick={() => onSelect(index, word)}
       style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${predictionCount}, 1fr)`,
-        gap: '4px',
-        backgroundColor: 'transparent',
-        // compact=true → nav VISIBLE (smaller, saves space for nav bar)
-        // compact=false → nav HIDDEN (larger, uses full available height)
-        height: compact ? 'clamp(88px, 10.5vh, 126px)' : 'clamp(112px, 12.5vh, 138px)',
-        minHeight: compact ? 'clamp(88px, 10.5vh, 126px)' : 'clamp(112px, 12.5vh, 138px)',
-        padding: 0,
-        borderRadius: '14px',
-        border: 'none',
-        overflow: 'hidden',
-        boxShadow: _isDarkMode ? '0 6px 16px rgba(0,0,0,0.16)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
-        flexShrink: 0,
+        width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(6px, 0.6vw, 12px)',
+        border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
+        backgroundColor: best ? predictionBestBg : keyboardTheme.predictionBg,
+        color: best ? predictionBestText : predictionText,
+        fontWeight: best ? 780 : 700,
+        fontFamily: UI_FONT,
+        lineHeight: 1.1,
+        whiteSpace: 'nowrap',
+        opacity: 1,
+        cursor: selectable ? 'pointer' : 'default',
+        // The slot is the size container for its label (see below).
+        containerType: 'inline-size',
+      } as React.CSSProperties}
+    >
+      {/* Long words shrink to fit the slot instead of being clipped; short words
+          keep the large keyboard size. 100cqw is the slot's content width. */}
+      <span className="keyboard-word-slot-label" style={{
+        fontSize: `min(clamp(34px, 3.6vw, 52px), calc(100cqw / ${(letters * 0.62).toFixed(2)}))`,
+      }}>
+        {word}
+      </span>
+    </GazeButton>
+  );
+});
+
+/** Phrase suggestions (sentences, starters, abbreviation expansions): one cell, never a word slot. */
+const PhraseSuggestionButton: React.FC<{
+  suggestion: SentenceSuggestion | null;
+  selectable: boolean;
+  isDarkMode: boolean;
+  gazeEnabled: boolean;
+  gazeEnabledTimestamp: number;
+  onSelect: (suggestion: SentenceSuggestion) => void;
+}> = React.memo(({ suggestion, selectable, isDarkMode, gazeEnabled, gazeEnabledTimestamp, onSelect }) => {
+  const { sentenceSuggestionBg, sentenceSuggestionText } = getKeyboardHierarchyColors(isDarkMode);
+  if (!suggestion) {
+    return <div className="keyboard-phrase-slot keyboard-phrase-slot-empty" aria-hidden="true" style={{ backgroundColor: sentenceSuggestionBg }} />;
+  }
+  return (
+    <GazeButton
+      id="phrase-suggestion-0"
+      className="keyboard-phrase-slot"
+      ariaLabel={`Insert phrase ${suggestion.text}`}
+      dwellCategory="predictionButton"
+      gazeEnabled={gazeEnabled}
+      gazeEnabledTimestamp={gazeEnabledTimestamp}
+      disabled={!selectable}
+      onClick={() => onSelect(suggestion)}
+      style={{
+        width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(10px, 1vw, 18px)',
+        border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
+        backgroundColor: sentenceSuggestionBg, color: sentenceSuggestionText,
+        fontSize: 'clamp(20px, 2vw, 30px)', fontWeight: 720, fontFamily: UI_FONT, lineHeight: 1.12,
+        textAlign: 'center', overflow: 'hidden', cursor: selectable ? 'pointer' : 'default',
       }}
     >
-      {predictions.length === 0 ? (
-        <div style={{
-          gridColumn: '1 / -1',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: keyboardTheme.predictionBg,
-          color: isHindiMode ? (_isDarkMode ? 'rgba(234, 198, 136, 0.58)' : lightColors.text.tertiary) : keyboardTheme.keyTextMuted,
-          fontSize: isHindiMode ? 'clamp(24px, 2.6vw, 32px)' : 'clamp(28px, 2.95vw, 38px)',
-          fontFamily: predWordFont,
-          lineHeight: isHindiMode ? 1.6 : 1.4,
-          fontWeight: 500,
-          fontStyle: 'italic',
-        }}>
-          {predHintText}
-        </div>
-      ) : (
-        [...predictions.slice(0, predictionCount), ...Array(Math.max(0, predictionCount - predictions.length)).fill(null)].slice(0, predictionCount).map((p, i) => {
-          if (!p) {
-            return (
-              <div
-                key={`empty-${i}`}
-                style={{
-                  backgroundColor: keyboardTheme.predictionBg,
-                  boxSizing: 'border-box',
-                  width: '100%',
-                  height: '100%',
-                }}
-              />
-            );
-          }
-          const isBestPrediction = i === 0;
-          return (
-            <button key={`${p.word}-${i}`}
-              className="gaze-button"
-              data-gaze="true"
-              data-gaze-context="prediction"
-              onMouseEnter={() => enter(i, p.word)}
-              onMouseLeave={leaveItem}
-              onClick={() => onSelect(p.word, i)}
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                backgroundColor: hIdx === i
-                  ? keyboardTheme.predictionHoverBg
-                  : isBestPrediction
-                    ? predictionBestBg
-                    : keyboardTheme.predictionBg,
-                border: 'none',
-                boxShadow: 'none',
-                boxSizing: 'border-box',
-                margin: 0,
-                color: isBestPrediction ? predictionBestText : predWordColor,
-                fontSize: predWordSize,
-                fontFamily: predWordFont,
-                fontWeight: isBestPrediction ? 780 : 700,
-                lineHeight: isHindiMode ? 1.6 : 1.2,
-                cursor: isLocked ? 'default' : 'pointer',
-                whiteSpace: 'nowrap', textAlign: 'center',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'background-color 150ms',
-              }}
-            >
-              {hIdx === i && progress > 0 && (
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, height: 6, // Thicker progress bar
-                  width: `${progress * 100}%`, backgroundColor: predDwellBar,
-                }} />
-              )}
-              {/* Neural AI indicator — small dot for neural-fused predictions */}
-              {p.source === 'neural_fused' && (
-                <div style={{
-                  position: 'absolute', top: 5, right: 7,
-                  width: 7, height: 7, borderRadius: '50%',
-                  backgroundColor: '#a78bfa', // Soft purple dot
-                  opacity: 0.8,
-                }} title="AI predicted" />
-              )}
-              {p.word}
-            </button>
-          );
-        })
-      )}
-    </div>
+      <span style={{
+        display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+        overflow: 'hidden', whiteSpace: 'normal', maxWidth: '100%',
+      }}>
+        {suggestion.text}
+      </span>
+    </GazeButton>
   );
-};
-
+});
 
 // Main Keyboard Screen
 const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   onNavigate, onSpeak, onTextChange, initialText = '', isDarkMode = true,
-  showHindi = false, getPredictions, predictions = [],
-  expandAbbreviation, abbreviationExpansion, learnWord, learnSentence,
-  sentencePredictions = [], onNavHiddenChange,
+  showHindi = false, getPredictions, predictions = [], wordSlots = null, predictionMeta = null,
+  expandAbbreviation, abbreviationExpansion, learnWord, learnSentence, undoWordLearning,
+  sentencePredictions = [], onNavHiddenChange, connected = true,
 }) => {
   const [text, setText] = useState(initialText);
+  // Latest text for selection handlers: a dwell can complete between renders.
+  const textRef = useRef(initialText);
+  textRef.current = text;
+  const lineageResetRef = useRef(true);
   const [isShift, setIsShift] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false); // New state for expand/collapse
   // Keyboard always opens with global nav hidden — gives the keyboard maximum
@@ -767,8 +643,8 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
 
   // Strict Vertical Grid — hard-capped heights prevent flexbox collision
   // Nav-hidden mode should be keyboard-first: slimmer support rails, taller alphabet rows.
-  const PREDICTION_ROW_HEIGHT = navHidden ? 'clamp(96px, 10vh, 108px)' : '82px';
-  const ACTION_BAR_HEIGHT = navHidden ? '124px' : 'clamp(112px, 12.2vh, 132px)';
+  // Row heights live in keyboard-layout.css (--kb-*), with short-viewport tiers.
+  const ACTION_BAR_HEIGHT = 'var(--kb-action-row)';
   const GAZE_HUB_DIAMETER = navHidden ? '107px' : '97px';
   const SHOW_NAV_COLUMN = 'minmax(170px, 0.78fr)';
 
@@ -779,11 +655,26 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     };
   }, [navHidden, onNavHiddenChange]);
 
+  const lastPredictionRequestRef = useRef<string | null>(null);
   useEffect(() => {
-    if (getPredictions) {
-      getPredictions(text, undefined, keyboardMode);
+    if (!getPredictions) return;
+    if (!connected) {
+      // Nothing reaches a closed socket, and a restarted backend has no board:
+      // ask again for the current draft, on a fresh board, once reconnected.
+      lastPredictionRequestRef.current = null;
+      lineageResetRef.current = true;
+      return;
     }
-  }, [text, getPredictions, keyboardMode]);
+    // One request per distinct draft: re-renders (a new predictions response,
+    // a new callback identity) must never trigger another request.
+    const requestKey = `${keyboardMode}\u0000${text}`;
+    if (lastPredictionRequestRef.current === requestKey) return;
+    lastPredictionRequestRef.current = requestKey;
+    // The first request after opening the keyboard starts a fresh board;
+    // afterwards the backend keeps slot positions while one word grows.
+    getPredictions(text, undefined, keyboardMode, { slotCount: WORD_SLOT_COUNT, resetLineage: lineageResetRef.current });
+    lineageResetRef.current = false;
+  }, [text, getPredictions, keyboardMode, connected]);
   useEffect(() => {
     if (abbreviationExpansion) {
       const words = text.trim().split(' ');
@@ -808,15 +699,6 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     });
   }, []);
 
-
-  const starterFallbackPredictions = useMemo(
-    () => ENGLISH_STARTER_FALLBACK.map((word, index) => ({
-      word,
-      score: 0.95 - (index * 0.05),
-      source: 'starter',
-    })),
-    []
-  );
 
   const handleKey = useCallback((key: string, action?: string) => {
     switch (action) {
@@ -853,6 +735,8 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           const lastSpace = trimmed.lastIndexOf(' ');
           const n = lastSpace === -1 ? '' : trimmed.substring(0, lastSpace + 1);
           onTextChange?.(n);
+          // Explicit Delete Word: a prediction accepted by mistake is not learned.
+          undoWordLearning?.(p, n);
           return n;
         });
         break;
@@ -908,7 +792,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         }
         if (isShift) setIsShift(false); break;
     }
-  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, recordPredictionTelemetry, showHindi, onNavigate]);
+  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, recordPredictionTelemetry, showHindi, onNavigate, undoWordLearning]);
 
   const handlePrediction = useCallback((word: string, rank?: number) => {
     const normalizedWord = word.trim();
@@ -947,34 +831,41 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     );
   }, [text, onTextChange, learnSentence, learnWord, recordPredictionTelemetry, keyboardMode]);
 
-  const handleSentenceSelect = useCallback((sentence: string) => {
-    const trimmed = text.trimEnd();
-    const shouldCompleteCurrentText = !!trimmed && sentence.toLowerCase().startsWith(trimmed.toLowerCase());
-    const separator = trimmed.length > 0 ? ' ' : '';
-    const nextText = shouldCompleteCurrentText
-      ? sentence.trim() + ' '
-      : trimmed + separator + sentence + ' ';
-
+  const handleSentenceSelect = useCallback((suggestion: SentenceSuggestion) => {
+    const current = textRef.current;
+    if (!predictionsAreFresh(predictionMeta, current)) return;
+    const nextText = acceptSentenceSuggestion(current, suggestion);
+    if (nextText === null) return;
+    const trimmed = current.trimEnd();
+    textRef.current = nextText;
     setText(nextText);
     onTextChange?.(nextText);
-    learnSentence?.(sentence);
+    learnSentence?.(suggestion.text);
     recordPredictionTelemetry(
       trimmed.length === 0 ? 'starter' : 'sentence',
-      shouldCompleteCurrentText ? sentence.trim().length - trimmed.length : sentence.trim().length,
+      Math.max(0, nextText.trim().length - trimmed.length),
       { rank: 0, lang: keyboardMode === 'hindi' ? 'hi' : 'en' },
     );
-  }, [text, onTextChange, learnSentence, recordPredictionTelemetry, keyboardMode]);
+  }, [predictionMeta, onTextChange, learnSentence, recordPredictionTelemetry, keyboardMode]);
 
-  // Bottom phrase buttons: only SHORT phrases (patient request 2026-07-06 —
-  // long multi-line sentence suggestions were confusing). Keep the phrase
-  // feature, but cap at <=6 words / <=42 chars so a button stays one short line.
-  const shortSentencePredictions = useMemo(
-    () => (sentencePredictions || []).filter(sp => {
-      const t = (sp.text || '').trim();
-      return t.length > 0 && t.length <= 42 && t.split(/\s+/).length <= 6;
-    }),
-    [sentencePredictions]
-  );
+  // Word slots: insert the displayed word exactly once, and only while it still
+  // completes the draft it was computed for.
+  const handleWordSlot = useCallback((index: number, word: string) => {
+    const current = textRef.current;
+    if (!predictionsAreFresh(predictionMeta, current) || !wordFitsText(current, word)) return;
+    const nextText = acceptWordPrediction(current, word);
+    const partial = current.match(/[A-Za-z']+$/)?.[0].length ?? 0;
+    textRef.current = nextText;
+    setText(nextText);
+    onTextChange?.(nextText);
+    learnWord?.(word, current, nextText);
+    recordPredictionTelemetry(
+      current.trimEnd().length === 0 ? 'starter' : 'word',
+      Math.max(0, word.length - partial),
+      { rank: index, lang: keyboardMode === 'hindi' ? 'hi' : 'en' },
+    );
+  }, [predictionMeta, onTextChange, learnWord, recordPredictionTelemetry, keyboardMode]);
+
 
   // QuickWord → sentence map. ONLY give choices when options mean DIFFERENT actions.
   // Single-sentence entries insert directly (no picker shown).
@@ -1031,38 +922,6 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     setQuickWordChoices(null);
   }, [handlePrediction]);
 
-  // Extra smart predictions (shown in bottom row when nav hidden) — next 4 after the top row
-  const extraPredictions = useMemo(() => {
-    if (!navHidden) return [];
-    const mainWords = new Set((predictions || []).slice(0, TOP_PREDICTION_COUNT).map(p => p.word));
-    const extra: Array<{ word: string; score: number }> = [];
-    // Take the next ranked predictions after the visible top row.
-    (predictions || []).slice(TOP_PREDICTION_COUNT).forEach(p => {
-      if (!mainWords.has(p.word) && extra.length < 4) {
-        extra.push(p);
-      }
-    });
-    // Fill from common words if not enough predictions
-    if (extra.length < 4) {
-      const prefix = text.trim().split(' ').pop()?.toLowerCase() || '';
-      const allCommon = [
-        ...(AAC_FALLBACK_VOCABULARY[2] || []),
-        ...(AAC_FALLBACK_VOCABULARY[3] || []),
-        ...(AAC_FALLBACK_VOCABULARY[4] || []),
-        ...(AAC_FALLBACK_VOCABULARY[5] || []),
-        ...(AAC_FALLBACK_VOCABULARY[6] || []),
-        ...(AAC_FALLBACK_VOCABULARY[7] || []),
-        ...(AAC_FALLBACK_VOCABULARY[8] || []),
-      ];
-      const seen = new Set([...mainWords, ...extra.map(e => e.word)]);
-      if (prefix) {
-        allCommon.filter(w => w.startsWith(prefix) && !seen.has(w)).forEach(w => {
-          if (extra.length < 4) { seen.add(w); extra.push({ word: w, score: 0.3 }); }
-        });
-      }
-    }
-    return extra;
-  }, [predictions, text, navHidden]);
 
   // Hindi word predictions — active when keyboardMode is 'hindi'
   // Does prefix-match against HINDI_AAC_VOCABULARY, falls back to top daily words
@@ -1093,8 +952,19 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     return result;
   }, [keyboardMode, text]);
 
+  // Ten word slots: five in the top strip, five in the lower row, in fixed
+  // positions from the backend. Hindi mode (not reachable in this English
+  // release) keeps its local list in the same slots.
+  const slotWords = keyboardMode === 'hindi' && predictions.length === 0 ? hindiPredictions : predictions;
+  const slots = presentWordSlots(keyboardMode === 'hindi' ? null : wordSlots, slotWords, predictionMeta?.text ?? text);
+  const slotsSelectable = predictionsAreFresh(predictionMeta, text);
+  const phraseSuggestion = useMemo(
+    () => (sentencePredictions || []).find(s => isShortSentence(s.text)) ?? null,
+    [sentencePredictions]
+  );
+
   return (
-    <div className={`keyboard-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
+    <div className={`keyboard-screen${navHidden ? ' keyboard-nav-hidden' : ' keyboard-nav-visible'}${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex', flexDirection: 'column',
       height: '100%',
       backgroundColor: keyboardTheme.shellBg,
@@ -1155,20 +1025,18 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           </span>
         </GazeButton>
       ) : (
-        <>
-          <Predictions
-            predictions={keyboardMode === 'hindi'
-              ? (predictions.length > 0 ? predictions : hindiPredictions)
-              : (predictions.length > 0 ? predictions : (text.trim().length === 0 ? starterFallbackPredictions : []))}
-            onSelect={handlePrediction}
-            isDarkMode={isDarkMode}
-            gazeEnabled={isGazeEnabled}
-            lastEnabledTs={lastEnabledTimestamp}
-            hasRealGaze={hasRealGaze}
-            compact={!navHidden}
-            isHindiMode={keyboardMode === 'hindi'}
-          />
-        </>
+        <div className="keyboard-prediction-bar keyboard-word-row keyboard-word-row-top" aria-label="Word suggestions 1 to 5 and a phrase">
+          {slots.slice(0, TOP_WORD_SLOTS).map((word, index) => (
+            <WordSlotButton key={`${index}:${word ?? ''}`} index={index} word={word}
+              selectable={slotsSelectable} best={index === 0} isDarkMode={isDarkMode}
+              gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+              onSelect={handleWordSlot} />
+          ))}
+          <PhraseSuggestionButton key={`phrase:${phraseSuggestion?.mode ?? ''}:${phraseSuggestion?.text ?? ''}`}
+            suggestion={phraseSuggestion} selectable={slotsSelectable} isDarkMode={isDarkMode}
+            gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+            onSelect={handleSentenceSelect} />
+        </div>
       )}
 
       {/* ===== Full-screen Keyboard (Hidden if expanded) ===== */}
@@ -1178,12 +1046,9 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           gap: 'clamp(1px, 0.18vh, 2px)',
           padding: 'clamp(1px, 0.18vh, 3px) 6px',
           backgroundColor: keyboardTheme.textAreaBg,
-          borderRadius: navHidden ? '10px 10px 0 0' : '10px',
+          borderRadius: '10px 10px 0 0',
           minHeight: 0,
           overflow: 'hidden',
-          // When nav visible: cap total keyboard height so freed space goes to gap before nav bar
-          // v10: Increased from 430-580px to 480-640px (+15%) for larger key targets
-          ...(!navHidden ? { maxHeight: 'clamp(480px, 58vh, 640px)' } : {}),
         }}>
           {(() => {
             const actionRow = QWERTY_ROWS[QWERTY_ROWS.length - 1];
@@ -1440,168 +1305,44 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               );
             })
           })()}
-          {/* Gap between action bar and lower predictions */}
-          {navHidden && <div style={{ height: '1px', flexShrink: 0, pointerEvents: 'none' }} />}
-          {/* ===== Extra Smart Predictions / Sentence Predictions Row + SHOW NAV ===== */}
-          {/* Shows sentence predictions or extra word predictions when nav is hidden */}
-          {navHidden && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: shortSentencePredictions.length > 0
-                ? `repeat(${Math.min(shortSentencePredictions.length, 2)}, 1fr) ${SHOW_NAV_COLUMN}`
-                : `repeat(4, 1fr) ${SHOW_NAV_COLUMN}`,
-              gap: '4px',
-              backgroundColor: 'transparent',
-              height: keyboardMode === 'hindi' ? '84px' : PREDICTION_ROW_HEIGHT,
-              minHeight: keyboardMode === 'hindi' ? '84px' : PREDICTION_ROW_HEIGHT,
-              flexShrink: 0,
-              padding: 0,
-              borderRadius: '0 0 14px 14px',
-              border: 'none',
-              borderTop: 'none',
-              overflow: 'hidden',
-              boxShadow: isDarkMode ? '0 5px 14px rgba(0,0,0,0.14)' : '0 2px 8px rgba(139, 121, 104, 0.10), 0 1px 2px rgba(139, 121, 104, 0.06)',
-              margin: '0 -2px',
-            }}>
-              {shortSentencePredictions.length > 0 ? (
-                <>
-                  {/* Sentence predictions — max 2 shown, short phrases only */}
-                  {shortSentencePredictions.slice(0, 2).map((sp, i) => {
-                    return (
-                      <GazeButton
-                        key={`sent-${i}-${sp.text.slice(0,10)}`}
-                        id={`sentence-pred-${i}`}
-                        gazeEnabled={isGazeEnabled}
-                        gazeEnabledTimestamp={lastEnabledTimestamp}
-                        onClick={() => handleSentenceSelect(sp.text)}
-                        dwellCategory="predictionButton"
-                        style={{
-                          width: '100%', height: '100%',
-                          minWidth: 0,
-                          backgroundColor: sentenceSuggestionBg,
-                          border: 'none',
-                          borderRadius: '10px',
-                          boxSizing: 'border-box',
-                          color: sentenceSuggestionText,
-                          fontSize: 'clamp(24px, 2.35vw, 34px)',
-                          fontWeight: 720,
-                          lineHeight: 1.08,
-                          display: 'flex', alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          padding: '0 clamp(14px, 1.4vw, 24px)',
-                          textAlign: 'center',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <span style={{
-                          minWidth: 0,
-                          maxWidth: '100%',
-                          overflow: 'hidden',
-                          display: '-webkit-box',
-                          WebkitBoxOrient: 'vertical',
-                          WebkitLineClamp: 2,
-                          whiteSpace: 'normal',
-                          overflowWrap: 'normal',
-                        }}>
-                          {sp.text}
-                        </span>
-                      </GazeButton>
-                    );
-                  })}
-                  {/* SHOW NAV button */}
-                  {!isFocusLocked && (
-                    <GazeButton
-                      id="nav-restore-btn"
-                      gazeEnabled={isGazeEnabled}
-                      gazeEnabledTimestamp={lastEnabledTimestamp}
-                      onClick={() => { setNavHidden(false); setWordLengthHint(null); }}
-                      dwellCategory="navigationButton"
-                      style={{
-                        width: '100%', height: '100%',
-                        backgroundColor: showNavSuggestionBg,
-                        border: 'none', borderRadius: '10px',
-                        color: showNavSuggestionText,
-                        fontSize: 'clamp(15px, 1.6vw, 20px)',
-                        fontWeight: 820,
-                        display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: '8px',
-                        padding: '0 clamp(12px, 1.2vw, 18px)',
-                        cursor: 'pointer',
-                        letterSpacing: '1.1px',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      <span style={{ fontSize: 'inherit' }}>SHOW NAV</span>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 19V5" /><polyline points="5 12 12 5 19 12" />
-                      </svg>
-                    </GazeButton>
-                  )}
-                </>
-              ) : (
-                /* Fallback: show extra word predictions (existing behavior) */
-                <>
-                  {[...extraPredictions.slice(0, 4), ...Array(Math.max(0, 4 - extraPredictions.length)).fill(null)].slice(0, 4).map((p, i) => {
-                    if (!p) return (
-                      <div
-                        key={`extra-empty-${i}`}
-                        style={{
-                          backgroundColor: secondarySuggestionBg,
-                          boxSizing: 'border-box',
-                          width: '100%',
-                          height: '100%',
-                        }}
-                      />
-                    );
-                    return (
-                      <GazeButton key={`extra-${p.word}-${i}`} id={`extra-pred-${i}`}
-                        gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-                        onClick={() => handlePrediction(p.word)} dwellCategory="predictionButton"
-                        style={{
-                          width: '100%', height: '100%', backgroundColor: secondarySuggestionBg,
-                          border: 'none',
-                          borderRadius: '10px',
-                          boxSizing: 'border-box',
-                          color: secondarySuggestionText,
-                          fontSize: 'clamp(32px, 3.25vw, 46px)', fontWeight: 720,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center',
-                          transition: 'background-color 150ms',
-                        }}>
-                        {p.word}
-                      </GazeButton>
-                    );
-                  })}
-                  {isFocusLocked ? (
-                    <div style={{ backgroundColor: secondarySuggestionBg, borderRadius: '10px', width: '100%', height: '100%' }} />
-                  ) : (
-                    <GazeButton id="nav-restore-btn" gazeEnabled={isGazeEnabled}
-                      gazeEnabledTimestamp={lastEnabledTimestamp}
-                      onClick={() => { setNavHidden(false); setWordLengthHint(null); }}
-                      dwellCategory="navigationButton"
-                      style={{
-                        width: '100%', height: '100%',
-                        backgroundColor: showNavSuggestionBg,
-                        border: 'none', borderRadius: '10px',
-                        color: showNavSuggestionText, fontSize: 'clamp(15px, 1.6vw, 20px)',
-                        fontWeight: 820, display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: '8px', cursor: 'pointer',
-                        padding: '0 clamp(12px, 1.2vw, 18px)',
-                        transition: 'all 150ms ease',
-                        letterSpacing: '1.1px',
-                        textTransform: 'uppercase',
-                      }}>
-                      <span style={{ fontSize: 'inherit' }}>SHOW NAV</span>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 19V5" /><polyline points="5 12 12 5 19 12" />
-                      </svg>
-                    </GazeButton>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+          {/* ===== Word slots 6-10 (always visible) + SHOW NAV when navigation is hidden ===== */}
+          <div className={`keyboard-prediction-bar keyboard-word-row keyboard-word-row-bottom${navHidden ? ' with-show-nav' : ''}`}
+            aria-label="Word suggestions 6 to 10">
+            {slots.slice(TOP_WORD_SLOTS, WORD_SLOT_COUNT).map((word, offset) => {
+              const index = TOP_WORD_SLOTS + offset;
+              return (
+                <WordSlotButton key={`${index}:${word ?? ''}`} index={index} word={word}
+                  selectable={slotsSelectable} best={false} isDarkMode={isDarkMode}
+                  gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+                  onSelect={handleWordSlot} />
+              );
+            })}
+            {navHidden && (isFocusLocked ? (
+              <div style={{ backgroundColor: secondarySuggestionBg, borderRadius: '10px', width: '100%', height: '100%' }} />
+            ) : (
+              <GazeButton id="nav-restore-btn" gazeEnabled={isGazeEnabled}
+                gazeEnabledTimestamp={lastEnabledTimestamp}
+                onClick={() => { setNavHidden(false); setWordLengthHint(null); }}
+                dwellCategory="navigationButton"
+                style={{
+                  width: '100%', height: '100%',
+                  backgroundColor: showNavSuggestionBg,
+                  border: 'none', borderRadius: '10px',
+                  color: showNavSuggestionText, fontSize: 'clamp(15px, 1.6vw, 20px)',
+                  fontWeight: 820, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: '8px', cursor: 'pointer',
+                  padding: '0 clamp(12px, 1.2vw, 18px)',
+                  transition: 'all 150ms ease',
+                  letterSpacing: '1.1px',
+                  textTransform: 'uppercase',
+                }}>
+                <span style={{ fontSize: 'inherit' }}>SHOW NAV</span>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 19V5" /><polyline points="5 12 12 5 19 12" />
+                </svg>
+              </GazeButton>
+            ))}
+          </div>
         </div>
       )}
 

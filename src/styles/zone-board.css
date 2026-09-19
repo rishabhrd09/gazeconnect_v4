@@ -43,6 +43,8 @@
 :root[data-theme] .zone-workspace button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -3px; }
 :root[data-theme] .zone-workspace .zone-group { font-size: clamp(32px, 4vh, 46px) !important; letter-spacing: 0.035em; font-weight: 650 !important; }
 :root[data-theme] .zone-workspace .zone-suggestion { font-size: clamp(24px, 2.8vh, 32px) !important; color: var(--ui-accent-ink) !important; overflow-wrap: anywhere; }
+/* An unused suggestion cell keeps its grid position but is never a target. */
+:root[data-theme] .zone-workspace .zone-suggestion-empty { min-width: 80px; min-height: 80px; box-sizing: border-box; border: 1px dashed var(--ui-border); border-radius: 14px; opacity: 0.5; pointer-events: none; }
 .zone-current-word {
   grid-area: current;
   display: flex;
