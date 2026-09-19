@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "generator": "GazeCompass_ML_Final_Audited/tools/export_shared_english_to_gazecompass.mjs",
+  "sourceArtifact": {
+    "path": "reports/private/shared_english_v1/shared_english_ngram_v1.json",
+    "artifactKind": "shared_english_modified_kneser_ney_trigram_v1_1",
+    "modelVersion": "1.2",
+    "artifactSha256": "a5f8c564b63289963c6341c520db19c414331e3c2ff18446516d0158adf4d4a4",
+    "corpusManifestSha256": "567218c2c3eb24e1fee5656d552a52bdd1ae57ebbb36ffbcf3f0ce42383743e2",
+    "sentenceCount": 5641,
+    "sources": {
+      "active_reviewed_phrase_texts": 386,
+      "consented_general_messages": 123,
+      "consented_shared_phrase_only_messages": 5,
+      "llm_authored_training_expansion": 4963,
+      "project_teaching_sentences": 164
+    },
+    "claimBoundary": "shared English AAC n-gram v1; reviewed teaching text plus consented general messages from one AAC user; not evidence of new-user performance",
+    "releaseAllowed": false,
+    "deploymentStatus": "not_deployed_requires_gazespell_governed_integration",
+    "consent": {
+      "base_consent_record_id": "PALS_V1",
+      "permitted_use": "shared_english_aac_model_training",
+      "shared_training_consent_record_id": "PALS-SHARED-001"
+    }
+  },
+  "supportingInputs": [
+    {
+      "path": "data/english/shared_v1_frequency_prior.json",
+      "sha256": "87fc7d97c06dd1359839332caf94dd11dcf7c8b9808b07ae2da6f279ceb4e045"
+    },
+    {
+      "path": "data/english/shared_v1_grammar_rules.json",
+      "sha256": "6bed8e54c19daec2a5f92b091b5edff02899a0b02a8861e761b273ff5f9ac1cf"
+    },
+    {
+      "path": "reports/private/shared_english_v1/semantic_assets_v13.json",
+      "sha256": "33361e77f75de88f225ebb9fa1f3d22efef89f86795fd5d18cbc4c630fa28fb3",
+      "use": "class language model only; embeddings not exported in phase 1"
+    },
+    {
+      "path": "data/english/vocabulary.json",
+      "sha256": "98893b9da3ecfeaab9092df96b296dc83fcbfe8ed8cde6f3d3bf0f79b5bfba79",
+      "use": "frequency-band fallback only"
+    },
+    {
+      "path": "data/english/shared_v1_vocabulary_extension.json",
+      "sha256": "02e4c0832a93f706706c24af854ada50e946905dde88fc6614a5e172ec5f501e",
+      "use": "frequency-band fallback only"
+    }
+  ],
+  "lexiconIntersection": {
+    "appSuggestableWords": 9957,
+    "corpusVocabulary": 2376,
+    "droppedSuccessorsOutsideAppLexicon": true,
+    "note": "Totals, lambdas and continuation counts are computed from the full counts before filtering, so surviving probabilities are the true model probabilities."
+  },
+  "privacy": {
+    "rawTextExported": false,
+    "identifiersExported": false,
+    "localOnly": true,
+    "telemetry": "none",
+    "releaseReviewRequired": true
+  },
+  "emitted": {
+    "sharedEnglishNgram.v1.ts": {
+      "sha256": "f822af2b5d91eb80f94f3747c3678fc05b5206141bbac8e09a2f8192f7bcd7da",
+      "bytes": 898214
+    },
+    "sharedEnglishSemantic.v1.ts": {
+      "sha256": "5e1b22d67eae3ab8eadd90a53a1130022fba4d724f3376ce06a02de1d46443bb",
+      "bytes": 240307
+    },
+    "sharedEnglishGrammar.v1.ts": {
+      "sha256": "baa2376b3f133c78a6f17efca87e503dd34222c6b2dff67f9ab4fafae66de2f0",
+      "bytes": 12091
+    }
+  }
+}

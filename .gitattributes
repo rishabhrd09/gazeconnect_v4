@@ -1,0 +1,6 @@
+# Word prediction data is verified by SHA-256 (asset manifest, generator --check
+# modes, bundle verifier). Keep the committed bytes on every platform: no
+# line-ending conversion on Windows checkouts.
+python/services/deterministic_prediction/assets/** -text
+python/services/deterministic_prediction/english_only_policy.v1.json -text
+docs/phrase-inventory.csv -text

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "assetVersion": "v1",
+  "engine": "gazecompass-deterministic-word-prediction",
+  "reference": {
+    "commit": "de33a958848c3cff3cabd851d8f2eb50f4214a00",
+    "subject": "Show a near-top second word form and admit missing contractions"
+  },
+  "generator": "tools/prediction/export_reference_tables.mjs",
+  "sources": {
+    "src/spell/predictionService.ts": "8cfcc5f407034c1ef185999c70de0cd3655620f24a8bdf1761e807f9daea8ed8",
+    "src/spell/sharedEnglishModel.ts": "75e9c753b7d852d8d68479414d9bd84c8fc042720b21632f6623ebfcc43c4ea5",
+    "src/spell/semanticModel.ts": "c88d169341ecd55eec1b7f02dabfd9f9c726224dd369857e8e67a0d8473ade0a",
+    "src/spell/spellTypes.ts": "e713ef34cc01e3098e18ff6fb2c45184c4d6701fd3a69f41edb4814f973012d3",
+    "src/spell/personalContinuations.ts": "75f457c7214415edba98a6bb2b6f407a214e9f3a248c97651a744d42a8ef3367",
+    "src/spell/placeContext.ts": "4561cee310f4b492ba9441cd34e25154ca0e06dbeb904bd2c239f52d8fe1924e",
+    "src/spell/communicationContentPolicy.ts": "b876d4c6fb6187aac764317294c013592a18f532d21bb5a5fd1d84dcf6cf4bfa",
+    "src/spell/data/vocabulary/AAC_CORPUS_LICENSE.md": "a60fcb0f38fa47f70a470eca0cc8315da093a7d39b6b720c96c3d525021ca027",
+    "src/spell/data/vocabulary/CONTEXT_PRIORS_LICENSE.md": "35b1898658307528a5672924822ab4063d21b8d69212266bc09bb0dab28062d2",
+    "src/spell/data/vocabulary/DISTILLED_CONTINUATIONS_LICENSE.md": "6bc573ed1f004c5f5a8e269478b824a79b5ba6f3f368b62e7ede33f1d5108e85",
+    "src/spell/data/vocabulary/FALLBACK_UNIGRAM_PRIOR_LICENSE.md": "0fca5b815b710cb2e13f01c524791dc58704b6142aa5e15e56abceb3a23a5c24",
+    "src/spell/data/vocabulary/SYMSPELL_DATA_LICENSE.md": "5348fbf4ac9bb604940309e09f317f1107df9c42ebc818f7eb7332bdd4aeca0c",
+    "src/spell/data/vocabulary/THIRD_PARTY_DATA_NOTICES.md": "1fb24b57178dace07ca4fd12a1a78199cfa2bf2a7a898bc107f38a5747054a9d",
+    "src/spell/data/vocabulary/WORDNET_LICENSE.md": "81c5600a4f2796f5c174232869a559b9b351a347ea5318995d3ac504bb18468a",
+    "src/spell/data/vocabulary/aacContextEdges.v1.ts": "24a7c4fb63cfc6fd2495bfc11c23226df1b72ff8a2c13f5b301518bb01c61910",
+    "src/spell/data/vocabulary/contextPriors.v1.ts": "01ee35d7c34177e18e3067a2df434b6b3c8d2cb373d58903382b634b13fd73f4",
+    "src/spell/data/vocabulary/conversationVocabulary.v1.ts": "c042f793bbe76f9bb234e50d376e2c3dedbda0861a08cb28f7d20311cc8bb77f",
+    "src/spell/data/vocabulary/dailyCareReviewed.v1.ts": "a824d0caafc3c0410505b6a5b299f8e4187cfeceba3b7a4d06d5c1968ccf2daf",
+    "src/spell/data/vocabulary/derivedPartsOfSpeech.v1.ts": "dd48db60086611f53a141c3284f85ccb9ca6191cb20478c07e7d12b48abee625",
+    "src/spell/data/vocabulary/derivedVocabulary.v1.ts": "53aaa03ea6c67393434161f5c6694869ee71cd96eb60a25a3f621439f796b637",
+    "src/spell/data/vocabulary/distilledContinuations.v1.ts": "df9049458c8956c4b07458f34694f0566adf584281aa7450272e229e67fd034e",
+    "src/spell/data/vocabulary/everydayCommunicationPhrases.v1.ts": "7197f014be1deeacf564c6244f949cb1ebdcf2db29dde3fe5d9ef0f28144aa4d",
+    "src/spell/data/vocabulary/everydayGapsReviewed.v1.ts": "a9c7a4810e2007293281c37a1612a0137c83626c6cabe4fcd65c95c2353e98b5",
+    "src/spell/data/vocabulary/fallbackUnigramPrior.v1.ts": "012b126ecd45ae4a234969c1fc6c3bebbd65b46a9c7ed0fded26c5205f2786f7",
+    "src/spell/data/vocabulary/index.ts": "ab9a8cc36c59fcc24306af519bb7b36e998c1f4488929732183305de75b7de07",
+    "src/spell/data/vocabulary/indianEnglishOverrides.v1.ts": "b01f5fe023ae914bf83b9aeda4be2b99e1ffd756221599c9a479344eabab39c3",
+    "src/spell/data/vocabulary/indianEnglishReviewed.v1.ts": "4e5124f7f75fe0fb7506e91ca4d69174b09ce398cce0054d6e44bdac913b2677",
+    "src/spell/data/vocabulary/personCenteredPrefixContext.v1.ts": "c031a649bf0073df975ff18d9c42db5c96f6816eca4fe579cf5b7a838c173813",
+    "src/spell/data/vocabulary/practicalEnglishContextEdges.v1.ts": "99fff609a2b39531dcd3877acf22f7adb7ad215edab1815eb9466eabaadbf78b",
+    "src/spell/data/vocabulary/practicalEnglishLemmas.v1.ts": "efd9113aa387ec5cb4ab30518ec8579dfb3254c8ae5cf96fb1f5e3fef5a5564c",
+    "src/spell/data/vocabulary/practicalEnglishMetadata.v1.ts": "baf16d2b11d30db59ed5863b4fd48f4d8495fe3414d82f46c06b40cb1cd82ba5",
+    "src/spell/data/vocabulary/practicalEnglishPartsOfSpeech.v1.ts": "78b4ef2a65eab251559263e4ce676910065502ecbeafb14fee6a47e9b4f3e865",
+    "src/spell/data/vocabulary/practicalEnglishSurfaceForms.v1.ts": "36b86298983a633ab8b347d1bef27489acba92ce4e36ba93a6e9a5a3ec58dd43",
+    "src/spell/data/vocabulary/predictionSafety.v1.ts": "240078624d4ee2d83f7cb8eccbf1f340d24fbc477eb930819ca025699e02f130",
+    "src/spell/data/vocabulary/protectedCareVocabulary.v1.ts": "148487283c305e68e40ba679303ca8006045b6c33f35eff8ee954e81f3b545c7",
+    "src/spell/data/vocabulary/protectedPaths.v1.ts": "49b7c7b5e2097d05e32a29ef75f862d98a2ca024e79f2c6edd90b286d274bc1c",
+    "src/spell/data/vocabulary/sharedEnglishGrammar.v1.ts": "5a83cd9e048c8e7c5cd31cc543823d09d72ec5465a8ed66541101a7676f1029a",
+    "src/spell/data/vocabulary/sharedEnglishNgram.v1.ts": "f36e55690772c2e00784b76d4306654e157ddf05111e84b59bb4d3e4567ec36f",
+    "src/spell/data/vocabulary/sharedEnglishProvenance.v1.json": "73f952b27ea0464a9b0946feaefc757a7e6ef21303a3306964082385dd26aa6f",
+    "src/spell/data/vocabulary/sharedEnglishSemantic.v1.ts": "20a6068a1d046bfe5c0ca678f4a52e61170e7f652931405993d9ffb2a47856b5",
+    "src/spell/data/vocabulary/urgentCommunicationPhrases.v1.ts": "f9550fa085f877e42a465cdfeaa32d598f91d6db0630a3ac5f0f52a887b89cc3",
+    "src/spell/data/vocabulary/vocabularyManifest.v1.json": "01243eacaeaf33f145c32a54d802025d58f7a780c8b8209c132a19f58ad438bc"
+  },
+  "assets": {
+    "index.v1.json": {
+      "sha256": "36ea043a9fa2fda081aa66f75e7c22441da813b0d25a8eb26d51577aa1fbd966",
+      "bytes": 1550028
+    },
+    "context_priors.v1.json": {
+      "sha256": "fc4a8bfab0195b393bd1e43b445dd45c2e4ef233f66fc8767a1b77b05297cc74",
+      "bytes": 1790368
+    },
+    "distilled_continuations.v1.json": {
+      "sha256": "130cc0a33cc494048097ff4465dd7d83d259aba4a5d47f8370b2e87b97773acf",
+      "bytes": 4778686
+    },
+    "shared_english.v1.json": {
+      "sha256": "64d56c4bb1c4baea290583db2f6f4d7902922ac6d5c5c5e1e60149f5ff66293f",
+      "bytes": 906686
+    },
+    "semantic.v1.json": {
+      "sha256": "4545e7f8bf1f24b1757b139b96c694120354329276b8dad64f7f41a6c5ee5448",
+      "bytes": 238771
+    },
+    "engine_tables.v1.json": {
+      "sha256": "3b921dfbc8bbb55d9d414b5e2a5cfe8f03b42e2a1319a3546829ddaaa0a542e7",
+      "bytes": 36295
+    }
+  },
+  "licenceFiles": {
+    "licenses/THIRD_PARTY_DATA_NOTICES.md": "1fb24b57178dace07ca4fd12a1a78199cfa2bf2a7a898bc107f38a5747054a9d",
+    "licenses/AAC_CORPUS_LICENSE.md": "a60fcb0f38fa47f70a470eca0cc8315da093a7d39b6b720c96c3d525021ca027",
+    "licenses/CONTEXT_PRIORS_LICENSE.md": "35b1898658307528a5672924822ab4063d21b8d69212266bc09bb0dab28062d2",
+    "licenses/DISTILLED_CONTINUATIONS_LICENSE.md": "6bc573ed1f004c5f5a8e269478b824a79b5ba6f3f368b62e7ede33f1d5108e85",
+    "licenses/FALLBACK_UNIGRAM_PRIOR_LICENSE.md": "0fca5b815b710cb2e13f01c524791dc58704b6142aa5e15e56abceb3a23a5c24",
+    "licenses/SYMSPELL_DATA_LICENSE.md": "5348fbf4ac9bb604940309e09f317f1107df9c42ebc818f7eb7332bdd4aeca0c",
+    "licenses/sharedEnglishProvenance.v1.json": "73f952b27ea0464a9b0946feaefc757a7e6ef21303a3306964082385dd26aa6f",
+    "licenses/vocabularyManifest.v1.json": "01243eacaeaf33f145c32a54d802025d58f7a780c8b8209c132a19f58ad438bc"
+  }
+}
