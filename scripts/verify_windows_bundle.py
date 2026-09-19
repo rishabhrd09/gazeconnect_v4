@@ -16,6 +16,12 @@ TOBII_DLLS = (
 NATIVE_X64 = {"Tobii.EyeX.Client.dll", "tobii_stream_engine.dll"}
 ASSETS = ("data/smart_bigrams.json", "ml/trained_models/vocabulary.json",
           "ml/trained_models/gazeconnect_lm_quantized.onnx")
+# Deterministic word prediction (default engine): versioned tables checked
+# against their manifest hashes, plus the English-only display policy.
+PREDICTION_ASSET_DIR = "services/deterministic_prediction/assets"
+PREDICTION_ASSETS = tuple(f"{name}.v1.json" for name in (
+    "index", "context_priors", "distilled_continuations", "shared_english", "semantic", "engine_tables"))
+ENGLISH_ONLY_POLICY = "services/deterministic_prediction/english_only_policy.v1.json"
 
 
 def require_file(path: Path) -> Path:
@@ -52,11 +58,28 @@ def verify_dlls(root: Path) -> dict[str, str]:
     return hashes
 
 
+def verify_prediction_assets(root: Path) -> None:
+    directory = root / PREDICTION_ASSET_DIR
+    manifest = json.loads(require_file(directory / "manifest.json").read_text(encoding="utf-8"))
+    listed = {name: info.get("sha256") for name, info in (manifest.get("assets") or {}).items()}
+    listed.update(manifest.get("licenceFiles") or {})
+    for name in PREDICTION_ASSETS:
+        if name not in listed:
+            raise ValueError(f"Prediction manifest does not list {name}")
+    for name, expected in listed.items():
+        if hashlib.sha256(require_file(directory / name).read_bytes()).hexdigest() != expected:
+            raise ValueError(f"Prediction asset hash mismatch: {name}")
+    policy = json.loads(require_file(root / ENGLISH_ONLY_POLICY).read_text(encoding="utf-8"))
+    if not policy.get("withheldRomanizedHindi"):
+        raise ValueError(f"Empty English-only policy: {root / ENGLISH_ONLY_POLICY}")
+
+
 def verify_assets(root: Path) -> None:
     for asset in ASSETS:
         path = require_file(root / asset)
         if path.suffix == ".json":
             json.loads(path.read_text(encoding="utf-8"))
+    verify_prediction_assets(root)
 
 
 def verify_stage(root: Path, packaged: bool = False) -> dict[str, str]:

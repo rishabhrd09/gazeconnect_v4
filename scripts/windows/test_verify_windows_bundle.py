@@ -1,4 +1,5 @@
 """Portable failure-injection tests for the Windows release validator."""
+import hashlib
 import importlib.util
 import json
 import struct
@@ -9,6 +10,18 @@ from pathlib import Path
 spec = importlib.util.spec_from_file_location("bundle", Path(__file__).parents[1] / "verify_windows_bundle.py")
 bundle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bundle)
+
+
+def prediction_assets(root):
+    """Small stand-in tables with a manifest that lists their hashes."""
+    directory = root / bundle.PREDICTION_ASSET_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    assets = {}
+    for name in bundle.PREDICTION_ASSETS:
+        (directory / name).write_text('{"table": "%s"}' % name)
+        assets[name] = {"sha256": hashlib.sha256((directory / name).read_bytes()).hexdigest()}
+    (directory / "manifest.json").write_text(json.dumps({"assets": assets, "licenceFiles": {}}))
+    (root / bundle.ENGLISH_ONLY_POLICY).write_text(json.dumps({"withheldRomanizedHindi": ["khana"]}))
 
 
 def pe(path, machine=0x8664):
@@ -44,6 +57,7 @@ class BundleValidationTests(unittest.TestCase):
             asset = self.root / "python-dist/backend/_internal" / relative
             asset.parent.mkdir(parents=True, exist_ok=True)
             asset.write_text("{}" if asset.suffix == ".json" else "model")
+        prediction_assets(self.root / "python-dist/backend/_internal")
 
     def test_valid_managed_anycpu_and_native_x64(self):
         self.assertEqual(len(bundle.verify_dlls(self.helper)), 6)
@@ -80,6 +94,25 @@ class BundleValidationTests(unittest.TestCase):
         (self.root / "python-dist/backend/_internal" / bundle.ASSETS[2]).unlink()
         with self.assertRaisesRegex(ValueError, "Missing"):
             bundle.verify_stage(self.root)
+
+    def test_missing_or_tampered_deterministic_prediction_asset_rejected(self):
+        self.stage()
+        tables = self.root / "python-dist/backend/_internal" / bundle.PREDICTION_ASSET_DIR
+        (tables / bundle.PREDICTION_ASSETS[0]).write_text('{"table": "edited"}')
+        with self.assertRaisesRegex(ValueError, "hash mismatch"):
+            bundle.verify_stage(self.root)
+        (tables / bundle.PREDICTION_ASSETS[0]).unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            bundle.verify_stage(self.root)
+
+    def test_missing_english_only_policy_rejected(self):
+        self.stage()
+        (self.root / "python-dist/backend/_internal" / bundle.ENGLISH_ONLY_POLICY).unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            bundle.verify_stage(self.root)
+
+    def test_repository_prediction_assets_verify(self):
+        bundle.verify_prediction_assets(Path(__file__).parents[2] / "python")
 
     def test_missing_floorplan_python_runtime_rejected(self):
         self.stage()

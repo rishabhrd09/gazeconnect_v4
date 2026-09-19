@@ -56,6 +56,7 @@ jobs:
           Invoke-Checked 'npm.cmd' @('run', 'check:gaze-safety')
           Invoke-Checked 'npm.cmd' @('run', 'check:browser-gaze-safety')
           Invoke-Checked 'node.exe' @('scripts/check-zone-board.cjs')
+          Invoke-Checked 'node.exe' @('scripts/check-word-prediction-slots.cjs')
           Invoke-Checked 'node.exe' @('scripts/check-dev-startup.cjs')
           Invoke-Checked 'node.exe' @('scripts/check-floorplan-transport.cjs')
       - name: Check Windows Python dependencies and finite runtime probes
@@ -64,3 +65,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\scripts\windows\Test-Environment.ps1 -Simulate
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Word prediction tests (reference parity fixture, spawned worker, policy, learning)
+        run: |
+          . .\scripts\windows\Common.ps1
+          Invoke-Checked $VenvPython @('-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_deterministic_*.py')
+          Invoke-Checked $VenvPython @('-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_prediction_pipeline.py')

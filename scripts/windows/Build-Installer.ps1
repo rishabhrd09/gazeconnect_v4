@@ -45,6 +45,10 @@ try {
 
     Write-Host '[1/5] Building frozen backend and floor-plan service...'
     $backendArgs = $common + @('--name', 'GazeConnectBackend',
+        # Deterministic word prediction (default engine): tables + English-only policy.
+        '--add-data', ((Join-Path $ProjectRoot 'python\services\deterministic_prediction\assets') + ';services/deterministic_prediction/assets'),
+        '--add-data', ((Join-Path $ProjectRoot 'python\services\deterministic_prediction\english_only_policy.v1.json') + ';services/deterministic_prediction'),
+        '--hidden-import', 'services.deterministic_prediction.worker',
         '--add-data', ((Join-Path $ProjectRoot 'python\data\smart_bigrams.json') + ';data'),
         '--add-data', ((Join-Path $ProjectRoot 'python\ml\trained_models\gazeconnect_lm_quantized.onnx') + ';ml/trained_models'),
         '--add-data', ((Join-Path $ProjectRoot 'python\ml\trained_models\vocabulary.json') + ';ml/trained_models'),
