@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "description": "Pinned GazeCompass deterministic prediction snapshot used as the porting reference and parity oracle. Development tooling only; the runtime never reads the reference repository.",
+  "referenceRepository": "GazeCompass working_gaze_compass (local clone; path supplied on the command line)",
+  "commit": "de33a958848c3cff3cabd851d8f2eb50f4214a00",
+  "commitSubject": "Show a near-top second word form and admit missing contractions",
+  "pinnedOn": "2026-09-19",
+  "sourceSha256": {
+    "src/spell/predictionService.ts": "8cfcc5f407034c1ef185999c70de0cd3655620f24a8bdf1761e807f9daea8ed8",
+    "src/spell/sharedEnglishModel.ts": "75e9c753b7d852d8d68479414d9bd84c8fc042720b21632f6623ebfcc43c4ea5",
+    "src/spell/semanticModel.ts": "c88d169341ecd55eec1b7f02dabfd9f9c726224dd369857e8e67a0d8473ade0a",
+    "src/spell/spellTypes.ts": "e713ef34cc01e3098e18ff6fb2c45184c4d6701fd3a69f41edb4814f973012d3",
+    "src/spell/personalContinuations.ts": "75f457c7214415edba98a6bb2b6f407a214e9f3a248c97651a744d42a8ef3367",
+    "src/spell/placeContext.ts": "4561cee310f4b492ba9441cd34e25154ca0e06dbeb904bd2c239f52d8fe1924e",
+    "src/spell/communicationContentPolicy.ts": "b876d4c6fb6187aac764317294c013592a18f532d21bb5a5fd1d84dcf6cf4bfa"
+  }
+}

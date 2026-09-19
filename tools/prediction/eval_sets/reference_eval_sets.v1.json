@@ -1,0 +1,7276 @@
+{
+ "schemaVersion": 1,
+ "reference": {
+  "commit": "de33a958848c3cff3cabd851d8f2eb50f4214a00"
+ },
+ "generator": "tools/prediction/export_eval_sets.mjs",
+ "sources": {
+  "scripts/benchmark/goldenDrafts.ts": "cbdda83a98faf9d3b5e7641476cfafb827a66fcc762a84241250a0a9765e06ba",
+  "scripts/benchmark/ksrDrafts.ts": "dff13342574ca33f7d41841b010fbcb68ec40469f442cc443a4dc7ef4b6ef964",
+  "scripts/benchmark/nextWordProbes.ts": "c816822ffad464402777e6dc1bb727aabbd5ffcdd7c1b756990cf61725388339",
+  "scripts/benchmark/evalSentences.ts": "4bf7c98aca6e20fe1f5238eaf91ec3eab2fff25f3158f558dcaef8e013b1d85b",
+  "scripts/benchmark/contextEvalSentences.ts": "60709d7a1bfd2f17eb5be953d1860d1d49cd08651f17bbc943eb8f091f96c4fe",
+  "scripts/benchmark/aacEvalSentences.ts": "40210b816def68b1778816546348911a106363fe70ea38b02edeff8be1601607",
+  "scripts/benchmark/independentEvalSentences.mjs": "ddf24be8968a2a56a3357dbfcfdb8423889a115a9a4aa50a6ba006f1b47eee32",
+  "scripts/benchmark/secondIndependentEvalSentences.mjs": "eff5a017010296959bbf3acd438caf441e03eb62d39b1bb917d36ad08d0cde15"
+ },
+ "notice": "Evaluation-only text. aacEvalSentences: Vertanen & Kristensson (EMNLP 2011) crowdsourced AAC corpus dev/test split, CC BY 4.0. independent: Tatoeba English sentences (List 907), CC BY 2.0 FR, ids/owners retained. Other sets were written by the GazeCompass author for evaluation. Never bundled with the application.",
+ "development": {
+  "goldenDrafts": [
+   "",
+   "I ",
+   "he ",
+   "she ",
+   "it ",
+   "you ",
+   "we ",
+   "they ",
+   "hello ",
+   "hello good ",
+   "I need ",
+   "I want ",
+   "I am ",
+   "I cannot ",
+   "turn me ",
+   "check my ",
+   "change my ",
+   "give me ",
+   "raise my ",
+   "lower my ",
+   "my breathing ",
+   "breathing is ",
+   "pain is ",
+   "can you ",
+   "can i ",
+   "need to ",
+   "want to ",
+   "please call ",
+   "please give ",
+   "thank you ",
+   "am ",
+   "having ",
+   "trouble ",
+   "please ",
+   "call ",
+   "change ",
+   "feel ",
+   "oxygen ",
+   "more ",
+   "I nee",
+   "I need wa",
+   "I need wate",
+   "I need he",
+   "I need suc",
+   "I need bip",
+   "I need secr",
+   "I need oxim",
+   "I need med",
+   "I need my med",
+   "I cannot br",
+   "I cannot sw",
+   "I am ti",
+   "I am hun",
+   "I am thir",
+   "I am unc",
+   "I feel di",
+   "I feel na",
+   "I feel we",
+   "please call c",
+   "please call n",
+   "please call d",
+   "please change my pos",
+   "please turn me le",
+   "please turn me ri",
+   "check my ox",
+   "check my pre",
+   "check my pul",
+   "my pain is wor",
+   "a",
+   "b",
+   "c",
+   "d",
+   "e",
+   "f",
+   "g",
+   "h",
+   "i",
+   "j",
+   "k",
+   "l",
+   "m",
+   "n",
+   "o",
+   "p",
+   "q",
+   "r",
+   "s",
+   "t",
+   "u",
+   "v",
+   "w",
+   "x",
+   "y",
+   "z",
+   "br",
+   "ca",
+   "ch",
+   "co",
+   "cr",
+   "de",
+   "di",
+   "fe",
+   "ha",
+   "he",
+   "ho",
+   "in",
+   "ir",
+   "me",
+   "mo",
+   "ne",
+   "pa",
+   "pl",
+   "po",
+   "re",
+   "sl",
+   "sp",
+   "st",
+   "su",
+   "th",
+   "to",
+   "tu",
+   "un",
+   "wa",
+   "we",
+   "wo",
+   "CRU",
+   "CRUE",
+   "CRUEL",
+   "IR",
+   "IRR",
+   "IRRI",
+   "IRRIT",
+   "HEL",
+   "INJ",
+   "hom",
+   "peopl",
+   "waer",
+   "don",
+   "dont",
+   "can",
+   "cant",
+   "im",
+   "wont",
+   "didn",
+   "doesn",
+   "couldn",
+   "shouldn",
+   "wouldn",
+   "hasn",
+   "shes",
+   "isn",
+   "wasn",
+   "lets",
+   "thats",
+   "I have ",
+   "I have been ",
+   "I was ",
+   "she is ",
+   "it is ",
+   "they are ",
+   "I would like to ",
+   "please do not ",
+   "I do not ",
+   "the pain ",
+   "my head ",
+   "my legs ",
+   "the nurse ",
+   "a little ",
+   "very ",
+   "too ",
+   "more ",
+   "less ",
+   "I need to ",
+   "I want to ",
+   "I am having ",
+   "please help me ",
+   "I am feeling ",
+   "it hurts ",
+   "my back ",
+   "my chest ",
+   "my throat ",
+   "I want to watch t",
+   "please open the wi",
+   "please turn on the f",
+   "I would like some w",
+   "call my fam",
+   "call my dau",
+   "call my s",
+   "what time ",
+   "when will ",
+   "how long ",
+   "where is ",
+   "who is ",
+   "good mor",
+   "good aft",
+   "good eve",
+   "thank y",
+   "sorr",
+   "plea",
+   "yes ",
+   "no ",
+   "maybe ",
+   "later ",
+   "now ",
+   "today ",
+   "tomorrow "
+  ],
+  "ksrDrafts": [
+   "i would like to sit up a little higher please",
+   "can you check my oxygen level and tell me the number",
+   "my back is sore from lying in the same position all morning",
+   "please call my sister and tell her i am doing better today",
+   "i am not hungry right now but i would like some water",
+   "the room feels too warm can you turn the fan on",
+   "please move my arm it is starting to go numb",
+   "i want to watch the news for a little while",
+   "my throat is dry could i have a small sip through the straw",
+   "thank you for staying with me this morning it helped a lot",
+   "please tell the nurse that my medicine is due soon",
+   "i had a good night and slept better than yesterday",
+   "can someone open the window i would like some fresh air",
+   "my legs feel stiff please straighten them for me",
+   "i would like to see my family this weekend if they are free",
+   "please charge my phone and leave it near my hand",
+   "the light is too bright can you dim it a little",
+   "i am feeling anxious this afternoon and would like company",
+   "please bring my glasses so i can read the message",
+   "i need suction now there is too much saliva",
+   "my chest feels tight and my breathing is harder than before",
+   "could you please put another pillow under my knees",
+   "i want to sleep for an hour please wake me before lunch",
+   "please write down what the doctor said so i can read it later",
+   "the blanket is too heavy could you fold it back a little",
+   "i am done eating you can take the tray away now"
+  ],
+  "nextWordProbes": [
+   {
+    "context": "give me black",
+    "want": "tea",
+    "also": [
+     "coffee"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i want hot",
+    "want": "water",
+    "also": [
+     "tea",
+     "milk",
+     "coffee"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "please bring cold",
+    "want": "water",
+    "also": [
+     "milk",
+     "juice"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "give me a clean",
+    "want": "towel",
+    "also": [
+     "shirt",
+     "cloth",
+     "sheet"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i need a bigger",
+    "want": "pillow",
+    "also": [
+     "blanket",
+     "screen"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "put on the small",
+    "want": "fan",
+    "also": [
+     "light",
+     "lamp"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "we may try to start",
+    "want": "practicing",
+    "also": [
+     "practice",
+     "walking",
+     "talking"
+    ],
+    "demands": "verb-ing"
+   },
+   {
+    "context": "i want to keep",
+    "want": "trying",
+    "also": [
+     "going",
+     "talking"
+    ],
+    "demands": "verb-ing"
+   },
+   {
+    "context": "please stop",
+    "want": "moving",
+    "also": [
+     "talking",
+     "pushing"
+    ],
+    "demands": "verb-ing"
+   },
+   {
+    "context": "i enjoy",
+    "want": "watching",
+    "also": [
+     "listening",
+     "reading"
+    ],
+    "demands": "verb-ing"
+   },
+   {
+    "context": "he finished",
+    "want": "eating",
+    "also": [
+     "reading",
+     "talking"
+    ],
+    "demands": "verb-ing"
+   },
+   {
+    "context": "there should",
+    "want": "be",
+    "demands": "verb-base",
+    "also": []
+   },
+   {
+    "context": "i will",
+    "want": "try",
+    "also": [
+     "be",
+     "call",
+     "wait",
+     "sleep"
+    ],
+    "demands": "verb-base"
+   },
+   {
+    "context": "can you please",
+    "want": "help",
+    "also": [
+     "come",
+     "call",
+     "check",
+     "bring"
+    ],
+    "demands": "verb-base"
+   },
+   {
+    "context": "we must",
+    "want": "go",
+    "also": [
+     "wait",
+     "tell",
+     "ask"
+    ],
+    "demands": "verb-base"
+   },
+   {
+    "context": "you should not",
+    "want": "worry",
+    "also": [
+     "go",
+     "wait",
+     "stop"
+    ],
+    "demands": "verb-base"
+   },
+   {
+    "context": "i would like to",
+    "want": "sleep",
+    "also": [
+     "rest",
+     "talk",
+     "watch",
+     "eat"
+    ],
+    "demands": "verb-base"
+   },
+   {
+    "context": "please switch on the",
+    "want": "fan",
+    "also": [
+     "light",
+     "television",
+     "tv",
+     "ac"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "where is my",
+    "want": "phone",
+    "also": [
+     "glasses",
+     "medicine",
+     "book"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "please call my",
+    "want": "daughter",
+    "also": [
+     "son",
+     "wife",
+     "family",
+     "brother",
+     "sister"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i finished my",
+    "want": "breakfast",
+    "also": [
+     "lunch",
+     "dinner",
+     "medicine",
+     "food"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "close the",
+    "want": "door",
+    "also": [
+     "window",
+     "curtains"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "today is a good",
+    "want": "day",
+    "also": [
+     "morning"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i want to sit on the",
+    "want": "chair",
+    "also": [
+     "bed",
+     "wheelchair",
+     "sofa"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "please put it on the",
+    "want": "table",
+    "also": [
+     "bed",
+     "chair",
+     "floor"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "we will talk in the",
+    "want": "morning",
+    "also": [
+     "evening",
+     "afternoon"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "the news is on",
+    "want": "television",
+    "also": [
+     "tv"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i am feeling much",
+    "want": "better",
+    "also": [
+     "worse"
+    ],
+    "demands": "adjective"
+   },
+   {
+    "context": "the food was very",
+    "want": "good",
+    "also": [
+     "tasty",
+     "hot",
+     "nice",
+     "cold"
+    ],
+    "demands": "adjective"
+   },
+   {
+    "context": "i slept very",
+    "want": "well",
+    "also": [
+     "badly",
+     "late"
+    ],
+    "demands": "any"
+   },
+   {
+    "context": "thank you so",
+    "want": "much",
+    "demands": "any",
+    "also": []
+   },
+   {
+    "context": "please come back",
+    "want": "soon",
+    "also": [
+     "later",
+     "tomorrow"
+    ],
+    "demands": "any"
+   },
+   {
+    "context": "i will see you",
+    "want": "tomorrow",
+    "also": [
+     "later",
+     "soon"
+    ],
+    "demands": "any"
+   },
+   {
+    "context": "how are",
+    "want": "you",
+    "demands": "any",
+    "also": []
+   },
+   {
+    "context": "what is the",
+    "want": "time",
+    "also": [
+     "date",
+     "news",
+     "problem"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i am not",
+    "want": "hungry",
+    "also": [
+     "tired",
+     "ready",
+     "sleepy",
+     "well"
+    ],
+    "demands": "adjective"
+   },
+   {
+    "context": "please read the",
+    "want": "news",
+    "also": [
+     "message",
+     "paper",
+     "letter"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i watched a good",
+    "want": "movie",
+    "also": [
+     "film",
+     "match",
+     "programme"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "my son is coming",
+    "want": "today",
+    "also": [
+     "tomorrow",
+     "home",
+     "soon"
+    ],
+    "demands": "any"
+   },
+   {
+    "context": "i need",
+    "want": "suction",
+    "also": [
+     "water",
+     "help",
+     "medicine",
+     "oxygen",
+     "rest"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "please check my",
+    "want": "oxygen",
+    "also": [
+     "pulse",
+     "temperature",
+     "pressure"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i cannot",
+    "want": "breathe",
+    "also": [
+     "swallow",
+     "sleep",
+     "move",
+     "speak"
+    ],
+    "demands": "verb-base"
+   },
+   {
+    "context": "my back is",
+    "want": "hurting",
+    "also": [
+     "paining",
+     "sore",
+     "stiff"
+    ],
+    "demands": "any"
+   },
+   {
+    "context": "the pain is getting",
+    "want": "worse",
+    "also": [
+     "better"
+    ],
+    "demands": "adjective"
+   },
+   {
+    "context": "please turn me to the",
+    "want": "left",
+    "also": [
+     "right"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "i want to change my",
+    "want": "position",
+    "also": [
+     "clothes",
+     "pillow"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "please clean my",
+    "want": "mouth",
+    "also": [
+     "face",
+     "hands",
+     "neck",
+     "nose"
+    ],
+    "demands": "noun"
+   },
+   {
+    "context": "the tube is",
+    "want": "blocked",
+    "also": [
+     "kinked",
+     "loose",
+     "clear"
+    ],
+    "demands": "any"
+   },
+   {
+    "context": "i feel",
+    "want": "tired",
+    "also": [
+     "dizzy",
+     "better",
+     "cold",
+     "hot",
+     "weak",
+     "sleepy"
+    ],
+    "demands": "adjective"
+   },
+   {
+    "context": "call the",
+    "want": "doctor",
+    "also": [
+     "nurse",
+     "caregiver"
+    ],
+    "demands": "noun"
+   }
+  ],
+  "evalSentences": [
+   {
+    "text": "i want to sit up a bit straighter now",
+    "theme": "care-requests"
+   },
+   {
+    "text": "can you wipe my face with warm water",
+    "theme": "care-requests"
+   },
+   {
+    "text": "i would like my hands washed before lunch",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please help me turn onto my other side",
+    "theme": "care-requests"
+   },
+   {
+    "text": "can someone hold my head while you move me",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please put my arm back on the pillow",
+    "theme": "care-requests"
+   },
+   {
+    "text": "i want my socks taken off for now",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please fold the sheet under my feet",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please press the middle of my back gently",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please help me clear my throat",
+    "theme": "care-requests"
+   },
+   {
+    "text": "i would like my hair washed tomorrow morning",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please help me sit closer to the window",
+    "theme": "care-requests"
+   },
+   {
+    "text": "can you fix my shirt it is twisted",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please put a fresh cover on this pillow",
+    "theme": "care-requests"
+   },
+   {
+    "text": "i want to be moved before you leave",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please check if my heel is resting badly",
+    "theme": "care-requests"
+   },
+   {
+    "text": "can you lift my legs onto the cushion",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please help me stretch my fingers slowly",
+    "theme": "care-requests"
+   },
+   {
+    "text": "i would like a warm towel on my forehead",
+    "theme": "care-requests"
+   },
+   {
+    "text": "please press my shoulders for a minute",
+    "theme": "care-requests"
+   },
+   {
+    "text": "my throat feels rough this morning",
+    "theme": "symptoms"
+   },
+   {
+    "text": "the pain in my hip is back",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my left hand feels colder than the right",
+    "theme": "symptoms"
+   },
+   {
+    "text": "there is a strange taste in my mouth",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my chest feels heavy again tonight",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my legs feel weak after sitting up",
+    "theme": "symptoms"
+   },
+   {
+    "text": "the itching on my arm is worse",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my eyes feel tired and heavy",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my jaw is aching from the morning",
+    "theme": "symptoms"
+   },
+   {
+    "text": "i feel a cramp starting in my calf",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my stomach feels full and uncomfortable",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my head hurts behind my eyes",
+    "theme": "symptoms"
+   },
+   {
+    "text": "the numbness in my foot has returned",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my breathing feels slower than usual today",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my skin feels itchy under the tape",
+    "theme": "symptoms"
+   },
+   {
+    "text": "i have a dull ache in my lower back",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my fingers feel stiff this evening",
+    "theme": "symptoms"
+   },
+   {
+    "text": "there is pressure on my right shoulder",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my mouth feels dry again already",
+    "theme": "symptoms"
+   },
+   {
+    "text": "the burning feeling has almost gone",
+    "theme": "symptoms"
+   },
+   {
+    "text": "my head has slipped off the pillow",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "the sheet is bunched under my hip",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "please lower my legs a little more",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "i am leaning too far to the left",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "the blanket is falling off my feet",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "my arm is stuck under my body",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "please move me back toward the middle",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "this angle is too high for me",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "i want to lie flatter for a while",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "the cushion under my knee has shifted",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "my shoulder needs a little more support",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "please turn my head toward the window",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "i feel like i am sliding to the side",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "the belt across my chest feels tight",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "please make it a little less tight",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "my feet are hanging off the edge",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "this pillow is far too soft tonight",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "i would be better sitting slightly higher",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "please support my elbow with a small cushion",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "my back feels better in this position",
+    "theme": "comfort-positioning"
+   },
+   {
+    "text": "i would like something warm to drink",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "the soup was too salty for me",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "can i have a little more water",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i am not hungry at all today",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "please make the food a bit softer",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i would like a small piece of fruit",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "the tea has gone cold already",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "can you feed me more slowly please",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i want to try the rice tonight",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "that was enough food for now",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i would like plain water without ice",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "the yogurt tasted better than yesterday",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "please wait a moment before the next spoon",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i can taste the sugar in this",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i do not want anything sweet now",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "can i have my drink a bit warmer",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "the bread was too dry to swallow",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i would like breakfast a little later",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "please stir it before you give it to me",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "i am still thirsty after that",
+    "theme": "food-and-drink"
+   },
+   {
+    "text": "tell my sister i was asking about her",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i want the children to visit on sunday",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "has anyone heard from my brother today",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "please sit with me for a little while",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i miss talking with everyone in the evening",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "my friend called and i want to answer",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "please send my love to the family",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i want to hear about your day",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "tell them i am doing fine today",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i would like a photo of the garden",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "my nephew must be growing so fast",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "please thank them for coming yesterday",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i want everyone to eat before me",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "ask my wife to come after lunch",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i hope the children did well in school",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "please do not tell them i was upset",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i want to say goodnight to everyone",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "my mother would have liked this weather",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "please invite them again next weekend",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "i enjoyed the visit more than i expected",
+    "theme": "family-and-social"
+   },
+   {
+    "text": "the screen is too bright for my eyes",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "please charge this before the battery dies",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the fan is making a strange noise",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "can you turn the volume down a little",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the light above my bed keeps blinking",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "please move the table a bit closer",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "my glasses have slipped down my nose",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the door keeps hitting the wall",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "please put the clock where i can see it",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the screen keeps losing my words",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "can you clean the dust off the table",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the bell on the table is out of reach",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "please plug the lamp back in",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the water bottle is empty again",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "can you open the window just slightly",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the curtain is letting in too much light",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "please wipe the screen it is dirty",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the radio was better than the television tonight",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "can someone bring the spare blanket from the cupboard",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "the room smells of paint again",
+    "theme": "device-and-household"
+   },
+   {
+    "text": "what time is the doctor coming tomorrow",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "i would like to sleep a little longer",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "please wake me before the visitors arrive",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "how many hours until the evening meal",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "i want to rest until about four",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "do not wake me before eight tomorrow",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "the morning went by very quickly today",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "please remind me again this afternoon",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "can we do the bath after lunch instead",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "i lost track of the days again",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "let us start a bit earlier tomorrow",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "i will be ready in a few minutes",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "the evening feels much longer than the morning",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "please come back in about half an hour",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "we can finish the rest later tonight",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "is there time to rest before they come",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "i would rather do this in the morning",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "please give me five more minutes",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "the whole week has gone by already",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "wake me if i sleep past twelve",
+    "theme": "time-and-scheduling"
+   },
+   {
+    "text": "i am feeling much calmer this evening",
+    "theme": "feelings"
+   },
+   {
+    "text": "today has been a hard day for me",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am frustrated with myself again",
+    "theme": "feelings"
+   },
+   {
+    "text": "i feel a bit low this morning",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am grateful for everything you do",
+    "theme": "feelings"
+   },
+   {
+    "text": "i was worried when nobody came",
+    "theme": "feelings"
+   },
+   {
+    "text": "i feel better after talking with you",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am tired of lying here all day",
+    "theme": "feelings"
+   },
+   {
+    "text": "i felt proud of them yesterday",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am sorry for being difficult earlier",
+    "theme": "feelings"
+   },
+   {
+    "text": "i feel safe when you are here",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am happier than i was last week",
+    "theme": "feelings"
+   },
+   {
+    "text": "i get scared in the middle of the night",
+    "theme": "feelings"
+   },
+   {
+    "text": "i do not want to be a burden",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am trying to stay hopeful about this",
+    "theme": "feelings"
+   },
+   {
+    "text": "i felt lonely for most of the afternoon",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am glad the noise has stopped",
+    "theme": "feelings"
+   },
+   {
+    "text": "i feel embarrassed asking for so much",
+    "theme": "feelings"
+   },
+   {
+    "text": "today i actually feel like myself again",
+    "theme": "feelings"
+   },
+   {
+    "text": "i am at peace with how things are",
+    "theme": "feelings"
+   },
+   {
+    "text": "did the rain stop outside",
+    "theme": "questions"
+   },
+   {
+    "text": "who is coming to see me today",
+    "theme": "questions"
+   },
+   {
+    "text": "is the food ready yet",
+    "theme": "questions"
+   },
+   {
+    "text": "where did you put my glasses",
+    "theme": "questions"
+   },
+   {
+    "text": "how was the traffic this morning",
+    "theme": "questions"
+   },
+   {
+    "text": "are you getting enough sleep yourself",
+    "theme": "questions"
+   },
+   {
+    "text": "why is the house so quiet",
+    "theme": "questions"
+   },
+   {
+    "text": "did anyone remember to water the plants",
+    "theme": "questions"
+   },
+   {
+    "text": "what is that noise in the kitchen",
+    "theme": "questions"
+   },
+   {
+    "text": "can you stay a little longer tonight",
+    "theme": "questions"
+   },
+   {
+    "text": "how is your back feeling these days",
+    "theme": "questions"
+   },
+   {
+    "text": "is it warm enough outside for the balcony",
+    "theme": "questions"
+   },
+   {
+    "text": "did the letter arrive in the post",
+    "theme": "questions"
+   },
+   {
+    "text": "what did the doctor say about the results",
+    "theme": "questions"
+   },
+   {
+    "text": "are the children home from school yet",
+    "theme": "questions"
+   },
+   {
+    "text": "how much did all of this cost",
+    "theme": "questions"
+   },
+   {
+    "text": "is there anything i can do for you",
+    "theme": "questions"
+   },
+   {
+    "text": "did you eat something before you came",
+    "theme": "questions"
+   },
+   {
+    "text": "what is on the television this evening",
+    "theme": "questions"
+   },
+   {
+    "text": "will you be here again tomorrow morning",
+    "theme": "questions"
+   },
+   {
+    "text": "the weather looks lovely from this window",
+    "theme": "small-talk"
+   },
+   {
+    "text": "that bird has been singing all morning",
+    "theme": "small-talk"
+   },
+   {
+    "text": "you look tired today my friend",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the flowers on the table are beautiful",
+    "theme": "small-talk"
+   },
+   {
+    "text": "i like your new shirt very much",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the street outside is busier than usual",
+    "theme": "small-talk"
+   },
+   {
+    "text": "that was a funny thing to say",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the tea always tastes better in the evening",
+    "theme": "small-talk"
+   },
+   {
+    "text": "i heard the neighbors laughing earlier",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the sky was orange just before dark",
+    "theme": "small-talk"
+   },
+   {
+    "text": "you have been very kind this week",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the house feels different when it rains",
+    "theme": "small-talk"
+   },
+   {
+    "text": "that music brought back an old memory",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the cat has been sleeping all day",
+    "theme": "small-talk"
+   },
+   {
+    "text": "nothing much has happened since you left",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the days are getting warmer again",
+    "theme": "small-talk"
+   },
+   {
+    "text": "you always know how to make me smile",
+    "theme": "small-talk"
+   },
+   {
+    "text": "that story made me smile a lot",
+    "theme": "small-talk"
+   },
+   {
+    "text": "the room looks nicer with the flowers there",
+    "theme": "small-talk"
+   },
+   {
+    "text": "it is good to see your face",
+    "theme": "small-talk"
+   }
+  ],
+  "contextEvalSentences": [
+   {
+    "text": "please suction my throat now",
+    "register": "care"
+   },
+   {
+    "text": "my back is hurting again",
+    "register": "care"
+   },
+   {
+    "text": "the tube is uncomfortable today",
+    "register": "care"
+   },
+   {
+    "text": "i need to change my position",
+    "register": "care"
+   },
+   {
+    "text": "my legs feel very heavy",
+    "register": "care"
+   },
+   {
+    "text": "please raise the head of the bed",
+    "register": "care"
+   },
+   {
+    "text": "the mask is too tight",
+    "register": "care"
+   },
+   {
+    "text": "i am having trouble breathing",
+    "register": "care"
+   },
+   {
+    "text": "please check the ventilator settings",
+    "register": "care"
+   },
+   {
+    "text": "my mouth is very dry",
+    "register": "care"
+   },
+   {
+    "text": "where are the remaining people",
+    "register": "people"
+   },
+   {
+    "text": "please call my son",
+    "register": "people"
+   },
+   {
+    "text": "is my wife still here",
+    "register": "people"
+   },
+   {
+    "text": "tell the nurse i am fine",
+    "register": "people"
+   },
+   {
+    "text": "i want to see my grandchildren",
+    "register": "people"
+   },
+   {
+    "text": "ask the doctor to come tomorrow",
+    "register": "people"
+   },
+   {
+    "text": "thank you for staying with me",
+    "register": "people"
+   },
+   {
+    "text": "my brother is coming this evening",
+    "register": "people"
+   },
+   {
+    "text": "please open the window a little",
+    "register": "everyday"
+   },
+   {
+    "text": "the room is too cold",
+    "register": "everyday"
+   },
+   {
+    "text": "i would like some water",
+    "register": "everyday"
+   },
+   {
+    "text": "please turn off the television",
+    "register": "everyday"
+   },
+   {
+    "text": "what time is it now",
+    "register": "everyday"
+   },
+   {
+    "text": "i am feeling much better today",
+    "register": "everyday"
+   },
+   {
+    "text": "please put my phone near me",
+    "register": "everyday"
+   },
+   {
+    "text": "the food was very good",
+    "register": "everyday"
+   },
+   {
+    "text": "the story of my life is interesting",
+    "register": "reflective"
+   },
+   {
+    "text": "i have been thinking about my childhood",
+    "register": "reflective"
+   },
+   {
+    "text": "this has been a difficult year for everyone",
+    "register": "reflective"
+   },
+   {
+    "text": "i am grateful for everything you have done",
+    "register": "reflective"
+   },
+   {
+    "text": "the weather today is beautiful",
+    "register": "reflective"
+   },
+   {
+    "text": "i remember that day very clearly",
+    "register": "reflective"
+   },
+   {
+    "text": "life is still worth living",
+    "register": "reflective"
+   },
+   {
+    "text": "the news this morning was terrible",
+    "register": "reflective"
+   },
+   {
+    "text": "i am proud of what you have become",
+    "register": "reflective"
+   },
+   {
+    "text": "it was a wonderful evening",
+    "register": "reflective"
+   },
+   {
+    "text": "where are the remaining tablets",
+    "register": "question"
+   },
+   {
+    "text": "when is the doctor coming",
+    "register": "question"
+   },
+   {
+    "text": "how long will this take",
+    "register": "question"
+   },
+   {
+    "text": "why is the machine beeping",
+    "register": "question"
+   },
+   {
+    "text": "can you please help me",
+    "register": "question"
+   },
+   {
+    "text": "did you speak to the nurse",
+    "register": "question"
+   },
+   {
+    "text": "what did the report say",
+    "register": "question"
+   },
+   {
+    "text": "are you leaving now",
+    "register": "question"
+   }
+  ]
+ },
+ "heldOut": {
+  "aacEvalSentences": [
+   "need change clothes for dinner",
+   "what is happening there",
+   "i want to goto my friend's home drop me there",
+   "i want some bacon for breakfast",
+   "please pass the water",
+   "that movie was a real let down",
+   "please apply some lotion on my hand it hurts too much",
+   "this room stinks can you open the windows",
+   "get me my ipod i am in the mood of some music",
+   "why isn't tom back from work",
+   "could i have some milk please",
+   "what did the doctor say",
+   "my arm hurts",
+   "i had a great time",
+   "can you fasten the windows",
+   "please pick up some toothpaste",
+   "the tv is too loud",
+   "great to see you",
+   "i really appreciate what you did yesterday",
+   "this hard to use",
+   "i smell something bad",
+   "think positively and do good",
+   "would you like to go out to lunch with me",
+   "where is ma",
+   "i am not very hungry",
+   "i can do it by myself",
+   "please check my mailbox",
+   "i am angry",
+   "where can we go today",
+   "i am very busy today",
+   "want to go to beach",
+   "can we go to the store",
+   "is my boss thinking about firing me",
+   "the drain is choked call a plumber",
+   "i need help with this",
+   "i appreciate your help",
+   "i had a good time",
+   "wen can we go home",
+   "its pretty good",
+   "my phone is broken",
+   "can you please let the dog out",
+   "be home by midnight",
+   "it is hard for me to communicate",
+   "will you find my keys",
+   "i am sorry but i do not feel well",
+   "doctor can i go and watch the gunners match this sunday",
+   "can you take me to barber shop for a haircut",
+   "could you turn on the television please",
+   "mom i know how sad you are",
+   "let's meet saturday",
+   "what is it like there and how much care do they offer",
+   "let me know when you finish",
+   "how is your uncle john doing",
+   "please call to make my appointment",
+   "friends do not take you life for granted",
+   "i think he is cute",
+   "i can't get this open",
+   "i feel weak",
+   "will you push me over by the window",
+   "will sarah come today",
+   "i use this to talk for me",
+   "happy hour tonight",
+   "what would you like to do tonight",
+   "i have lost my senses",
+   "what are you cooking",
+   "we are out of orange juice",
+   "everything is great",
+   "it's so nice of you to visit",
+   "i need to stretch my muscles",
+   "the weather is getting real nice",
+   "i cannot speak because of my condition",
+   "thankfully i have this device",
+   "please come to my home i am feeling lonely",
+   "hope i get better",
+   "i doubt that very seriously",
+   "want to rest",
+   "you should come and visit soon",
+   "well dad i could really use a drink about now",
+   "you look great",
+   "don't forget to feed the cats",
+   "i would like to charge this",
+   "today is my anniversary",
+   "don't forget the keys",
+   "i cannot speak because of an accident",
+   "my feet are cold",
+   "check whether they deliver to uk",
+   "i need to get gas in my car",
+   "can i have a coke",
+   "that girl over there is so hot",
+   "i wonder if i can get her number",
+   "i get disoriented after my morning dosage please check with my doctor",
+   "miss can you help me",
+   "i am with you",
+   "it is almost noon",
+   "where can we go",
+   "i have been very bored all day",
+   "what is the name on the card",
+   "i don't like that",
+   "i want a sandwich",
+   "did you buy a new coat",
+   "call me when you get there",
+   "can you read the letter aloud",
+   "will i be able to claim accident insurance",
+   "i enjoy speaking with you",
+   "please repeat what you just told me",
+   "let's go for a dinner",
+   "i need to replace satellite we keep losing the signal",
+   "could you scratch my back",
+   "i am too cold",
+   "i cannot wait to see you again",
+   "hey dude when you will reach my home",
+   "did you inform my boss about the accident",
+   "i am thinking about the situation",
+   "i am hungry give me some food",
+   "i am thirsty bring me a glass of water",
+   "i was born this way",
+   "i would like to watch a movie",
+   "can you bring me the cat",
+   "it is a nice hotel",
+   "when you go to the store today get me some candy",
+   "i can't eat this",
+   "can you give me a hand",
+   "will you bring my earphones when you visit next time",
+   "ok i bring for you",
+   "how many bottles",
+   "don't go there",
+   "do the search",
+   "i will be home after dark",
+   "turn the light off when you leave the room",
+   "okay i will go",
+   "you are incorrect",
+   "wow that's nice",
+   "where are we going today",
+   "can you drive me to the store",
+   "i need a drink of water",
+   "can you put a stamp on the letter and post it",
+   "would you like to eat with me",
+   "tell them hi",
+   "can you get me some coffee",
+   "is anyone visiting today",
+   "have a good night",
+   "how can you highlight a letter when you can touch nothing and cannot move",
+   "it was nice to meet you",
+   "pass the sugar please",
+   "why is that bill so high",
+   "hey bro how is school going",
+   "please be quit",
+   "my jokes are kinda flat nowdays ha ha ha",
+   "i'd like to get a fill up",
+   "wait a minute we need to decide things",
+   "i did a lot today",
+   "what time is the doctor coming by",
+   "can i offer a drink",
+   "hello my owners name is sean",
+   "i want one too",
+   "i'm glad you came over",
+   "are you coming tomorrow",
+   "my feet have gone numb",
+   "thank you for everything you've done for me",
+   "i will never forget you",
+   "can i have something else to eat",
+   "i am on leave",
+   "i want to hear songs",
+   "need to be alone",
+   "how long until i can talk or type again",
+   "can you fix this",
+   "would you bring me a sweater",
+   "will you turn the television up louder",
+   "is it raining",
+   "this has too many spices",
+   "when do your holidays begin",
+   "when is my next surgery",
+   "my favorite tv show has been cancelled",
+   "i am so sad",
+   "i feel drowsy",
+   "please read the newspaper",
+   "can you check and get tickets for the new movie",
+   "did you ring up the plumber",
+   "i will drive her there",
+   "how are you feeling",
+   "i woke up early this morning",
+   "help me really quick",
+   "have you seen my glasses",
+   "clean the room",
+   "doctor is on his way",
+   "it is fairly inconvenient",
+   "i will not be able to go",
+   "where is the child",
+   "it is a wonderful day today",
+   "how long wil i b like this",
+   "where is the remote control",
+   "was nice to meet you",
+   "where did they go",
+   "tell them i said hi",
+   "please excuse me",
+   "where is my blue shirt",
+   "sometimes i cant communicate what i think",
+   "how much longer until i can type again",
+   "that performance was great",
+   "i did it by mistake",
+   "i am very bored and need something to do",
+   "how was the show",
+   "will you call my husband",
+   "will you adjust my bed up a little bit",
+   "did you bring some new books",
+   "can i have the newspaper",
+   "ring up the cleaning lady and ask her to come tomorrow",
+   "do you have a plan",
+   "there is no cure",
+   "i need a doctor's appointment",
+   "i am proud of you",
+   "can i use the computer",
+   "i have headache",
+   "that's the best thing you can do",
+   "that shirt doesn't match",
+   "do we go for the tests today",
+   "i feel scared",
+   "had a nightmare",
+   "can you send an e card to my cousin",
+   "no i do not want any",
+   "no worries his time this device is performing well",
+   "could you make a call for me",
+   "can you bring me outside",
+   "i need my coat",
+   "put on the ac",
+   "i am very hungry",
+   "bring me my cell phone",
+   "i have to go to the doctor tomorrow",
+   "water source is less",
+   "i do not know",
+   "the building was on fire last night",
+   "can you change the sheets they stink",
+   "i need you to pick up my medication at the store",
+   "smells like your cooking chicken tonight",
+   "i am voting for todd",
+   "are you going to tell your parents about the accident",
+   "i can't wait to see her",
+   "meet me in home",
+   "i have sen a beautiful new car outside is it yours",
+   "it sure has been a cold nasty winter",
+   "i am in pain and need to see the doctor",
+   "could i get a drink of water please",
+   "pleased to meet you too",
+   "i would like some more coffee please",
+   "help me to wear this",
+   "i would like cereals for breakfast",
+   "the answer is final",
+   "need my medicine",
+   "is someone sitting here",
+   "are you cooking tonight",
+   "my hand itches a lot please help me",
+   "get me another pillow i can't see the tv screen",
+   "when is dinner going to be served",
+   "give me first aid",
+   "finally i will be cured tell everyone the good news",
+   "i lost my cell phone",
+   "is it too late to get tickets for the movie",
+   "the dog looks hungry",
+   "yes i like that",
+   "who won today's match",
+   "did they like your proposal",
+   "thank you for showing so much care",
+   "its really freaking",
+   "i wish i did not have to use this device",
+   "i need to rest now",
+   "what do they have left to do in planning the wedding",
+   "who is coming to visit",
+   "is it time for my medicine",
+   "what happened with your poker game",
+   "can you hand me that book",
+   "i wish i could speak to you",
+   "want to wash laundry",
+   "nice to meet you too",
+   "sorry bout this",
+   "can i get meds",
+   "obama can take this healthcare plan and shove it",
+   "do you love me",
+   "can i have an extra pillow",
+   "mum you're so embarrassing stop fussing over me",
+   "how horrible accident was",
+   "love you too",
+   "what is the weather today",
+   "everything is going to be fine",
+   "we need to get ready for the storm",
+   "i have a hard time getting around",
+   "can we go sit in the sun",
+   "did you get it in the mail yet",
+   "let's go for a walk",
+   "you know what i am thining",
+   "did your basketball team win its game yesterday",
+   "i miss the kids",
+   "i am glad that you all can understand what i am trying to say",
+   "turn off tv",
+   "please get me something to drink",
+   "thank you for the card you sent",
+   "i am working",
+   "what time is this",
+   "what did my boss say when you gave the news",
+   "has sarah agreed to tracy's proposal",
+   "please pass me the water i'm parched",
+   "please call a taxi",
+   "i'd like to listen to music",
+   "from where you came now",
+   "will you come visit me this friday",
+   "keep doing the positive good",
+   "how is your mom now i heard she wsa ill",
+   "doctor i don't have any sensation in my hands",
+   "i feel happy today",
+   "i need my medications",
+   "dad i am fine",
+   "i have to go to the bathroom",
+   "can you inform sarah and ask her to visit me",
+   "why can't i use my hands",
+   "where am i at",
+   "that could go very wrong",
+   "when does church begin",
+   "right leg hurts",
+   "you are very nice",
+   "have you watered the plants",
+   "am i too early",
+   "have a nice day ahead",
+   "thanks for loving me so much",
+   "is stacy coming this weekend",
+   "how much is that",
+   "will my wheelchair fold properly",
+   "hang out sometime",
+   "do your job",
+   "i am feeling cold give me a blanket",
+   "this is the great book i have been reading",
+   "please check the fridge and get some provisions",
+   "where is bro tell him i am fine",
+   "you sure look nice today betty",
+   "my name ralph i am forty",
+   "can you bring the dog to me",
+   "i want to love you",
+   "where is a bathroom",
+   "can we shop together online",
+   "supposedly i can go home in a week guys",
+   "when is the surgery scheduled",
+   "do you feel pain",
+   "please pass the food",
+   "can i sit out in the sun",
+   "i love to go to downtown",
+   "i would like something sweet",
+   "i would love to sit in the sun",
+   "is lucy here",
+   "what breed is she",
+   "can you itch my left arm for me",
+   "i want some pizza",
+   "i hit the buttons and it talks",
+   "long time no see",
+   "who are you going to vote for in november",
+   "i am waiting for your call",
+   "will i be able to sit for the exams",
+   "dog is outside",
+   "everybody please calm down",
+   "try to understand problem",
+   "have a nice day",
+   "i don't know how to use this",
+   "i have to get some rest",
+   "pull the blinds down the sun is to bright",
+   "can't get up",
+   "please help me choose a gift for my sister",
+   "i don't know if i can",
+   "it is too hot in here",
+   "i could really use a beer want to go to the bar",
+   "submit application today",
+   "need to go to store",
+   "give me your phone",
+   "it is too cold in here",
+   "mom please do t cry",
+   "i would like to read a new book",
+   "do me a favor",
+   "come over here and give me a hug",
+   "will you help me look for my cell phone",
+   "now i am used to this device",
+   "can you come to the party",
+   "i need some new clothes",
+   "i think i'll take a nap",
+   "i am getting thirsty",
+   "i want to read something",
+   "i care about you very much",
+   "are you going to the school reunion",
+   "i am happy",
+   "my head stomach chest hurts",
+   "i want water",
+   "is it time for my medicines",
+   "i think you forgot your purse",
+   "can you take me to the physiotherapist",
+   "i hope you are having a good time",
+   "this device will speak for me",
+   "i can't talk",
+   "it was a very good way to go",
+   "do you working",
+   "how was ur day",
+   "do you know of any good doctors",
+   "is the doctor ready to see me",
+   "can i play football again",
+   "can i have a piece of paper",
+   "will you get my reports and deliver them to my doctor",
+   "can you bring my slippers",
+   "may i join you",
+   "please lock the safe",
+   "i missed the program",
+   "i am taking good care of myself",
+   "can you put the baseball game on the tv",
+   "can have a drink of water",
+   "it doesn't feel right",
+   "when do the tests start",
+   "can you let the dog out",
+   "i could meet with you later",
+   "want to go out for dinner tomorrow",
+   "i will gladly help",
+   "i am going for a walk",
+   "i'm glad you're willing to help me",
+   "please put out the garbage",
+   "do you found the flash light",
+   "are sam and sarah still together",
+   "looks like its going to be a beautiful day",
+   "sure i will visit you tomorrow morning",
+   "can you go get me a newspaper",
+   "the concert last night rocked",
+   "thanks for taking me",
+   "i cant hear you speak loudly",
+   "don't worry evrything will be alright",
+   "i forgot the noodles",
+   "what are we eating for dinner tonight",
+   "when is my next appointment",
+   "i need to scratch my eye",
+   "did you hear that",
+   "can you ask the doctor to send me a helper",
+   "we can go together",
+   "i miss singing",
+   "jack can you stop that right now",
+   "i need a new job",
+   "let's not panic",
+   "the menu please",
+   "maybe you should leave",
+   "i'm not sure if that would work",
+   "she irritates me",
+   "thanks thanks so much",
+   "off to see the wizard",
+   "i just got a part time job working from home",
+   "i am so excited",
+   "i am very sorry don't be mad at me",
+   "can i have some chilled water please",
+   "how is your wife",
+   "it costs a dollar",
+   "i would like to meet you soon again",
+   "do you know a lot about electronics",
+   "go outside for sometime",
+   "how about a game of risk",
+   "could i have something to drink please",
+   "is the wedding date fixed",
+   "this is boring",
+   "can you pick my daughter from college",
+   "this meal is fine but i would like some salt",
+   "i am so glad you liked it",
+   "can i have a tissue",
+   "lets go to the fair tonite",
+   "keep it a secret untill i tell you",
+   "my car engine knocks",
+   "i hope to take a vacation in the spring with my sister",
+   "i like this shirt",
+   "it is hot outside",
+   "will i get back to normal before my birthday",
+   "time is it",
+   "thanks a lot i too like tis dress so much",
+   "can you bring my jacket",
+   "too warm in here",
+   "this is my moment",
+   "do we have any cereal",
+   "i don't like this",
+   "have you seen my new car yet",
+   "it's time for me to go now",
+   "where can i get the forms",
+   "i am tired and want to sit down",
+   "i don't know what to buy for her",
+   "she said she'll will prepare dinner for me",
+   "everything will work out",
+   "my sneakers are full of holes",
+   "when will we meet again",
+   "can you lend me a hand",
+   "she likes you",
+   "heather you are so clumsy",
+   "could you please help me",
+   "i think i have cold feet",
+   "i am looking into finding a special dog to adopt",
+   "it is very hot",
+   "do you want an aspirin",
+   "ok what time",
+   "it's better this way",
+   "you look beautiful",
+   "hey suzie did you go to work today",
+   "it's not worth worrying about",
+   "are you getting bored here",
+   "mum what's for dinner",
+   "where is restroom",
+   "simple and easy",
+   "can we go to the book store",
+   "awesome painting really",
+   "the room is dark",
+   "they are adorable",
+   "that really didn't turn out too well",
+   "could you help me get dressed",
+   "it was so beautiful",
+   "no she cant do this",
+   "i was up late last night",
+   "you should work hard",
+   "i miss my family",
+   "an extra pillow would be nice",
+   "didn't you notice the time",
+   "can you call my mom",
+   "i will respond yes or no",
+   "tell me the truth",
+   "i must not have slept enough",
+   "this too bad",
+   "what music do you like",
+   "i need pain medication my leg hurts a lot",
+   "did you check my mailbox",
+   "when is registration due",
+   "i need a drink",
+   "i thought of you instantly",
+   "i want to thank you",
+   "please take this i want you to have it",
+   "do you like this song",
+   "the kitchen is through that door",
+   "i can't get this song out of my mind",
+   "did you bet on the match",
+   "turn off the computer",
+   "have you heard of him",
+   "see you soon",
+   "i have arrived where are you",
+   "can i get up",
+   "how is mom",
+   "new audio books",
+   "lost my bracelet round here",
+   "tell me your news",
+   "the door is open",
+   "would you please open the door i am hot",
+   "i have an appointment coming up",
+   "can you do me a favour",
+   "you were looking so angry the other day",
+   "can you get me some good movies and music",
+   "i need you over here",
+   "could you open the door please",
+   "do you understand",
+   "can we go jogging",
+   "can you bring me something back",
+   "sorry but i don't have recognized you",
+   "what took you so long",
+   "i'm not so sure about that",
+   "can you bring me a sweater",
+   "go call your father",
+   "i like the way you talk",
+   "please make a list of things to get from the store",
+   "my leg is hurting take me to doctor",
+   "this tea is refreshing",
+   "it makes sense to switch",
+   "the tv screen is tilted the wrong way",
+   "want to play a game",
+   "what is wrong with you",
+   "when will you return",
+   "you're making me blush",
+   "what do you wish",
+   "did you saw her in this week",
+   "i need to go the library",
+   "i still take two pills daily",
+   "where is ben",
+   "i want to watch tv",
+   "he's doing well",
+   "he about to start school soon",
+   "the cookout is tomorrow",
+   "dad can we go out to the park this afternoon",
+   "we can have fun",
+   "lets walk the dog",
+   "put my shoes below the table",
+   "when did the cat get out",
+   "latte is my favorite",
+   "i want to go out in the evening am getting bored out here",
+   "i'm getting a headache",
+   "join me for coffee later",
+   "would you keep quite please",
+   "is there a new book to read",
+   "i will have guests over tonight",
+   "inform me again",
+   "please close the shades",
+   "my arm is sore",
+   "please i need your help",
+   "hey soph how was your day",
+   "come home dear lets chat",
+   "i need a haircut",
+   "please take care",
+   "are you done with dinner",
+   "i'll never party again",
+   "when is the funeral",
+   "could i get some oj",
+   "you know you didn't have to help me",
+   "bring me a glass of water",
+   "help me wear my shoes",
+   "let me think about it",
+   "can we go to the park",
+   "where is dr hart",
+   "don't close those curtains yet",
+   "don't worry about the mess",
+   "spur of the moment",
+   "i loved this book",
+   "wanna go out",
+   "cat got out again",
+   "drop this off later ok",
+   "i feel fortunate to have you as my friend",
+   "where is you car",
+   "that girl looks beautiful",
+   "did you get the keys to the car",
+   "can i borrow your phone",
+   "please turn on the overhead lights",
+   "you should give her a moment",
+   "how is this dress",
+   "give me some junk food i am tired of all this hospital stuff",
+   "i will be waiting for you",
+   "my friends broke up with each other",
+   "let's not make this about you",
+   "lets go the park today",
+   "glad you came",
+   "i really do care",
+   "she has a great smile",
+   "you should give it a try",
+   "it was fun",
+   "have you seen my cell phone",
+   "let's see it",
+   "close the window too much light is coming",
+   "hope is all we have",
+   "i want to tell you something",
+   "thank you for all of the volunteer work you did last week",
+   "is there any news yet",
+   "it is time to get ready to go",
+   "my feet are numb",
+   "traveling sounds like a great plan",
+   "are you married",
+   "please put a pillow under my feet",
+   "need help stretching",
+   "i'm doing okay",
+   "can we go out for a drive",
+   "could you read me another story",
+   "can you put on the football game",
+   "it looks different now a days",
+   "when do we eat",
+   "will you get me some aspirin i have a headache",
+   "i enjoyed going to the park yesterday with some very good friends",
+   "yes what would you like to eat",
+   "how is your day going",
+   "lets have lunch",
+   "cool website bro",
+   "dont worry i will be okay soon",
+   "what have you been up to lately",
+   "do i know you from somewhere",
+   "can you meet me at the coffeeshop",
+   "do you like sports",
+   "looking for a good eatery",
+   "do you know of one close by",
+   "i need my medicine",
+   "i want to go play with my friends",
+   "do you have any plans for tomorrow",
+   "hannah can you pass me that bag of chips",
+   "tell me what you heard",
+   "will i be discharged soon",
+   "what's wrong with the bell",
+   "i need that dress for tomorrow",
+   "reach for more",
+   "i'd like to go out later",
+   "can i help you",
+   "that's a great point of view",
+   "my back is sore please help me to sit up",
+   "the carpenter is coming to put in my wheel ramps on thursday",
+   "why are you so late",
+   "who is driving",
+   "mom please help me to get to the grocery store this week",
+   "need help standing",
+   "do you understand me",
+   "you ask me questions",
+   "i will try to come there",
+   "the plumber is coming later",
+   "okay that is fine",
+   "did you convey the message to my sister",
+   "find a comfortable bed for me",
+   "i need my medication",
+   "long one looks better",
+   "i am very grateful",
+   "it's been a long time",
+   "i want to leave",
+   "hows it goin",
+   "will you please turn off the lights",
+   "that blouse is lovely",
+   "can you go with me",
+   "i would like some fresh fruit",
+   "i think that would be fine",
+   "are you buying a new car",
+   "it should work out fine",
+   "i feel sorry for her",
+   "give me message",
+   "i need to be alone now",
+   "your phone is ringing",
+   "do you feel better",
+   "keep it up",
+   "what is the next step",
+   "please take care of my dog at home while i'm in this state",
+   "can i claim personal injury",
+   "that might just work",
+   "who are you",
+   "do you think i look good",
+   "please don't leave me alone",
+   "which road do i take",
+   "do you like my outfit",
+   "how is the weather",
+   "its nice to be with you",
+   "i need to mail this",
+   "hey thanks for coming here",
+   "you did a fine job",
+   "i think it's my bed time",
+   "this special devise is easy to use once you get used to it",
+   "i knew you would never disheart me",
+   "hey georgie you look pretty today",
+   "i love your makeup",
+   "you should eat healthier",
+   "i'm going to the doctor's",
+   "i want to get well soon",
+   "i would appreciate it if you would stay here",
+   "did you call the theater",
+   "i should have cared much",
+   "milk no sugar",
+   "i'm cold can i get an extra blanket",
+   "i like this",
+   "how was your weekend",
+   "can you borrow me some money",
+   "i think i need some help",
+   "can i help",
+   "we should do this often",
+   "i'm unable to meet today",
+   "e mail me",
+   "my dog is amazing",
+   "i a so glad you came",
+   "that's fine with me",
+   "can i have a burger",
+   "try to be positive",
+   "please let me know",
+   "movie time again",
+   "can you mail this for me",
+   "i have to pee",
+   "what is the total",
+   "want to eat",
+   "i would like to go the library",
+   "any medical breakthrough",
+   "i need to turn in this application",
+   "i like it very much",
+   "what time does the bus come",
+   "can you take me along yourself",
+   "please turn on tv i am getting bored",
+   "did you get my clothes from the laundry",
+   "would you type an email for me",
+   "please get food",
+   "what is your phone number",
+   "join me at the club later",
+   "do you know where is my medicine",
+   "lets sit the porch awhile",
+   "i feel bad",
+   "you are a very special person",
+   "i don't want to go to school",
+   "i'm not sure how to get there will you pick me up",
+   "i think the water is too cold",
+   "itch between shoulders",
+   "what on earth are you doing joanna",
+   "isn't that boring",
+   "why is that happening",
+   "i don't have any sensation in my leg",
+   "my muscles are sore today",
+   "are you serious",
+   "i love you very much also",
+   "does it contain soya",
+   "let me help you",
+   "there is no time to see her",
+   "do i have physical therapy today",
+   "my nose itches",
+   "were are you now",
+   "i feel lonely",
+   "i think you need a psychiatrist",
+   "please kill me",
+   "i need a new car",
+   "you are the best friend",
+   "where is tommy",
+   "can you take my to shopping mall",
+   "i have to buy new clothes",
+   "a new job can be exciting",
+   "i would have loved to go but the rain kept me inside all weekend",
+   "would you like to go out",
+   "can you fix the computer for me",
+   "i love you all very much",
+   "are you enjoying",
+   "i need you to get me something",
+   "ryan is bein a jerk",
+   "i need to have dinner after work",
+   "i need the bathroom",
+   "how is everyone doing at home",
+   "i need a ticket",
+   "did you see the new car i bought",
+   "any new movie worth watching",
+   "i wish you too could be there",
+   "please tell me honestly",
+   "do you know where my shoes are",
+   "can you rub my shoulder",
+   "that's not right",
+   "give me the keys now",
+   "did you speak to the doctor",
+   "please read loudly i cant hear",
+   "are you leaving soon",
+   "i need you to trust me",
+   "we can pray now",
+   "can you tell me the final report",
+   "please come near me",
+   "best to do",
+   "i got married yesterday",
+   "i've been waiting for you",
+   "lets go somewhere",
+   "ok but why",
+   "are you exciting about the new career",
+   "talk to me",
+   "sure take it until i get fine",
+   "edward you have been playing that game all day",
+   "can you carry the package",
+   "can you get the door",
+   "get a pic",
+   "did she call you too",
+   "i think you did a really good job",
+   "everyone has been so helpful",
+   "i really appreciate it",
+   "things are a bit hectic",
+   "left your game by the tv",
+   "i need pain meds",
+   "how do i look"
+  ],
+  "independentTatoeba": [
+   {
+    "sourceId": 27708,
+    "owner": "CM",
+    "sentence": "i'm coming with you",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 2,
+    "targetOffset": 1,
+    "target": "with",
+    "acceptableAlternatives": [
+     "home",
+     "back"
+    ]
+   },
+   {
+    "sourceId": 71055,
+    "owner": "CK",
+    "sentence": "i'll tell you about my father",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "father",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 254533,
+    "owner": "CK",
+    "sentence": "i must open the window",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 4,
+    "targetOffset": 0,
+    "target": "window",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 255977,
+    "owner": "CK",
+    "sentence": "i remember seeing you before",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 4,
+    "targetOffset": 0,
+    "target": "before",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 304849,
+    "owner": "CK",
+    "sentence": "he didn't stop talking",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 2,
+    "targetOffset": 1,
+    "target": "stop",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 311618,
+    "owner": "CK",
+    "sentence": "she is having dinner now",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 4,
+    "targetOffset": 0,
+    "target": "now",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 881793,
+    "owner": "CK",
+    "sentence": "lunch is at noon",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "noon",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1441423,
+    "owner": "quickfitter",
+    "sentence": "he's worried about the result",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 3,
+    "targetOffset": 1,
+    "target": "the",
+    "acceptableAlternatives": [
+     "my",
+     "your",
+     "this"
+    ]
+   },
+   {
+    "sourceId": 1553531,
+    "owner": "CK",
+    "sentence": "can i make you a drink",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "you",
+    "acceptableAlternatives": [
+     "him",
+     "her"
+    ]
+   },
+   {
+    "sourceId": 2044420,
+    "owner": "CK",
+    "sentence": "i'm happy to wait",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "wait",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2291407,
+    "owner": "CK",
+    "sentence": "i didn't think you were coming",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "were",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2308115,
+    "owner": "CK",
+    "sentence": "i could have lost my job",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "job",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2361324,
+    "owner": "CK",
+    "sentence": "i don't like not being liked",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "being",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2406328,
+    "owner": "CK",
+    "sentence": "i should get home",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 1,
+    "targetOffset": 2,
+    "target": "should",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2458225,
+    "owner": "CK",
+    "sentence": "don't ask me such difficult questions",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "such",
+    "acceptableAlternatives": [
+     "those",
+     "these"
+    ]
+   },
+   {
+    "sourceId": 2647834,
+    "owner": "CK",
+    "sentence": "we need a new plan",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 3,
+    "targetOffset": 1,
+    "target": "new",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2713494,
+    "owner": "CK",
+    "sentence": "are you really a doctor",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 0,
+    "target": "doctor",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2785008,
+    "owner": "CM",
+    "sentence": "i fell in love with him",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "him",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2818769,
+    "owner": "CH",
+    "sentence": "do you love him",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "question",
+    "theme": "feelings",
+    "targetIndex": 1,
+    "targetOffset": 2,
+    "target": "you",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2867344,
+    "owner": "CK",
+    "sentence": "it's pouring down rain",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 2,
+    "targetOffset": 1,
+    "target": "down",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3150363,
+    "owner": "CK",
+    "sentence": "we need to buy some time",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "time",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3154901,
+    "owner": "CK",
+    "sentence": "am i supposed to eat this",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "eat",
+    "acceptableAlternatives": [
+     "do",
+     "drink",
+     "have"
+    ]
+   },
+   {
+    "sourceId": 3314978,
+    "owner": "CK",
+    "sentence": "i'm not a big tv watcher",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "big",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3328456,
+    "owner": "CK",
+    "sentence": "can you come over tonight",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "come",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3408256,
+    "owner": "Hybrid",
+    "sentence": "i ate a salad for lunch",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "lunch",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3729875,
+    "owner": "CM",
+    "sentence": "think about your family",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "family",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3737077,
+    "owner": "CK",
+    "sentence": "we'd better wait until tomorrow",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "wait",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3823000,
+    "owner": "CK",
+    "sentence": "all right i'm listening",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 1,
+    "targetOffset": 2,
+    "target": "right",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3905464,
+    "owner": "CH",
+    "sentence": "i told her to stay indoors",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "indoors",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 4012324,
+    "owner": "CK",
+    "sentence": "what are you guys doing tonight",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "tonight",
+    "acceptableAlternatives": [
+     "today",
+     "tomorrow"
+    ]
+   },
+   {
+    "sourceId": 4915838,
+    "owner": "CK",
+    "sentence": "i think we're getting better",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 4,
+    "targetOffset": 0,
+    "target": "better",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5325988,
+    "owner": "mailohilohi",
+    "sentence": "tell me the good news first",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "news",
+    "acceptableAlternatives": [
+     "story",
+     "part"
+    ]
+   },
+   {
+    "sourceId": 5473707,
+    "owner": "CK",
+    "sentence": "get back to work right away",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "work",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5474678,
+    "owner": "CK",
+    "sentence": "perhaps it'll rain tomorrow",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "tomorrow",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5642764,
+    "owner": "CK",
+    "sentence": "i remember playing with those",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "playing",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5741266,
+    "owner": "CM",
+    "sentence": "i read anything i can get",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "get",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5850790,
+    "owner": "CK",
+    "sentence": "i chose to wait",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 1,
+    "targetOffset": 2,
+    "target": "chose",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5858558,
+    "owner": "CK",
+    "sentence": "i think i'm smart",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "smart",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6262870,
+    "owner": "CK",
+    "sentence": "i hope to live there someday",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "there",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6274442,
+    "owner": "CK",
+    "sentence": "i didn't feel cold",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 1,
+    "targetOffset": 2,
+    "target": "didn't",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6363041,
+    "owner": "Hybrid",
+    "sentence": "some things can't be rushed",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "can't",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6372952,
+    "owner": "CarpeLanam",
+    "sentence": "this tree will never bear fruit",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "fruit",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6532403,
+    "owner": "CK",
+    "sentence": "is your car blue",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "blue",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6665978,
+    "owner": "CK",
+    "sentence": "please turn the radio off",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 3,
+    "targetOffset": 1,
+    "target": "radio",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6691437,
+    "owner": "Hybrid",
+    "sentence": "the room was dimly lit",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "was",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7158315,
+    "owner": "Sleekkat",
+    "sentence": "check if everything is correct",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "everything",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7492834,
+    "owner": "CK",
+    "sentence": "this room isn't very large",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "isn't",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8244252,
+    "owner": "CK",
+    "sentence": "can you play the saxophone too",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "the",
+    "acceptableAlternatives": [
+     "a",
+     "this"
+    ]
+   },
+   {
+    "sourceId": 8330275,
+    "owner": "CK",
+    "sentence": "i thought you already knew that",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "that",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8354703,
+    "owner": "shekitten",
+    "sentence": "not everyone is going to understand",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "understand",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8422650,
+    "owner": "deniko",
+    "sentence": "the door was closing",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 2,
+    "targetOffset": 1,
+    "target": "was",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8684054,
+    "owner": "Hybrid",
+    "sentence": "life is short and precious",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "short",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8841479,
+    "owner": "CK",
+    "sentence": "i want to buy this one",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "this",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8951019,
+    "owner": "CK",
+    "sentence": "why don't you just stop talking",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "people",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "stop",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9089132,
+    "owner": "CK",
+    "sentence": "it was a very hot night",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "very",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9309027,
+    "owner": "CK",
+    "sentence": "don't be deceived my dear friends",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "friends",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9366273,
+    "owner": "CK",
+    "sentence": "why can't i stay here",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 3,
+    "targetOffset": 1,
+    "target": "stay",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9494138,
+    "owner": "sundown",
+    "sentence": "you'll have to walk",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "walk",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9505441,
+    "owner": "CK",
+    "sentence": "we want to start a family",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "start",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9628371,
+    "owner": "CK",
+    "sentence": "do you want some more soup",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "soup",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9807684,
+    "owner": "CK",
+    "sentence": "it's really hot outside right now",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "outside",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9823437,
+    "owner": "CK",
+    "sentence": "this isn't something you can buy",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "can",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9831173,
+    "owner": "Amastan",
+    "sentence": "elephants drink large amounts of water",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "amounts",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10330885,
+    "owner": "CK",
+    "sentence": "today i turn thirty years old",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "thirty",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10511189,
+    "owner": "CK",
+    "sentence": "that'll be all for today",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "all",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10540897,
+    "owner": "CK",
+    "sentence": "you can't control everybody",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 3,
+    "targetOffset": 0,
+    "target": "everybody",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10732693,
+    "owner": "CK",
+    "sentence": "yesterday was very hot and humid",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 4,
+    "targetOffset": 1,
+    "target": "and",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11038655,
+    "owner": "sundown",
+    "sentence": "it's going well today",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 2,
+    "targetOffset": 1,
+    "target": "well",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11070803,
+    "owner": "carlosalberto",
+    "sentence": "some people don't eat eggs",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 2,
+    "targetOffset": 2,
+    "target": "don't",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11160044,
+    "owner": "sundown",
+    "sentence": "can you describe exactly what happened",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "exactly",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11885975,
+    "owner": "sundown",
+    "sentence": "i've spoken to some friends",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 3,
+    "targetOffset": 1,
+    "target": "some",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11922396,
+    "owner": "CK",
+    "sentence": "are you not a doctor",
+    "lengthBand": "short",
+    "wordCount": 5,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 0,
+    "target": "doctor",
+    "acceptableAlternatives": [
+     "nurse",
+     "patient"
+    ]
+   },
+   {
+    "sourceId": 12317491,
+    "owner": "CK",
+    "sentence": "would you like some time alone",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "feelings",
+    "targetIndex": 5,
+    "targetOffset": 0,
+    "target": "alone",
+    "acceptableAlternatives": [
+     "away",
+     "today"
+    ]
+   },
+   {
+    "sourceId": 12528984,
+    "owner": "CK",
+    "sentence": "did you talk with the doctor",
+    "lengthBand": "short",
+    "wordCount": 6,
+    "sentenceType": "question",
+    "theme": "people",
+    "targetIndex": 3,
+    "targetOffset": 2,
+    "target": "with",
+    "acceptableAlternatives": [
+     "to",
+     "about"
+    ]
+   },
+   {
+    "sourceId": 13214846,
+    "owner": "araneo",
+    "sentence": "i really like writing",
+    "lengthBand": "short",
+    "wordCount": 4,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 1,
+    "targetOffset": 2,
+    "target": "really",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 16919,
+    "owner": "CK",
+    "sentence": "please give my regards to your father",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "your",
+    "acceptableAlternatives": [
+     "my",
+     "the"
+    ]
+   },
+   {
+    "sourceId": 21934,
+    "owner": "CK",
+    "sentence": "he took his daughter with him whenever he went abroad",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "abroad",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 25044,
+    "owner": "CK",
+    "sentence": "please give me something hot to drink",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "drink",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 31448,
+    "owner": "CK",
+    "sentence": "won't you have another cup of coffee",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "coffee",
+    "acceptableAlternatives": [
+     "tea",
+     "water"
+    ]
+   },
+   {
+    "sourceId": 38261,
+    "owner": "CK",
+    "sentence": "every now and then they went shopping together",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "went",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 42398,
+    "owner": "CM",
+    "sentence": "it is like the air we breathe",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "breathe",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 51434,
+    "owner": "CM",
+    "sentence": "would you kindly make room for this old woman",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "home",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "woman",
+    "acceptableAlternatives": [
+     "man",
+     "lady"
+    ]
+   },
+   {
+    "sourceId": 55972,
+    "owner": "CM",
+    "sentence": "this movie is not anything like as exciting as that one",
+    "lengthBand": "medium",
+    "wordCount": 11,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 10,
+    "targetOffset": 0,
+    "target": "one",
+    "acceptableAlternatives": [
+     "movie",
+     "film"
+    ]
+   },
+   {
+    "sourceId": 69442,
+    "owner": "CK",
+    "sentence": "he said that you had better go",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "better",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 237873,
+    "owner": "CK",
+    "sentence": "my brother gave me a pair of jeans",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "pair",
+    "acceptableAlternatives": [
+     "box",
+     "couple"
+    ]
+   },
+   {
+    "sourceId": 245577,
+    "owner": "CK",
+    "sentence": "my sister is thin but i'm a little overweight",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 7,
+    "targetOffset": 1,
+    "target": "little",
+    "acceptableAlternatives": [
+     "bit"
+    ]
+   },
+   {
+    "sourceId": 251359,
+    "owner": "CK",
+    "sentence": "my grandmother raised a family of ten",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "ten",
+    "acceptableAlternatives": [
+     "five",
+     "six"
+    ]
+   },
+   {
+    "sourceId": 253313,
+    "owner": "CM",
+    "sentence": "having a slight cold i went to bed early",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "early",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 254380,
+    "owner": "CK",
+    "sentence": "i intended to have finished the work",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "finished",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 260146,
+    "owner": "CM",
+    "sentence": "i saw him walking with a book under his arm",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "arm",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 260688,
+    "owner": "CK",
+    "sentence": "i would like to repay him for his kindness",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 7,
+    "targetOffset": 1,
+    "target": "his",
+    "acceptableAlternatives": [
+     "the",
+     "her"
+    ]
+   },
+   {
+    "sourceId": 282973,
+    "owner": "CK",
+    "sentence": "i'll give him your message when he comes",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "when",
+    "acceptableAlternatives": [
+     "if",
+     "after"
+    ]
+   },
+   {
+    "sourceId": 284574,
+    "owner": "CK",
+    "sentence": "tell him to come here at once",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "once",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 293610,
+    "owner": "CK",
+    "sentence": "he has lost faith in the doctor",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "doctor",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 303882,
+    "owner": "CK",
+    "sentence": "he gets up as early as five every morning",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "morning",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 318612,
+    "owner": "CK",
+    "sentence": "unfortunately the food supplies gave out before the end of winter",
+    "lengthBand": "medium",
+    "wordCount": 11,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 10,
+    "targetOffset": 0,
+    "target": "winter",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 351281,
+    "owner": "human600",
+    "sentence": "because i didn't take the bus i'm not home yet",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "not",
+    "acceptableAlternatives": [
+     "still",
+     "finally"
+    ]
+   },
+   {
+    "sourceId": 509645,
+    "owner": "mahdiye",
+    "sentence": "i can't say i share your enthusiasm for the idea",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "idea",
+    "acceptableAlternatives": [
+     "opinion",
+     "view"
+    ]
+   },
+   {
+    "sourceId": 553052,
+    "owner": "darinmex",
+    "sentence": "my shoelaces came untied as i was walking down the street",
+    "lengthBand": "medium",
+    "wordCount": 11,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 10,
+    "targetOffset": 0,
+    "target": "street",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 689556,
+    "owner": "CM",
+    "sentence": "if there were an accident we would have to report it",
+    "lengthBand": "medium",
+    "wordCount": 11,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 9,
+    "targetOffset": 1,
+    "target": "report",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 841660,
+    "owner": "Zifre",
+    "sentence": "this car's tires don't have enough air",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "have",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 898517,
+    "owner": "CK",
+    "sentence": "what kind of food should i be feeding my dog",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "dog",
+    "acceptableAlternatives": [
+     "cat",
+     "children"
+    ]
+   },
+   {
+    "sourceId": 1035117,
+    "owner": "CK",
+    "sentence": "please give me a cup of coffee",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "coffee",
+    "acceptableAlternatives": [
+     "tea",
+     "water"
+    ]
+   },
+   {
+    "sourceId": 1074098,
+    "owner": "Scott",
+    "sentence": "eating fast food is bad for your health",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "for",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1170040,
+    "owner": "etoile",
+    "sentence": "since i couldn't pay the rent i asked him for help",
+    "lengthBand": "medium",
+    "wordCount": 11,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 10,
+    "targetOffset": 0,
+    "target": "help",
+    "acceptableAlternatives": [
+     "support",
+     "assistance"
+    ]
+   },
+   {
+    "sourceId": 1181143,
+    "owner": "CM",
+    "sentence": "i wish i wouldn't have to meet you again",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "again",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1291590,
+    "owner": "PeterR",
+    "sentence": "you have to read between the lines",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "lines",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1515505,
+    "owner": "Cainntear",
+    "sentence": "don't go to sleep with the light on",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "light",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1594880,
+    "owner": "CM",
+    "sentence": "i don't have the time to read that book",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "read",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1977837,
+    "owner": "Spamster",
+    "sentence": "he didn't want to think about it",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "about",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2016818,
+    "owner": "CK",
+    "sentence": "are you sure you don't want coffee",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "don't",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2300736,
+    "owner": "CK",
+    "sentence": "i can give you some medicine for the pain",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 7,
+    "targetOffset": 1,
+    "target": "the",
+    "acceptableAlternatives": [
+     "my",
+     "this"
+    ]
+   },
+   {
+    "sourceId": 2317460,
+    "owner": "CK",
+    "sentence": "i don't have to listen to you",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "listen",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2389524,
+    "owner": "CK",
+    "sentence": "i only hope i'm not too late",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "late",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2389917,
+    "owner": "CK",
+    "sentence": "i ran away from home when i was thirteen",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 7,
+    "targetOffset": 1,
+    "target": "was",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2486886,
+    "owner": "Opiejay888",
+    "sentence": "i've done all that i can do today",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "today",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2537993,
+    "owner": "CK",
+    "sentence": "i wonder if there's enough food for everyone",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "everyone",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2538671,
+    "owner": "CK",
+    "sentence": "make sure you don't let the dog outside",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "dog",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2538964,
+    "owner": "CK",
+    "sentence": "i wonder who'll be helping us tomorrow",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "tomorrow",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2663021,
+    "owner": "CK",
+    "sentence": "after tonight that won't be a problem",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "problem",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2798097,
+    "owner": "patgfisher",
+    "sentence": "this is a film all parents should watch",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "should",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2882912,
+    "owner": "CK",
+    "sentence": "is there anything in this box you can use",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "use",
+    "acceptableAlternatives": [
+     "keep",
+     "take",
+     "have"
+    ]
+   },
+   {
+    "sourceId": 2903769,
+    "owner": "Hybrid",
+    "sentence": "is this the best you can do",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "can",
+    "acceptableAlternatives": [
+     "could",
+     "will"
+    ]
+   },
+   {
+    "sourceId": 3001593,
+    "owner": "CK",
+    "sentence": "what makes you think that's what caused the fire",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "reflective",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "caused",
+    "acceptableAlternatives": [
+     "started"
+    ]
+   },
+   {
+    "sourceId": 3150720,
+    "owner": "CK",
+    "sentence": "i would like to buy a sofa",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "buy",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3204531,
+    "owner": "CK",
+    "sentence": "did i ever tell you where i met your mother",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "question",
+    "theme": "people",
+    "targetIndex": 8,
+    "targetOffset": 1,
+    "target": "your",
+    "acceptableAlternatives": [
+     "my",
+     "his",
+     "her"
+    ]
+   },
+   {
+    "sourceId": 3346235,
+    "owner": "CK",
+    "sentence": "would you ever consider going out with someone like me",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "question",
+    "theme": "feelings",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "someone",
+    "acceptableAlternatives": [
+     "me",
+     "him",
+     "her"
+    ]
+   },
+   {
+    "sourceId": 3533850,
+    "owner": "adamtrousers",
+    "sentence": "you make me want to be a better person",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "person",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3723174,
+    "owner": "CM",
+    "sentence": "i hope there's plenty of air in here",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "here",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3723567,
+    "owner": "CM",
+    "sentence": "please tell me you're not that naive",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "not",
+    "acceptableAlternatives": [
+     "serious",
+     "joking"
+    ]
+   },
+   {
+    "sourceId": 3730264,
+    "owner": "CM",
+    "sentence": "i can tell you're a nice guy",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "nice",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3783381,
+    "owner": "popball",
+    "sentence": "i'm going to stop by your office tomorrow",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "office",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 4341097,
+    "owner": "JBean",
+    "sentence": "it was very difficult to swim against the current",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "against",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 4664674,
+    "owner": "CK",
+    "sentence": "can you tell me why you did that",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "did",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5262896,
+    "owner": "Hybrid",
+    "sentence": "do you know how to make a grilled cheese sandwich",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "sandwich",
+    "acceptableAlternatives": [
+     "meal"
+    ]
+   },
+   {
+    "sourceId": 5302503,
+    "owner": "CK",
+    "sentence": "i think this is a big mistake",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "mistake",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5357245,
+    "owner": "Hybrid",
+    "sentence": "do you want to go to the movies tomorrow",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "tomorrow",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5445953,
+    "owner": "CK",
+    "sentence": "i've got too much work to do",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "work",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5545141,
+    "owner": "CK",
+    "sentence": "you sure have a lot of friends",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "friends",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5790234,
+    "owner": "Eccles17",
+    "sentence": "do you know how to read a map",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "question",
+    "theme": "media",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "read",
+    "acceptableAlternatives": [
+     "use",
+     "follow"
+    ]
+   },
+   {
+    "sourceId": 5849189,
+    "owner": "CK",
+    "sentence": "how much longer can i stay here",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "here",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5850975,
+    "owner": "CK",
+    "sentence": "i came home earlier than usual today",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "today",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5907679,
+    "owner": "CK",
+    "sentence": "i almost always go to bed before midnight",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "bed",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5915415,
+    "owner": "CK",
+    "sentence": "i needed to buy food for the party",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "for",
+    "acceptableAlternatives": [
+     "before",
+     "at"
+    ]
+   },
+   {
+    "sourceId": 5930983,
+    "owner": "mailohilohi",
+    "sentence": "i think we have to wait a little more",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "more",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6242591,
+    "owner": "CK",
+    "sentence": "you wouldn't mind doing that would you",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "you",
+    "acceptableAlternatives": [
+     "they",
+     "he",
+     "she"
+    ]
+   },
+   {
+    "sourceId": 6244184,
+    "owner": "CK",
+    "sentence": "what kind of food do you like the most",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "like",
+    "acceptableAlternatives": [
+     "want",
+     "eat",
+     "prefer"
+    ]
+   },
+   {
+    "sourceId": 6250997,
+    "owner": "CK",
+    "sentence": "the past three days have been cold",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "cold",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6341699,
+    "owner": "CK",
+    "sentence": "was the movie you saw yesterday interesting",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "reflective",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "interesting",
+    "acceptableAlternatives": [
+     "good",
+     "funny",
+     "boring"
+    ]
+   },
+   {
+    "sourceId": 6343733,
+    "owner": "CK",
+    "sentence": "i thought i told you to stop doing that",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "stop",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6435105,
+    "owner": "CK",
+    "sentence": "i promise i'll do that before i go home",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "home",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6568010,
+    "owner": "Hybrid",
+    "sentence": "my hands and feet always feel cold",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "feel",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6678220,
+    "owner": "CK",
+    "sentence": "if i'd been with you i could've helped you",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "could've",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6696541,
+    "owner": "CK",
+    "sentence": "i'm not sure that i'm ready for this",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "ready",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6705577,
+    "owner": "Eccles17",
+    "sentence": "no one is here to take your call",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "take",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6710288,
+    "owner": "Hybrid",
+    "sentence": "tell me the whole story and start from the beginning",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "from",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6793145,
+    "owner": "CK",
+    "sentence": "who'll be at the meeting this afternoon",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "this",
+    "acceptableAlternatives": [
+     "today",
+     "tomorrow"
+    ]
+   },
+   {
+    "sourceId": 6877443,
+    "owner": "CK",
+    "sentence": "if i had enough money i'd buy this",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "buy",
+    "acceptableAlternatives": [
+     "get"
+    ]
+   },
+   {
+    "sourceId": 7205590,
+    "owner": "CK",
+    "sentence": "i think there's still a chance that'll happen",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "happen",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7213025,
+    "owner": "CK",
+    "sentence": "at present there's no plan to do that",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "that",
+    "acceptableAlternatives": [
+     "it",
+     "this"
+    ]
+   },
+   {
+    "sourceId": 7217443,
+    "owner": "CK",
+    "sentence": "i'm afraid that i have a touch of a cold",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "cold",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7506990,
+    "owner": "CK",
+    "sentence": "didn't you know that you could walk there from here",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "there",
+    "acceptableAlternatives": [
+     "home",
+     "outside"
+    ]
+   },
+   {
+    "sourceId": 7737165,
+    "owner": "CK",
+    "sentence": "i need to take my medicine now",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "now",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7762925,
+    "owner": "CK",
+    "sentence": "it was cloudy so i took an umbrella with me",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "umbrella",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7897848,
+    "owner": "CK",
+    "sentence": "i'm afraid that there isn't any coffee left",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "left",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8187548,
+    "owner": "Hybrid",
+    "sentence": "don't worry too much about what others think about you",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "you",
+    "acceptableAlternatives": [
+     "me",
+     "them",
+     "that"
+    ]
+   },
+   {
+    "sourceId": 8272909,
+    "owner": "CK",
+    "sentence": "i hope that you enjoy this holiday season",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "holiday",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8351128,
+    "owner": "CK",
+    "sentence": "i'm not sure but i think you may be wrong",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "wrong",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8363109,
+    "owner": "CK",
+    "sentence": "we're going to stay there for three weeks",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "three",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8419452,
+    "owner": "CK",
+    "sentence": "i didn't believe that it really happened",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "really",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8599692,
+    "owner": "CK",
+    "sentence": "in what ways is the new system better",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "question",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "system",
+    "acceptableAlternatives": [
+     "plan",
+     "approach",
+     "model"
+    ]
+   },
+   {
+    "sourceId": 8854692,
+    "owner": "CK",
+    "sentence": "i can count on you i hope",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "hope",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8930098,
+    "owner": "CK",
+    "sentence": "i'll tell you the good news first",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "news",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9414848,
+    "owner": "CK",
+    "sentence": "not everything in this room is for sale",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "sale",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9484099,
+    "owner": "CK",
+    "sentence": "i wonder why the bus isn't here yet",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "yet",
+    "acceptableAlternatives": [
+     "today",
+     "now"
+    ]
+   },
+   {
+    "sourceId": 9640533,
+    "owner": "CK",
+    "sentence": "you think that's where we'll find it don't you",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "reflective",
+    "targetIndex": 7,
+    "targetOffset": 1,
+    "target": "don't",
+    "acceptableAlternatives": [
+     "right",
+     "then"
+    ]
+   },
+   {
+    "sourceId": 9643197,
+    "owner": "CK",
+    "sentence": "when was the last time you hugged your mother",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "people",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "hugged",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9701105,
+    "owner": "CK",
+    "sentence": "if anybody did that to me i'd call the police",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "police",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9766733,
+    "owner": "CK",
+    "sentence": "i had some difficulty finding your house",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "house",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9809678,
+    "owner": "CK",
+    "sentence": "let's hope that things stay this way",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "way",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9836405,
+    "owner": "CK",
+    "sentence": "let's hope that this doesn't happen again",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "again",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9851484,
+    "owner": "NurseMeeks",
+    "sentence": "were your eyelids stuck together when you woke up this morning",
+    "lengthBand": "medium",
+    "wordCount": 11,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 9,
+    "targetOffset": 1,
+    "target": "this",
+    "acceptableAlternatives": [
+     "today"
+    ]
+   },
+   {
+    "sourceId": 10196949,
+    "owner": "DJ_Saidez",
+    "sentence": "it's going to be a big day tomorrow",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 5,
+    "targetOffset": 2,
+    "target": "big",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10333156,
+    "owner": "AlanF_US",
+    "sentence": "don't forget to buy bread on the way back",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "back",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10457530,
+    "owner": "CK",
+    "sentence": "there are some hot dogs in the refrigerator",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "refrigerator",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10550266,
+    "owner": "AlanF_US",
+    "sentence": "a cat is walking on the roof",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "roof",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10665436,
+    "owner": "Sprakify",
+    "sentence": "tell me about the scar on your palm",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 7,
+    "targetOffset": 0,
+    "target": "palm",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10680254,
+    "owner": "CK",
+    "sentence": "i'd suggest that you go home early",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "home",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10973902,
+    "owner": "CK",
+    "sentence": "i don't know about you but i want to leave",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "want",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 10981273,
+    "owner": "CK",
+    "sentence": "i guess neither one of us can do that",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "can",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11149644,
+    "owner": "CK",
+    "sentence": "you shouldn't believe everything you read online",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "online",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11167780,
+    "owner": "sundown",
+    "sentence": "we have to prepare for the storm",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 6,
+    "targetOffset": 0,
+    "target": "storm",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11444267,
+    "owner": "sundown",
+    "sentence": "i'd like to book a single room",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 5,
+    "targetOffset": 1,
+    "target": "single",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11540871,
+    "owner": "CK",
+    "sentence": "we all thought it would be impossible to do that",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 9,
+    "targetOffset": 0,
+    "target": "that",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11599481,
+    "owner": "ddnktr",
+    "sentence": "is there something wrong with the car",
+    "lengthBand": "medium",
+    "wordCount": 7,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 4,
+    "targetOffset": 2,
+    "target": "with",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11801071,
+    "owner": "CK",
+    "sentence": "there are two pencils on the dining room table",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 8,
+    "targetOffset": 0,
+    "target": "table",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 11834439,
+    "owner": "CK",
+    "sentence": "my mother went to town to buy some bread",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 7,
+    "targetOffset": 1,
+    "target": "some",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 12419572,
+    "owner": "CK",
+    "sentence": "my cat likes to look out the window",
+    "lengthBand": "medium",
+    "wordCount": 8,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 6,
+    "targetOffset": 1,
+    "target": "the",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 12615565,
+    "owner": "urro",
+    "sentence": "every year i receive a birthday present from my mother",
+    "lengthBand": "medium",
+    "wordCount": 10,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 7,
+    "targetOffset": 2,
+    "target": "from",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 12784233,
+    "owner": "CK",
+    "sentence": "what country would you like to visit and why",
+    "lengthBand": "medium",
+    "wordCount": 9,
+    "sentenceType": "question",
+    "theme": "people",
+    "targetIndex": 6,
+    "targetOffset": 2,
+    "target": "visit",
+    "acceptableAlternatives": [
+     "see",
+     "go"
+    ]
+   },
+   {
+    "sourceId": 25293,
+    "owner": "mamat",
+    "sentence": "i am wondering if i could be of any service to you",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "service",
+    "acceptableAlternatives": [
+     "help",
+     "use"
+    ]
+   },
+   {
+    "sourceId": 37836,
+    "owner": "CK",
+    "sentence": "it was such a pleasant day that we went for a walk",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "walk",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 40954,
+    "owner": "CK",
+    "sentence": "it was careless of you to leave your camera in the taxi",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "taxi",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 58076,
+    "owner": "CM",
+    "sentence": "what was the idea of leaving the cup upside down last time",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "time",
+    "acceptableAlternatives": [
+     "day",
+     "night"
+    ]
+   },
+   {
+    "sourceId": 243230,
+    "owner": "CK",
+    "sentence": "i would rather stay at home than go to the movies tonight",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "tonight",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 247098,
+    "owner": "CK",
+    "sentence": "the first thing i want to do tomorrow is to find a good part time job",
+    "lengthBand": "long",
+    "wordCount": 16,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 13,
+    "targetOffset": 2,
+    "target": "part",
+    "acceptableAlternatives": [
+     "full"
+    ]
+   },
+   {
+    "sourceId": 280992,
+    "owner": "Zifre",
+    "sentence": "within a couple of minutes she had eaten up all the bread and cheese",
+    "lengthBand": "long",
+    "wordCount": 14,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 12,
+    "targetOffset": 1,
+    "target": "and",
+    "acceptableAlternatives": [
+     "with"
+    ]
+   },
+   {
+    "sourceId": 301138,
+    "owner": "CK",
+    "sentence": "he was so busy that he sent his son instead of going himself",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 12,
+    "targetOffset": 0,
+    "target": "himself",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 305022,
+    "owner": "CM",
+    "sentence": "i feel in my bones that they will never get along well together",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "along",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 306450,
+    "owner": "CK",
+    "sentence": "they can come on monday or tuesday but not on wednesday or thursday",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "wednesday",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 320606,
+    "owner": "CM",
+    "sentence": "mom was at a loss about what to do with the mess",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 10,
+    "targetOffset": 1,
+    "target": "the",
+    "acceptableAlternatives": [
+     "this",
+     "her"
+    ]
+   },
+   {
+    "sourceId": 325047,
+    "owner": "CK",
+    "sentence": "would you please allow me to treat you to dinner next week",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "food",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "week",
+    "acceptableAlternatives": [
+     "month",
+     "weekend"
+    ]
+   },
+   {
+    "sourceId": 430155,
+    "owner": "witbrock",
+    "sentence": "the meeting will take place no matter what the weather is like",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "like",
+    "acceptableAlternatives": [
+     "today",
+     "outside"
+    ]
+   },
+   {
+    "sourceId": 436463,
+    "owner": "lukaszpp",
+    "sentence": "i bought flowers because i am going to visit my grandmother this afternoon",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 11,
+    "targetOffset": 1,
+    "target": "this",
+    "acceptableAlternatives": [
+     "next",
+     "later"
+    ]
+   },
+   {
+    "sourceId": 737585,
+    "owner": "CM",
+    "sentence": "i could tell he was in low spirits by the look on his face",
+    "lengthBand": "long",
+    "wordCount": 14,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 13,
+    "targetOffset": 0,
+    "target": "face",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 903842,
+    "owner": "CK",
+    "sentence": "i think it's time for me to give her a ride home",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "home",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 909547,
+    "owner": "CK",
+    "sentence": "is it worth spending time trying to help people who don't want to be helped",
+    "lengthBand": "long",
+    "wordCount": 15,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 14,
+    "targetOffset": 0,
+    "target": "helped",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 953315,
+    "owner": "CK",
+    "sentence": "he kept saying to himself that he must not tell so many lies",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 11,
+    "targetOffset": 1,
+    "target": "many",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 953704,
+    "owner": "CK",
+    "sentence": "i was just wondering if you have any experiences you would like to share with us",
+    "lengthBand": "long",
+    "wordCount": 16,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 14,
+    "targetOffset": 1,
+    "target": "with",
+    "acceptableAlternatives": [
+     "me",
+     "them"
+    ]
+   },
+   {
+    "sourceId": 1127882,
+    "owner": "CK",
+    "sentence": "she doesn't want to talk to me now and i don't know why",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 12,
+    "targetOffset": 0,
+    "target": "why",
+    "acceptableAlternatives": [
+     "where",
+     "how"
+    ]
+   },
+   {
+    "sourceId": 1155909,
+    "owner": "marcelostockle",
+    "sentence": "first i'll look at the prices and only then i'll decide whether i'll buy the camera or not",
+    "lengthBand": "long",
+    "wordCount": 18,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 17,
+    "targetOffset": 0,
+    "target": "not",
+    "acceptableAlternatives": [
+     "wait"
+    ]
+   },
+   {
+    "sourceId": 1409051,
+    "owner": "CK",
+    "sentence": "i'm on my way to visit a friend who's in the hospital",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "people",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "hospital",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 1446159,
+    "owner": "human600",
+    "sentence": "last night there was still snow on the ground but this morning it's all melted",
+    "lengthBand": "long",
+    "wordCount": 15,
+    "sentenceType": "statement",
+    "theme": "weather",
+    "targetIndex": 14,
+    "targetOffset": 0,
+    "target": "melted",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 2662628,
+    "owner": "CK",
+    "sentence": "the problem is i still don't know if i can trust you",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "can",
+    "acceptableAlternatives": [
+     "could",
+     "would"
+    ]
+   },
+   {
+    "sourceId": 2799525,
+    "owner": "Cainntear",
+    "sentence": "if you don't want to be alone i can keep you company",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "requests",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "keep",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3001775,
+    "owner": "CK",
+    "sentence": "are you still interested in going out for a drink after work",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 10,
+    "targetOffset": 1,
+    "target": "after",
+    "acceptableAlternatives": [
+     "tonight",
+     "later",
+     "tomorrow"
+    ]
+   },
+   {
+    "sourceId": 3735432,
+    "owner": "CK",
+    "sentence": "i think we'll never be able to afford that kind of car",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "kind",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 3737106,
+    "owner": "CK",
+    "sentence": "i'm sick and tired of eating the same thing for lunch every day",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "lunch",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 5238212,
+    "owner": "CK",
+    "sentence": "i'd like to sing a song for you that i wrote last night",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 11,
+    "targetOffset": 1,
+    "target": "last",
+    "acceptableAlternatives": [
+     "yesterday"
+    ]
+   },
+   {
+    "sourceId": 5936332,
+    "owner": "CK",
+    "sentence": "you never look angry even though i know that sometimes you are",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "sometimes",
+    "acceptableAlternatives": [
+     "often"
+    ]
+   },
+   {
+    "sourceId": 6227930,
+    "owner": "CK",
+    "sentence": "i don't like being the one who always has to take out the garbage",
+    "lengthBand": "long",
+    "wordCount": 14,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 12,
+    "targetOffset": 1,
+    "target": "the",
+    "acceptableAlternatives": [
+     "my",
+     "our"
+    ]
+   },
+   {
+    "sourceId": 6228138,
+    "owner": "CK",
+    "sentence": "how many more days do you think it'll take to finish doing that",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "question",
+    "theme": "reflective",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "finish",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6229820,
+    "owner": "CK",
+    "sentence": "i get the feeling that i'm the only one who can do that",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "feelings",
+    "targetIndex": 12,
+    "targetOffset": 0,
+    "target": "that",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6431157,
+    "owner": "CK",
+    "sentence": "i usually get up at six but this morning i didn't get up until eight",
+    "lengthBand": "long",
+    "wordCount": 15,
+    "sentenceType": "statement",
+    "theme": "plans",
+    "targetIndex": 13,
+    "targetOffset": 1,
+    "target": "until",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6431830,
+    "owner": "CK",
+    "sentence": "how long do you think you'll be able to help us today",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "plans",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "help",
+    "acceptableAlternatives": [
+     "join",
+     "support"
+    ]
+   },
+   {
+    "sourceId": 6655578,
+    "owner": "CK",
+    "sentence": "i have a lot of clothes in my closet that i never wear anymore",
+    "lengthBand": "long",
+    "wordCount": 14,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 12,
+    "targetOffset": 1,
+    "target": "wear",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6699173,
+    "owner": "CK",
+    "sentence": "if i'd known that was going to happen i would've gone home earlier",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "gone",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6776722,
+    "owner": "CK",
+    "sentence": "i don't have enough time to do that before i go home",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "home",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "home",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 6963046,
+    "owner": "sabretou",
+    "sentence": "the tea at my office isn't good so i don't drink it",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "food",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "don't",
+    "acceptableAlternatives": [
+     "never",
+     "rarely"
+    ]
+   },
+   {
+    "sourceId": 7171320,
+    "owner": "CK",
+    "sentence": "i thought that you said that you were glad you didn't do that",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "didn't",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7171681,
+    "owner": "CK",
+    "sentence": "i thought you said that you didn't do that kind of thing",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 9,
+    "targetOffset": 2,
+    "target": "kind",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7222403,
+    "owner": "CK",
+    "sentence": "i hope that i gave you enough money to buy everything that you needed",
+    "lengthBand": "long",
+    "wordCount": 14,
+    "sentenceType": "statement",
+    "theme": "daily",
+    "targetIndex": 12,
+    "targetOffset": 1,
+    "target": "you",
+    "acceptableAlternatives": [
+     "him",
+     "her"
+    ]
+   },
+   {
+    "sourceId": 7223073,
+    "owner": "CK",
+    "sentence": "i think that i have a good chance of being hired for the job",
+    "lengthBand": "long",
+    "wordCount": 14,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 13,
+    "targetOffset": 0,
+    "target": "job",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 7227181,
+    "owner": "CK",
+    "sentence": "i don't think i'll ever be given the chance to do that",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "that",
+    "acceptableAlternatives": [
+     "it"
+    ]
+   },
+   {
+    "sourceId": 7587069,
+    "owner": "_undertoad",
+    "sentence": "do you have any idea how much work has gone into this",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "daily",
+    "targetIndex": 10,
+    "targetOffset": 1,
+    "target": "into",
+    "acceptableAlternatives": [
+     "in",
+     "on"
+    ]
+   },
+   {
+    "sourceId": 7987234,
+    "owner": "CK",
+    "sentence": "why didn't you tell me you weren't going to be there yesterday",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "requests",
+    "targetIndex": 11,
+    "targetOffset": 0,
+    "target": "yesterday",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 8186104,
+    "owner": "CK",
+    "sentence": "i had no idea that you were so good at playing the guitar",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "statement",
+    "theme": "reflective",
+    "targetIndex": 12,
+    "targetOffset": 0,
+    "target": "guitar",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 9665255,
+    "owner": "CK",
+    "sentence": "the first time i saw this movie was years ago at a drive in movie theater",
+    "lengthBand": "long",
+    "wordCount": 16,
+    "sentenceType": "statement",
+    "theme": "media",
+    "targetIndex": 15,
+    "targetOffset": 0,
+    "target": "theater",
+    "acceptableAlternatives": []
+   },
+   {
+    "sourceId": 12330745,
+    "owner": "CK",
+    "sentence": "which table do you think would look best in our dining room",
+    "lengthBand": "long",
+    "wordCount": 12,
+    "sentenceType": "question",
+    "theme": "home",
+    "targetIndex": 10,
+    "targetOffset": 1,
+    "target": "dining",
+    "acceptableAlternatives": [
+     "living",
+     "bedroom"
+    ]
+   },
+   {
+    "sourceId": 12784783,
+    "owner": "CK",
+    "sentence": "if you could visit any place in the world where would you go",
+    "lengthBand": "long",
+    "wordCount": 13,
+    "sentenceType": "question",
+    "theme": "people",
+    "targetIndex": 10,
+    "targetOffset": 2,
+    "target": "would",
+    "acceptableAlternatives": [
+     "do",
+     "can",
+     "will"
+    ]
+   }
+  ],
+  "secondIndependent": [
+   {
+    "sentence": "I want warm porridge today.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The kettle is boiling now.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Please draw the curtains halfway.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "My blue jumper is missing.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The biscuit tin is empty.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I slept poorly through the night.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "That programme was very funny.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The hallway feels quite chilly.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I need my reading glasses.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The cat is underfoot again.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "We can eat outside later.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The radio sounds too loud.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "My tea has gone cold.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The parcel arrived this morning.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I washed my hair yesterday.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The garden looks especially bright.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I cannot find my slippers.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The soup smells wonderful today.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I heard an owl outside.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The lift stopped between floors.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Could you fetch my cardigan?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Where did I leave lunch?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Will the rain ease soon?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Can we watch a comedy?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Did your sister call today?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Should I water those plants?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Why is the lamp flickering?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Have you spotted my wallet anywhere?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Would coffee help you wake?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Can I open this window?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Do we need more bread?",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I'm feeling rather sleepy.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "It's getting dark already.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Don't leave your umbrella indoors.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I've finished the crossword.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "We're cooking stew this evening.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "She won't miss the quiz.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "That's a lovely blanket.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I can't reach that shelf.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "He's bringing fresh fruit.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Please adjust my pillow.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "My shoulder feels sore.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The nurse checked earlier.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I need a slower turn.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The tablet tastes bitter.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Could you raise my bed?",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Is my water within reach?",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Please check the alarm.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I feel dizzy this afternoon.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "My hands are very cold.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Would you call the carer?",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Can we change position?",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I need the suction.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I'm ready for medicine.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Don't lower me quickly.",
+    "register": "care",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The bacon smells tempting.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Our neighbour waved cheerfully.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The mailbox needs repainting.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I folded the clean towels.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The bus was surprisingly quiet.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "My favourite mug cracked.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The sparrows are feeding nearby.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I saved some pudding.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The remote needs batteries.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "We missed the sunrise.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The laundry smells fresh.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "My cousin visits tomorrow.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The pavement looks slippery.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I chose the striped socks.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Our dinner was delicious.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The children sound excited.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "I prefer the quieter room.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "That song brings memories.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "The freezer door is open.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "We should order groceries.",
+    "register": "daily",
+    "declaredBand": "short"
+   },
+   {
+    "sentence": "Could I have cereal with sliced banana?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The weather forecast promises a breezy afternoon.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My brother's planning to visit after work.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Could you put the newspaper beside my chair?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I watched a detective drama before lunch.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The dog keeps carrying his squeaky toy.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We'll make fresh sandwiches for the long journey.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My phone's charging beside the sofa near window.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The neighbours planted tulips along their fence.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Do you think the plumber will arrive before noon?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Those apples in the bowl don't look fresh.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "You'll need to remind me about the library books.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I've found an old photograph in drawers.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The chicken's resting before we carve supper tonight.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We've heard thunder beyond the shopping centre.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My aunt's sent a cheerful postcard yesterday.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The hallway mirror needs a careful polish.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I'd rather listen to gentle jazz tonight at home.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The shop's got fresh peaches this week.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We'll need another packet of tissues for winter.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The new film's starting after the news.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I've left the washing machine running upstairs.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The local cafe's serving excellent vegetable soup.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My grandson's enjoying drawing colourful rockets today.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Did the visitor bring flowers from her garden?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Could you check whether the gate latched?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "What time does the delivery arrive tomorrow?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Would you like toast with your eggs?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Did the pharmacist explain those new tablets?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Can you move the tray closer please?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Should we ask for an extra blanket?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Where did the physiotherapist leave my notes?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Have you measured my temperature this evening?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Will the doctor visit after breakfast tomorrow morning?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Could the television volume be a little lower please?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Why does the kitchen tap keep dripping overnight?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Do you remember where we parked yesterday evening?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Are the shops open on Sunday morning nearby?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "May I have another slice of cake please?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Did you enjoy meeting the new neighbour?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I am tired. I want to rest.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We ate lunch. Then I read quietly.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The bell rang. My friend arrived smiling.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I felt cold. Please bring my shawl.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The show ended. Everyone clapped warmly in hall.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I finished breakfast. Now I need tea.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The rain stopped. We opened the curtains.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My visitor left. I felt peaceful afterwards.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I took medicine. Then I felt sleepy.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The timer rang. Please check the oven.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I made coffee. It smells inviting this morning.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The nurse came. She checked my pulse.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I lost my pen. It rolled downstairs.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The phone rang. My sister was laughing.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I heard rain. The gutters overflowed near garage.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I'm not hungry, but I'll have yoghurt.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "It's lovely when the house feels calm.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We don't need to hurry this morning.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I've put your coat beside the door.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "She can't decide which scarf she likes.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We're expecting a parcel after lunch today.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "He'll bring the newspaper on his way.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I won't forget that surprising story from yesterday.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "That's not the programme I wanted to see.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "You've made the room look much brighter with curtains.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "They aren't serving fish this evening at cafe.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I'd enjoy a walk beside the river.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The cinnamon made the whole kitchen fragrant.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My coat pocket contains several bus tickets.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The garden path is covered with leaves.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We can freeze the leftover casserole tomorrow.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The bluebirds nested under our porch roof.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I remember that holiday with great affection.",
+    "register": "reflective",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Does the calendar say our appointment is Friday?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My slippers disappeared beneath the armchair again.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Does the bakery sell crusty rolls before midday?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We should replace the bulb in hallway.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The recipe needs parsley and lemon zest.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I enjoy hearing the rain on windows.",
+    "register": "reflective",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The old clock chimes every quarter hour.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My niece is learning to play violin.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The bus shelter keeps out most rain.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Could you help fasten this tiny button?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The carer placed my drink on coaster.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Will you tell me when supper is ready?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The chair by the fire's especially cosy.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We've found a robin near the shed.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The library book has an interesting ending.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My neighbour makes the best oat biscuits.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The painter finished our fence last week.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I keep thinking about our seaside picnic.",
+    "register": "reflective",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The washing line is dancing in wind.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We bought ripe tomatoes from the market yesterday.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The postman whistled past our open window.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I am pleased that everyone came safely.",
+    "register": "reflective",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The bedroom is warmer with the radiator.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My friend recommended a gentle comedy series.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The cupboard holds jars of dried beans.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I can smell toast from the kitchen.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The train was late because of fog.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Our umbrella turned inside out in wind yesterday.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I need to practise my breathing exercises.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The nurse explained the new routine patiently.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Please keep the call bell nearby this afternoon.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The pharmacist delivered my prescription this morning.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My ankles feel less swollen today than yesterday.",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The curtains make the sunlight look golden.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I like hearing familiar voices on radio.",
+    "register": "reflective",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The kettle clicked off before it boiled.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My visitor remembered my favourite sweets from bakery.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The tomatoes need another day to ripen.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We watched ducks paddle across the pond.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I sometimes wonder where old friends live.",
+    "register": "reflective",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The fresh sheets feel cool and smooth.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My jacket zipper keeps catching the lining.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The community centre offers a singing group.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "I prefer marmalade on thick toast at breakfast.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The evening sky turned purple over rooftops.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "We can save that puzzle for tomorrow.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "Could you check the bedside lamp's loose switch?",
+    "register": "care",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My glasses fogged when I opened oven.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The visitors stayed until the football finished.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "May I have some quiet after lunch?",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "The taxi driver knew a shorter route.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "My cousin baked a lemon sponge cake.",
+    "register": "daily",
+    "declaredBand": "medium"
+   },
+   {
+    "sentence": "After breakfast, I like to sit quietly and watch the pigeons gather near the bird feeder.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The weather was mild, so we opened the patio door and listened to children playing nearby.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "When my sister visits tomorrow, we will choose a film and share the popcorn together.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I put the soup in the freezer because there was enough left for another supper.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The old radio plays softly in the morning while I fold towels and plan the day.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Although the bus was delayed, I enjoyed talking with a friendly woman at the stop.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Before the rain began, our neighbour brought in the cushions from the garden chairs.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I found a recipe for apple crumble that uses oats, cinnamon, and a little brown sugar.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The house feels especially peaceful when the dishwasher hums and the lamps are glowing.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "We can call the family after dinner and tell them about the funny thing that happened.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Could you leave the bedroom door open so I can hear when visitors arrive this afternoon?",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Why did the gardener move those pots before the frost had completely disappeared?",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Would you mind checking the calendar because I cannot remember the date of my appointment?",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Do you think the new television programme will be gentler than the one last week?",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Have you seen the small notebook where I wrote down the telephone numbers?",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Can we ask the shop to deliver milk, bread, and fruit before the weekend?",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Should I wear the green scarf if the weather turns colder this evening?",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Will the nurse be able to explain why my shoulder has felt stiff recently?",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Could we move my chair a little nearer the window when the sunshine arrives?",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The toast burned. I laughed because the smoke alarm sounded more dramatic than the mistake.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I missed the call. Please write the number down so I can ring back later.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The rain cleared. We saw a rainbow stretching behind the row of tall houses.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I finished the book. Its final chapter made me think about my own childhood.",
+    "register": "reflective",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The carer arrived. We talked about the plan before she helped me get comfortable.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "My cousin called. She promised to bring photographs from the family reunion next month.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I'm glad we waited because the soup tastes better after the flavours have settled together.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "We don't have to decide today, since tomorrow may bring a clearer answer for everyone.",
+    "register": "reflective",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I've always liked this song because it reminds me of dancing in my parents' kitchen.",
+    "register": "reflective",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The kettle won't switch on, so perhaps the plug has come loose behind the cupboard.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "She's bringing her grandson, who loves asking questions about the old photographs on shelves.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "After my tablets, I would appreciate a few minutes of quiet before we start the exercises.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The doctor said the new cream should help if I remember to use it each morning.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Please keep my emergency button visible while you tidy the bedside table this afternoon.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "When the room gets warm, I find it easier to relax and breathe at a steady pace.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The market was busy, but we found ripe pears and a bunch of bright yellow daffodils.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I like how the evening light makes the familiar street look new and almost magical.",
+    "register": "reflective",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Before you leave, could you place the water jug where I can reach it safely?",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "If the rain continues tomorrow, we might play cards and make hot chocolate instead.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The children were laughing outside while I listened to a story on the afternoon radio.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I remembered your advice and packed a snack, a map, and my small umbrella.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "When the visitor arrives, I want to offer tea before we settle down to talk.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The nurse explained the blood pressure reading in words that were calm and easy to understand.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "My favourite part of the day is when the curtains close and everything becomes quiet.",
+    "register": "reflective",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "We watched the match together, although neither of us understood the final referee decision.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The new neighbour seems kind, and I hope we can invite her for coffee soon.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "After the shower, please make sure the towel and call bell are close to my hand.",
+    "register": "care",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "The recipe looked complicated, but the cake turned out light, golden, and pleasantly moist.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "I feel happier when I can choose the music and hear a familiar voice nearby.",
+    "register": "reflective",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "On sunny afternoons, the cat stretches across the rug and refuses to move for anyone.",
+    "register": "daily",
+    "declaredBand": "long"
+   },
+   {
+    "sentence": "Before bedtime, I enjoy a warm drink and a few pages from an easy novel.",
+    "register": "daily",
+    "declaredBand": "long"
+   }
+  ]
+ }
+}
