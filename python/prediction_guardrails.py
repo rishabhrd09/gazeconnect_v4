@@ -63,6 +63,29 @@ BLOCKED_PREDICTION_WORDS = {
     "embarrassed", "embarrassing", "humiliated", "humiliating",
     "overwhelmed",
 
+    # --- Inflections of the English entries above ---
+    # The deterministic predictor's lexicon (13.9k words) contains inflected
+    # forms the legacy vocabulary never offered; a blocked word stays blocked in
+    # every form. Generated from the pinned lemma table plus -s/-ed/-ing/-er
+    # forms; python/tests/test_deterministic_policy.py fails if a blocked
+    # word gains an unblocked form in the lexicon.
+    "attacked", "attacker", "attacking", "attacks",
+    "bombed", "bomber", "bombing", "bombings", "bombs",
+    "burdened", "burdening", "burdens",
+    "deader", "deadest", "deadly", "deaths", "died", "dies",
+    "destroyer", "destroying", "destroys",
+    "emptied", "emptier", "empties", "emptiest", "emptiness", "emptying",
+    "fats", "fatter", "fattest",
+    "fooled", "fooling", "fools",
+    "hits", "hitting", "kicker", "kicks",
+    "killer", "killings", "kills",
+    "lazier", "laziest",
+    "murdered", "murderer", "murdering", "murders",
+    "shooter", "shootings", "shoots", "shots",
+    "slaved", "slaves", "slaving",
+    "stupider", "stupidest", "stupidity", "uglier", "ugliest", "violently",
+    "bastards", "craps", "damned", "damning", "damns", "heller", "hells", "idiots", "morons",
+
     # --- Hindi (Devanagari): violent / self-harm / poison ---
     # Mirrors the English violent+self-harm set for the bilingual patient.
     # Token equality (not substring), so e.g. मार blocks only the exact token
