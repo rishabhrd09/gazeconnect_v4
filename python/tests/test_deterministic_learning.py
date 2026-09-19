@@ -98,6 +98,36 @@ class LearningStoreTests(unittest.TestCase):
         self.assertNotIn('rest', json.loads((self.state_dir / STATE_FILE_NAME).read_text(encoding='utf-8'))['acceptedWords'])
         store.save()  # retried on the next save
         self.assertIn('rest', json.loads((self.state_dir / STATE_FILE_NAME).read_text(encoding='utf-8'))['acceptedWords'])
+        self.assertEqual(sorted(p.name for p in self.state_dir.iterdir()), [STATE_FILE_NAME])
+
+    def test_malformed_saved_state_recovers_without_blocking_startup(self):
+        self.state_dir.mkdir(parents=True)
+        for payload in ([], {'schemaVersion': 1, 'acceptedWords': ['water']},
+                        {'schemaVersion': 1, 'commitSequence': float('inf')}):
+            with self.subTest(payload=payload):
+                (self.state_dir / STATE_FILE_NAME).write_text(json.dumps(payload), encoding='utf-8')
+                self.assertEqual(self.store().snapshot()['acceptedWords'], {})
+                self.assertTrue((self.state_dir / 'deterministic_prediction_state.v1.unreadable.json').is_file())
+
+    def test_nonfinite_counts_are_ignored_and_valid_learning_survives(self):
+        self.state_dir.mkdir(parents=True)
+        (self.state_dir / STATE_FILE_NAME).write_text(json.dumps({
+            'schemaVersion': 1, 'acceptedWords': {'water': 3, 'rest': float('inf'), 'food': float('nan')},
+            'acceptedWordLastUsedAt': {'water': float('inf')},
+        }), encoding='utf-8')
+        self.assertEqual(self.store().snapshot()['acceptedWords'], {'water': 3})
+
+    def test_malformed_legacy_history_does_not_block_migration(self):
+        legacy = self.root / 'legacy'
+        legacy.mkdir()
+        for payload in ([], {'user_frequencies': ['water']},
+                        {'user_frequencies': {'water': float('inf'), 'rest': float('nan')}, 'recent_words': 42}):
+            with self.subTest(payload=payload):
+                path = legacy / 'custom_dictionary.json'
+                path.write_text(json.dumps(payload), encoding='utf-8')
+                before = _digest(path)
+                self.assertEqual(migrate_legacy_history([legacy])[0], {})
+                self.assertEqual(_digest(path), before)
 
     # ------------------------------------------------------------- learning
     def test_only_committed_single_words_are_counted(self):
@@ -154,6 +184,32 @@ class LearningStoreTests(unittest.TestCase):
         self.assertEqual(store.undo_removed_words('call Papa ', 'call '), ['papa'])
         self.assertEqual(store.snapshot()['acceptedWords'], {})
         self.assertEqual(store.snapshot()['acceptedWordLastUsedAt'], {})
+
+    def test_undo_preserves_a_later_spoken_use_and_its_recency(self):
+        store = self.store()
+        store.record_accepted_word('water', 'wa', 'water ')
+        store.record_spoken('water')
+        stamp = store.snapshot()['acceptedWordLastUsedAt']['water']
+        store.undo_removed_words('water ', '')
+        self.assertEqual(store.snapshot()['acceptedWords'], {'water': 1})
+        self.assertEqual(store.snapshot()['acceptedWordLastUsedAt']['water'], stamp)
+
+    def test_undo_multiple_acceptances_restores_original_recency(self):
+        store = self.store()
+        store.record_spoken('water')
+        original = store.snapshot()
+        store.record_accepted_word('water', 'wa', 'water ')
+        store.record_accepted_word('water', 'water wa', 'water water ')
+        store.undo_removed_words('water water ', '')
+        self.assertEqual(store.snapshot()['acceptedWords'], original['acceptedWords'])
+        self.assertEqual(store.snapshot()['acceptedWordLastUsedAt'], original['acceptedWordLastUsedAt'])
+
+    def test_undo_at_count_cap_does_not_remove_an_unrecorded_increment(self):
+        store = self.store()
+        store._accepted = {'water': MAX_WORD_COUNT}
+        store.record_accepted_word('water', 'wa', 'water ')
+        store.undo_removed_words('water ', '')
+        self.assertEqual(store.snapshot()['acceptedWords'], {'water': MAX_WORD_COUNT})
 
     def test_undo_ignores_edits_that_do_not_remove_the_word(self):
         store = self.store()

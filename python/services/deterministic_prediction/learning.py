@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
@@ -45,9 +46,13 @@ _WORD = re.compile(r"[a-z]+(?:'[a-z]+)?")
 
 def _bounded(words: Mapping[str, Any], last_used: Mapping[str, Any]) -> Tuple[Dict[str, int], Dict[str, int]]:
     """boundAcceptedWords / boundAcceptedWordLastUsedAt from the reference session store."""
+    if not isinstance(words, dict) or not isinstance(last_used, dict):
+        raise ValueError('invalid learned word maps')
     counted = []
     for word, count in words.items():
-        if isinstance(count, bool) or not isinstance(count, (int, float)) or not count > 0 or count != count:
+        if not isinstance(word, str) or not _WORD.fullmatch(word):
+            continue
+        if isinstance(count, bool) or not isinstance(count, (int, float)) or not count > 0 or (isinstance(count, float) and not math.isfinite(count)):
             continue
         counted.append((word, min(int(count), MAX_WORD_COUNT)))
     counted.sort(key=lambda item: (-item[1], item[0]))
@@ -57,7 +62,7 @@ def _bounded(words: Mapping[str, Any], last_used: Mapping[str, Any]) -> Tuple[Di
         key = word.strip().lower()
         if not key or key not in bounded_words:
             continue
-        if isinstance(stamp, bool) or not isinstance(stamp, (int, float)) or not stamp > 0 or stamp != stamp:
+        if isinstance(stamp, bool) or not isinstance(stamp, (int, float)) or not stamp > 0 or (isinstance(stamp, float) and not math.isfinite(stamp)):
             continue
         stamps.append((key, int(stamp)))
     stamps.sort(key=lambda item: (-item[1], item[0]))
@@ -88,10 +93,12 @@ def migrate_legacy_history(candidate_dirs: Sequence[Path]) -> Tuple[Dict[str, in
             data = json.loads(dictionary.read_text(encoding='utf-8'))
         except (OSError, ValueError):
             continue
+        if not isinstance(data, dict) or not isinstance(data.get('user_frequencies', {}), dict):
+            continue
         counts: Dict[str, int] = {}
         for raw_word, freq in (data.get('user_frequencies') or {}).items():
             word = normalize_word(str(raw_word))
-            if not _WORD.fullmatch(word) or isinstance(freq, bool) or not isinstance(freq, (int, float)) or freq <= 0:
+            if not _WORD.fullmatch(word) or isinstance(freq, bool) or not isinstance(freq, (int, float)) or freq <= 0 or (isinstance(freq, float) and not math.isfinite(freq)):
                 continue
             counts[word] = min(MAX_WORD_COUNT, counts.get(word, 0) + int(freq))
         order: Dict[str, float] = {}
@@ -101,13 +108,14 @@ def migrate_legacy_history(candidate_dirs: Sequence[Path]) -> Tuple[Dict[str, in
                 usage = json.loads(recency_path.read_text(encoding='utf-8'))
                 for raw_word, stamps in usage.items():
                     word = normalize_word(str(raw_word))
-                    numeric = [s for s in stamps if isinstance(s, (int, float)) and not isinstance(s, bool) and s > 0]
+                    numeric = [s for s in stamps if isinstance(s, (int, float)) and not isinstance(s, bool) and s > 0 and (not isinstance(s, float) or math.isfinite(s))]
                     if word in counts and numeric:
                         order[word] = max(numeric)
                 report['sourceFiles']['patient_data/recency_scores.json'] = _file_sha256(recency_path)
             except (OSError, ValueError, AttributeError, TypeError):
                 pass
-        recent = [normalize_word(str(w)) for w in data.get('recent_words') or []]
+        raw_recent = data.get('recent_words')
+        recent = [normalize_word(str(w)) for w in raw_recent] if isinstance(raw_recent, list) else []
         base = max(order.values(), default=0.0)
         for position, word in enumerate(recent):  # oldest first, newest last
             if word in counts and word not in order:
@@ -145,7 +153,7 @@ class PredictionLearningStore:
             if self.path.is_file():
                 try:
                     data = json.loads(self.path.read_text(encoding='utf-8'))
-                    if data.get('schemaVersion') != SCHEMA_VERSION:
+                    if not isinstance(data, dict) or data.get('schemaVersion') != SCHEMA_VERSION:
                         raise ValueError('unsupported schema')
                     self._accepted, self._last_used = _bounded(data.get('acceptedWords') or {}, data.get('acceptedWordLastUsedAt') or {})
                     self._sequence = max([int(data.get('commitSequence') or 0), *self._last_used.values()], default=0)
@@ -153,7 +161,7 @@ class PredictionLearningStore:
                     self._migration = data.get('migration') or {}
                     self.version += 1
                     return
-                except (OSError, ValueError, TypeError):
+                except (OSError, ValueError, TypeError, OverflowError):
                     # Keep the unreadable file for inspection; start from a migration.
                     try:
                         os.replace(self.path, self.path.with_suffix('.unreadable.json'))
@@ -182,6 +190,7 @@ class PredictionLearningStore:
                 'personalContinuations': self._continuations,
                 'migration': self._migration,
             }
+            temp_name = None
             try:
                 self.directory.mkdir(parents=True, exist_ok=True)
                 handle, temp_name = tempfile.mkstemp(prefix='.prediction-state-', suffix='.json', dir=str(self.directory))
@@ -191,6 +200,12 @@ class PredictionLearningStore:
                 self._dirty = False
             except OSError:
                 pass  # The in-memory state stays valid; the next save retries.
+            finally:
+                if temp_name is not None:
+                    try:
+                        os.unlink(temp_name)
+                    except OSError:
+                        pass
 
     # ---------------------------------------------------------------- reading
     def snapshot(self) -> Dict[str, Any]:
@@ -232,13 +247,15 @@ class PredictionLearningStore:
             return False
         token = tokens[0]
         with self._lock:
+            previous_count = self._accepted.get(token, 0)
             changes = self._count([token])
             # The draft keeps the inserted spelling ("call Papa "); the token is normalised.
             inserted = text_after is not None and text_after[-(len(token) + 1):].lower() == f'{token} '
             if text_before is not None and inserted:
                 end = len(text_after) - 1
                 self._journal.append({'word': token, 'start': end - len(token), 'end': end,
-                                      'previousStamp': changes[0][1], 'existed': changes[0][2]})
+                                      'previousStamp': changes[0][1], 'commitStamp': self._sequence,
+                                      'counted': self._accepted.get(token, 0) > previous_count})
                 self._journal = self._journal[-MAX_UNDO_JOURNAL:]
                 self._continuations = apply_continuation_edit(
                     self._continuations, text_before, text_after, word=token, context=list(context or ()))
@@ -259,24 +276,27 @@ class PredictionLearningStore:
         undone = []
         with self._lock:
             kept = []
-            for entry in self._journal:
+            # Unwind newest first so repeated acceptances restore recency in order.
+            for entry in reversed(self._journal):
                 removed = entry['end'] > len(text_after) and text_before[entry['start']:entry['end']].lower() == entry['word']
                 if not removed:
                     kept.append(entry)
                     continue
                 word = entry['word']
-                remaining = self._accepted.get(word, 0) - 1
-                if remaining <= 0 or not entry['existed']:
+                remaining = self._accepted.get(word, 0) - int(entry['counted'])
+                if remaining <= 0:
                     self._accepted.pop(word, None)
                     self._last_used.pop(word, None)
                 else:
                     self._accepted[word] = remaining
-                    if entry['previousStamp'] is None:
-                        self._last_used.pop(word, None)
-                    else:
-                        self._last_used[word] = entry['previousStamp']
+                    # Later spoken/accepted uses are independent commits and survive.
+                    if self._last_used.get(word) == entry['commitStamp']:
+                        if entry['previousStamp'] is None:
+                            self._last_used.pop(word, None)
+                        else:
+                            self._last_used[word] = entry['previousStamp']
                 undone.append(word)
-            self._journal = kept
+            self._journal = list(reversed(kept))
             if undone:
                 self._continuations = apply_continuation_edit(self._continuations, text_before, text_after, undo=True)
                 self._dirty = True

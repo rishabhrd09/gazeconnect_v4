@@ -6,7 +6,7 @@ import KeyboardMessageDisplay from '../components/shared/KeyboardMessageDisplay'
 import { HomeIcon, KeyboardIcon, MessageIcon, FullscreenIcon, MinimizeIcon, EyeIcon, PauseIcon } from '../components/icons/Icons';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { commitZoneSuggestion, currentZoneWord, zoneSuggestions, ZoneSuggestion, ZONE_SUGGESTION_COUNT } from '../utils/zoneBoardText';
-import { wordFitsText } from '../utils/wordPredictionSlots';
+import { predictionsAreFresh, wordFitsText, WordPredictionMeta } from '../utils/wordPredictionSlots';
 import '../styles/zone-board.css';
 
 const nativeWindow = () => (window as Window & { electronAPI?: { window: {
@@ -21,8 +21,10 @@ interface SpatialKeyboardProps {
   initialText?: string;
   isDarkMode?: boolean;
   showHindi?: boolean;
-  getPredictions?: (text: string) => void;
+  getPredictions?: (text: string, lengthHint?: number, lang?: string, options?: { slotCount?: number; resetLineage?: boolean }) => void;
   predictions?: ZoneSuggestion[];
+  predictionMeta?: WordPredictionMeta | null;
+  connected?: boolean;
   expandAbbreviation?: (abbrev: string) => void;
   abbreviationExpansion?: string | null;
   learnWord?: (word: string, textBefore?: string, textAfter?: string) => void;
@@ -31,23 +33,33 @@ interface SpatialKeyboardProps {
 
 const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
   onNavigate, onSpeak, onTextChange, initialText = '', getPredictions,
-  predictions = [], learnWord, learnSentence,
+  predictions = [], predictionMeta, connected = true, learnWord, learnSentence,
 }) => {
   const [text, setText] = useState(initialText);
   const textRef = useRef(initialText);
   const predictRef = useRef(getPredictions);
+  const resetLineageRef = useRef(true);
   predictRef.current = getPredictions;
   const { isGazeEnabled, toggleGaze, lastEnabledTimestamp, signalNavigation } = useGazeControl();
   const { isFocusMode } = useFocusMode();
   const [fullscreen, setFullscreen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullscreenNotice, setFullscreenNotice] = useState('');
-  const suggestions = useMemo(() => zoneSuggestions(text, predictions), [text, predictions]);
+  const suggestions = useMemo(() => zoneSuggestions(text,
+    connected && predictionsAreFresh(predictionMeta, text) ? predictions : []),
+  [text, predictions, predictionMeta, connected]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => predictRef.current?.(text), 120);
+    if (!connected) {
+      resetLineageRef.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      predictRef.current?.(text, undefined, 'en', { slotCount: 10, resetLineage: resetLineageRef.current });
+      resetLineageRef.current = false;
+    }, 120);
     return () => window.clearTimeout(timer);
-  }, [text]);
+  }, [text, connected]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,8 +87,10 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
   }, [onTextChange]);
   const applySuggestion = (word: string) => {
     const before = textRef.current;
-    // A (possibly stale) suggestion inserts only while it still completes the typed word.
-    if (!wordFitsText(before, word)) return;
+    // Reject a second activation before React has rendered the new draft.
+    // Backend suggestions shown above must also match the full draft; checking
+    // the prefix alone would allow stale suggestions after a space or deletion.
+    if (before !== text || !wordFitsText(before, word)) return;
     const after = commitZoneSuggestion(before, word);
     updateText(after);
     learnWord?.(word, before, after);

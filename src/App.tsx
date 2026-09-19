@@ -317,6 +317,8 @@ const InnerApp: React.FC = () => {
           initialText={globalText}
           getPredictions={ws.getPredictions}
           predictions={ws.predictions}
+          predictionMeta={ws.predictionMeta}
+          connected={ws.isConnected}
           expandAbbreviation={ws.expandAbbreviation}
           abbreviationExpansion={ws.abbreviationExpansion}
           learnWord={ws.learnWord}
