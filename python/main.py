@@ -82,6 +82,16 @@ from services.word_prediction import (
     WordPredictionEngine, AAC_PHRASES, ABBREVIATIONS
 )
 from services.sentence_prediction import SentencePredictor
+from services.deterministic_prediction.engine import confirmed_history
+from services.deterministic_prediction.facade import DeterministicPredictionFacade
+from services.deterministic_prediction.jsutil import current_prefix
+from services.deterministic_prediction.learning import PredictionLearningStore
+from services.deterministic_prediction.policy import load_english_only_withheld
+from services.deterministic_prediction.service import (
+    ENGINE_VERSION as DETERMINISTIC_ENGINE_VERSION,
+    EnglishOnlyText,
+    WordPredictionService,
+)
 from prediction_guardrails import (
     contains_blocked_prediction_word,
     is_blocked_prediction_word,
@@ -331,6 +341,17 @@ class ServerConfig:
     retain_spoken_logs: bool = False
     keyboard_chat_keep_files: int = 5
     enable_datamuse: bool = False
+    # Word prediction: 'deterministic' (GazeCompass port, default) or 'legacy'
+    # (previous n-gram + ONNX engine, kept only as a rollback).
+    prediction_engine: str = 'deterministic'
+    # Where deterministic scoring runs: 'process' keeps CPU work off the gaze
+    # loop; 'thread' and 'inline' exist for tests and constrained fallbacks.
+    prediction_execution: str = 'process'
+    # Neural sentence continuation loads onnxruntime; off unless asked for.
+    enable_neural_sentence_continuation: bool = False
+    # Where the one-time, read-only migration looks for legacy learned words.
+    # None = the data dir plus the legacy engine's working-directory ./data.
+    prediction_legacy_data_dirs: Optional[List[str]] = None
 
 # ============================================
 # PORT UTILITIES
@@ -872,7 +893,35 @@ class GazeConnectBackend:
         self._last_sample_rate_ts: Optional[float] = None
         self._measured_sample_rate_hz = 0.0
         self.target_registry = TargetRegistry()
-        self.prediction = WordPredictionEngine()
+        self.word_service: Optional[WordPredictionService] = None
+        self._prediction_tasks: Set[asyncio.Task] = set()
+        self._english_only = EnglishOnlyText(load_english_only_withheld())
+        if self.config.prediction_engine == 'legacy':
+            self.prediction = WordPredictionEngine()
+        else:
+            patient_dir = Path(self.config.data_dir) / 'patient_data'
+            # The legacy engine was constructed without a data_dir, so its
+            # history lives under the working directory's ./data. Both places
+            # are read (never written) by the one-time migration.
+            legacy_dirs = []
+            candidates = (self.config.prediction_legacy_data_dirs
+                          if self.config.prediction_legacy_data_dirs is not None
+                          else [self.config.data_dir, './data'])
+            for candidate in candidates:
+                resolved = Path(candidate).resolve()
+                if resolved not in legacy_dirs:
+                    legacy_dirs.append(resolved)
+            store = PredictionLearningStore(patient_dir, legacy_dirs=legacy_dirs)
+            self.prediction = DeterministicPredictionFacade(
+                store, Path(self.config.data_dir), legacy_dirs, self._english_only,
+                enable_neural_sentence_continuation=self.config.enable_neural_sentence_continuation,
+            )
+            self.prediction.load()
+            self.word_service = WordPredictionService(
+                store,
+                execution=self.config.prediction_execution,
+                content_items=self.prediction.caregiver_content_items,
+            )
         self.sentence_predictor = SentencePredictor(
             data_dir=Path(self.config.data_dir) / 'patient_data'
         )
@@ -1624,10 +1673,15 @@ class GazeConnectBackend:
                     data.get('length_hint'),
                     data.get('top_k', 12),
                     data.get('request_id'),
+                    slot_count=data.get('slot_count'),
+                    reset_lineage=bool(data.get('reset_lineage', False)),
                 ),
+                'set_prediction_context': lambda: self._set_prediction_context(websocket, data.get('phrases', []), data.get('words', [])),
+                'undo_word_learning': lambda: self._undo_word_learning(data.get('text_before'), data.get('text_after')),
+                'reset_word_learning': lambda: self._reset_word_learning(websocket),
                 'get_phrases': lambda: self._get_phrases(websocket, data.get('category')),
                 'expand_abbreviation': lambda: self._expand_abbreviation(websocket, data.get('abbrev', '')),
-                'learn_word': lambda: self.prediction.learn_word(data.get('word', '')),
+                'learn_word': lambda: self._learn_word(data),
                 'add_word': lambda: self._add_word(websocket, data.get('word', '')),
                 'learn_sentence': lambda: self._learn_sentence(data.get('sentence', '')),
                 'get_dictionary_data': lambda: self._get_dictionary_data(websocket),
@@ -2019,8 +2073,147 @@ class GazeConnectBackend:
         length_hint: Optional[int] = None,
         top_k: int = 12,
         request_id: Optional[int] = None,
+        slot_count: Optional[int] = None,
+        reset_lineage: bool = False,
     ):
-        """Get word predictions + sentence predictions in one response."""
+        """Word + sentence suggestions. Deterministic by default; legacy on rollback."""
+        if self.word_service is None:
+            return self._get_predictions_legacy(websocket, text, length_hint, top_k, request_id)
+        text = text if isinstance(text, str) else ''
+        slots = slot_count if isinstance(slot_count, int) and not isinstance(slot_count, bool) else 10
+        slots = 10 if slots >= 10 else max(5, slots)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop (unit tests, tools): compute inline.
+            result = self.word_service.predict_sync(websocket, text, slots, reset_lineage)
+            self._send(websocket, 'predictions', self._deterministic_payload(text, result, request_id))
+            return
+        task = asyncio.create_task(self._get_predictions_deterministic(websocket, text, slots, reset_lineage, request_id))
+        self._prediction_tasks.add(task)
+        task.add_done_callback(self._prediction_tasks.discard)
+
+    async def _get_predictions_deterministic(self, websocket, text: str, slots: int, reset_lineage: bool,
+                                             request_id: Optional[int]):
+        if websocket is not None and websocket not in self.connected_clients:
+            return  # queued behind a disconnect; no lineage for a closed session
+        try:
+            result = await self.word_service.predict(websocket, text, slots, reset_lineage)
+        except Exception as error:
+            # Answer anyway: explicit empty word slots (never the previous draft's
+            # words), and phrase suggestions, which do not depend on the word engine.
+            logger.warning(f"Word prediction failed: {error!r}", exc_info=True)
+            result = {'prefix': current_prefix(text), 'ranked': [], 'slots': [None] * slots, 'scores': {}, 'lineage': False}
+        if result is None:
+            return  # superseded by a newer request from this client
+        if websocket is not None and websocket not in self.connected_clients:
+            return  # disconnected while computing; never deliver to a new session
+        self._send(websocket, 'predictions', self._deterministic_payload(text, result, request_id))
+
+    def _deterministic_payload(self, text: str, result: Dict[str, Any], request_id: Optional[int]) -> Dict[str, Any]:
+        return {
+            # Ranked candidates (board order), kept for existing consumers.
+            'words': [
+                {'word': word, 'score': round(float(result['scores'].get(word, 0.0)), 4), 'source': 'deterministic'}
+                for word in result['ranked']
+            ],
+            # Presentation slots: fixed positions, None = deliberately empty.
+            'word_slots': result['slots'],
+            'sentences': self._deterministic_sentences(text),
+            'request_id': request_id,
+            'prediction': {
+                'engine': DETERMINISTIC_ENGINE_VERSION,
+                'text': text,
+                'prefix': result['prefix'],
+                'slot_count': len(result['slots']),
+                'lineage': bool(result.get('lineage')),
+            },
+        }
+
+    def _deterministic_sentences(self, text: str) -> List[Dict[str, Any]]:
+        """Phrase-level suggestions, separate from word slots, English-only.
+
+        modes: 'replace_token' (abbreviation expansion replaces the typed
+        shortcut), 'complete_or_append' (sentence completes the typed text when
+        it starts with it, otherwise is appended), 'append' (starters).
+        """
+        suggestions: List[Dict[str, Any]] = []
+        seen: Set[str] = set()
+
+        def push(item: Dict[str, Any]) -> None:
+            key = item['text'].strip().lower()
+            if not key or key in seen or contains_blocked_prediction_word(item['text']):
+                return
+            if not self._english_only.allows(item['text']):
+                return
+            seen.add(key)
+            suggestions.append(item)
+
+        token_match = re.search(r'(\S+)$', text)
+        if token_match and not text[-1:].isspace():
+            token = token_match.group(1)
+            expansion = self.prediction.expand_abbreviation(token)
+            if expansion:
+                push({'text': expansion, 'score': 2.0, 'source': 'abbreviation', 'mode': 'replace_token', 'token': token})
+        topic_boosts = self._session_topics.get_boosts(text)
+        stripped = text.strip()
+        if not stripped:
+            for item in self._get_starter_predictions(topic_boosts=topic_boosts, top_k=8):
+                push({'text': item['word'], 'score': item['score'], 'source': item['source'], 'mode': 'append'})
+        elif len(stripped) >= 2:
+            for sp in self.sentence_predictor.predict(stripped, top_k=6, topic_boosts=topic_boosts):
+                push({'text': sp.text, 'score': sp.score, 'source': sp.source, 'mode': 'complete_or_append'})
+            if self.config.enable_neural_sentence_continuation and len(suggestions) < 3:
+                words = stripped.split()
+                context = ' '.join(words[:-1]) if not text.endswith(' ') and len(words) >= 2 else stripped
+                if len(context.split()) >= 2:
+                    continuation = self.prediction.predict_sentence_neural(context, num_words=4)
+                    if continuation and len(continuation.strip()) >= 3:
+                        push({'text': f"{context} {continuation}".strip(), 'score': 0.5, 'source': 'neural', 'mode': 'complete_or_append'})
+        return suggestions[:4]
+
+    def _learn_word(self, data: Dict[str, Any]) -> None:
+        """A word the person explicitly accepted (prediction selected / Zone Board confirmed)."""
+        word = data.get('word', '')
+        if not isinstance(word, str) or not word.strip() or is_blocked_prediction_word(word.strip().lower()):
+            return
+        if self.word_service is None:
+            self.prediction.learn_word(word)
+            return
+        before, after = data.get('text_before'), data.get('text_after')
+        before = before if isinstance(before, str) else None
+        after = after if isinstance(after, str) else None
+        context = confirmed_history(before) if before is not None else None
+        self.prediction.learn_word(word, before, after, context)
+
+    def _undo_word_learning(self, text_before: Any, text_after: Any) -> None:
+        if self.word_service is None or not isinstance(text_before, str) or not isinstance(text_after, str):
+            return
+        self.prediction.store.undo_removed_words(text_before, text_after)
+
+    def _reset_word_learning(self, websocket) -> None:
+        if self.word_service is None:
+            return
+        self.prediction.store.reset()
+        self.prediction.store.save()
+        self._send(websocket, 'word_learning_reset', {'success': True})
+
+    def _set_prediction_context(self, websocket, phrases: Any, words: Any) -> None:
+        """Household configuration from the renderer: board phrases and configured words."""
+        if self.word_service is None or not isinstance(phrases, list):
+            return
+        counts = self.word_service.set_context(phrases, words if isinstance(words, list) else [])
+        self._send(websocket, 'prediction_context_set', counts)
+
+    def _get_predictions_legacy(
+        self,
+        websocket: WebSocketServerProtocol,
+        text: str,
+        length_hint: Optional[int] = None,
+        top_k: int = 12,
+        request_id: Optional[int] = None,
+    ):
+        """Legacy engine path (rollback): unchanged behaviour."""
         topic_boosts = self._session_topics.get_boosts(text)
         if not text.strip():
             results = self._get_starter_predictions(topic_boosts=topic_boosts, top_k=top_k)
@@ -3046,6 +3239,8 @@ class GazeConnectBackend:
             pass
         finally:
             self.connected_clients.discard(websocket)
+            if self.word_service is not None:
+                self.word_service.forget_client(websocket)
             logger.info(f"Client disconnected ({len(self.connected_clients)} remaining)")
 
     async def _periodic_tasks(self):
@@ -3096,10 +3291,16 @@ class GazeConnectBackend:
         data_file = Path(self.config.data_dir) / 'prediction_data.json'
         self.prediction.load()
 
-        # Learn from saved chat history to improve predictions
+        # Learn from saved chat history to improve predictions (legacy engine
+        # only; the deterministic engine learns from committed actions).
         chat_dir = self._get_chat_history_dir()
         self.prediction.learn_from_chat_history(str(chat_dir))
         logger.info(f"Chat history folder: {chat_dir}")
+
+        # Warm the word prediction worker before the first keystroke needs it.
+        if self.word_service is not None:
+            self.word_service.start()
+            logger.info(f"Word prediction: {DETERMINISTIC_ENGINE_VERSION} ({self.config.prediction_execution})")
 
         # Enforce retention limits at startup as well.
         self._run_storage_maintenance()
@@ -3166,6 +3367,8 @@ class GazeConnectBackend:
         data_file = Path(self.config.data_dir) / 'prediction_data.json'
         self.prediction.save()
         self.sentence_predictor.save()
+        if self.word_service is not None:
+            self.word_service.shutdown()
 
         logger.info("Backend stopped")
 
@@ -3184,6 +3387,19 @@ def main():
     parser.add_argument('--no-tobii', action='store_true', help='Disable Tobii')
     parser.add_argument('--data-dir', default='./data', help='Data directory')
     parser.add_argument('--survey-data-dir', default='./survey_data', help='Survey data directory')
+    def env_choice(name: str, choices: tuple, default: str) -> str:
+        # argparse does not validate defaults, so normalise the environment here.
+        value = os.environ.get(name, '').strip().lower()
+        if value and value not in choices:
+            logger.warning(f"Ignoring {name}={value!r}; expected one of {', '.join(choices)}")
+        return value if value in choices else default
+
+    parser.add_argument('--prediction-engine', choices=('deterministic', 'legacy'),
+                        default=env_choice('GAZECONNECT_PREDICTION_ENGINE', ('deterministic', 'legacy'), 'deterministic'),
+                        help='Word prediction engine (legacy is a rollback)')
+    parser.add_argument('--prediction-execution', choices=('process', 'thread', 'inline'),
+                        default=env_choice('GAZECONNECT_PREDICTION_EXECUTION', ('process', 'thread', 'inline'), 'process'),
+                        help='Where deterministic scoring runs')
 
     args = parser.parse_args()
 
@@ -3193,7 +3409,9 @@ def main():
         tobii_enabled=not args.no_tobii,
         tobii_simulated=args.simulate,
         data_dir=args.data_dir,
-        survey_data_dir=args.survey_data_dir
+        survey_data_dir=args.survey_data_dir,
+        prediction_engine=args.prediction_engine,
+        prediction_execution=args.prediction_execution,
     )
 
     backend = GazeConnectBackend(config)
