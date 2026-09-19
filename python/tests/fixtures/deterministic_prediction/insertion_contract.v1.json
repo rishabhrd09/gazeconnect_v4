@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "description": "Word-slot insertion contract: currentPrefix(draft) and acceptPredictedWord(draft, word). Expected values generated from the pinned reference; checked by scripts/check-word-prediction-slots.cjs (renderer) and python/tests/test_deterministic_insertion_contract.py (engine).",
+  "reference": {
+    "commit": "de33a958848c3cff3cabd851d8f2eb50f4214a00",
+    "functions": [
+      "currentPrefix",
+      "acceptPredictedWord"
+    ]
+  },
+  "cases": [
+    {
+      "draft": "",
+      "word": "hello",
+      "prefix": "",
+      "accepted": "hello "
+    },
+    {
+      "draft": "i need wa",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "i need water "
+    },
+    {
+      "draft": "i need ",
+      "word": "water",
+      "prefix": "",
+      "accepted": "i need water "
+    },
+    {
+      "draft": "i need",
+      "word": "needed",
+      "prefix": "need",
+      "accepted": "i needed "
+    },
+    {
+      "draft": "Hi,wa",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "Hi, water "
+    },
+    {
+      "draft": "I\nwant\twa",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "I\nwant\twater "
+    },
+    {
+      "draft": "don",
+      "word": "don't",
+      "prefix": "don",
+      "accepted": "don't "
+    },
+    {
+      "draft": "i can'",
+      "word": "can't",
+      "prefix": "can'",
+      "accepted": "i can't "
+    },
+    {
+      "draft": "I need water. ",
+      "word": "please",
+      "prefix": "",
+      "accepted": "I need water. please "
+    },
+    {
+      "draft": "I need water.",
+      "word": "Please",
+      "prefix": "",
+      "accepted": "I need water. Please "
+    },
+    {
+      "draft": "wa  ",
+      "word": "water",
+      "prefix": "",
+      "accepted": "wa  water "
+    },
+    {
+      "draft": "i need wa",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "i need water "
+    },
+    {
+      "draft": "don’",
+      "word": "don't",
+      "prefix": "don'",
+      "accepted": "don't "
+    },
+    {
+      "draft": "I NEED WA",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "I NEED water "
+    },
+    {
+      "draft": "call pa",
+      "word": "Papa",
+      "prefix": "pa",
+      "accepted": "call Papa "
+    },
+    {
+      "draft": "my back is hu",
+      "word": "hurting",
+      "prefix": "hu",
+      "accepted": "my back is hurting "
+    },
+    {
+      "draft": "123 wa",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "123 water "
+    },
+    {
+      "draft": "(wa",
+      "word": "water",
+      "prefix": "wa",
+      "accepted": "( water "
+    },
+    {
+      "draft": "i need wa ",
+      "word": "water",
+      "prefix": "",
+      "accepted": "i need wa water "
+    },
+    {
+      "draft": "i need water ",
+      "word": "now",
+      "prefix": "",
+      "accepted": "i need water now "
+    }
+  ]
+}
