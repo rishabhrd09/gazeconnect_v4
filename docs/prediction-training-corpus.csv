@@ -1,0 +1,894 @@
+index,text,role,source
+1,I want to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+2,I need to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+3,I would like,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+4,I am feeling,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+5,Can you please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+6,Could you please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+7,Please help me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+8,Thank you for,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+9,I don't want,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+10,Let me know,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+11,Tell me about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+12,I think we should,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+13,I want you to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+14,Please check my,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+15,Please give me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+16,Please bring me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+17,Please tell them,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+18,Please come here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+19,Please call,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+20,I am doing fine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+21,I am comfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+22,I am not comfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+23,I am improving,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+24,I am hopeful,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+25,I am worried about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+26,I am happy with,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+27,I am tired of,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+28,Please turn on the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+29,Please turn off the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+30,Change my position,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+31,Adjust my pillow,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+32,I need suction,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+33,I need water,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+34,I need medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+35,Check my blood pressure,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+36,Check my temperature,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+37,Give me nebulization,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+38,Start the ambu,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+39,Turn me on my left side,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+40,Turn me on my right side,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+41,Raise my head,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+42,Lower my head,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+43,Apply body lotion,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+44,Give me sponging,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+45,Good morning,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+46,Good night,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+47,Good evening,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+48,How are you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+49,I miss you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+50,Happy birthday,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+51,All the best,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+52,Rest is fine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+53,Enough for today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+54,Good bye,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+55,What else,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+56,Any update,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+57,Any news,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+58,Tell them to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+59,Remind them about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+60,Call the doctor,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+61,Call mummy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+62,Call papa,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+63,Play some music,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+64,Play old songs,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+65,Turn on the TV,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+66,Change the channel,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+67,I am feeling cold,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+68,I am feeling hot,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+69,I am feeling hungry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+70,I am feeling thirsty,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+71,The staff is good,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+72,The caretaker needs to work,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+73,Please delegate work,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+74,Train the new person,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+75,Be careful with me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+76,Handle me gently,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+77,Don't leave me alone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+78,Stay with me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+79,I want to sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+80,I want to rest,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+81,I want black tea,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+82,I want warm water,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+83,Tell mummy to take rest,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+84,Tell mummy to take sufficient rest and care for health,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+85,I am worried about health,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+86,I am worried about nilesh going on leave,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+87,Staff is good and picking up fast,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+88,New man is picking up fast,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+89,Please check my blood pressure medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+90,Saliva is thick,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+91,Saliva is thick as if glycolate,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+92,Respiratory system has become weak,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+93,Ambu is needed every time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+94,Clean my neck and ears properly,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+95,Apply body lotion on body everywhere,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+96,Start black masala tea in morning,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+97,Give me fruit at ten morning,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+98,Give me desi nashta alternate day,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+99,Delegate some more work to staff,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+100,Put some warm water and medicines here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+101,Tell both staff to stay for long time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+102,Tell both staff to stay for long time and respect each other,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+103,I am improving and hopeful,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+104,Rest is fine looking ahead,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+105,Enough for today good night,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+106,Happy Diwali,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+107,Happy Deepawali,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+108,I keep sliding give me support,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+109,Cover my body properly,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+110,Cover my body to avoid embarrassment,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+111,Suction is in control,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+112,I will require glycolate,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+113,I will require glycolate for two three days,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+114,Back care is important,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+115,TT management is also an issue,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+116,Please take quick decisions,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+117,Please take quick decisions about house and plot,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+118,Any progress regarding plot,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+119,What about music show,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+120,I am enjoying all diets and services,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+121,I am busy in sleeping diet and sponging,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+122,Come out of my worries,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+123,Good night and sweet dreams,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+124,Keep your passion live,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+125,I am doing fine with your efforts,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+126,I am doing fine with your efforts and durgesh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+127,Call rishabh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+128,Call parakh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+129,Call mummy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+130,Call nilesh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+131,Call durgesh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+132,Call akhil,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+133,Call anand,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+134,Call rahul,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+135,Call chetan,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+136,Call girish,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+137,Call rajesh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+138,Tell rishabh about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+139,Tell parakh about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+140,Pari your jobs are good,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+141,Pari must prepare,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+142,Parakh all the best and badhai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+143,Parakh be focused punctual and loyal,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+144,Tell ani also to be calm,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+145,Akhil any update about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+146,Anand and pintoo assign work,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+147,Assign my work to anand pintoo and staff,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+148,Nilesh is here for me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+149,Please see nilesh status,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+150,Worried about nilesh going on leave,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+151,Durgesh resolved our issues very nicely,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+152,Durgesh is working hard,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+153,Durgesh is over exerting,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+154,Share my view with durgesh also,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+155,Show him salman photo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+156,Keep connected with shuklaji and jatav,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+157,Gift them deepawali saree and shirt,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+158,Girish is also good person,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+159,Train the new person about back care,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+160,The caretaker is over smart,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+161,He does not want to work,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+162,TT suction needed now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+163,Oral suction needed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+164,This time TT is not comfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+165,Bombay wala much better,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+166,Clear and no bleeding,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+167,They are trial and error,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+168,Give me nityam daily irrespective of motion,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+169,I am requiring glycolate also due to excessive saliva,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+170,Nebulization twice a day with ambu,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+171,Exercises are in full mood,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+172,Side suction band,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+173,Breathing problem ambu bag,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+174,Check vitals oxygen pulse,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+175,Ventilator alarm check,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+176,Chest discomfort,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+177,Feeling cold shivering,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+178,I want a list of works for new staff with time table,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+179,He should come a day earlier for proper training,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+180,About black tea order daddu to do it,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+181,He will do it with pleasure,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+182,Pink is very good we will use when guests are there,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+183,Nilesh was to bring a massage oil,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+184,Mummy greet elders for diwali including badi mummy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+185,Enough for today come out of my lafada,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+186,Start about construction and bahu,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+187,What about my black tea and nashta,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+188,Your music program was good keep it up,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+189,He is busy in chatting tobacco toilet and meals,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+190,Not learning inspite of such a good trainer like durgesh,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+191,Keep connected with shuklaji,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+192,I am busy in karvat for eight hours a day,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+193,Sleeping diet and sponging TV,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+194,Check exact location of sky park plot,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+195,Plot near play ground east facing is fine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+196,I have already started planning but disposal first,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+197,West facing ka plan also ready,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+198,Any progress regarding plot and medical bill,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+199,Hundai and tata have come with good SUVs,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+200,Bahu laane ka please jaldi,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+201,Happy birthday month to your mummy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+202,My dear boss,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+203,I am enjoying all diets and services,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+204,I am comfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+205,I am not comfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+206,Rest is okay,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+207,I can not tolerate him,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+208,He treats me like an object not as a human,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+209,Don't leave me alone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+210,Stay with me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+211,I am feeling itching in whole body,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+212,Vishnuji welcome,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+213,What else anything else,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+214,Any news from anywhere,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+215,I want to go,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+216,I want to eat,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+217,I want to sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+218,I want to know,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+219,I want to see,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+220,I want to talk,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+221,I want to read,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+222,I want to watch,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+223,I want to hear,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+224,I want to rest,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+225,I want to try,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+226,I want to sit,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+227,I want to learn,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+228,I want to play,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+229,I want to call,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+230,I want to tell,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+231,I want to ask,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+232,I want to meet,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+233,I want to help,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+234,I want to stay,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+235,I want to leave,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+236,I want to think,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+237,I want to drink,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+238,I want to write,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+239,I want to speak,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+240,I want to understand,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+241,I want to change,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+242,I need to rest,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+243,I need to eat,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+244,I need to sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+245,I need to talk,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+246,I need to think,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+247,I need to go,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+248,I need to see,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+249,I need to tell,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+250,I need to ask,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+251,I need to know,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+252,I need to check,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+253,I need to call,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+254,I need to take,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+255,I need to find,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+256,I need to stop,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+257,I need to start,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+258,Can you help me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+259,Can you please come,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+260,Can you bring me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+261,Can you turn on the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+262,Can you turn off the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+263,Can you check,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+264,Can you call,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+265,Can you tell me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+266,Can you give me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+267,Can you show me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+268,Can you open the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+269,Can you close the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+270,Can you move,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+271,Can you read to me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+272,Can you play some music,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+273,Can you wait,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+274,Could you please help,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+275,Could you bring me water,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+276,Could you turn the light on,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+277,Could you close the window,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+278,Could you call the doctor,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+279,Could you check my temperature,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+280,Could you please come here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+281,Could you move the pillow,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+282,Please help me with,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+283,Please bring me some,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+284,Please turn on,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+285,Please turn off,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+286,Please come here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+287,Please wait a moment,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+288,Please tell them,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+289,Please call the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+290,Please check my,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+291,Please give me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+292,Please don't go,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+293,Please be careful,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+294,Please sit down,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+295,Please close the door,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+296,Please open the window,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+297,Please bring my,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+298,Please remind me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+299,Please show me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+300,I am fine today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+301,I am feeling better,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+302,I am feeling worse,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+303,I am feeling tired,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+304,I am feeling cold,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+305,I am feeling hot,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+306,I am feeling hungry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+307,I am feeling thirsty,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+308,I am feeling sick,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+309,I am feeling happy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+310,I am feeling sad,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+311,I am feeling lonely,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+312,I am doing well,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+313,I am okay,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+314,I am ready,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+315,I am not feeling well,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+316,I am not hungry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+317,I am not tired,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+318,I feel much better today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+319,I feel a little pain,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+320,I feel like watching something,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+321,I feel like listening to music,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+322,I think we should,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+323,I think it is time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+324,I think that is,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+325,I think you are right,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+326,I think he should,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+327,I think she is,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+328,I think they will,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+329,I think we need to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+330,I think it would be,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+331,I believe it will,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+332,I believe we can,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+333,It is very cold today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+334,It is too hot,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+335,It is getting late,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+336,It is time for medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+337,It is time for dinner,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+338,It is time to sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+339,It is raining outside,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+340,That is very good,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+341,That is not right,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+342,That is enough,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+343,That is what I want,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+344,That was nice,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+345,There is something wrong,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+346,There is too much noise,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+347,There is a problem,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+348,There is no need to worry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+349,There are people coming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+350,There are some things I want to say,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+351,What time is it,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+352,What is happening,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+353,What do you think,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+354,What did the doctor say,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+355,What is the weather like,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+356,What should we do,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+357,What else is there,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+358,Where is my phone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+359,Where is everyone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+360,Where did they go,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+361,When will they come,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+362,When is the appointment,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+363,When is dinner,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+364,Who is at the door,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+365,Who called,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+366,Who is coming today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+367,How are you doing,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+368,How is the weather,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+369,How long will it take,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+370,How much does it cost,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+371,How is everything,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+372,Why is it taking so long,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+373,Why did they leave,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+374,The weather is nice today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+375,The food is good,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+376,The doctor will come,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+377,The nurse is here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+378,The medicine is working,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+379,The pain is less today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+380,The family is coming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+381,The children are playing,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+382,The morning was nice,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+383,The evening was peaceful,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+384,The water is warm,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+385,The room is cold,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+386,In the morning I want,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+387,In the evening we can,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+388,Tomorrow I want to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+389,Yesterday was a good day,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+390,Today I am feeling,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+391,This morning I had,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+392,This evening I want,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+393,Tonight I want to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+394,Every day I need,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+395,Every morning they should,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+396,Last night I could not sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+397,Last week was better,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+398,Tell me about your day,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+399,Tell me what happened,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+400,Let me know when,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+401,Let me think about it,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+402,I am looking forward to,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+403,I was thinking about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+404,We should talk about,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+405,We need to discuss,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+406,They should come and visit,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+407,He said that he would,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+408,She told me that,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+409,It seems like the,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+410,I would like to know,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+411,I would like to have,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+412,I should have told you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+413,I could not sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+414,We can try again tomorrow,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+415,We will see what happens,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+416,Thank you for everything,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+417,Thank you for coming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+418,Thank you for your help,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+419,Thank you so much,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+420,I appreciate what you do,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+421,I appreciate your effort,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+422,I am sorry for the trouble,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+423,I am sorry about that,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+424,I am grateful for your support,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+425,I am blessed to have you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+426,You are doing a great job,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+427,You are very kind,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+428,Take care of yourself,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+429,Take some rest please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+430,Don't worry about me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+431,Don't forget to eat,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+432,I will be fine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+433,Everything will be okay,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+434,Life is getting better,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+435,Things are improving,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+436,I have been thinking about the future,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+437,I want to spend time with family,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+438,Send my regards to everyone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+439,I miss being outside,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+440,The world is a beautiful place,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+441,Mummy ko bulao,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+442,Pani de do,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+443,Dawa ka time ho gaya,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+444,Chai de do please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+445,Mujhe dard ho raha hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+446,Mujhe neend aa rahi hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+447,Position change karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+448,AC chalu karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+449,Fan band karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+450,Light band karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+451,TV chalu karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+452,Khana garam karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+453,Khana halka chahiye,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+454,Doodh garam karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+455,Staff ko bulao,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+456,Doctor ko call karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+457,Suction kar do,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+458,Sab theek hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+459,Koi baat nahi,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+460,Aaram se karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+461,Dawai de do time pe,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+462,Pani thanda chahiye,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+463,Garam pani lao,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+464,Kambal de do,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+465,Takiya adjust karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+466,Light off karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+467,Phone lao,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+468,Remote kidhar hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+469,Nurse ko bulao,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+470,Mujhe uthao,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+471,Side change karo,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+472,Kamar mein dard hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+473,Pair mein dard hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+474,Sar mein dard hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+475,Pet mein taklif hai,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+476,What time is it now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+477,What is for dinner today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+478,What did the doctor say,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+479,Where is my phone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+480,Where is mummy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+481,Where is the remote,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+482,When will doctor come,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+483,When is medicine time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+484,When will they come,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+485,Who is at the door,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+486,Who called just now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+487,How are you feeling,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+488,How is the weather today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+489,How long will it take,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+490,Why is it taking so long,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+491,What channel is this,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+492,What happened today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+493,What is wrong,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+494,Where did everyone go,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+495,Where is my glasses,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+496,Where is the wheelchair,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+497,When is breakfast ready,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+498,When is physiotherapy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+499,When will nurse come,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+500,Who is coming today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+501,Who is on duty today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+502,Who will stay tonight,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+503,How is papa doing,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+504,How much medicine left,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+505,Why is it so cold,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+506,I am feeling much better today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+507,I am not feeling well,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+508,I am grateful for your help,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+509,I miss talking to everyone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+510,I am proud of you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+511,Take care of yourself also,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+512,Do not worry about me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+513,Everything will be fine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+514,I am feeling hopeful today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+515,I am feeling a bit low,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+516,You make me happy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+517,I am sorry for the trouble,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+518,I wish I could do more,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+519,Keep up the good work,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+520,You are doing great,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+521,I feel safe with you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+522,I trust you completely,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+523,God bless you all,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+524,I pray for everyone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+525,Give medicine on time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+526,Check oxygen level,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+527,Change the bedsheet,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+528,Massage my legs gently,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+529,Support my back properly,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+530,Do not rush the sponging,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+531,Be careful with the tube,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+532,Check blood pressure twice daily,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+533,Record the temperature,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+534,Suction every two hours,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+535,Nebulization before meals,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+536,Give water through the funnel,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+537,Elevate the bed head,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+538,Apply cream on pressure areas,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+539,Turn me every two hours,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+540,Check the oxygen concentrator,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+541,Replace the nasal cannula,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+542,Prepare the ambu bag,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+543,Keep emergency medicines ready,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+544,Monitor breathing pattern,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+545,Report any skin redness,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+546,Start with tea and medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+547,Give sponge bath before breakfast,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+548,Time for physiotherapy exercises,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+549,Read the newspaper to me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+550,Put on some devotional music,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+551,Lunch should be light today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+552,Afternoon rest time now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+553,Wake me at four o clock,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+554,Evening walk in wheelchair,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+555,Family video call after dinner,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+556,Check everything before night,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+557,Set the bed properly for sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+558,Morning prayer time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+559,Brush my teeth please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+560,Shave my face today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+561,Cut my nails please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+562,Clean my ears gently,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+563,Wash my face please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+564,How is everyone at home,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+565,Tell the children I said hello,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+566,I want to talk to bhaiya,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+567,Ask didi to visit this weekend,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+568,Send birthday wishes to him,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+569,Congratulations to the family,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+570,I remember the old days,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+571,Those were good times,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+572,Tell me about the grandchildren,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+573,How is school going,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+574,Is there any function coming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+575,Wedding preparations going well,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+576,Tell them not to worry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+577,I am managing well here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+578,Send photos of the family,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+579,Show me the video from yesterday,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+580,Room is too cold please warm it,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+581,Room is too hot turn on AC,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+582,The noise is disturbing me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+583,Please close the window,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+584,Open the curtains for sunlight,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+585,The bed is uncomfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+586,Pillow needs to be higher,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+587,Blanket is too heavy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+588,The light is too bright,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+589,Keep a small light on,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+590,Air freshener please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+591,The room smells bad,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+592,Clean the floor please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+593,Arrange my things properly,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+594,Keep water bottle within reach,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+595,Put the call bell near me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+596,I want something sweet,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+597,I want something salty,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+598,Make dal and rice for lunch,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+599,I want soup for dinner,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+600,Fruit juice please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+601,Give me banana shake,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+602,No spicy food today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+603,I want soft food only,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+604,Warm milk before sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+605,Give me curd rice,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+606,I want boiled vegetables,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+607,Make porridge for breakfast,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+608,No oil in the food,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+609,Add less salt please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+610,I want ice cream,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+611,Give me coconut water,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+612,Wake me up at six,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+613,Time for morning medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+614,Give me my morning tea first,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+615,Start with sponging today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+616,Brush my teeth please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+617,Wash my face,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+618,Comb my hair,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+619,Time for breakfast now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+620,Give me my vitamins,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+621,Check my blood sugar,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+622,Time for physiotherapy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+623,Lunch should be light today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+624,I want to take a nap,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+625,Wake me up after one hour,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+626,Time for evening medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+627,What is for dinner tonight,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+628,Give me warm milk before sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+629,Turn off all lights,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+630,Today was a good day,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+631,Ready for bed now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+632,Check everything before sleeping,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+633,Keep water bottle near me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+634,Keep the bell near my hand,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+635,Keep phone on charging,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+636,Set the room temperature,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+637,Night duty person should stay alert,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+638,Morning staff should come on time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+639,Prepare my schedule for tomorrow,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+640,Raise my head a little,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+641,Lower my head please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+642,Tilt me slightly to the left,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+643,Tilt me slightly to the right,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+644,Straighten my legs,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+645,Bend my knees a little,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+646,Put support behind my back,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+647,Support under my arms please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+648,My hand is sliding down,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+649,Fix my hand position,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+650,My foot is hanging off the bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+651,Elevate my legs please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+652,I am sliding down on the bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+653,Pull me up on the bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+654,Adjust the bed angle,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+655,Recline the bed more,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+656,Make the bed flat,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+657,My neck needs more support,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+658,Put a roll under my neck,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+659,My shoulder is hurting from this position,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+660,I have been in this position too long,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+661,Change me to the other side,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+662,I want to sit in the wheelchair,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+663,I want to go back to bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+664,Put cushion under my knees,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+665,Suction is needed now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+666,Oral suction first then TT,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+667,Be gentle with the suction,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+668,How much secretion came out,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+669,Secretion is thick today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+670,Secretion is thin and clear,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+671,Give nebulization before suction,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+672,Start ambu bag for five minutes,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+673,Check ventilator settings,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+674,Oxygen saturation is dropping,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+675,Increase the oxygen flow,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+676,Check the tube position,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+677,The tube is uncomfortable,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+678,Tracheostomy site needs cleaning,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+679,Apply ointment on the site,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+680,Check for any redness or swelling,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+681,Give me glycopyrolate for saliva,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+682,Saliva is too much today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+683,I need mouth suctioning more often,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+684,Give me the inhaler,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+685,My chest feels congested,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+686,Do chest physiotherapy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+687,Percussion on both sides,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+688,Postural drainage needed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+689,Record my vitals now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+690,Write down the readings,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+691,Show me my vitals chart,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+692,Compare with yesterday readings,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+693,Inform the doctor about this,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+694,Schedule a doctor visit,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+695,I want something warm to eat,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+696,I want something cold to drink,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+697,Make it less spicy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+698,Add more salt,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+699,No sugar in this,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+700,Blend it smooth for me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+701,It should be easy to swallow,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+702,Cut it into very small pieces,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+703,Make it semi liquid,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+704,I want curd rice today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+705,Give me dal with ghee,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+706,Moong dal soup please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+707,Banana shake for me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+708,Apple juice without sugar,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+709,Warm honey water,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+710,Give me protein shake,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+711,Ensure or supplement drink,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+712,I want home cooked food,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+713,No outside food today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+714,Give me a small portion,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+715,I am full now thank you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+716,Save the rest for later,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+717,Reheat my food please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+718,Feed me slowly please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+719,How are the children doing,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+720,Show me their school photos,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+721,Tell the children to study well,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+722,I want to see the grandchildren,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+723,Record a message for them,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+724,Play the voice message again,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+725,Tell them not to worry about me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+726,Send my blessings to everyone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+727,Plan a family video call,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+728,I want to talk to my brother,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+729,I want to talk to my sister,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+730,Wish them happy birthday from me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+731,Wish them happy anniversary,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+732,Help them with the paperwork,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+733,Pay the bills on time,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+734,Check the bank account,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+735,Review the insurance papers,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+736,Follow up on pending work,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+737,Remind them about the appointment,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+738,I appreciate everything you do,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+739,You are doing a wonderful job,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+740,I am proud of this family,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+741,Your support means everything,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+742,I feel blessed to have you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+743,Today I am in a good mood,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+744,Let us talk about something nice,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+745,Tell me some good news,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+746,Play my favorite songs,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+747,Show me family photos,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+748,Read something inspiring to me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+749,I want to hear a story,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+750,Tell me about your day,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+751,What is happening in the world,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+752,I want to express my gratitude,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+753,Life is precious,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+754,Every day is a gift,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+755,Who is visiting today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+756,I am ready for visitors now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+757,I need thirty minutes to rest first,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+758,Please keep the visit short,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+759,Tell them I enjoyed the visit,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+760,Thank them for coming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+761,I do not want visitors right now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+762,Let only family come today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+763,Prepare tea for the guests,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+764,Ask them to come again,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+765,Change the TV channel,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+766,Put on the news channel,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+767,Play cricket highlights,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+768,Open YouTube on the TV,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+769,Play devotional songs,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+770,Play classical music,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+771,Play old Hindi songs,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+772,Increase the volume a little,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+773,Decrease the volume,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+774,Put on subtitles,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+775,Read my messages to me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+776,Check my WhatsApp,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+777,Show me today newspaper,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+778,Read the headlines to me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+779,What is the weather outside,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+780,Is it raining today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+781,Open the curtains I want to see outside,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+782,The room is too dark,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+783,The room needs fresh air,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+784,Spray some room freshener,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+785,Clean the room please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+786,Change the bed cover,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+787,Put fresh flowers in the room,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+788,I am stuck in this position,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+789,Pull me up in bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+790,Adjust the footrest,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+791,Adjust the recline,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+792,Raise the head of the bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+793,Lower the head of the bed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+794,I need a heating pad,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+795,I need an ice pack,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+796,I need lip balm,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+797,I need lotion on my skin,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+798,I feel nauseous,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+799,I feel light headed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+800,I feel dizzy,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+801,I have a headache,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+802,I have a stomach ache,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+803,My throat is sore,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+804,I feel stiff all over,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+805,I have a rash,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+806,Wash my hair please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+807,Give me a shave,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+808,Clip my nails,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+809,Give me a bath,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+810,Clean me up please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+811,I need a fresh gown,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+812,I need clean clothes,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+813,Get my glasses please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+814,Wipe my mouth,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+815,Wipe my eyes,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+816,Clean my nose,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+817,My breathing feels different,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+818,Something does not feel right,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+819,The pain is getting worse,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+820,The pain is in a new place,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+821,I feel better than yesterday,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+822,I feel the same as yesterday,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+823,I feel worse than yesterday,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+824,The medicine is helping,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+825,The medicine is not helping,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+826,My mouth is very dry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+827,My eyes are very dry,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+828,I feel very weak today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+829,I feel stronger today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+830,My throat feels tight,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+831,I am having trouble swallowing,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+832,I choked a little,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+833,Wait I am not finished,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+834,Let me finish my sentence,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+835,I made a mistake start over,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+836,You did not understand me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+837,Please read what I typed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+838,Say that again please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+839,Speak slower please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+840,Come closer I cannot see you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+841,I cannot hear you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+842,Move to my other side,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+843,Look at the screen,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+844,Read the screen please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+845,What day is it today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+846,What is the date today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+847,What time is it now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+848,How long have I been sleeping,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+849,How long until my next medicine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+850,When is the doctor coming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+851,When is my next meal,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+852,Is it morning or evening,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+853,What is happening today,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+854,I need some quiet time alone,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+855,I want company please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+856,I am feeling lonely,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+857,I am feeling anxious,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+858,I feel overwhelmed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+859,I need to rest my eyes,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+860,Can we just sit together quietly,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+861,Hold my hand please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+862,I want to listen to something calming,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+863,I need a break from talking,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+864,I want to see the sky outside,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+865,Open the window I want fresh air,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+866,Something is beeping,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+867,The alarm is going off,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+868,Check the machine,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+869,I cannot reach the call button,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+870,My tube feels wrong,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+871,Something is leaking,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+872,I am about to cough,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+873,I need suctioning right now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+874,Hold my head please,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+875,Support my neck,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+876,I cannot sleep,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+877,I need to change position again,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+878,Check on me in thirty minutes,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+879,Do not wake me unless urgent,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+880,Leave a small light on,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+881,Play soft music for me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+882,I am comfortable now thank you,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+883,Good night see you in the morning,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+884,You are very kind,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+885,I appreciate your patience,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+886,That was exactly what I needed,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+887,You understood me perfectly,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+888,That feels much better now,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+889,You make my day better,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+890,I am lucky to have such good care,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+891,Please thank everyone for me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+892,You are getting better at understanding me,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS
+893,I feel safe with you here,"N-gram training, not guaranteed phrase suggestion",python/services/word_prediction.py:TRAINING_CORPUS

@@ -1,0 +1,362 @@
+section,group,text,spoken,status,source
+Quick Phrases / Quick Words,Medical / Urgent,TT Suction,TT Suction,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → TT Suction,Do TT suction,Do TT suction,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → TT Suction,Remove secretions from suction side,Remove secretions from suction side,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → TT Suction,Check the trach tube,Check the trach tube,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → TT Suction,I am feeling some obstruction,I am feeling some obstruction,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent,Oral Suction,Oral Suction,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Oral Suction,Do oral suction,Do oral suction,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Oral Suction,There is saliva in my mouth,There is saliva in my mouth,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Oral Suction,Do oral care and clean my teeth,Do oral care and clean my teeth,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Oral Suction,I am choking on secretions,I am choking on secretions,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Oral Suction,Come quickly,Come quickly,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent,Breathing / Ambu,Breathing / Ambu,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Breathing / Ambu,I am having trouble breathing,I am having trouble breathing,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Breathing / Ambu,Use the Ambu bag,Use the Ambu bag,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Breathing / Ambu,Check oxygen support,Check oxygen support,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Breathing / Ambu,Check TT cuff pressure,Check TT cuff pressure,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Breathing / Ambu,Call nurse now,Call nurse now,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent,BP / Pulse,BP / Pulse,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → BP / Pulse,Check my BP,Check my BP,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → BP / Pulse,Check my pulse,Check my pulse,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → BP / Pulse,I feel dizzy,I feel dizzy,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → BP / Pulse,I feel weak,I feel weak,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → BP / Pulse,Check the monitor,Check the monitor,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent,Chest / Nebulization,Chest / Nebulization,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Chest / Nebulization,I have chest discomfort,I have chest discomfort,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Chest / Nebulization,My chest feels tight / chest congestion,My chest feels tight / chest congestion,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Chest / Nebulization,Give nebulization,Give nebulization,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent,Severe Pain,Severe Pain,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Severe Pain,Back pain / headache,Back pain / headache,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Severe Pain,Throat pain,Throat pain,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Severe Pain,Pain in hands and legs,Pain in hands and legs,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Medical / Urgent → Severe Pain,Stomach pain,Stomach pain,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position,Turn Left,Turn Left,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position,Turn Right,Turn Right,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position,Head Up,Head Up,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Up,Raise bed angle,Raise bed angle,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Up,Raise the backrest,Raise the backrest,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Up,Shift me up,Shift me up,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Up,Adjust bed angle to sitting position,Adjust bed angle to sitting position,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position,Head Down,Head Down,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Down,Lower bed angle,Lower bed angle,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Down,Lower the backrest,Lower the backrest,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Down,Shift me up,Shift me up,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Head Down,Adjust bed angle to sitting position,Adjust bed angle to sitting position,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position,Fix Pillow,Fix Pillow,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Fix Pillow,Fix my pillow,Fix my pillow,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Fix Pillow,Move the pillow higher,Move the pillow higher,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Fix Pillow,Move the pillow lower,Move the pillow lower,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Fix Pillow,Support my neck better,Support my neck better,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Fix Pillow,That is better,That is better,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position,Adjust Hands & Legs,Adjust Hands & Legs,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Adjust Hands & Legs,Adjust my hands,Adjust my hands,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Adjust Hands & Legs,Adjust my legs,Adjust my legs,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Adjust Hands & Legs,My arm is uncomfortable,My arm is uncomfortable,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Adjust Hands & Legs,My leg needs support,My leg needs support,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Position → Adjust Hands & Legs,That is better now,That is better now,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,Water,Water,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,Eyes / Face,Eyes / Face,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Eyes / Face,Put eye drops,Put eye drops,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Eyes / Face,My eyes are dry,My eyes are dry,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Eyes / Face,Clean my eyes,Clean my eyes,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Eyes / Face,Clean my face,Clean my face,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Eyes / Face,My eyes are irritated,My eyes are irritated,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,Blanket,Blanket,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Blanket,Cover me,Cover me,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Blanket,I feel cold,I feel cold,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Blanket,Use a light blanket,Use a light blanket,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Blanket,Remove the blanket,Remove the blanket,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Blanket,Adjust the blanket,Adjust the blanket,Configured but hidden: picker limit is 4,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,Fan,Fan,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Fan,Turn the fan on,Turn the fan on,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Fan,Turn the fan off,Turn the fan off,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Fan,Increase the fan,Increase the fan,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Fan,Reduce the fan,Reduce the fan,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,Urine Pot / Toilet,Urine Pot / Toilet,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Urine Pot / Toilet,I need the urine pot now,I need the urine pot now,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Urine Pot / Toilet,Remove the urine pot,Remove the urine pot,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,AC,AC,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → AC,Turn on the AC,Turn on the AC,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → AC,Turn off the AC,Turn off the AC,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → AC,Increase AC cooling,Increase AC cooling,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → AC,Reduce AC cooling,Reduce AC cooling,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care,Food / Diet,Food / Diet,Displayed card; opens phrases,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Food / Diet,I want food,I want food,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Food / Diet,I am hungry,I am hungry,Displayed,src/services/careContentPresets.ts
+Quick Phrases / Quick Words,Daily Care → Food / Diet,I need my diet,I need my diet,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,TT Suction needed now,TT Suction needed now,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,Oral suction needed,Oral suction needed,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,Breathing problem - Ambu bag,Breathing problem - Ambu bag,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,Breathing discomfort,Breathing discomfort,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,"Check vitals - O2, Pulse","Check vitals - O2, Pulse",Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,Ventilator alarm - check,Ventilator alarm - check,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,Check TT cuff / balloon pressure,Check TT cuff / balloon pressure,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,AIRWAY & VITALS,Call nurse immediately,Call nurse immediately,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Turn to Left Side,Turn to Left Side,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Turn to Right Side,Turn to Right Side,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Raise my head,Raise my head,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Lower my head,Lower my head,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Fix Pillow,Fix Pillow,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Adjust Head / Neck,Adjust Head / Neck,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Adjust Hands & Legs,Adjust Hands & Legs,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,BED & POSITION,Back care needed,Back care needed,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,I want food,I want food,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,I am hungry,I am hungry,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,I need my diet,I need my diet,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,I need Water,I need Water,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,Oral Care / Clean Teeth,Oral Care / Clean Teeth,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,Clean Face / Eyes,Clean Face / Eyes,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,Eye Drops,Eye Drops,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,Toilet / Urine Pot,Toilet / Urine Pot,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,Fan,Fan,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,Blanket / Shawl,Blanket / Shawl,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,DAILY CARE,AC,AC,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,I am in severe pain,I am in severe pain,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Chest discomfort,Chest discomfort,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Fever,Fever,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Feeling cold / shivering,Feeling cold / shivering,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Feeling hot / sweating,Feeling hot / sweating,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Panic / Anxiety,Panic / Anxiety,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Itching,Itching,Displayed,src/services/careContentPresets.ts
+Assistance / Daily Care,SYMPTOMS,Too tired / need rest,Too tired / need rest,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Yes,Yes,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,No,No,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Wait a moment,Wait a moment,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Let me think,Let me think,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,I don't understand,I don't understand,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Repeat that,Repeat that,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Ask yes or no,Ask yes or no,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Speak slowly,Speak slowly,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Thank you,Thank you,Displayed,src/services/careContentPresets.ts
+Phrases,Communication,Sorry,Sorry,Configured but hidden: category limit is 9,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I am okay,I am okay,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I am scared,I am scared,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I am anxious,I am anxious,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I feel uncomfortable,I feel uncomfortable,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I am tired,I am tired,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I feel lonely,I feel lonely,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I am grateful,I am grateful,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I love you,I love you,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,I miss you,I miss you,Displayed,src/services/careContentPresets.ts
+Phrases,Feelings & Emotions,Pray for me,Pray for me,Configured but hidden: category limit is 9,src/services/careContentPresets.ts
+Phrases,People & Visitors,Call family,Call family,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,Call nurse,Call nurse,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,Call doctor,Call doctor,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,Call caretaker,Call caretaker,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,Who is there?,Who is there?,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,Who is at the door?,Who is at the door?,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,I want to video call,I want to video call,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,I don't want visitors,I don't want visitors,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Phrases,People & Visitors,Ask them to wait,Ask them to wait,Configured but hidden: category excluded from Phrases screen,src/services/careContentPresets.ts
+Feelings,Feelings,I am happy,I am happy,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am sad,I am sad,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am tired,I am tired,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am in pain,I am in pain,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I feel uncomfortable,I feel uncomfortable,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am feeling better,I am feeling better,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am anxious,I am anxious,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am frustrated,I am frustrated,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am bored,I am bored,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am grateful,I am grateful,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am cold,I am cold,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am hot,I am hot,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am hungry,I am hungry,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am thirsty,I am thirsty,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I need rest,I need rest,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am okay,I am okay,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I love you,I love you,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I miss you,I miss you,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I am scared,I am scared,Displayed,src/services/defaultCustomization.ts
+Feelings,Feelings,I feel lonely,I feel lonely,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,I need water,I need water,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,I need food,I need food,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,I need bathroom,I need bathroom,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Urine pot,Urine pot,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Remove urine pot,Remove urine pot,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,I am cold,I am cold,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,I am hot,I am hot,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Need blanket,Need blanket,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Adjust pillow,Adjust pillow,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Change position,Change position,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Adjust bed up,Adjust bed up,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Adjust bed down,Adjust bed down,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Adjust fan speed,Adjust fan speed,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Adjust AC,Adjust AC,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Close window,Close window,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Lip balm,Lip balm,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Eye drops,Eye drops,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Head massage,Head massage,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Clean face,Clean face,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Shawl please,Shawl please,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Scratch my nose,Scratch my nose,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Wipe my face,Wipe my face,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Mosquito,Mosquito,Displayed,src/services/defaultCustomization.ts
+Basic Needs,Basic Needs,Itching,Itching,Displayed,src/services/defaultCustomization.ts
+Activities,TV Channels,Switch ON TV,Switch on TV,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,Switch OFF TV,Switch off TV,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,News - 508,Change to channel 508,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,News - 511,Change to channel 511,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,News - 521,Change to channel 521,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,News - 524,Change to channel 524,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,Movies - 310,Change to channel 310,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,Tarak Mehta,Change to channel 132,Displayed,src/services/careContentPresets.ts
+Activities,TV Channels,Ramayan,Change to channel 128,Configured but hidden: activity limit is 8,src/services/careContentPresets.ts
+Activities,YouTube,Play old songs,Play old songs,Displayed,src/services/careContentPresets.ts
+Activities,YouTube,Play comedy videos,Play comedy videos,Displayed,src/services/careContentPresets.ts
+Activities,YouTube,Play devotional music,Play devotional music,Displayed,src/services/careContentPresets.ts
+Activities,YouTube,Play news clips,Play news clips,Displayed,src/services/careContentPresets.ts
+Activities,YouTube,Pause video,Pause video,Displayed,src/services/careContentPresets.ts
+Activities,YouTube,Volume down,Volume down,Displayed,src/services/careContentPresets.ts
+Activities,Alexa,Om chanting,Alexa play Om chanting,Displayed,src/services/careContentPresets.ts
+Activities,Alexa,Hanuman Chalisa,Alexa play Hanuman Chalisa,Displayed,src/services/careContentPresets.ts
+Activities,Alexa,Kishore Kumar songs,Alexa play Kishore Kumar songs,Displayed,src/services/careContentPresets.ts
+Activities,Alexa,Bhajan playlist,Alexa play bhajan playlist,Displayed,src/services/careContentPresets.ts
+Activities,Alexa,Stop music,Alexa stop music,Displayed,src/services/careContentPresets.ts
+Activities,Alexa,Set volume low,Alexa set volume low,Displayed,src/services/careContentPresets.ts
+Home,Care cards,TT Suction,TT Suction,Displayed,src/services/defaultCustomization.ts
+Home,Care cards,Ambu Bag,Ambu Bag,Displayed,src/services/defaultCustomization.ts
+Home,Care cards,Oral Suction,Oral Suction,Displayed,src/services/defaultCustomization.ts
+Home,Care cards,Breathing Discomfort,Breathing Discomfort,Displayed,src/services/defaultCustomization.ts
+People,Contacts,Rishabh,Rishabh,Displayed,src/services/defaultCustomization.ts
+People,Stored phrases for Rishabh,Call Rishabh,Call Rishabh,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Rishabh,Rishabh come here,Rishabh come here,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Rishabh,Talk to Rishabh,Talk to Rishabh,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Rishabh,Where is Rishabh,Where is Rishabh,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Rishabh,Rishabh thank you,Rishabh thank you,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Contacts,Bhawana,Bhawana,Displayed,src/services/defaultCustomization.ts
+People,Stored phrases for Bhawana,Call Bhawana,Call Bhawana,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Bhawana,Bhawana come here,Bhawana come here,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Bhawana,Talk to Bhawana,Talk to Bhawana,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Bhawana,Where is Bhawana,Where is Bhawana,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Bhawana,Bhawana thank you,Bhawana thank you,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Contacts,Parakh,Parakh,Displayed,src/services/defaultCustomization.ts
+People,Stored phrases for Parakh,Call Parakh,Call Parakh,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Parakh,Parakh come here,Parakh come here,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Parakh,Talk to Parakh,Talk to Parakh,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Parakh,Where is Parakh,Where is Parakh,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Parakh,Parakh thank you,Parakh thank you,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Contacts,Caretaker,Caretaker,Displayed,src/services/defaultCustomization.ts
+People,Stored phrases for Caretaker,Call Caretaker,Call Caretaker,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Caretaker,Caretaker come here,Caretaker come here,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Caretaker,Talk to Caretaker,Talk to Caretaker,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Caretaker,Where is Caretaker,Where is Caretaker,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Caretaker,Caretaker thank you,Caretaker thank you,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Contacts,Nurse,Nurse,Displayed,src/services/defaultCustomization.ts
+People,Stored phrases for Nurse,Call Nurse,Call Nurse,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Nurse,Nurse come here,Nurse come here,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Nurse,Talk to Nurse,Talk to Nurse,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Nurse,Where is Nurse,Where is Nurse,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Nurse,Nurse thank you,Nurse thank you,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Contacts,Doctor,Doctor,Displayed,src/services/defaultCustomization.ts
+People,Stored phrases for Doctor,Call Doctor,Call Doctor,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Doctor,Doctor come here,Doctor come here,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Doctor,Talk to Doctor,Talk to Doctor,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Doctor,Where is Doctor,Where is Doctor,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+People,Stored phrases for Doctor,Doctor thank you,Doctor thank you,Configured but hidden: People screen speaks name only,src/services/defaultCustomization.ts
+Alert Mode,Dedicated board,SOS Emergency,Emergency please come immediately,Displayed,src/screens/AlertModeScreen.tsx
+Alert Mode,Dedicated board,TT Suction,TT Suction,Displayed,src/services/defaultCustomization.ts
+Alert Mode,Dedicated board,Oral Suction,Oral Suction,Displayed,src/services/defaultCustomization.ts
+Alert Mode,Dedicated board,Position Change,Position Change,Displayed,src/services/defaultCustomization.ts
+Alert Mode,Dedicated board,Pain,Pain,Displayed,src/services/defaultCustomization.ts
+Alert Mode,Dedicated board,Ambu Bag,Ambu Bag,Displayed,src/services/defaultCustomization.ts
+Unused preset data,Quick Words coreWords,Yes,Yes,Unused: QuickWordsGrid accepts but does not render coreWords,src/services/careContentPresets.ts
+Unused preset data,Quick Words coreWords,No,No,Unused: QuickWordsGrid accepts but does not render coreWords,src/services/careContentPresets.ts
+Unused preset data,Quick Words coreWords,Wait,Wait,Unused: QuickWordsGrid accepts but does not render coreWords,src/services/careContentPresets.ts
+Unused preset data,Quick Words coreWords,Stop,Stop,Unused: QuickWordsGrid accepts but does not render coreWords,src/services/careContentPresets.ts
+Unused preset data,Quick Words coreWords,Help,Help,Unused: QuickWordsGrid accepts but does not render coreWords,src/services/careContentPresets.ts
+Unused preset data,Quick Words coreWords,Pain,Pain,Unused: QuickWordsGrid accepts but does not render coreWords,src/services/careContentPresets.ts
+Unused preset data,AAC / FAMILY & PEOPLE,Rishabh,Rishabh,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FAMILY & PEOPLE,Mummy,Mummy,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FAMILY & PEOPLE,Nurse,Nurse,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FAMILY & PEOPLE,Doctor,Doctor,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FAMILY & PEOPLE,Caretaker,Caretaker,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / EMERGENCY,Help,Help,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / EMERGENCY,Pain,Pain,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / EMERGENCY,Suction,Suction,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / EMERGENCY,Medicine,Medicine,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / EMERGENCY,Breathing Problem,Breathing Problem,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / EMERGENCY,Emergency,Emergency,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / BASIC NEEDS,Water,Water,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / BASIC NEEDS,Bathroom,Bathroom,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / BASIC NEEDS,Position,Position,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / BASIC NEEDS,Hot,Hot,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / BASIC NEEDS,Cold,Cold,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / BASIC NEEDS,Diet/Food,Diet/Food,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / RESPONSES,Yes,Yes,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / RESPONSES,No,No,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / RESPONSES,Maybe,Maybe,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / RESPONSES,OK,OK,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / RESPONSES,Wait,Wait,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / COURTESY,Please,Please,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / COURTESY,Thank you,Thank you,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / COURTESY,Sorry,Sorry,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / COURTESY,Excuse me,Excuse me,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FEELINGS,Happy,Happy,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FEELINGS,Sad,Sad,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FEELINGS,Tired,Tired,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FEELINGS,Uncomfortable,Uncomfortable,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FEELINGS,Scared,Scared,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / FEELINGS,Lonely,Lonely,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIONS,Turn on TV,Turn on TV,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIONS,Adjust Bed,Adjust Bed,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIONS,Fan Speed,Fan Speed,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIONS,AC Temperature,AC Temperature,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIONS,Light On/Off,Light On/Off,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIVITIES,TV,TV,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIVITIES,Music,Music,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIVITIES,Now,Now,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,AAC / ACTIVITIES,Later,Later,Unused: no active AAC board renderer,src/services/defaultCustomization.ts
+Unused preset data,STANDARD_QUICKFIRES,Yes,Yes,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,No,No,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Wait,Please wait,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Help,I need help,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,More,Tell me more,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Done,I am done,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Thanks,Thank you,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,OK,OK,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Repeat,Repeat that,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Stop,Stop,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Pain,I have pain,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,STANDARD_QUICKFIRES,Water,I want water,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Pain,I have pain,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Suction,I need suction,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Position,Change my position,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Water,I want water,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Toilet,I need to use the toilet,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Medicine,I need my medicine,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Cold,I am feeling cold,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Hot,I am feeling hot,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Breathing,Breathing problem,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,MEDICAL_QUICKFIRES,Help,I need help,Unused: QuickFires has no imports,src/components/QuickFires.tsx
+Unused preset data,Old keyboard picker / fan,Turn on the fan,Turn on the fan,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / fan,Turn off the fan,Turn off the fan,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / ac,Turn on the AC,Turn on the AC,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / ac,Turn off the AC,Turn off the AC,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / adjust fan / ac,Turn on the fan,Turn on the fan,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / adjust fan / ac,Turn off the fan,Turn off the fan,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / adjust fan / ac,Turn on the AC,Turn on the AC,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / adjust fan / ac,Turn off the AC,Turn off the AC,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / tv,Turn on the TV,Turn on the TV,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / tv,Turn off the TV,Turn off the TV,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / water,I want warm water,I want warm water,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / water,I want cold water,I want cold water,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / pain,I am in pain,I am in pain,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / pain,Give me pain medicine,Give me pain medicine,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / medicine,Give me medicine,Give me medicine,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / medicine,Medicine time now,Medicine time now,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / tt suction,TT suction needed now,TT suction needed now,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / oral suction,Oral suction needed,Oral suction needed,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / ambu bag,Start ambu please,Start ambu please,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / breathing discomfort,I am having trouble breathing,I am having trouble breathing,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / severe pain,I am in severe pain,I am in severe pain,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / help now,Help me please come fast,Help me please come fast,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / turn left,Turn me to left side,Turn me to left side,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / turn right,Turn me to right side,Turn me to right side,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / head up,Raise my head please,Raise my head please,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / head down,Lower my head please,Lower my head please,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / adjust pillows,Adjust my pillow please,Adjust my pillow please,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / adjust neck support,Adjust my neck support please,Adjust my neck support please,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / blanket / shawl,Give me blanket please,Give me blanket please,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / fever,I am having fever,I am having fever,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
+Unused preset data,Old keyboard picker / check o₂,Check oxygen level,Check oxygen level,Unreachable: quickWordsOpen is never set true,src/screens/KeyboardScreen.tsx
