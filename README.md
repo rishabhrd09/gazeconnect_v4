@@ -34,9 +34,9 @@ The development launcher accepts `start-dev.bat --simulate`, explicitly passing 
 ## Using the application
 
 - Enable gaze with the round gaze toggle, then look at a target until the dwell indicator completes. Mouse input also works.
-- Selection uses five fixed times: **500 ms** letters/keys, **1,000 ms** word suggestions/alphabet groups, **1,250 ms** communication, **1,500 ms** navigation/choices, and **2,000 ms** deliberate actions. Settings explains the groups; there are no individual timing sliders.
+- Selection uses five times, one per kind of action, chosen as a complete set in Settings → App Settings → **Selection Speed**: **Balanced** (default) 900 ms letters/keys, 1,300 ms word suggestions/alphabet groups, 1,600 ms communication, 1,900 ms navigation/choices, 2,500 ms deliberate actions; **Quick** 500 / 1,000 / 1,250 / 1,500 / 2,000 ms for a practised user; **Relaxed** 1,300 / 1,700 / 2,000 / 2,400 / 3,000 ms when selections happen too fast. There are no individual timing sliders.
 - Open Keyboard, Phrases, Quick Words, or the care boards to express a message. Speech depends on the computer's voices and volume.
-- Choose Balanced (default), Responsive, Steady or Gentle smoothing in Settings → App Settings. These change movement response, never the five selection durations.
+- Choose Balanced (default), Responsive, Steady or Gentle smoothing in Settings → App Settings. These change movement response, never the selection durations. Balanced and Responsive follow the eyes at once; Steady and Gentle wait a moment first, so a stray glance never moves the cursor. **Show Gaze Cursor** can hide the circle that follows the eyes; the highlight and dwell ring still appear on the item being looked at.
 - Choose **Warm** or **Dark** in Settings → App Settings. Older Light preferences migrate to Warm; Mix preferences migrate to Dark.
 - Settings is a caregiver page operated with a mouse. Use its export/import actions to back up personal phrases, people, and preferences before upgrades.
 - Social & Connect currently shows “Coming soon” for Gmail, LinkedIn and WhatsApp.
