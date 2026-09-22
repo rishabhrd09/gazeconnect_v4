@@ -73,3 +73,64 @@ function Remove-GeneratedDirectory([string]$RelativePath) {
         Remove-Item -LiteralPath $target -Recurse -Force
     }
 }
+function Get-ProjectProcesses {
+    # Processes that verifiably belong to a development launch from THIS checkout: matched on the
+    # executable or script path inside $ProjectRoot, never on a generic process name or a port alone.
+    # Vite counts only without --port or inside the launcher's own range (5173-5183), so another
+    # tool's preview server on its own port is never touched.
+    # -IncludeInstalled adds the packaged application, whose binaries have unique product names and
+    # which needs the same tracker and ports, so it cannot run beside a development launch anyway.
+    param([switch]$IncludeInstalled)
+    $installedNames = @('GazeConnect Pro.exe', 'GazeConnectBackend.exe', 'GazeConnectFloorplan.exe')
+    $root = $ProjectRoot.TrimEnd('\')
+    $rootPattern = [regex]::Escape($root)
+    @(Get-CimInstance Win32_Process | Where-Object {
+        $cmd = [string]$_.CommandLine
+        $exe = [string]$_.ExecutablePath
+        $name = [string]$_.Name   # inside switch, $_ is the switch value
+        switch ($name) {
+            'electron.exe' { ($exe -like "$root\node_modules\electron\*") -and ($cmd -match 'electron\.exe"?\s+\.\s*$') }
+            'TobiiGazeHelper.exe' { $IncludeInstalled -or ($exe -like "$root\tobii-helper\*") }
+            'python.exe' { $cmd -match ($rootPattern + '\\(python\\main\.py|tools\\floorplan_server\.py)') }
+            'node.exe' {
+                ($cmd -match ($rootPattern + '\\node_modules\\')) -and
+                ($cmd -match 'electron\\cli\.js"?\s+\.\s*$|npm-run-all|vite\\bin\\vite\.js"?(\s+--port\s+51(7[3-9]|8[0-3]))?\s*$')
+            }
+            default { $IncludeInstalled -and ($name -in $installedNames) }
+        }
+    })
+}
+function Stop-ProjectProcesses {
+    # Tree-kill so the interpreter behind the venv python launcher, and Electron's children, go too.
+    param([switch]$IncludeInstalled)
+    $stopped = 0
+    foreach ($process in (Get-ProjectProcesses -IncludeInstalled:$IncludeInstalled)) {
+        if (Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue) {
+            # An earlier tree-kill in this loop may already have ended it; taskkill then reports
+            # "not found" on stderr, which Windows PowerShell 5.1 would raise as an error under
+            # ErrorActionPreference=Stop. cmd discards the output, so only the exit code remains.
+            & cmd.exe /d /c "taskkill /F /T /PID $($process.ProcessId) >nul 2>&1"
+            $stopped++
+        }
+    }
+    return $stopped
+}
+function Get-PortListeners([int]$Port) {
+    @(Get-NetTCPConnection -ErrorAction SilentlyContinue |
+        Where-Object { $_.State -eq 'Listen' -and $_.LocalPort -eq $Port } |
+        Select-Object -ExpandProperty OwningProcess -Unique)
+}
+function Get-PortOwnerText([int]$Port) {
+    # Names the program so the message is actionable without Task Manager.
+    $parts = foreach ($id in (Get-PortListeners $Port)) {
+        $owner = Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue
+        if ($owner) { "{0} (PID {1}) {2}" -f $owner.Name, $id, $owner.ExecutablePath } else { "PID $id" }
+    }
+    return ($parts -join '; ')
+}
+function Find-FreePort([int]$Preferred, [int]$Last) {
+    for ($port = $Preferred; $port -le $Last; $port++) {
+        if (@(Get-PortListeners $port).Count -eq 0) { return $port }
+    }
+    throw "No free port between $Preferred and $Last. $Preferred is held by: $(Get-PortOwnerText $Preferred)"
+}

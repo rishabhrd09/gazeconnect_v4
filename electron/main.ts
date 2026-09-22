@@ -11,7 +11,7 @@
  */
 
 import { app, BrowserWindow, BrowserView, ipcMain, Tray, Menu, screen, nativeImage, dialog } from 'electron';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { requestFloorplan, type FloorplanRequest } from './floorplanTransport';
@@ -23,13 +23,25 @@ import {
   buildBrowserCursorInjectionScript,
   buildGazeUpdateAndPollScript,
 } from './browser/browserGazeController';
-import { disposeBrowserView } from './browser/browserViewController';
+import { disposeBrowserView, strayBrowserViews } from './browser/browserViewController';
 import { BrowserGazeGate, type BrowserGazeOptions } from './browser/browserGazeGate';
 import {
   buildYoutubeCommandScript,
   isYoutubeCommand,
   type YoutubeCommandResult,
 } from './browser/youtubeController';
+import { installStdioGuard } from './stdioGuard';
+
+// First, before anything logs: a launching console that goes away must cost
+// log lines, never the main thread (see stdioGuard.ts). This also installs the
+// uncaughtException handler.
+installStdioGuard(() => {
+  try {
+    return app.isPackaged ? app.getPath('logs') : path.join(__dirname, '..', 'tools', 'reports');
+  } catch {
+    return null;
+  }
+});
 
 // ============================================
 // GLOBALS
@@ -75,6 +87,11 @@ let isUiLocked = false;
 
 let activeBrowserView: BrowserView | null = null; // Gaze-controlled BrowserView
 let activeBrowserViewSessionId = 0;
+// Every renderer open, close and reset takes the next ticket. An open that is
+// still waiting (for the previous page to close, or for its own page to load)
+// when a later ticket is issued has been overtaken: it must not put a page on
+// screen that the interface has already asked to remove.
+let browserViewRequestSeq = 0;
 const browserGazeGates = new WeakMap<BrowserView, BrowserGazeGate>();
 let lastBrowserGazeFrameAt = 0;
 let lastNavState: { canGoBack: boolean; canGoForward: boolean; url: string } | null = null;
@@ -166,7 +183,7 @@ let browserGazeConfig: BrowserGazeConfig = {
   // stop on a video card; widening these defaults gives a larger lock
   // zone once a target is acquired without making fresh acquisition
   // looser. Mirror gcConfig defaults in browserGazeController.ts.
-  dwellMs: 1500,
+  dwellMs: 1900,   // Navigation group of the default (Balanced) timing set.
   onsetMs: 280,
   stabilityRadiusPx: 60,
   postClickCooldownMs: 900,
@@ -336,6 +353,7 @@ function startBrowserDiagnosticsSampling(): void {
 
 async function closeActiveBrowserView(reason: string): Promise<void> {
   const view = activeBrowserView;
+  if (!view && strayBrowserViews(mainWindow, null).length === 0) return;  // Nothing on screen.
   if (view) gazeGateFor(view).invalidate();
   lastBrowserGazeFrameAt = 0;
   activeBrowserView = null;
@@ -347,6 +365,13 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
   }
 
   await disposeBrowserView(mainWindow, view, reason);
+  // No page may outlive a close. A page no longer tracked as active (left by an
+  // interrupted open or teardown) is removed too; a page opened while this
+  // close was finishing is the active one and stays.
+  for (const stray of strayBrowserViews(mainWindow, activeBrowserView)) {
+    browserDiagnostics.warn('browser-stray-view', `[BrowserView] removing a page nobody owns (${reason})`);
+    void disposeBrowserView(mainWindow, stray, `stray:${reason}`);
+  }
   lastNavState = null;
   lastPlaybackState = null;
   lastBrowserDwellState = 'idle';
@@ -715,6 +740,22 @@ function quitAppNow(): void {
   app.quit();
 }
 
+// On Windows ChildProcess.kill() ends only the process it started. The venv python.exe is a
+// launcher whose real interpreter is a child, so a plain kill can leave the backend holding its
+// port after the app has gone. End the whole tree; fall back to a plain kill elsewhere.
+function killProcessTree(child: ChildProcess): void {
+  if (process.platform === 'win32' && typeof child.pid === 'number') {
+    const result = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'],
+      { windowsHide: true, stdio: 'ignore', timeout: 4000 });
+    if (!result.error) return;
+  }
+  try {
+    child.kill('SIGTERM');
+  } catch {
+    try { child.kill(); } catch { /* ignore */ }
+  }
+}
+
 // ============================================
 // TOBII HELPER MANAGEMENT
 // ============================================
@@ -779,11 +820,7 @@ function startTobiiHelper(): void {
 function stopTobiiHelper(): void {
   if (tobiiProcess) {
     console.log('Stopping Tobii Helper...');
-    try {
-      tobiiProcess.kill('SIGTERM');
-    } catch {
-      try { tobiiProcess.kill(); } catch { /* ignore */ }
-    }
+    killProcessTree(tobiiProcess);
     tobiiProcess = null;
   }
 }
@@ -892,7 +929,7 @@ function startPythonBackend(): void {
 function stopPythonBackend(): void {
   if (pythonProcess) {
     console.log('Stopping Python backend...');
-    pythonProcess.kill('SIGTERM');
+    killProcessTree(pythonProcess);
     pythonProcess = null;
   }
 }
@@ -958,7 +995,7 @@ function startFloorplanServer(): void {
 function stopFloorplanServer(): void {
   if (floorplanProcess) {
     console.log('Stopping floor plan server...');
-    floorplanProcess.kill('SIGTERM');
+    killProcessTree(floorplanProcess);
     floorplanProcess = null;
   }
 }
@@ -1038,6 +1075,45 @@ function buildAppMenu(): void {
 // ============================================
 // WINDOW MANAGEMENT
 // ============================================
+
+// The window is shown maximised, then goes full screen (maintainer decision,
+// 21 Sep 2026). Full screen matters for gaze: a maximised window leaves a strip
+// to the taskbar, and the live recordings show the tracker reporting gaze inside
+// that strip while a bottom-row control is looked at (the window was 1920x1032:
+// 178 of 2066 bottom-third samples fell below it, 23 losses in 100 s). In full
+// screen every window edge is a physical screen edge, where the backend accepts
+// gaze reported slightly off the glass (python/main.py, SCREEN_EDGE_BAND_PX).
+//
+// Calling setFullScreen(true) on the still hidden, transparent window during the
+// splash was followed by this process hanging at 100 % CPU on the rig (21 Sep
+// 2026). A rehearsal of this exact start-up on the rig (22 Sep: same Electron,
+// same window options and splash hand-off) could not reproduce that hang on any
+// path, but full screen is still only requested the way the right-click menu and
+// the Zone Board request it: on the visible, opaque window, after it has settled.
+// GAZECONNECT_START_FULLSCREEN=0 starts maximised as before.
+const START_FULL_SCREEN = process.env.GAZECONNECT_START_FULLSCREEN !== '0';
+const START_FULL_SCREEN_SETTLE_MS = 400;
+let startupFullScreenScheduled = false;
+
+function presentMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.maximize();
+}
+
+function enterStartupFullScreen(): void {
+  if (!START_FULL_SCREEN || startupFullScreenScheduled) return;
+  startupFullScreenScheduled = true;
+  // Called straight after show()/focus(): let Windows finish showing the window first.
+  setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isFullScreen()) return;
+    if (!mainWindow.isVisible() || mainWindow.isMinimized() || mainWindow.getOpacity() < 0.99) {
+      console.log('[Window] Full screen at start skipped: the window is not visible and opaque');
+      return;
+    }
+    console.log('[Window] Entering full screen');
+    mainWindow.setFullScreen(true);
+  }, START_FULL_SCREEN_SETTLE_MS);
+}
 
 function createWindow(): void {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -1169,10 +1245,26 @@ function createWindow(): void {
     contextMenu.popup({ window: mainWindow });
   });
 
+  // A web page is a native layer above the interface, not part of its DOM. When
+  // the interface document is replaced (Ctrl+R, the error screen's Reload, a
+  // development reload) or its renderer dies, no React code is left to close
+  // the page, and it would sit over whatever screen comes up next.
+  mainWindow.webContents.on('did-start-navigation', (_event: any, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
+    if (!isMainFrame || isInPlace) return;
+    browserViewRequestSeq += 1;
+    void closeActiveBrowserView('interface-reload');
+  });
+  mainWindow.webContents.on('render-process-gone', () => {
+    browserViewRequestSeq += 1;
+    void closeActiveBrowserView('interface-renderer-gone');
+  });
+
   // Load app
   const isDev = !app.isPackaged;
   if (isDev) {
-    const devUrls = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+    // The development launcher passes the interface port it chose (5173 unless that was taken).
+    const vitePort = Number(process.env.GAZECONNECT_VITE_PORT) || 5173;
+    const devUrls = [`http://localhost:${vitePort}`, `http://127.0.0.1:${vitePort}`];
     const loadWithRetry = (retries = 30, urlIndex = 0) => {
       const devUrl = devUrls[urlIndex % devUrls.length];
       mainWindow!.loadURL(devUrl).catch((err: Error) => {
@@ -1197,9 +1289,10 @@ function createWindow(): void {
       maybeBeginSplashTransition('window-ready');
     } else {
       // No splash (already closed or never created) — show immediately
-      mainWindow?.maximize();
+      presentMainWindow();
       mainWindow?.show();
       mainWindow?.focus();
+      enterStartupFullScreen();
     }
   });
 
@@ -1208,9 +1301,10 @@ function createWindow(): void {
     if (mainWindow && !mainWindow.isVisible()) {
       console.log('ready-to-show timeout - forcing window visible');
       closeSplashWindow();
-      mainWindow.maximize();
+      presentMainWindow();
       mainWindow.show();
       mainWindow.focus();
+      enterStartupFullScreen();
     }
   }, 20000);
 
@@ -1378,7 +1472,7 @@ function setupIpcHandlers(): void {
     if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
       throw new Error('Floor-plan requests are only available to the main app.');
     }
-    return requestFloorplan(input);
+    return requestFloorplan(input, Number(process.env.FLOORPLAN_PORT) || 5050);
   });
 
   // Stream app context
@@ -1493,10 +1587,18 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('webview:open', async (_event: any, url: string, bounds: { x: number; y: number; width: number; height: number }) => {
     browserDiagnostics.debug('webview-open', `[Main] webview:open called for: ${url}`, 500);
+    const ticket = ++browserViewRequestSeq;
+    let openedView: BrowserView | null = null;
     if (!mainWindow) return { success: false };
+    if (!bounds || ![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) ||
+        bounds.width <= 0 || bounds.height <= 0) {
+      return { success: false, error: 'invalid bounds' };
+    }
     try {
-      if (activeBrowserView) {
-        await closeActiveBrowserView('replace');
+      await closeActiveBrowserView('replace');
+      // A close or a newer open arrived while the previous page was closing.
+      if (ticket !== browserViewRequestSeq || !mainWindow || mainWindow.isDestroyed()) {
+        return { success: false, cancelled: true };
       }
       lastNavState = null;
       lastPlaybackState = null;
@@ -1522,13 +1624,17 @@ function setupIpcHandlers(): void {
       (view as any)._pageScriptReady = false;
 
       activeBrowserView = view;
+      openedView = view;
       activeBrowserViewSessionId += 1;
       const sessionId = activeBrowserViewSessionId;
       browserDiagnostics.markOpen();
       startBrowserDiagnosticsSampling();
 
       mainWindow.addBrowserView(view);
-      view.setBounds(bounds);
+      view.setBounds({
+        x: Math.round(bounds.x), y: Math.round(bounds.y),
+        width: Math.round(bounds.width), height: Math.round(bounds.height),
+      });
       view.setAutoResize({ width: true, height: true });
 
       const listenerCleanup: Array<() => void> = [];
@@ -1692,10 +1798,26 @@ function setupIpcHandlers(): void {
       (view as any)._playbackPoll = playbackPoll;
 
       await view.webContents.loadURL(url);
+      // Closed or replaced while it loaded: the page is already gone.
+      if (activeBrowserView !== view || ticket !== browserViewRequestSeq) {
+        return { success: false, cancelled: true };
+      }
       sendBrowserNavState(true);
 
       return { success: true, url };
     } catch (err: any) {
+      const stillShowing = !!openedView && activeBrowserView === openedView && ticket === browserViewRequestSeq;
+      // ERR_ABORTED only says this first navigation was superseded (a script
+      // redirect, or the page starting another load); the page is alive and
+      // loading, so it stays. Closing it here made such sites vanish.
+      if (stillShowing && (err?.code === 'ERR_ABORTED' || err?.errno === -3)) {
+        sendBrowserNavState(true);
+        return { success: true, url };
+      }
+      if (!stillShowing) {
+        // A later close or open removed this page; never close its successor.
+        return { success: false, cancelled: true };
+      }
       console.error('webview:open failed:', err?.message);
       await closeActiveBrowserView('open-failed');
       return { success: false, error: err?.message };
@@ -1703,6 +1825,7 @@ function setupIpcHandlers(): void {
   });
 
   ipcMain.handle('webview:close', async () => {
+    browserViewRequestSeq += 1;
     await closeActiveBrowserView('close');
     return { success: true };
   });
@@ -2034,7 +2157,7 @@ function setupIpcHandlers(): void {
     */
   ipcMain.handle('webview:setGazeConfig', async (_event: any, config: Partial<BrowserGazeConfig>) => {
     browserGazeConfig = {
-      dwellMs: typeof config?.dwellMs === 'number' && [500, 1000, 1250, 1500, 2000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
+      dwellMs: typeof config?.dwellMs === 'number' && [500, 900, 1000, 1250, 1300, 1500, 1600, 1700, 1900, 2000, 2400, 2500, 3000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
       onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
       stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),
@@ -2135,17 +2258,24 @@ function setupIpcHandlers(): void {
   });
 
   ipcMain.handle('webview:resetBrowserSession', async (_event: any, reason: string) => {
+    browserViewRequestSeq += 1;
     await closeActiveBrowserView(typeof reason === 'string' && reason ? reason : 'renderer-reset');
     return { success: true };
   });
 
   ipcMain.handle('webview:setBounds', (_event: any, bounds: { x: number; y: number; width: number; height: number }) => {
+    if (!bounds || ![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) ||
+        bounds.width <= 0 || bounds.height <= 0) return;
     if (activeBrowserView) {
+      const next = {
+        x: Math.round(bounds.x), y: Math.round(bounds.y),
+        width: Math.round(bounds.width), height: Math.round(bounds.height),
+      };
       const previous = activeBrowserView.getBounds();
-      if (previous.x !== bounds.x || previous.y !== bounds.y || previous.width !== bounds.width || previous.height !== bounds.height) {
+      if (previous.x !== next.x || previous.y !== next.y || previous.width !== next.width || previous.height !== next.height) {
         invalidateBrowserGaze(activeBrowserView);
+        activeBrowserView.setBounds(next);
       }
-      activeBrowserView.setBounds(bounds);
     }
   });
 
@@ -2515,9 +2645,10 @@ function createSplashWindow(): void {
       closeSplashWindow();
       if (mainWindow && !mainWindow.isVisible()) {
         mainWindow.setOpacity(1);
-        mainWindow.maximize();
+        presentMainWindow();
         mainWindow.show();
         mainWindow.focus();
+        enterStartupFullScreen();
       }
     }
   }, SPLASH_MAX_DURATION_MS);
@@ -2537,7 +2668,7 @@ function transitionFromSplash(): void {
   // This completely solves Chromium background rendering pauses (black screens)
   if (mainWindow) {
     mainWindow.setOpacity(0);
-    mainWindow.maximize();
+    presentMainWindow();
     mainWindow.showInactive();
   }
 
@@ -2571,6 +2702,7 @@ function transitionFromSplash(): void {
       // Brief delay before closing splash so there's no flash
       setTimeout(() => {
         closeSplashWindow();
+        enterStartupFullScreen();
       }, 300);
     }, 950);
   }, remaining);
@@ -2639,7 +2771,11 @@ app.on('before-quit', () => {
   stopTobiiHelper();
 });
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-});
+// Ctrl+C in the launching terminal, or a terminate request, takes the normal quit path so the
+// helper, backend and floor plan server are closed instead of being orphaned.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as NodeJS.Signals[]) {
+  process.on(signal, () => quitAppNow());
+}
+
+// Uncaught exceptions are reported by the handler installStdioGuard() set up at
+// the top of this file; logging them here directly could loop on a broken console.

@@ -1,6 +1,8 @@
 const http = require('http');
 
-const CANDIDATE_URLS = ['http://127.0.0.1:5173', 'http://localhost:5173'];
+// The launcher picks the interface port (5173 unless it is taken) and passes it here.
+const VITE_PORT = Number(process.env.GAZECONNECT_VITE_PORT) || 5173;
+const CANDIDATE_URLS = [`http://127.0.0.1:${VITE_PORT}`, `http://localhost:${VITE_PORT}`];
 const MAX_WAIT = 60000; // 60 seconds max
 const POLL_INTERVAL = 500;
 
@@ -10,7 +12,7 @@ const start = Date.now();
 
 function checkVite() {
     if (Date.now() - start > MAX_WAIT) {
-        console.error("Vite did not become ready on port 5173. Electron was not started. Check the development log.");
+        console.error(`Vite did not become ready on port ${VITE_PORT}. Electron was not started. Check the development log.`);
         process.exit(1);
         return;
     }

@@ -9,7 +9,10 @@ if /I "%~1"=="-s" goto simulate
 if /I "%~1"=="-Simulate" goto simulate
 if /I "%~1"=="--skip-build" goto skip_build
 if /I "%~1"=="-SkipBuild" goto skip_build
-echo Unknown argument. Use --simulate and/or --skip-build.
+if /I "%~1"=="--quiet" goto quiet
+if /I "%~1"=="-q" goto quiet
+if /I "%~1"=="-Quiet" goto quiet
+echo Unknown argument. Use --simulate, --skip-build and/or --quiet.
 exit /b 1
 :simulate
 set "DEV_ARGS=%DEV_ARGS% -Simulate"
@@ -17,6 +20,10 @@ shift
 goto parse
 :skip_build
 set "DEV_ARGS=%DEV_ARGS% -SkipBuild"
+shift
+goto parse
+:quiet
+set "DEV_ARGS=%DEV_ARGS% -Quiet"
 shift
 goto parse
 :run
