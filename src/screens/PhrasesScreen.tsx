@@ -20,11 +20,11 @@ import {
 import { useCustomization } from '../contexts/CustomizationContext';
 
 // Colors from design.ts screenThemes
-const SELECTED_COLOR = '#B88A37';
+const SELECTED_COLOR = screenThemes.phrases.selectedColor;
 const SIDEBAR_BG = screenThemes.phrases.sidebarBg;
 const ACCENT_TEAL = screenThemes.phrases.accentTeal;
-const CATEGORY_NAME_COLOR = '#6F7650';
-const PAGE_ICON_COLOR = '#A99673';
+const CATEGORY_NAME_COLOR = '#DDE3DC';
+const PAGE_ICON_COLOR = '#B9CDA8';
 const ENGLISH_UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 const HINDI_UI_FONT = "'Noto Sans Devanagari', 'Mukta', 'Mangal', 'Segoe UI', sans-serif";
 

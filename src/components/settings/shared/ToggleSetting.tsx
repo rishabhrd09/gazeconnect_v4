@@ -35,7 +35,7 @@ const ToggleSetting: React.FC<ToggleSettingProps> = ({
         <div style={{
           fontSize: typography.fontSize.lg,
           color: colors.text.primary,
-          fontWeight: typography.fontWeight.medium,
+          fontWeight: typography.fontWeight.semibold,
         }}>
           {label}
         </div>

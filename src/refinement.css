@@ -3,40 +3,46 @@
   font-family: 'Manrope'; font-style: normal; font-weight: 200 800; font-display: swap;
   src: url('./assets/fonts/manrope-latin-wght-normal.woff2') format('woff2');
 }
+/* One semantic palette per theme. Roles: page < panel < surface (cards/inputs); inset = recessed
+   fields; selected = ordinary selection; accent-ink = selection/action text and borders (sage/green);
+   accent = gaze dwell/focus feedback only (teal, unchanged); brand = wordmark and home icons (olive);
+   care-ink = corrective/care actions (restrained coral). */
 :root {
   color-scheme: dark;
-  --ui-page: #101923;
-  --ui-surface: #152231;
-  --ui-panel: #13202d;
-  --ui-inset: #0e1823;
-  --ui-hover: #1e3042;
-  --ui-border: #304254;
-  --ui-ink: #edf1f5;
-  --ui-muted: #adbccc;
-  --ui-brand: #c1d1e3;
+  --ui-page: #171c19;
+  --ui-surface: #212823;
+  --ui-panel: #1d241f;
+  --ui-inset: #131815;
+  --ui-hover: #2a332d;
+  --ui-border: #4a574d;
+  --ui-ink: #f1f3ed;
+  --ui-muted: #bbc6be;
+  --ui-brand: #b9cda8;
   --ui-accent: #2dd4bf;
-  --ui-accent-ink: #8dd9cd;
-  --ui-care-ink: #e2cbc7;
-  --ui-care-border: #47525e;
-  --ui-selected: #233a4a;
+  --ui-accent-ink: #a5d0b9;
+  --ui-care-ink: #e3a49b;
+  --ui-care-border: #5a4c47;
+  --ui-selected: #263e30;
+  --ui-on-action: #15231c;
   --ui-font: 'Manrope', 'Segoe UI', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
 }
 :root[data-theme='warm'] {
   color-scheme: light;
-  --ui-page: #f9f3eb;
-  --ui-surface: #f7efe5;
-  --ui-panel: #f5ece1;
-  --ui-inset: #f2e8dc;
-  --ui-hover: #eee4d6;
-  --ui-border: #d9cebe;
-  --ui-ink: #272d27;
-  --ui-muted: #606557;
-  --ui-brand: #596942;
+  --ui-page: #faf5ed;
+  --ui-surface: #fcf8f2;
+  --ui-panel: #f7f1e8;
+  --ui-inset: #f4efe7;
+  --ui-hover: #f0e9dd;
+  --ui-border: #d6cbbb;
+  --ui-ink: #26342d;
+  --ui-muted: #5c665e;
+  --ui-brand: #5c6c3e;
   --ui-accent: #087b6e;
-  --ui-accent-ink: #276c60;
-  --ui-care-ink: #744d46;
-  --ui-care-border: #d6c7b7;
-  --ui-selected: #e6e8d9;
+  --ui-accent-ink: #285c4d;
+  --ui-care-ink: #703f37;
+  --ui-care-border: #d9c3b8;
+  --ui-selected: #e4ead9;
+  --ui-on-action: #ffffff;
 }
 /* Existing warm screen paint uses these aliases. Keep one palette, including portals. */
 [data-theme='warm'] {
@@ -47,7 +53,12 @@
   --wm-text: var(--ui-ink); --wm-text-2: var(--ui-muted); --wm-text-3: var(--ui-muted);
   --wm-border: var(--ui-border); --wm-border-light: var(--ui-border);
 }
-:root[data-theme] body, :root[data-theme] #root > div, :root[data-theme] [class*='-screen'], :root[data-theme] .nav-bar-container {
+/* The gaze cursor's layers (data-cursor: the bubble and the dwell highlight)
+   are also direct children of #root. They must stay see-through: painted with
+   the page colour, the highlight became an opaque box that hid the label of
+   the very key or card being selected, and the bubble's centre hid what it
+   was on (22 Sep 2026). */
+:root[data-theme] body, :root[data-theme] #root > div:not([data-cursor]), :root[data-theme] [class*='-screen'], :root[data-theme] .nav-bar-container {
   background: var(--ui-page) !important;
   color: var(--ui-ink);
 }
@@ -121,6 +132,8 @@
   border-color: var(--ui-border) !important; box-shadow: none !important;
 }
 :root[data-theme] .settings-panel input[type='range'] { accent-color: var(--ui-accent); }
+/* Filled caregiver actions keep readable text on the fill (Dark: deep ink on sage; Warm: white on green). */
+:root[data-theme] .settings-panel :is([class*='-btn-primary'], [class*='-btn-success'], .hl-active-badge) { color: var(--ui-on-action) !important; }
 :root[data-theme] .settings-panel .settings-section {
   background: var(--ui-surface) !important; border-color: var(--ui-border) !important; box-shadow: none !important;
 }
@@ -140,8 +153,8 @@
   border-color: var(--ui-border); box-shadow: none !important;
 }
 :root[data-theme] .theme-swatch { width: 16px; height: 16px; border-radius: 50%; border: 1px solid #819080; flex-shrink: 0; }
-:root[data-theme] .theme-swatch-warm { background: #f9f3eb; }
-:root[data-theme] .theme-swatch-dark { background: #152231; }
+:root[data-theme] .theme-swatch-warm { background: #faf5ed; }
+:root[data-theme] .theme-swatch-dark { background: #212823; }
 /* Interaction feedback is retained; no scaling or motion of the gaze target. */
 :root[data-theme] :is(.grid-card,.design-card,.phrase-card,.home-care-card,.keyboard-key):hover {
   border-color: var(--ui-accent) !important;

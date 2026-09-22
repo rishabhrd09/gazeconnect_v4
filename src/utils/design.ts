@@ -7,27 +7,27 @@
 
 export const darkColors = {
   background: {
-    primary: '#0E1620',
-    secondary: '#131E2E',
-    tertiary: '#1C2B3E',
-    elevated: '#223247',
-    overlay: 'rgba(7, 10, 16, 0.76)',
+    primary: '#171C19',
+    secondary: '#1D241F',
+    tertiary: '#262E28',
+    elevated: '#2B342E',
+    overlay: 'rgba(10, 13, 11, 0.78)',
   },
   text: {
-    primary: '#F0EDE8',
-    secondary: '#A8B5C4',
-    tertiary: '#74879B',
-    inverse: '#0E1620',
+    primary: '#F1F3ED',
+    secondary: '#BBC6BE',
+    tertiary: '#8E9B92',
+    inverse: '#15231C',
   },
   border: {
-    main: '#2A3D52',
-    light: '#223246',
-    focus: '#38BDF8',
+    main: '#4A574D',
+    light: '#333D36',
+    focus: '#A5D0B9',
   },
   accent: {
-    main: '#38BDF8',
-    hover: '#67D0FA',
-    subtle: 'rgba(56, 189, 248, 0.14)',
+    main: '#A5D0B9',      // sage — ordinary selection/action (dwell progress stays teal, see gaze.active)
+    hover: '#BFE0CD',
+    subtle: 'rgba(165, 208, 185, 0.14)',
   },
   success: {
     main: '#34D399',
@@ -45,30 +45,30 @@ export const darkColors = {
     subtle: '#2E1A1A',
   },
   navigation: {
-    pillBackground: 'rgba(14, 20, 28, 0.96)',
-    pillBorder: 'rgba(168, 181, 196, 0.24)',
-    pillShadow: '0 8px 18px rgba(0,0,0,0.22)',
-    containerDivider: 'rgba(213, 216, 188, 0.08)',
-    idleBackground: 'rgba(6, 10, 16, 0.34)',
-    idleText: '#A8B5C4',
+    pillBackground: '#212823',
+    pillBorder: '#4A574D',
+    pillShadow: 'none',
+    containerDivider: 'rgba(241, 243, 237, 0.10)',
+    idleBackground: 'transparent',
+    idleText: '#BBC6BE',
     hoverBackground: 'rgba(255,255,255,0.055)',
-    activeBackground: 'rgba(240, 237, 232, 0.14)',
-    activeBorder: 'rgba(240, 237, 232, 0.22)',
-    activeShadow: 'inset 0 0 0 1px rgba(240, 237, 232, 0.06)',
-    activeText: '#F0EDE8',
+    activeBackground: '#263E30',
+    activeBorder: 'rgba(165, 208, 185, 0.45)',
+    activeShadow: 'none',
+    activeText: '#F1F3ED',
     backBackground: 'rgba(255,255,255,0.045)',
     backHoverBackground: 'rgba(255,255,255,0.08)',
     backBorder: 'rgba(255,255,255,0.06)',
     backShadow: 'none',
-    gazeBackgroundOn: 'rgba(56, 189, 248, 0.18)',
-    gazeBackgroundOff: 'rgba(12, 18, 28, 0.88)',
-    gazeBorderOn: 'rgba(145, 203, 255, 0.82)',
-    gazeBorderOff: 'rgba(120, 135, 150, 0.82)',
-    gazeGlow: '0 0 18px rgba(96, 165, 250, 0.18)',
-    gazeTextOn: '#D9F1FF',
-    gazeTextOff: '#D7DEE6',
+    gazeBackgroundOn: 'rgba(45, 212, 191, 0.14)',
+    gazeBackgroundOff: '#131815',
+    gazeBorderOn: 'rgba(94, 224, 207, 0.85)',
+    gazeBorderOff: '#63756A',
+    gazeGlow: '0 0 14px rgba(45, 212, 191, 0.16)',
+    gazeTextOn: '#D7F5EF',
+    gazeTextOff: '#DDE3DC',
     auxiliaryBackground: 'rgba(255,255,255,0.05)',
-    auxiliaryBorder: '#2A3D52',
+    auxiliaryBorder: '#4A574D',
   },
   category: {
     people: '#7B8FA8',
@@ -97,7 +97,7 @@ export const darkColors = {
   gaze: {
     active: '#2DD4BF', // Teal-400 (Warm Subtle Teal)
     activeSubtle: 'rgba(45, 212, 191, 0.15)',
-    inactive: '#1C2128',
+    inactive: '#1D241F',
     text: '#2DD4BF',
   },
   // Text-safe accent variants — same shape as light/warm so callers can use
@@ -134,40 +134,40 @@ export const darkColors = {
 // =====================================================================
 export const lightColors = {
   background: {
-    primary: '#F2EDE0',     // page bg ~91% L* — AAC-comfort cream
-    secondary: '#EEE9DC',   // grouped panels
-    tertiary: '#E7E0D0',    // sunken / nav rails
-    elevated: '#FAF5E8',    // raised cards ~94% L*
-    overlay: 'rgba(242, 237, 224, 0.94)',
+    primary: '#FAF5ED',     // page bg ~91% L* — AAC-comfort cream
+    secondary: '#F7F1E8',   // grouped panels
+    tertiary: '#F4EFE7',    // sunken / nav rails
+    elevated: '#FCF8F2',    // raised cards ~94% L*
+    overlay: 'rgba(250, 245, 237, 0.94)',
   },
   text: {
-    primary: '#2F2A26',     // 13.96:1 on cards — unified with warm mode
-    secondary: '#6A625B',   // 5.88:1 on cards — subtitles
-    tertiary: '#8A7C6B',    // helper / hints
+    primary: '#26342D',     // 13.96:1 on cards — unified with warm mode
+    secondary: '#5C665E',   // 5.88:1 on cards — subtitles
+    tertiary: '#656D61',    // helper / hints
     inverse: '#FFF7EF',     // text on filled dark accents (cream, not pure white)
   },
   icon: {
-    primary: '#2F2A26',
+    primary: '#26342D',
     onEmergency: '#FFF7EF',
-    muted: '#8A7C6B',
+    muted: '#656D61',
     warm: '#9F7857',
     olive: '#A48F63',
   },
   border: {
-    main: '#DED2C2',        // unified hairline (matches warm)
-    light: '#E4D9CC',
+    main: '#D6CBBB',        // unified hairline (matches warm)
+    light: '#E3DACD',
     focus: '#497775',       // teal focus / dwell ring
-    strong: '#CBBCA9',
+    strong: '#C2B6A3',
   },
   accent: {
-    main: '#497775',        // muted teal — unified primary
-    hover: '#3F6864',
-    subtle: '#E7EEEA',
+    main: '#285C4D',        // primary action green — ordinary selection (dwell progress stays teal)
+    hover: '#1F4A3E',
+    subtle: '#E4EAD9',
     ring: '#497775',
   },
   success: {
-    main: '#7D9475',        // sage — unified
-    hover: '#5F7057',
+    main: '#4F6F4A',        // deeper sage — readable as text (4.9:1 on its tint) and under white text (5.7:1)
+    hover: '#3F5A3B',
     subtle: '#E9EFE6',
   },
   warning: {
@@ -184,30 +184,30 @@ export const lightColors = {
     subtle: '#F4E3E0',
   },
   navigation: {
-    pillBackground: '#F4EFE2',
-    pillBorder: '#DED2C2',
-    pillShadow: '0 2px 6px rgba(122, 99, 71, 0.08)',
-    containerDivider: '#E4D9CC',
+    pillBackground: '#F7F1E8',
+    pillBorder: '#D6CBBB',
+    pillShadow: 'none',
+    containerDivider: '#E3DACD',
     idleBackground: 'transparent',
-    idleText: '#6A625B',
-    hoverBackground: '#F3E8D1',
-    activeBackground: '#E7EEEA',
-    activeBorder: '#497775',
-    activeShadow: 'inset 0 0 0 1px rgba(73, 119, 117, 0.20)',
-    activeText: '#2F2A26',
-    backBackground: '#EEE9DC',
-    backHoverBackground: '#E7E0D0',
-    backBorder: '#DED2C2',
+    idleText: '#5C665E',
+    hoverBackground: '#F0E9DD',
+    activeBackground: '#E4EAD9',
+    activeBorder: '#285C4D',
+    activeShadow: 'none',
+    activeText: '#26342D',
+    backBackground: '#F7F1E8',
+    backHoverBackground: '#F4EFE7',
+    backBorder: '#D6CBBB',
     backShadow: 'none',
     gazeBackgroundOn: '#E7EEEA',
-    gazeBackgroundOff: '#F4EFE2',
+    gazeBackgroundOff: '#F7F1E8',
     gazeBorderOn: '#497775',
-    gazeBorderOff: '#CBBCA9',
+    gazeBorderOff: '#C2B6A3',
     gazeGlow: '0 3px 12px rgba(73, 119, 117, 0.16)',
-    gazeTextOn: '#2F2A26',
-    gazeTextOff: '#6A625B',
-    auxiliaryBackground: '#EEE9DC',
-    auxiliaryBorder: '#DED2C2',
+    gazeTextOn: '#26342D',
+    gazeTextOff: '#5C665E',
+    auxiliaryBackground: '#F7F1E8',
+    auxiliaryBorder: '#D6CBBB',
   },
   category: {
     people: '#5F7C58',      // deeper sage
@@ -261,7 +261,7 @@ export const lightColors = {
     active: '#497775',
     activeSubtle: 'rgba(73, 119, 117, 0.14)',
     inactive: '#A48F63',
-    text: '#2F2A26',
+    text: '#26342D',
   },
 };
 
@@ -275,40 +275,40 @@ export const lightColors = {
 // =====================================================================
 export const warmColors = {
   background: {
-    primary: '#F5EEDF',     // page bg — slightly more peach undertone for warmer feel
-    secondary: '#F8F1DF',   // grouped panels
-    tertiary: '#EDE3CD',    // sunken / nav rail
-    elevated: '#FBF5E5',    // raised cards — gentle cream paper, not bright white
-    overlay: 'rgba(245, 238, 223, 0.94)',
+    primary: '#FAF5ED',     // page bg — slightly more peach undertone for warmer feel
+    secondary: '#F7F1E8',   // grouped panels
+    tertiary: '#F4EFE7',    // sunken / nav rail
+    elevated: '#FCF8F2',    // raised cards — gentle cream paper, not bright white
+    overlay: 'rgba(250, 245, 237, 0.94)',
   },
   text: {
-    primary: '#2F2A26',     // 7.3:1 on #F7F2E8 — lifted from #2F2A26 for AAA on large
-    secondary: '#6A625B',   // subtitles
-    tertiary: '#8A7C6B',    // hints / muted
+    primary: '#26342D',     // 7.3:1 on #F7F2E8 — lifted from #2F2A26 for AAA on large
+    secondary: '#5C665E',   // subtitles
+    tertiary: '#656D61',    // hints / muted
     inverse: '#FFFDF8',     // text on filled dark accents
   },
   icon: {
-    primary: '#2F2A26',
+    primary: '#26342D',
     onEmergency: '#FFF7EF',
-    muted: '#8A7C6B',
+    muted: '#656D61',
     warm: '#9F7857',
     olive: '#A48F63',
   },
   border: {
-    main: '#DED2C2',
-    light: '#E5DBCC',
+    main: '#D6CBBB',
+    light: '#E3DACD',
     focus: '#6E8F8B',       // teal-grey focus / dwell ring
-    strong: '#CBBCA9',
+    strong: '#C2B6A3',
   },
   accent: {
-    main: '#497775',        // muted teal (primary active)
-    hover: '#467472',
-    subtle: '#E7EEEA',      // active background tint
+    main: '#285C4D',        // primary action green — ordinary selection (dwell progress stays teal)
+    hover: '#1F4A3E',
+    subtle: '#E4EAD9',      // selected tint
     ring: '#6E8F8B',
   },
   success: {
-    main: '#7D9475',        // dusty sage
-    hover: '#6C8364',
+    main: '#4F6F4A',        // deeper sage — readable as text (4.9:1 on its tint) and under white text (5.7:1)
+    hover: '#3F5A3B',
     subtle: '#E9EFE6',
   },
   warning: {
@@ -325,30 +325,30 @@ export const warmColors = {
     subtle: '#F4E3E0',
   },
   navigation: {
-    pillBackground: '#FBF6EC',
-    pillBorder: '#DED2C2',
-    pillShadow: '0 2px 6px rgba(122, 99, 71, 0.08)',
-    containerDivider: '#E5DBCC',
+    pillBackground: '#F7F1E8',
+    pillBorder: '#D6CBBB',
+    pillShadow: 'none',
+    containerDivider: '#E3DACD',
     idleBackground: 'transparent',
-    idleText: '#6A625B',
-    hoverBackground: '#F3E8D1',
-    activeBackground: '#E7EEEA',
-    activeBorder: '#497775',
-    activeShadow: 'inset 0 0 0 1px rgba(73, 119, 117, 0.20)',
-    activeText: '#2F2A26',
-    backBackground: '#FAF4EA',
-    backHoverBackground: '#EFE7D8',
-    backBorder: '#DED2C2',
+    idleText: '#5C665E',
+    hoverBackground: '#F0E9DD',
+    activeBackground: '#E4EAD9',
+    activeBorder: '#285C4D',
+    activeShadow: 'none',
+    activeText: '#26342D',
+    backBackground: '#F7F1E8',
+    backHoverBackground: '#F0E9DD',
+    backBorder: '#D6CBBB',
     backShadow: 'none',
     gazeBackgroundOn: '#E7EEEA',
-    gazeBackgroundOff: '#FBF6EC',
+    gazeBackgroundOff: '#F7F1E8',
     gazeBorderOn: '#497775',
-    gazeBorderOff: '#CBBCA9',
+    gazeBorderOff: '#C2B6A3',
     gazeGlow: '0 3px 12px rgba(73, 119, 117, 0.16)',
-    gazeTextOn: '#2F2A26',
-    gazeTextOff: '#6A625B',
-    auxiliaryBackground: '#FAF4EA',
-    auxiliaryBorder: '#DED2C2',
+    gazeTextOn: '#26342D',
+    gazeTextOff: '#5C665E',
+    auxiliaryBackground: '#F7F1E8',
+    auxiliaryBorder: '#D6CBBB',
   },
   category: {
     people: '#5F7C58',      // deeper sage — family / calm
@@ -392,7 +392,7 @@ export const warmColors = {
     active: '#497775',      // teal
     activeSubtle: 'rgba(73, 119, 117, 0.14)',
     inactive: '#A48F63',
-    text: '#2F2A26',
+    text: '#26342D',
   },
 };
 
@@ -400,14 +400,14 @@ export const warmColors = {
 export const warmScreenTokens = {
   home: {
     bgGradient: 'radial-gradient(circle at 50% 8%, #FCF4DD 0%, #F5EEDF 52%, #EBDDC2 100%)',
-    bg: '#F5EEDF',
-    cardBg: '#FBF5E5',
+    bg: '#FAF5ED',
+    cardBg: '#FCF8F2',
     cardBorder: '1.5px solid rgba(122, 99, 71, 0.22)',
     cardShadow: '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)',
     cardShadowHover: '0 12px 26px rgba(122, 99, 71, 0.14), 0 2px 8px rgba(122, 99, 71, 0.10)',
-    text: '#2F2A26',
-    subtleText: '#6A625B',
-    mutedText: '#8A7C6B',
+    text: '#26342D',
+    subtleText: '#5C665E',
+    mutedText: '#656D61',
     brand: 'rgba(47, 42, 38, 0.74)',
     dockSeparator: 'rgba(122, 99, 71, 0.22)',
     quickPhrasesBg: '#F3E8D1',
@@ -422,14 +422,14 @@ export const warmScreenTokens = {
     placeholderBorder: 'rgba(122, 99, 71, 0.16)',
     dividerBackground: 'linear-gradient(180deg, transparent 0%, rgba(122, 99, 71, 0.20) 50%, transparent 100%)',
     tileSurfaces: {
-      kb:  '#FBF5E5',
-      ph:  '#FBF5E5',
-      ac:  '#FBF5E5',
-      pp:  '#FBF5E5',
-      med: '#FBF5E5',
-      st:  '#FBF5E5',
-      web: '#FBF5E5',
-      fp:  '#FBF5E5',
+      kb:  '#FCF8F2',
+      ph:  '#FCF8F2',
+      ac:  '#FCF8F2',
+      pp:  '#FCF8F2',
+      med: '#FCF8F2',
+      st:  '#FCF8F2',
+      web: '#FCF8F2',
+      fp:  '#FCF8F2',
     } as Record<string, string>,
     // Home tile icon palette — 8 distinct DEEPER, RICHER warm-muted tones.
     // Each color is the saturated/darkened "richer" version of its previous
@@ -448,32 +448,32 @@ export const warmScreenTokens = {
     } as Record<string, string>,
   },
   phrases: {
-    pageBg: '#F5EEDF',
-    sidebarBg: '#FBF6EC',
-    sidebarBorder: '#DED2C2',
-    cardBg: '#FBF5E5',
-    cardBorder: '1.5px solid #DED2C2',
-    selectedBg: '#E2ECEF',                // soft sky-blue tint for selected (was teal-tinted #E7EEEA)
-    selectedColor: '#4F7388',             // dusty sky blue selected accent
-    selectedBorder: 'rgba(79, 115, 136, 0.36)',
+    pageBg: '#FAF5ED',
+    sidebarBg: '#F7F1E8',
+    sidebarBorder: '#D6CBBB',
+    cardBg: '#FCF8F2',
+    cardBorder: '1.5px solid #D6CBBB',
+    selectedBg: '#E4EAD9',                // soft sky-blue tint for selected (was teal-tinted #E7EEEA)
+    selectedColor: '#285C4D',             // dusty sky blue selected accent
+    selectedBorder: 'rgba(40, 92, 77, 0.40)',
     accentTeal: '#3F6968',                // deeper teal
     accentSky: '#4F7388',                 // sky blue — for sidebar / secondary accents
     accentCoral: '#A56D55',               // coral — for warm category accents
-    cardText: '#2F2A26',
+    cardText: '#26342D',
     hindiText: '#5C4F44',
-    activatedBorder: '#4F7388',           // sky blue activation ring
-    cardShadow: '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)',
-    cardShadowActivated: '0 0 0 1px rgba(79, 115, 136, 0.32), 0 8px 18px rgba(122, 99, 71, 0.14)',
+    activatedBorder: '#285C4D',           // sky blue activation ring
+    cardShadow: 'none',
+    cardShadowActivated: '0 0 0 1px rgba(40, 92, 77, 0.36)',
   },
   medical: {
-    pageBg: '#F5EEDF',
-    cardBg: '#FBF5E5',
-    cardBorder: '1.5px solid #DED2C2',
-    cardText: '#2F2A26',
+    pageBg: '#FAF5ED',
+    cardBg: '#FCF8F2',
+    cardBorder: '1.5px solid #D6CBBB',
+    cardText: '#26342D',
     cardShadow: '0 6px 16px rgba(122, 99, 71, 0.12), 0 1px 3px rgba(122, 99, 71, 0.08)',
-    sectionCardBg: '#F8F1DF',
-    sectionBackCardBg: '#EDE3CD',
-    sectionShadow: '0 4px 14px rgba(122, 99, 71, 0.10)',
+    sectionCardBg: '#FCF8F2',
+    sectionBackCardBg: '#F4EFE7',
+    sectionShadow: 'none',
     dividerColor: 'rgba(122, 99, 71, 0.22)',
     hindiColor: '#5C4F44',
     backIconColor: '#3F6968',           // deeper teal
@@ -482,33 +482,33 @@ export const warmScreenTokens = {
     bed: '#4F7388',                     // deeper dusty sky blue — position/comfort
     daily: '#5F7C58',                   // deeper sage — calm daily
     symptoms: '#A56D55',                // deeper warm coral — body symptoms
-    sidebarBg: '#FBF6EC',
-    sidebarBorder: '#DED2C2',
+    sidebarBg: '#F7F1E8',
+    sidebarBorder: '#D6CBBB',
     headerDivider: 'rgba(122, 99, 71, 0.22)',
   },
   activities: {
-    pageBg: '#F5EEDF',
-    sidebarBg: '#FBF6EC',
-    cardBg: '#FBF5E5',
-    cardBorder: '1.5px solid #DED2C2',
-    selectedBg: '#F1E5D7',                // warm gold-tint selected (was teal-tinted)
-    selectedColor: '#85703D',             // deeper rich gold — leisure/activities mood
+    pageBg: '#FAF5ED',
+    sidebarBg: '#F7F1E8',
+    cardBg: '#FCF8F2',
+    cardBorder: '1.5px solid #D6CBBB',
+    selectedBg: '#E4EAD9',                // warm gold-tint selected (was teal-tinted)
+    selectedColor: '#285C4D',             // deeper rich gold — leisure/activities mood
     accentTeal: '#3F6968',                // deeper teal kept for back/icon
     accentGold: '#85703D',                // gold for activity category emphasis
     accentSky: '#4F7388',                 // sky blue — secondary accents
     hindiSubtext: '#5C4F44',
   },
   keyboard: {
-    shellBg: '#F5EEDF',
-    textAreaBg: '#FBF5E5',
-    textAreaText: '#2F2A26',
-    railBg: '#FBF6EC',
-    railBorder: '#DED2C2',
-    keyBg: '#FBF5E5',
+    shellBg: '#FAF5ED',
+    textAreaBg: '#FCF8F2',
+    textAreaText: '#26342D',
+    railBg: '#F7F1E8',
+    railBorder: '#D6CBBB',
+    keyBg: '#FCF8F2',
     keyHoverBg: '#F3E8D1',
-    keyBorder: '#DED2C2',
-    keyText: '#2F2A26',
-    keyTextMuted: '#6A625B',
+    keyBorder: '#D6CBBB',
+    keyText: '#26342D',
+    keyTextMuted: '#5C665E',
     deleteWordBg: '#F1DBD1',              // soft deeper coral tint
     deleteWordColor: '#7A312E',           // deeper warm maroon
     speakBg: '#DFE8DC',                   // soft deeper sage tint
@@ -518,17 +518,17 @@ export const warmScreenTokens = {
     deleteWordSoftBorder: '#A56D55',      // deeper coral
     deleteWordSoftText: '#854A38',        // coral-text variant
     // Predictions hover-tinted with sky blue — adds variety to keyboard shell
-    predictionBg: '#FBF6EC',
+    predictionBg: '#F7F1E8',
     predictionHoverBg: '#E2ECEF',         // soft sky-blue tint
     predictionAccent: '#4F7388',          // sky blue prediction accent
   },
   web: {
-    bg: '#F5EEDF',
-    cardBg: '#FBF5E5',
-    cardBorder: '1.5px solid #DED2C2',
-    textMain: '#2F2A26',
-    textSub: '#6A625B',
-    textMuted: '#8A7C6B',
+    bg: '#FAF5ED',
+    cardBg: '#FCF8F2',
+    cardBorder: '1.5px solid #D6CBBB',
+    textMain: '#26342D',
+    textSub: '#5C665E',
+    textMuted: '#656D61',
     // Web hub leans into sky blue (deeper #4F7388) since the "global / browse"
     // metaphor is a sky-blue universe — the rest of the warm palette accents
     // build variety in icons/categories.
@@ -537,8 +537,8 @@ export const warmScreenTokens = {
     accentSelectedBg: '#E2ECEF',
     accentSelectedBorder: 'rgba(79, 115, 136, 0.36)',
     accentSelectedText: '#4F7388',
-    glass: '#FBF6EC',
-    glassBorder: '#DED2C2',
+    glass: '#F7F1E8',
+    glassBorder: '#D6CBBB',
     chrome: '#4F7388',                    // sky-blue chrome
     youtube: '#A56D55',                   // deeper coral
     ai: '#5F7C58',                        // deeper sage
@@ -558,13 +558,13 @@ export const warmScreenTokens = {
     controlModeText: '#4F7388',           // sky blue control
   },
   floorPlan: {
-    bg: '#F5EEDF',
-    panelBg: '#F8F1DF',
-    mutedPanel: '#EDE3CD',
-    cardBg: '#FBF5E5',
-    elevatedBg: '#FBF5E5',
-    border: '#DED2C2',
-    strongBorder: '#CBBCA9',
+    bg: '#FAF5ED',
+    panelBg: '#F7F1E8',
+    mutedPanel: '#F4EFE7',
+    cardBg: '#FCF8F2',
+    elevatedBg: '#FCF8F2',
+    border: '#D6CBBB',
+    strongBorder: '#C2B6A3',
     // Floor plan uses dual-accent: deeper teal for primary actions,
     // sky blue for secondary "info / map" affordances.
     accent: '#3F6968',                    // deeper muted teal
@@ -578,19 +578,19 @@ export const warmScreenTokens = {
     warningSubtle: '#EFE3C8',
     danger: '#A56D55',                    // deeper coral
     dangerSubtle: '#F1DBD1',
-    textMain: '#2F2A26',
-    textSub: '#6A625B',
-    textDim: '#8A7C6B',
+    textMain: '#26342D',
+    textSub: '#5C665E',
+    textDim: '#656D61',
     road: '#7A5638',                      // deeper warm brown
     gridLine: 'rgba(122, 99, 71, 0.22)',
   },
   settings: {
-    sidebarBg: '#FBF6EC',
+    sidebarBg: '#F7F1E8',
     // Settings selected uses deeper sky blue — a distinct accent from the
     // teal used for primary actions, signaling "navigation/configuration"
     // rather than "execute/confirm". Reinforces the diversified palette.
-    selectedColor: '#4F7388',             // sky blue selected accent
-    selectedBg: '#E2ECEF',                // soft sky-blue tint
+    selectedColor: '#285C4D',             // sky blue selected accent
+    selectedBg: '#E4EAD9',                // soft sky-blue tint
     separatorColor: 'rgba(122, 99, 71, 0.22)',
     accentTeal: '#3F6968',
     accentSky: '#4F7388',
@@ -763,31 +763,31 @@ export const splitScreenLayouts = {
 // Per-screen theme colors — centralizes hardcoded hex values from individual screens
 export const screenThemes = {
   home: {
-    bg: '#101923',
-    glass: '#13202D',
-    border: '#304254',
-    cardBg: '#152231',
-    cardBorder: '1.5px solid #304254',
-    teal: '#C1D1E3',
-    tealIcon: '#C1D1E3',
-    text: '#EDF1F5',
-    subtleBorder: '#304254',
+    bg: '#171C19',
+    glass: '#1D241F',
+    border: '#4A574D',
+    cardBg: '#212823',
+    cardBorder: '1.5px solid #4A574D',
+    teal: '#B9CDA8',
+    tealIcon: '#B9CDA8',
+    text: '#F1F3ED',
+    subtleBorder: '#4A574D',
     red: '#8A463D',
-    brand: '#C1D1E3',
-    dockSeparator: 'rgba(213, 216, 188, 0.10)',
-    quickPhrasesBg: '#13202D',
-    quickPhrasesBorder: '#304254',
-    quickPhrasesText: '#EDF1F5',
+    brand: '#B9CDA8',
+    dockSeparator: 'rgba(241, 243, 237, 0.10)',
+    quickPhrasesBg: '#1D241F',
+    quickPhrasesBorder: '#4A574D',
+    quickPhrasesText: '#F1F3ED',
   },
   phrases: {
-    selectedColor: '#C69A45',
-    sidebarBg: '#13202D',
-    accentTeal: '#6FB7B1',
-    cardBg: '#152231',
-    cardBorder: '1.5px solid #304254',
-    selectedBg: 'rgba(198, 154, 69, 0.16)',
-    aacLinkBg: 'rgba(111, 183, 177, 0.10)',
-    aacLinkBorder: 'rgba(111, 183, 177, 0.24)',
+    selectedColor: '#A5D0B9',
+    sidebarBg: '#1D241F',
+    accentTeal: '#A5D0B9',
+    cardBg: '#212823',
+    cardBorder: '1.5px solid #4A574D',
+    selectedBg: '#263E30',
+    aacLinkBg: 'rgba(165, 208, 185, 0.10)',
+    aacLinkBorder: 'rgba(165, 208, 185, 0.26)',
     hindiText: '#D79A83',
   },
   medical: {
@@ -796,50 +796,50 @@ export const screenThemes = {
     bed: '#C69A45',
     daily: '#8FAE72',
     symptoms: '#C7838F',
-    sidebarBg: '#13202D',
-    sidebarBorder: '#304254',
-    cardBg: '#152231',
-    cardBorder: '1.5px solid #304254',
-    headerDivider: '#304254',
+    sidebarBg: '#1D241F',
+    sidebarBorder: '#4A574D',
+    cardBg: '#212823',
+    cardBorder: '1.5px solid #4A574D',
+    headerDivider: '#414D44',
   },
   activities: {
-    selectedColor: '#C69A45',
-    sidebarBg: '#13202D',
-    accentTeal: '#6FB7B1',
-    cardBg: '#152231',
-    cardBorder: '1.5px solid #304254',
-    selectedBg: 'rgba(198, 154, 69, 0.16)',
+    selectedColor: '#A5D0B9',
+    sidebarBg: '#1D241F',
+    accentTeal: '#A5D0B9',
+    cardBg: '#212823',
+    cardBorder: '1.5px solid #4A574D',
+    selectedBg: '#263E30',
     hindiSubtext: 'rgba(255, 235, 205, 0.9)',
   },
   keyboard: {
-    shellBg: '#0E1620',
-    textAreaBg: '#131B24',
-    railBg: '#0F141C',
-    railBorder: '#263649',
-    keyBg: '#121821',
-    keyHoverBg: '#18212C',
-    keyBorder: '#243243',
-    keyText: '#F3EFE8',
-    keyTextMuted: '#A8B5C4',
-    deleteWordBg: 'rgba(58, 41, 25, 0.96)',
-    deleteWordColor: '#D7A152',
-    speakBg: 'rgba(33, 50, 42, 0.94)',
+    shellBg: '#171C19',
+    textAreaBg: '#1D241F',
+    railBg: '#141916',
+    railBorder: '#333D36',
+    keyBg: '#212823',
+    keyHoverBg: '#2A332D',
+    keyBorder: '#4A574D',
+    keyText: '#F1F3ED',
+    keyTextMuted: '#BBC6BE',
+    deleteWordBg: '#2C2921',
+    deleteWordColor: '#DCC28D',
+    speakBg: '#263E30',
     speakBorder: '#8FB49B',
-    speakText: '#A7C8B0',
-    deleteWordSoftBg: 'rgba(62, 40, 42, 0.94)',
-    deleteWordSoftBorder: '#C28F8A',
-    deleteWordSoftText: '#D6A6A0',
-    predictionBg: '#141B24',
-    predictionHoverBg: 'rgba(56, 189, 248, 0.10)',
+    speakText: '#A5D0B9',
+    deleteWordSoftBg: '#2F2624',
+    deleteWordSoftBorder: '#A87970',
+    deleteWordSoftText: '#E3A49B',
+    predictionBg: '#1D241F',
+    predictionHoverBg: 'rgba(165, 208, 185, 0.10)',
   },
   web: {
-    bg: '#101923',
-    cardBg: '#152231',
-    cardBorder: '1.5px solid #304254',
-    textMain: '#EDF1F5',
-    textSub: '#ADBCCC',
+    bg: '#171C19',
+    cardBg: '#212823',
+    cardBorder: '1.5px solid #4A574D',
+    textMain: '#F1F3ED',
+    textSub: '#BBC6BE',
     accent: '#B28A45',
-    glass: '#13202D',
+    glass: '#1D241F',
     chrome: '#648D8B',
     youtube: '#9A5D54',
     ai: '#6F9B96',
@@ -852,33 +852,33 @@ export const screenThemes = {
     status: '#8EA9B7',
   },
   floorPlan: {
-    bg: '#0E1620',
-    panelBg: '#131E2E',
-    mutedPanel: '#172231',
-    cardBg: '#223247',
-    elevatedBg: '#1A2638',
-    border: 'rgba(42, 61, 82, 0.82)',
-    strongBorder: 'rgba(42, 61, 82, 0.94)',
-    accent: '#74C6D4',
-    accentStrong: '#38BDF8',
-    accentSubtle: 'rgba(116, 198, 212, 0.12)',
+    bg: '#171C19',
+    panelBg: '#1D241F',
+    mutedPanel: '#1A201C',
+    cardBg: '#2B342E',
+    elevatedBg: '#212823',
+    border: 'rgba(74, 87, 77, 0.85)',
+    strongBorder: 'rgba(99, 117, 106, 0.92)',
+    accent: '#A5D0B9',
+    accentStrong: '#BFE0CD',
+    accentSubtle: 'rgba(165, 208, 185, 0.12)',
     success: '#9CC5B1',
     successSubtle: 'rgba(156, 197, 177, 0.14)',
-    warning: '#D7A152',
-    warningSubtle: 'rgba(215, 161, 82, 0.14)',
-    danger: '#E28C83',
-    dangerSubtle: 'rgba(226, 140, 131, 0.14)',
-    textMain: '#F0EDE8',
-    textSub: '#A8B5C4',
-    textDim: '#74879B',
+    warning: '#DCC28D',
+    warningSubtle: 'rgba(220, 194, 141, 0.14)',
+    danger: '#E3A49B',
+    dangerSubtle: 'rgba(227, 164, 155, 0.14)',
+    textMain: '#F1F3ED',
+    textSub: '#BBC6BE',
+    textDim: '#8E9B92',
     road: '#74B7D9',
-    gridLine: 'rgba(42, 61, 82, 0.72)',
+    gridLine: 'rgba(74, 87, 77, 0.72)',
   },
   settings: {
-    sidebarBg: '#172231',
-    selectedColor: '#74C6D4',
-    selectedBg: 'rgba(116, 198, 212, 0.12)',
-    separatorColor: 'rgba(42, 61, 82, 0.72)',
+    sidebarBg: '#1D241F',
+    selectedColor: '#A5D0B9',
+    selectedBg: '#263E30',
+    separatorColor: 'rgba(74, 87, 77, 0.72)',
   },
   cursor: {
     normal: '#38BDF8',
@@ -898,15 +898,15 @@ export const screenThemes = {
  * rather than re-declaring their own card surface values.
  */
 export const sharedCardTokens = {
-  cardBg: '#152231',
-  cardBorder: '1.5px solid #304254',
+  cardBg: '#212823',
+  cardBorder: '1.5px solid #4A574D',
   cardShadow: 'none',
   cardRadius: '22px',
   // Sidebar grammar (Phrases / Activities pattern)
-  sidebarBg: '#13202D',
-  sidebarBorder: '1.5px solid #304254',
-  sidebarSelectedAccent: '#C69A45',
-  sidebarSelectedBg: 'rgba(198, 154, 69, 0.16)',
+  sidebarBg: '#1D241F',
+  sidebarBorder: '1.5px solid #4A574D',
+  sidebarSelectedAccent: '#A5D0B9',
+  sidebarSelectedBg: '#263E30',
 } as const;
 
 export type Theme = 'dark' | 'warm';

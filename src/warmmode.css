@@ -315,10 +315,10 @@ html.theme-warm .nav-pill .nav-btn:hover {
 
 html[data-theme="warm"] .nav-pill .nav-btn-active,
 html.theme-warm .nav-pill .nav-btn-active {
-  color: var(--wm-text-on-teal) !important;
-  background: var(--wm-teal) !important;
-  border-color: var(--wm-teal-hover) !important;
-  box-shadow: inset 0 0 0 1px rgba(73, 119, 117, 0.30) !important;
+  color: var(--ui-accent-ink) !important;
+  background: var(--ui-selected) !important;
+  border-color: color-mix(in srgb, var(--ui-accent-ink) 45%, transparent) !important;
+  box-shadow: none !important;
   border-radius: 10px !important;
 }
 
@@ -443,49 +443,12 @@ html.theme-warm .live-clock-ampm {
 }
 
 /* ═══════════════════════════════════════════════════════
-   GAZE CURSOR — MUST REMAIN VISIBLE ON WARM PAPER
+   GAZE CURSOR
+   The gaze bubble (GazeCursor.tsx, v18) needs no theme rules: a light ring
+   with a soft dark edge and a clear centre, styled inline, reads on warm paper
+   and on dark screens alike (like Tobii Experience's gaze preview). The rules
+   for the old filled cursor disc and its centre dot went with it.
    ═══════════════════════════════════════════════════════ */
-html[data-theme="warm"] .gaze-cursor-ring,
-html.theme-warm .gaze-cursor-ring {
-  border-color: rgba(47, 42, 38, 0.62) !important;
-  background-color: rgba(255, 253, 248, 0.78) !important;
-  box-shadow: 0 2px 8px rgba(122, 99, 71, 0.10) !important;
-}
-
-html[data-theme="warm"] .gaze-cursor-ring.dwelling,
-html.theme-warm .gaze-cursor-ring.dwelling {
-  border-color: var(--wm-teal-ring) !important;
-  background-color: rgba(110, 143, 139, 0.12) !important;
-  box-shadow: 0 2px 8px rgba(110, 143, 139, 0.18) !important;
-}
-
-html[data-theme="warm"] .gaze-cursor-ring.locked,
-html.theme-warm .gaze-cursor-ring.locked {
-  border-color: var(--wm-teal) !important;
-  background-color: rgba(73, 119, 117, 0.10) !important;
-  box-shadow: 0 2px 8px rgba(73, 119, 117, 0.18) !important;
-}
-
-html[data-theme="warm"] .dwell-ring-svg circle,
-html.theme-warm .dwell-ring-svg circle {
-  stroke: var(--wm-teal-ring) !important;
-}
-
-html[data-theme="warm"] .gaze-cursor-dot,
-html.theme-warm .gaze-cursor-dot {
-  background-color: rgba(47, 42, 38, 0.85) !important;
-}
-
-html[data-theme="warm"] .gaze-cursor-dot.dwelling,
-html.theme-warm .gaze-cursor-dot.dwelling {
-  background-color: var(--wm-teal-ring) !important;
-}
-
-html[data-theme="warm"] .gaze-cursor-dot.locked,
-html.theme-warm .gaze-cursor-dot.locked {
-  background-color: var(--wm-teal) !important;
-}
-
 html[data-theme="warm"] .gaze-status-indicator,
 html.theme-warm .gaze-status-indicator {
   background-color: var(--wm-surface) !important;
@@ -608,9 +571,9 @@ html[data-theme="warm"] .keyboard-key[data-action="letter"]:hover,
 html.theme-warm .keyboard-key[data-action="letter"]:hover {
   /* ~3% darker warm-amber lift — perceptible without flashing.
      Research (Schlosser 2015): subtle hover state reduces fixation errors. */
-  background: #F5EAC8 !important;
+  background: var(--ui-hover) !important;
   border-color: var(--wm-border-strong) !important;
-  box-shadow: var(--wm-shadow-card) !important;
+  box-shadow: none !important;
 }
 
 /* ── BACKSPACE / DELETE WORD — Modified Fitzgerald "corrective red".
@@ -619,55 +582,55 @@ html[data-theme="warm"] .keyboard-key[data-action="backspace"],
 html[data-theme="warm"] .keyboard-key[data-action="deleteWord"],
 html.theme-warm .keyboard-key[data-action="backspace"],
 html.theme-warm .keyboard-key[data-action="deleteWord"] {
-  background: #F1DBD1 !important;        /* warm coral tint */
-  border: 2px solid var(--wm-coral) !important;       /* deeper coral border */
-  color: var(--wm-emergency) !important; /* deeper warm maroon text — 6.85:1 AAA */
+  background: #F8E7DF !important;        /* restrained delete surface */
+  border: 2px solid #CDA696 !important;
+  color: var(--ui-care-ink) !important;
 }
 html[data-theme="warm"] .keyboard-key[data-action="backspace"]:hover,
 html[data-theme="warm"] .keyboard-key[data-action="deleteWord"]:hover,
 html.theme-warm .keyboard-key[data-action="backspace"]:hover,
 html.theme-warm .keyboard-key[data-action="deleteWord"]:hover {
-  background: #ECC9BD !important;        /* deeper coral tint on hover */
-  border-color: var(--wm-emergency) !important;
+  background: #F3DBD0 !important;
+  border-color: var(--wm-coral) !important;
 }
 
 /* ── SPEAK — Modified Fitzgerald "positive sage". */
 html[data-theme="warm"] .keyboard-key[data-action="speak"],
 html.theme-warm .keyboard-key[data-action="speak"] {
-  background: var(--wm-sage-soft) !important;   /* sage tint */
-  border: 2px solid var(--wm-sage) !important;  /* deeper sage border */
-  color: #3F5A38 !important;                    /* sage text-safe ~5.5:1 */
+  background: var(--ui-selected) !important;
+  border: 2px solid #94A98B !important;
+  color: var(--ui-accent-ink) !important;
 }
 html[data-theme="warm"] .keyboard-key[data-action="speak"]:hover,
 html.theme-warm .keyboard-key[data-action="speak"]:hover {
-  background: #D2DECE !important;
-  border-color: #4F6B47 !important;
+  background: #D9E2CB !important;
+  border-color: var(--ui-accent-ink) !important;
 }
 
 /* ── QUICK WORDS — Alt input, sky-blue per diversification.
    Distinct from Speak (green) and Backspace (red); used heavily. */
 html[data-theme="warm"] .keyboard-key[data-action="quickWords"],
 html.theme-warm .keyboard-key[data-action="quickWords"] {
-  background: var(--wm-sky-soft) !important;    /* very light sky tint */
-  border: 2px solid var(--wm-sky) !important;   /* deeper sky blue border */
-  color: var(--wm-sky-text) !important;         /* sky text-safe ~6:1 */
+  background: var(--ui-panel) !important;
+  border: 2px solid #B9C4AE !important;
+  color: var(--ui-accent-ink) !important;
 }
 html[data-theme="warm"] .keyboard-key[data-action="quickWords"]:hover,
 html.theme-warm .keyboard-key[data-action="quickWords"]:hover {
-  background: #D6E2E8 !important;
-  border-color: var(--wm-sky-text) !important;
+  background: var(--ui-hover) !important;
+  border-color: var(--ui-accent-ink) !important;
 }
 
 /* ── SHIFT — Modifier key, neutral warm tan (no Fitzgerald color). */
 html[data-theme="warm"] .keyboard-key[data-action="shift"],
 html.theme-warm .keyboard-key[data-action="shift"] {
-  background: #F4ECD8 !important;        /* neutral warm tan */
+  background: var(--ui-panel) !important;
   border: 2px solid var(--wm-border-strong) !important;
   color: var(--wm-text) !important;
 }
 html[data-theme="warm"] .keyboard-key[data-action="shift"]:hover,
 html.theme-warm .keyboard-key[data-action="shift"]:hover {
-  background: #EBDFC0 !important;
+  background: var(--ui-hover) !important;
   border-color: var(--wm-umber) !important;
 }
 
@@ -675,26 +638,26 @@ html.theme-warm .keyboard-key[data-action="shift"]:hover {
 html[data-theme="warm"] .keyboard-key[data-action="toggleNumbers"],
 html.theme-warm .keyboard-key[data-action="toggleNumbers"] {
   background: var(--wm-surface) !important;
-  border: 2px solid var(--wm-umber) !important;
-  color: var(--wm-umber) !important;
+  border: 2px solid var(--wm-border-strong) !important;
+  color: var(--ui-muted) !important;
 }
 html[data-theme="warm"] .keyboard-key[data-action="toggleNumbers"]:hover,
 html.theme-warm .keyboard-key[data-action="toggleNumbers"]:hover {
-  background: #F1E8D2 !important;
-  border-color: #4F4231 !important;
+  background: var(--ui-hover) !important;
+  border-color: var(--ui-accent-ink) !important;
 }
 
 /* ── SPACE — Primary action, distinct neutral surface with teal accent. */
 html[data-theme="warm"] .keyboard-key[data-action="space"],
 html.theme-warm .keyboard-key[data-action="space"] {
   background: var(--wm-surface) !important;
-  border: 2px solid var(--wm-teal) !important;          /* deeper teal — primary */
+  border: 2px solid #94A98B !important;
   color: var(--wm-text) !important;
 }
 html[data-theme="warm"] .keyboard-key[data-action="space"]:hover,
 html.theme-warm .keyboard-key[data-action="space"]:hover {
-  background: var(--wm-teal-soft) !important;
-  border-color: var(--wm-teal-hover) !important;
+  background: var(--ui-hover) !important;
+  border-color: var(--ui-accent-ink) !important;
 }
 
 /* Prediction bar — slightly recessed warm tone, distinct from letter zone.
@@ -702,14 +665,14 @@ html.theme-warm .keyboard-key[data-action="space"]:hover {
    contrast is restrained (3:1 cluster boundary, not 4.5:1). */
 html[data-theme="warm"] .keyboard-prediction-bar,
 html.theme-warm .keyboard-prediction-bar {
-  background: #F4ECD8 !important;       /* recessed warm zone */
+  background: var(--ui-panel) !important;
   backdrop-filter: none !important;
   border: 1px solid var(--wm-border-strong) !important;
 }
 
 html[data-theme="warm"] .prediction-word,
 html.theme-warm .prediction-word {
-  color: #5C4A2A !important;           /* warm dark-brown ~7.5:1 AAA */
+  color: var(--ui-accent-ink) !important;
   font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
 }
 

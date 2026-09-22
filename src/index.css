@@ -23,8 +23,8 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
-  background-color: #0E1620;
-  color: #F0EDE8;
+  background-color: #171C19;
+  color: #F1F3ED;
 }
 
 #root {
@@ -39,7 +39,7 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid #58A6FF;
+  outline: 3px solid #2DD4BF;
   outline-offset: 2px;
 }
 
@@ -49,16 +49,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #131E2E;
+  background: #1D241F;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2A3D52;
+  background: #414D44;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #385068;
+  background: #63756A;
 }
 
 /* No text selection in AAC mode */

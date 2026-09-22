@@ -34,7 +34,7 @@ const SelectSetting: React.FC<SelectSettingProps> = ({
         <div style={{
           fontSize: typography.fontSize.lg,
           color: colors.text.primary,
-          fontWeight: typography.fontWeight.medium,
+          fontWeight: typography.fontWeight.semibold,
         }}>
           {label}
         </div>

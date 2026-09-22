@@ -76,15 +76,15 @@ const UI_FONT = typography.fontFamily.primary;
 // Note: most surface values are also overridden by CSS (data-action selectors)
 // so JSX inline-styles + CSS converge on the same target.
 const LIGHT_KEYBOARD_THEME = {
-  shellBg: '#F2EDE0',                    // page bg (matches --lm-root)
-  textAreaBg: '#FAF5E8',                 // raised text area cream
-  railBg: '#F4ECD8',                     // recessed action rail
-  railBorder: '#CBBCA6',
-  keyBg: '#FAF5E8',                      // letter cream
-  keyHoverBg: '#F2E6C7',                 // warm-amber hover lift
-  keyBorder: '#DED2C2',
-  keyText: '#2F2A26',                    // unified text — 13.96:1
-  keyTextMuted: '#6A625B',
+  shellBg: '#FAF5ED',                    // page bg (matches --lm-root)
+  textAreaBg: '#FCF8F2',                 // raised text area cream
+  railBg: '#F7F1E8',                     // recessed action rail
+  railBorder: '#D6CBBB',
+  keyBg: '#FCF8F2',                      // letter cream
+  keyHoverBg: '#F0E9DD',                 // warm-amber hover lift
+  keyBorder: '#D6CBBB',
+  keyText: '#26342D',                    // unified text — 13.96:1
+  keyTextMuted: '#5C665E',
   // Backspace (corrective) — Modified Fitzgerald muted coral
   deleteWordBg: '#F1DBD1',
   deleteWordColor: '#7A312E',
@@ -97,8 +97,8 @@ const LIGHT_KEYBOARD_THEME = {
   deleteWordSoftBorder: '#A56D55',
   deleteWordSoftText: '#7A312E',
   // Prediction strip — recessed warm zone, distinct from letter cream
-  predictionBg: '#EFE7D0',
-  predictionHoverBg: '#E5DBBC',
+  predictionBg: '#F4EFE7',
+  predictionHoverBg: '#F0E9DD',
 };
 
 const getKeyboardTheme = (isDarkMode: boolean) => (
@@ -106,24 +106,24 @@ const getKeyboardTheme = (isDarkMode: boolean) => (
 );
 
 const getKeyboardAccent = (isDarkMode: boolean) => (
-  isDarkMode ? darkColors.accent.main : lightColors.warning.main
+  isDarkMode ? screenThemes.cursor.normal : lightColors.warning.main
 );
 
 // Hierarchy colors — paper-mode values use the research-grounded prediction palette:
 // best prediction gets a slightly deeper amber accent so it's instantly identifiable
 // in eye-tracking scans (Schlosser 2015: visual hierarchy reduces fixation errors 24%).
 const getKeyboardHierarchyColors = (isDarkMode: boolean) => ({
-  predictionBestBg: isDarkMode ? '#192230' : '#F1E5C5',                    // deeper amber accent (best prediction stands out)
-  predictionText: isDarkMode ? 'rgba(237, 221, 195, 0.92)' : '#5C4A2A',    // warm dark-brown ~7.5:1
-  predictionBestText: isDarkMode ? '#F4E2C2' : '#2F2A26',                  // primary text (AAA on best-bg)
-  secondarySuggestionBg: isDarkMode ? '#151F24' : '#EFE7D0',
-  secondarySuggestionText: isDarkMode ? 'rgba(241, 234, 220, 0.90)' : '#5C4A2A',
+  predictionBestBg: isDarkMode ? '#242C26' : '#EEF0E4',                    // deeper amber accent (best prediction stands out)
+  predictionText: isDarkMode ? '#A5D0B9' : '#285C4D',    // warm dark-brown ~7.5:1
+  predictionBestText: isDarkMode ? '#CBE5D7' : '#1F4A3E',                  // primary text (AAA on best-bg)
+  secondarySuggestionBg: isDarkMode ? '#1A201C' : '#F4EFE7',
+  secondarySuggestionText: isDarkMode ? '#A5D0B9' : '#285C4D',
   // Sentence row — subtle sky-blue tint signals "alternate suggestion" zone
-  sentenceSuggestionBg: isDarkMode ? '#1E2C34' : '#E2ECEF',
-  sentenceSuggestionText: isDarkMode ? '#F1E5CF' : '#3D5E73',
+  sentenceSuggestionBg: isDarkMode ? '#222B27' : '#EDEFE6',
+  sentenceSuggestionText: isDarkMode ? '#DCE6DD' : '#26342D',
   // Show-nav suggestion — soft sage signals "navigation/positive"
-  showNavSuggestionBg: isDarkMode ? '#223330' : '#DFE8DC',
-  showNavSuggestionText: isDarkMode ? '#D9D0BA' : '#3F5A38',
+  showNavSuggestionBg: isDarkMode ? '#22302A' : '#E4EAD9',
+  showNavSuggestionText: isDarkMode ? '#BBC6BE' : '#285C4D',
 });
 
 interface KeyboardScreenProps {

@@ -307,13 +307,13 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   // dusty-rose on most monitors. Replaced with #E8D4B0 — confident warm sand
   // with strong yellow lead, never reads pink. The back-card pastel sage
   // (#DCE2C8) replaced with deeper #D2DCBC — Sarvam/Tobii-tier muted sage.
-  const sectionCardBg = isMix ? '#B6A17A' : isWarm ? warmScreenTokens.medical.sectionCardBg : isWarmMode ? 'rgba(27, 31, 27, 0.92)' : '#E8D4B0';
-  const sectionBackCardBg = isMix ? '#28321F' : isWarm ? warmScreenTokens.medical.sectionBackCardBg : isWarmMode ? 'rgba(25, 31, 24, 0.98)' : '#D2DCBC';
-  const sectionCardBorder = '1.5px solid transparent';
+  const sectionCardBg = isMix ? '#B6A17A' : isWarm ? warmScreenTokens.medical.sectionCardBg : isWarmMode ? screenThemes.medical.cardBg : '#E8D4B0';
+  const sectionBackCardBg = isMix ? '#28321F' : isWarm ? warmScreenTokens.medical.sectionBackCardBg : isWarmMode ? screenThemes.medical.sidebarBg : '#D2DCBC';
+  const sectionCardBorder = isWarm ? warmScreenTokens.medical.cardBorder : isWarmMode ? screenThemes.medical.cardBorder : '1.5px solid transparent';
   const sectionCardShadow = isWarm
     ? warmScreenTokens.medical.sectionShadow
     : isWarmMode
-      ? 'inset 0 1px 0 rgba(255,255,255,0.025), 0 9px 22px rgba(0,0,0,0.20)'
+      ? 'none'
       : '0 6px 16px rgba(95, 76, 52, 0.10), 0 1px 2px rgba(95, 76, 52, 0.06)';
   const dividerColor = isMix ? 'rgba(91,74,51,0.34)' : isWarm ? warmScreenTokens.medical.dividerColor : isWarmMode ? screenThemes.medical.headerDivider : colors.border.light;
   const hindiColor = isMix ? '#493B2E' : isWarm ? warmScreenTokens.medical.hindiColor : isWarmMode ? screenThemes.phrases.hindiText : colors.text.secondary;

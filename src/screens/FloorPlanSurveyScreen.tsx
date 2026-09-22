@@ -230,7 +230,7 @@ const SaveConfirmModal = ({ mode, onClose, isLight = false }: { mode: 'generate'
                 </p>
                 <GazeButton id="modal-ok" onClick={onClose} gazeEnabled={true} alwaysActive={true} gazeEnabledTimestamp={0} isDarkMode={!isLight}
                     dwellCategory="navigationButton"
-                    style={{ padding: 'clamp(12px, 1.8vh, 20px) clamp(32px, 5vw, 64px)', background: tAccent, color: '#FFF', borderRadius: '12px', fontSize: 'clamp(14px, 1.8vh, 20px)', fontWeight: 700, border: 'none' }}>
+                    style={{ padding: 'clamp(12px, 1.8vh, 20px) clamp(32px, 5vw, 64px)', background: tAccent, color: 'var(--ui-on-action)', borderRadius: '12px', fontSize: 'clamp(14px, 1.8vh, 20px)', fontWeight: 700, border: 'none' }}>
                     OK {mode === 'generate' ? '\u2014 Return to Home' : ''}
                 </GazeButton>
             </div>
@@ -879,7 +879,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                             padding: 'clamp(24px, 3.2vh, 38px)',
                                             fontSize: 'clamp(24px, 3.2vh, 34px)',
                                             background: T_accent,
-                                            color: '#FFF',
+                                            color: 'var(--ui-on-action)',
                                             fontWeight: 700,
                                             borderRadius: '16px',
                                             width: '100%',
@@ -908,7 +908,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     style={{
                                         padding: 'clamp(22px, 3vh, 36px)',
                                         background: T_accent,
-                                        color: '#FFF',
+                                        color: 'var(--ui-on-action)',
                                         borderRadius: '16px',
                                         width: '100%',
                                         fontSize: 'clamp(24px, 3.1vh, 34px)',
@@ -988,7 +988,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                                 flex: 2,
                                                 padding: 'clamp(18px, 2.4vh, 26px)',
                                                 background: T_accent,
-                                                color: '#FFF',
+                                                color: 'var(--ui-on-action)',
                                                 borderRadius: '14px',
                                                 fontSize: 'clamp(18px, 2.2vh, 24px)',
                                                 fontWeight: 700,
@@ -1037,7 +1037,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                         style={{
                                             padding: 'clamp(22px, 3vh, 36px)',
                                             background: T_accent,
-                                            color: '#FFF',
+                                            color: 'var(--ui-on-action)',
                                             borderRadius: '16px',
                                             width: '100%',
                                             fontWeight: 700,
@@ -1179,7 +1179,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                 background: T_accent,
                                 border: 'none',
                                 borderRadius: '18px',
-                                color: '#FFFFFF',
+                                color: 'var(--ui-on-action)',
                                 fontSize: 'clamp(21px, 2.6vh, 29px)',
                                 fontWeight: 700,
                                 minHeight: 'clamp(96px, 12.5vh, 134px)',
@@ -1267,7 +1267,7 @@ function FloorPlanSurveyScreen({ onNavigate, onSpeak, isGazeEnabled: globalGazeE
                                     dwellCategory="backSkipButton"
                                     style={{
                                         padding: 'clamp(10px, 1.4vh, 16px) clamp(18px, 2.2vw, 30px)',
-                                        background: T_accent, color: '#FFF', borderRadius: '12px',
+                                        background: T_accent, color: 'var(--ui-on-action)', borderRadius: '12px',
                                         fontSize: 'clamp(14px, 1.8vh, 19px)', fontWeight: 700, border: 'none',
                                     }}>
                                     CLOSE
