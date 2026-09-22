@@ -166,6 +166,18 @@ const InnerApp: React.FC = () => {
 
   const colors = isDarkMode ? darkColors : lightColors;
 
+  // A web page is a native layer above this whole window. Off the web screen
+  // (and on every fresh load of the interface, which starts on Home) no page
+  // may be showing, however the screen changed: navigation, Alert Mode's Home,
+  // an error screen, a reload. Closing when nothing is open does nothing.
+  useEffect(() => {
+    if (currentScreen === 'web') return;
+    try {
+      const api = (window as any).electronAPI;
+      void api?.webview?.close?.()?.catch?.(() => undefined);
+    } catch { /* ignore */ }
+  }, [currentScreen]);
+
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (api?.app?.rendererReady) {

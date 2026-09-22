@@ -1,21 +1,23 @@
 export const BROWSER_CURSOR_CSS = `
+  /* v17.26 — the app's gaze bubble (src/components/core/GazeCursor.tsx): a
+     light ring with a clear centre and a soft dark edge, readable on any page,
+     like Tobii Experience's "Preview my gaze". Dwell progress fills the ring in
+     teal (below); a selection flashes it teal. The old teal-filled disc with
+     yellow/green states hid what it sat on. */
   #gazeconnect-cursor {
-    position: fixed; width: 52px; height: 52px; border-radius: 50%;
-    border: 4px solid #2DD4BF; background: rgba(45,212,191,0.18);
+    position: fixed; width: 84px; height: 84px; border-radius: 50%;
+    box-sizing: border-box;
+    border: 6px solid rgba(255,255,255,0.82); background: transparent;
     pointer-events: none; z-index: 2147483647;
     transform: translate(-50%, -50%);
-    transition: border-color 120ms, background-color 120ms, transform 120ms;
-    box-shadow: 0 0 20px rgba(45,212,191,0.5);
+    transition: border-color 120ms, transform 120ms;
+    box-shadow: 0 0 0 1.5px rgba(0,0,0,0.32), 0 2px 12px rgba(0,0,0,0.45),
+      inset 0 0 0 1.5px rgba(0,0,0,0.30), inset 0 0 8px rgba(0,0,0,0.22);
     display: none;
   }
-  #gazeconnect-cursor.dwelling {
-    border-color: #FACC15; background: rgba(250,204,21,0.25);
-    transform: translate(-50%, -50%) scale(1.1);
-  }
   #gazeconnect-cursor.clicking {
-    border-color: #22C55E; background: rgba(34,197,94,0.4);
-    transform: translate(-50%, -50%) scale(0.9);
-    box-shadow: 0 0 40px rgba(34,197,94,0.8);
+    border-color: rgba(45,212,191,0.95);
+    transform: translate(-50%, -50%) scale(0.94);
   }
   /* v17.19 — dwell progress arc (gcConfig.progressArcEnabled). The app
      cursor has always shown dwell progress; the in-page ring was binary
@@ -23,8 +25,8 @@ export const BROWSER_CURSOR_CSS = `
      from one at 90% and tended to anxiously re-fixate. The arc sweeps
      0 -> 360deg as --gc-frac goes 0 -> 1 (set per frame). */
   #gazeconnect-cursor::after {
-    content: ''; position: absolute; inset: -4px; border-radius: 50%;
-    background: conic-gradient(#FACC15 calc(var(--gc-frac, 0) * 360deg), transparent 0deg);
+    content: ''; position: absolute; inset: -6px; border-radius: 50%;
+    background: conic-gradient(#2DD4BF calc(var(--gc-frac, 0) * 360deg), transparent 0deg);
     -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
     mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
     opacity: 0; transition: opacity 100ms;
@@ -166,7 +168,7 @@ export function buildBrowserCursorInjectionScript(): string {
       };
 
       window.gcConfig = Object.assign({
-        dwellMs: 1500,                       // Fixed Navigation group
+        dwellMs: 1900,                       // Navigation group, Balanced timing set
         onsetMs: 280,                        // v17: 300 → 280
         stabilityRadiusPx: 60,               // v17: 50 → 60 — base tolerates more ALS noise
         postClickCooldownMs: 900,
@@ -828,7 +830,7 @@ export function buildBrowserCursorInjectionScript(): string {
       // intent guard and must never shorten the selected action duration.
       const selectionDurationMs = () => {
         const requested = Number((window.gcConfig || {}).dwellMs);
-        return [500, 1000, 1250, 1500, 2000].includes(requested) ? requested : 1500;
+        return [500, 900, 1000, 1250, 1300, 1500, 1600, 1700, 1900, 2000, 2400, 2500, 3000].includes(requested) ? requested : 1900;
       };
 
       // Saved progress expires in wall time, including tracking gaps.
@@ -1677,9 +1679,15 @@ export function buildBrowserCursorInjectionScript(): string {
         if (now < state.blockedUntil) {
           // v17.22 — keep the cursor tracking gaze through the post-click
           // cooldown (this write used to happen unconditionally at the top).
+          // v17.26 — while the eyes stay on what was just selected the ring
+          // stays at its centre (no hop to the gaze there and back).
           cursor.style.display = 'block';
-          cursor.style.left = x + 'px';
-          cursor.style.top = y + 'px';
+          const heldOnSelected = state.targetRect &&
+            pointInsideRect(x, y, state.targetRect, targetRegionSlackPx);
+          const rx = heldOnSelected ? (state.targetRect.left + state.targetRect.right) / 2 : x;
+          const ry = heldOnSelected ? (state.targetRect.top + state.targetRect.bottom) / 2 : y;
+          cursor.style.left = rx + 'px';
+          cursor.style.top = ry + 'px';
           cursor.classList.remove('dwelling');
           state.dwellingExpiryAt = 0;
           return null;
@@ -1699,9 +1707,25 @@ export function buildBrowserCursorInjectionScript(): string {
         state.lastResolveMs = performance.now() - _rT0;
         const dist = Math.hypot(x - state.x, y - state.y);
 
+        // === v17.26: RING PLACEMENT ======================================
+        // The maintainer's rule (22 Sep 2026), mirror of the app's gaze
+        // bubble (src/utils/gazeFocus.ts): decide the target first, then show
+        // the ring at its centre. The ring sits at the centre of the target
+        // being dwelt on; while a NEW target is still being decided (its first
+        // frame) it waits where it is, so it never heads for a landing point
+        // and then turns to a centre; with nothing to select it follows the
+        // gaze. The CSS left/top transition (cursorSmoothingMs) makes every
+        // move one glide. Where the click lands is unchanged (clickReq).
+        const placeRing = (tracked) => {
+          if (tracked && state.targetRect) {
+            cursor.style.left = ((state.targetRect.left + state.targetRect.right) / 2) + 'px';
+            cursor.style.top = ((state.targetRect.top + state.targetRect.bottom) / 2) + 'px';
+          } else if (!clickReq) {
+            cursor.style.left = x + 'px';
+            cursor.style.top = y + 'px';
+          }
+        };
         cursor.style.display = 'block';
-        cursor.style.left = x + 'px';
-        cursor.style.top = y + 'px';
 
         // === v17.4: STICKY DWELL TARGET (BrowserView equivalent) =======
         // If resolveClickRequest returned null on this frame (Bayesian
@@ -1885,6 +1909,11 @@ export function buildBrowserCursorInjectionScript(): string {
             state.onsetEmitted = false;
           }
           cursor.classList.remove('clicking');
+          if (sameTarget) {
+            placeRing(true);        // Still the same target: stay at its centre.
+          } else if (!clickReq) {
+            placeRing(false);       // Nothing to select: show the gaze.
+          }                         // A new target: decided next frame; the ring waits.
           return null;
         }
 
@@ -2024,34 +2053,9 @@ export function buildBrowserCursorInjectionScript(): string {
           }
         }
 
-        // === v17.3 R2: TWO-PHASE VISUAL ANCHOR IN BROWSERVIEW ==========
-        // Mirror of the main-app two-phase anchor:
-        //   Phase A (elapsed > onsetMs): hard snap cursor to target
-        //     center for the rest of the dwell.
-        //   Phase B (40 ms < elapsed ≤ onsetMs): gradual pull toward
-        //     center so the cursor visibly homes in on a YouTube card
-        //     while the dwell is committing, instead of jittering on
-        //     the edge while the patient panics it'll exit the card.
-        // Only fires when sameTarget — if gaze flips to a neighbour,
-        // anchor releases immediately.
-        if (sameTarget && state.targetRect) {
-          const rect = state.targetRect;
-          const anchorX = (rect.left + rect.right) / 2;
-          const anchorY = (rect.top + rect.bottom) / 2;
-          if (elapsed > onsetMs) {
-            // Phase A — hard snap
-            cursor.style.left = anchorX + 'px';
-            cursor.style.top = anchorY + 'px';
-          } else if (elapsed > 40) {
-            // Phase B — proportional pull (ramps 0 → 1 over 40 → onsetMs)
-            const t = Math.min(1, (elapsed - 40) / Math.max(1, onsetMs - 40));
-            const pullStrength = 0.35 * t;
-            const cx = x + (anchorX - x) * pullStrength;
-            const cy = y + (anchorY - y) * pullStrength;
-            cursor.style.left = cx + 'px';
-            cursor.style.top = cy + 'px';
-          }
-        }
+        // v17.26 — the dwell continues: the ring is at its target's centre
+        // (see RING PLACEMENT above).
+        placeRing(sameTarget);
 
         // v17.22 — commit requires the committing element to BE the tracked
         // target (identity-compared, so kind flips / reflows still commit).

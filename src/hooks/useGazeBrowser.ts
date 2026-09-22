@@ -95,6 +95,20 @@ export function useGazeBrowser() {
     const [videoPlaybackState, setVideoPlaybackState] = useState<VideoPlaybackState>(() => defaultVideoPlaybackState());
     const boundsRef = useRef<BrowserViewBounds | null>(null);
     const cursorInsideRef = useRef(false);
+    // Bumped by every close. An open that resolves after a close was issued
+    // belongs to a page the user has already left and is not shown as open.
+    const openGenerationRef = useRef(0);
+
+    // The page is a native layer drawn over the whole window, not part of this
+    // screen's DOM, so unmounting the screen does not remove it. Whatever takes
+    // the screen away (Home, Alert Mode, an error screen), the page goes too.
+    useEffect(() => () => {
+        openGenerationRef.current += 1;
+        const api = getElectronAPI();
+        try {
+            void api?.webview?.close?.()?.catch?.(() => undefined);
+        } catch { /* ignore */ }
+    }, []);
 
     // Navigation state listener
     useEffect(() => {
@@ -156,7 +170,10 @@ export function useGazeBrowser() {
     useEffect(() => {
         const api = getElectronAPI();
         if (!api?.on) return;
-        const handler = () => {
+        const handler = (payload?: { reason?: string }) => {
+            // 'replace' is the previous page making way for the one being
+            // opened right now; that open is current, not stale.
+            if (payload?.reason !== 'replace') openGenerationRef.current += 1;
             setIsOpen(false);
             setCurrentUrl(null);
             setPageLinks([]);
@@ -179,8 +196,16 @@ export function useGazeBrowser() {
         }
         setLoading(true);
         boundsRef.current = bounds;
+        const generation = openGenerationRef.current;
         try {
             const result = await api.webview.open(url, bounds);
+            if (generation !== openGenerationRef.current) {
+                // Closed while this page was opening. The main process handles
+                // requests in order, so that close has already removed it (or
+                // cancelled the open); a further close here could hit the NEXT page.
+                setLoading(false);
+                return false;
+            }
             if (result?.success) {
                 setIsOpen(true);
                 setCurrentUrl(url);
@@ -201,6 +226,7 @@ export function useGazeBrowser() {
     const closePage = useCallback(async () => {
         const api = getElectronAPI();
         if (!api?.webview) return;
+        openGenerationRef.current += 1;
         try {
             await api.webview.close();
         } catch { /* ignore */ }
@@ -375,6 +401,7 @@ export function useGazeBrowser() {
             await closePage();
             return;
         }
+        openGenerationRef.current += 1;
         try {
             await api.webview.resetBrowserSession(reason);
         } catch (err) {

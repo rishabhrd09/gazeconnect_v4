@@ -592,8 +592,8 @@ scenario('S17 hide cancels pending dwell and all saved progress', (t) => {
   t.expect(out.clicks.length === 0, 'reappearance completed the old dwell');
 });
 
-scenario('S18 all five action durations exclude onset', (t) => {
-  for (const dwellMs of [500, 1000, 1250, 1500, 2000]) {
+scenario('S18 every duration of the three timing sets excludes onset', (t) => {
+  for (const dwellMs of [500, 900, 1000, 1250, 1300, 1500, 1600, 1700, 1900, 2000, 2400, 2500, 3000]) {
     for (const onsetMs of [120, 320]) {
       const env = makeEnv({ host: 'example.com' });
       inject(env, { dwellMs, onsetMs });
@@ -611,16 +611,16 @@ scenario('S18 all five action durations exclude onset', (t) => {
   }
 });
 
-scenario('S19 default and legacy browser durations use 1500ms navigation', (t) => {
-  for (const dwellMs of [undefined, 1800, 2800]) {
+scenario('S19 default and unknown browser durations use the Balanced 1900ms navigation', (t) => {
+  for (const dwellMs of [undefined, 1800, 2800, 450]) {
     const env = makeEnv({ zoom: 1.0 });
     inject(env, { dwellMs });
     const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'default' });
     const c = centerOfRect(anchor.rect);
-    const out = runTrace(env, Array(80).fill([c.x, c.y]));
+    const out = runTrace(env, Array(95).fill([c.x, c.y]));
     t.expect(out.clicks.length === 1, 'expected exactly one navigation selection');
-    if (out.clicks.length) t.expect(out.clicks[0].frameIndex >= 59 && out.clicks[0].frameIndex <= 63,
-      'navigation did not use 1500ms plus onset');
+    if (out.clicks.length) t.expect(out.clicks[0].frameIndex >= 72 && out.clicks[0].frameIndex <= 76,
+      `navigation did not use 1900ms plus onset (frame ${out.clicks[0].frameIndex})`);
   }
 });
 
@@ -949,6 +949,83 @@ scenario('S10 telemetry rings bounded after 4500 frames', (t) => {
     frames: st.frames.length, events2: st.events2.length,
     clicks: st.telemetry.length, posteriors: Object.keys(st.cardPosteriors).length,
   };
+});
+
+// === S21: the ring sits at the centre of the card being selected ===========
+// v17.26 (maintainer, 22 Sep 2026): decide the card first, then show the ring
+// at its centre; never the gaze wandering over it, never a recentring later.
+// Gaze rests 220 px from the centre with noise and a two-sample flash; the
+// ring must stay exactly on the centre, and the click land there (as S1).
+scenario('S21 the ring sits at the centre of the card being selected and clicks it once', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  const { anchor } = addGridCard(env, { left: 200, top: 150, width: 640, height: 360, vid: 'ctr' });
+  const c = centerOfRect(anchor.rect);
+  const gaze = { x: c.x - 190, y: c.y - 110 };
+  const cursor = env.doc.getElementById('gazeconnect-cursor');
+  const drawn = () => ({ x: parseFloat(cursor.style.left), y: parseFloat(cursor.style.top) });
+  const rng = mulberry32(21);
+  const clicks = [];
+  let worst = 0, atLanding = 0, onCentre = 0;
+  for (let i = 0; i < 100; i++) {
+    const flash = i === 40 || i === 41;                 // Two samples 200 px away, still on the card.
+    const gx = flash ? gaze.x + 200 : gaze.x + gauss(rng) * 4;
+    const gy = gaze.y + gauss(rng) * 4;
+    const res = frame(env, gx, gy, 30);
+    if (res.c) clicks.push(res.c);
+    if (!cursor || i < 2 || res.c) continue;            // From the card's second frame on.
+    const p = drawn();
+    const off = Math.hypot(p.x - c.x, p.y - c.y);
+    worst = Math.max(worst, off);
+    if (off < 1) onCentre++;
+    if (Math.hypot(p.x - gaze.x, p.y - gaze.y) < 30) atLanding++;
+  }
+  t.expect(!!cursor, 'no cursor element');
+  t.expect(worst < 1, `ring left the card's centre by ${worst.toFixed(0)} px (the gaze is 220 px away)`);
+  t.expect(atLanding === 0, `ring was drawn at the gaze landing point on ${atLanding} frames`);
+  t.expect(onCentre > 50, `ring on the centre for only ${onCentre} frames`);
+  t.expect(clicks.length === 1, `expected 1 click, got ${clicks.length}`);
+  if (clicks.length === 1) {
+    t.expect(Math.abs(clicks[0].x - c.x) <= 2 && Math.abs(clicks[0].y - c.y) <= 2,
+      `click at (${clicks[0].x},${clicks[0].y}) not at the card centre (${c.x},${c.y})`);
+  }
+});
+
+// === S22: from one card to another the ring goes centre to centre ==========
+// The eyes move from a corner of card A to a corner of card B mid-dwell. The
+// ring must go from A's centre straight to B's centre, never via either gaze
+// point, and B (not A) is what gets clicked.
+scenario('S22 moving to another card: the ring goes centre to centre, B is clicked', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  const A = addGridCard(env, { left: 60, top: 120, width: 420, height: 260, vid: 'aaa' }).anchor;
+  const B = addGridCard(env, { left: 900, top: 420, width: 420, height: 260, vid: 'bbb' }).anchor;
+  const ca = centerOfRect(A.rect), cb = centerOfRect(B.rect);
+  const gA = { x: ca.x - 150, y: ca.y - 90 }, gB = { x: cb.x + 150, y: cb.y + 90 };
+  const cursor = env.doc.getElementById('gazeconnect-cursor');
+  const drawn = () => ({ x: parseFloat(cursor.style.left), y: parseFloat(cursor.style.top) });
+  const rng = mulberry32(22);
+  const clicks = [];
+  for (let i = 0; i < 25; i++) {                        // Part of a dwell on A.
+    const res = frame(env, gA.x + gauss(rng) * 4, gA.y + gauss(rng) * 4, 30);
+    if (res.c) clicks.push(res.c);
+  }
+  const before = drawn();
+  t.expect(Math.hypot(before.x - ca.x, before.y - ca.y) < 1, `ring not on A's centre before the move`);
+  const seen = [];
+  for (let i = 0; i < 120; i++) {
+    const res = frame(env, gB.x + gauss(rng) * 4, gB.y + gauss(rng) * 4, 30);
+    if (res.c) clicks.push(res.c);
+    seen.push(drawn());
+  }
+  const offLanding = seen.filter(p => Math.hypot(p.x - gB.x, p.y - gB.y) < 30 || Math.hypot(p.x - gA.x, p.y - gA.y) < 30).length;
+  t.expect(offLanding === 0, `ring drawn at a gaze point on ${offLanding} frames`);
+  const others = seen.filter(p => Math.hypot(p.x - ca.x, p.y - ca.y) >= 1 && Math.hypot(p.x - cb.x, p.y - cb.y) >= 1);
+  t.expect(others.length === 0, `ring rested ${others.length} frames somewhere other than a centre`);
+  const last = seen[seen.length - 1];
+  t.expect(Math.hypot(last.x - cb.x, last.y - cb.y) < 1, `ring not on B's centre at the end`);
+  t.expect(clicks.length === 1 && clicks[0].href && clicks[0].href.includes('bbb'),
+    `expected one click on B, got ${JSON.stringify(clicks.map(c => c.href || c.key))}`);
 });
 
 // ---------------------------------------------------------------------------
