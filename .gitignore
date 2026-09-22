@@ -26,6 +26,8 @@ python/data/*.json
 # smart_bigrams.json is a pre-computed static asset (see python/scripts/generate_smart_bigrams.py),
 # not runtime patient data — keep it tracked.
 !python/data/smart_bigrams.json
+# Runtime patient data (learned words, abbreviations, caregiver words): local only.
+python/data/patient_data/
 *.spec
 
 # --- .NET build artifacts ---
