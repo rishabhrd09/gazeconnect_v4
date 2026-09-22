@@ -37,3 +37,22 @@ Development output: `TobiiGazeHelper/bin/Release/net8.0-windows/win-x64/TobiiGaz
 Use `build-installer.bat` for a complete installer candidate, including Python and frontend assets. End users of a validated installer should not need Node, Python or a separately installed .NET runtime. They still need the compatible Tobii device driver/Experience installation and successful display setup/calibration. A development machine's successful build does not verify those clean-machine requirements.
 
 Avoid competing gaze-to-mouse software during app-owned gaze selection. Plug/unplug, tracking loss, screen scaling, sleep/resume and reconnect must be included in native acceptance tests.
+
+## Status messages and stalled-stream recovery
+
+The SDK delivers no gaze callback while nobody is looking, so silence alone says nothing. Besides `gaze` lines the helper sends a `status` line on every change and once a second, carrying what the Tobii engine itself reports: `connection`, `device_status`, `user_presence`, `gaze_tracking`, and a derived `stream_state`:
+
+| `stream_state` | Meaning |
+| --- | --- |
+| `streaming` | Gaze samples are arriving. |
+| `no_user` / `no_gaze` | Tracker healthy; no eyes detected / eyes present but gaze not on the screen. Normal, never "repaired". |
+| `tracking_paused`, `device_not_connected`, `device_unavailable`, `engine_unavailable` | Tracking paused in Tobii Experience, tracker unplugged, tracker not ready, Tobii software not running. |
+| `stalled` / `recovering` | The engine reports gaze **is** tracked, continuously for 3 s, yet no sample arrives. |
+
+Only `stalled` is treated as a fault: the helper re-creates its Tobii `Host` with backoff (6, 12, 24, 30 s) and, after four attempts, exits with code 3 so the app's supervisor starts a clean process. The backend forwards the state to the interface, which explains why gaze is absent instead of going quiet.
+
+- `GAZE_HELPER_WATCHDOG=0` reports state but never re-creates the `Host` (diagnostics, rollback).
+- The helper requests Tobii's **unfiltered** gaze stream. The vendor's `LightlyFiltered` smoothing costs latency: on live recordings (21 Sep 2026) a real eye movement took a median 91 ms (p90 241 ms) to cross in the lightly filtered stream and 62 ms (p90 182 ms) unfiltered, and the maintainer judged the unfiltered stream the faster one on the tracker. The backend's estimator is noise-aware and, on this stream only, waits one sample (25 ms) before following a jump, which hides the single-sample glitches the raw stream carries. `GAZE_HELPER_STREAM=lightly_filtered` is the way back; `status.stream_mode` reports which one is active, and `tools/gaze_live_observer.py` compares them on a running session.
+- `--test-stall-first-host` discards the first `Host`'s samples so the recovery can be exercised on a live tracker. Never use it outside a test.
+
+The helper still serves exactly **one** TCP client and drops the previous one on a new connection. Do not connect a second consumer to port 5555, even to probe it, while the app is running; `tools/gaze_fixation_capture.py` checks the port by binding for this reason.

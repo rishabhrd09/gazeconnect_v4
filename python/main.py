@@ -404,6 +404,7 @@ class TobiiReceiver:
         self._stopping = False
         self._loss_reported = False
         self._tracking_epoch = None
+        self.last_status: Optional[Dict[str, Any]] = None
 
         # Device info (from TobiiHelper)
         self.device_name = ""
@@ -444,10 +445,18 @@ class TobiiReceiver:
             self._loss_reported = False
             self._tracking_epoch = None
             logger.info("Connected to TobiiHelper")
+            self._helper_link_changed()
             return True
         except (OSError, asyncio.TimeoutError):
             self.is_connected = False
+            self._helper_link_changed()
             return False
+
+    def _helper_link_changed(self):
+        """A status from a previous helper connection says nothing about now."""
+        self.last_status = None
+        if self.on_status:
+            self.on_status(None)
 
     def _report_loss(self):
         if self._loss_reported:
@@ -484,6 +493,7 @@ class TobiiReceiver:
                         self._writer.close()
                         self._writer = None
                     self._reader = None
+                    self._helper_link_changed()
         except asyncio.CancelledError:
             pass
         finally:
@@ -545,10 +555,20 @@ class TobiiReceiver:
                     self.on_gaze(point)
 
             elif msg_type == 'status':
-                self.device_name = data.get('device_name', '')
-                self.serial_number = data.get('serial_number', '')
-                self.sampling_rate = data.get('sampling_rate', 0)
-                logger.info(f"Tobii device: {self.device_name} (S/N: {self.serial_number})")
+                # Low-rate engine state from the helper (why there is or is
+                # not gaze). Logged on change only: it arrives every second.
+                device_name = str(data.get('device_name', '') or '')
+                if device_name and device_name != self.device_name:
+                    logger.info(f"Tobii device: {device_name} (S/N: {data.get('serial_number', '')})")
+                self.device_name = device_name or self.device_name
+                self.serial_number = data.get('serial_number', self.serial_number)
+                self.sampling_rate = data.get('sampling_rate', self.sampling_rate)
+                previous = (self.last_status or {}).get('stream_state')
+                self.last_status = data
+                if data.get('stream_state') != previous:
+                    logger.info(f"[TOBII] stream_state={data.get('stream_state')} "
+                                f"device={data.get('device_status')} presence={data.get('user_presence')} "
+                                f"gaze={data.get('gaze_tracking')} recoveries={data.get('recoveries')}")
 
                 if self.on_status:
                     self.on_status(data)
@@ -861,6 +881,42 @@ class GazeConnectBackend:
     MAGNET_HANDOFF_BIAS_PX = 8.0   # v15: reduced from 14 — faster key-to-key handoff on keyboard
     ACTIVE_PIPELINE_NAME = "adaptive_cursor_v1"
     SAMPLE_RATE_WINDOW = 120
+    # Tracker noise straddles the window boundary when the user looks at an
+    # edge target (the bottom keyboard row sits against the taskbar edge), so
+    # one out-of-window sample is not a departure. Such samples are never
+    # published or clamped; they are simply not allowed to wipe the filter and
+    # target state until they persist, stray far, or follow gaze that was not
+    # resting beside that edge. Shorter than every 150 ms freshness horizon.
+    EDGE_NOISE_HOLD_SECONDS = 0.070
+    EDGE_NOISE_MARGIN_PX = 64.0
+    EDGE_NOISE_NEAR_PX = 128.0
+    # Invalid gaze is never selectable, and every loss still clears the live
+    # filter and target state at once. But re-seeding the cursor at a raw sample
+    # after every blink or stray edge sample is the hop seen after blinks and
+    # the juggling along the bottom row. So a loss of a resumable kind suspends
+    # the DISPLAY state, and the next valid sample restores it if the loss was
+    # this short. Losing focus, stale or reordered data never resume.
+    # 1 s, the interface's own horizon (GAZE_RECOVERY_MS): it pauses a dwell
+    # through a loss this long and then continues it, so the cursor continues
+    # the same fixation too. At 400 ms, a dropout of 0.4-1 s (frequent near the
+    # bottom of the screen, where the tracker loses the eyes for a moment)
+    # re-seeded the cursor at the first, noisiest sample back: a hop while the
+    # dwell itself carried on (22 Sep 2026).
+    DISPLAY_RESUME_SECONDS = 1.000
+    DISPLAY_RESUMABLE_LOSSES = ('blink', 'lost', 'oob', 'outside_window')
+    # Maintainer decision, 21 Sep 2026 (AGENTS.md): the tracker sits under the
+    # screen and is least accurate along the bottom row, where a live recording
+    # showed gaze reported below the screen for 0.3-0.8 s at a time while a
+    # bottom control was being looked at. Nothing selectable exists beyond the
+    # glass, so gaze reported this little past a PHYSICAL screen edge is taken
+    # to be at that edge. 48 CSS px is about 13 mm on the validated 23 inch
+    # display, inside the tracker's own error at 60 cm. It applies only where
+    # the window edge IS the screen edge (full screen; top and sides when
+    # maximised). An edge that borders other UI - the taskbar, another window -
+    # stays strict, and anything farther out is rejected as before.
+    SCREEN_EDGE_BAND_PX = 48.0
+    SCREEN_EDGE_ALIGNED_PX = 2.0
+    SCREEN_EDGE_INSET_PX = 1.0
 
     ACTIVE_FILTER_PROFILES = FILTER_PROFILES
 
@@ -971,6 +1027,10 @@ class GazeConnectBackend:
         self._last_sample_timestamp = None
         self._last_sample_received = None
         self._tracking_lost = False
+        self._last_inside_px: Optional[tuple] = None
+        self._edge_outside_since: Optional[float] = None
+        self._suspended_display: Optional[Dict[str, Any]] = None
+        self._last_tracker_status: Optional[Dict[str, Any]] = None
         self._gaze_send_tasks = {}
         self._gaze_offset_x = 0     # Manual gaze X offset in CSS pixels (from Settings)
         self._gaze_offset_y = 0     # Manual gaze Y offset in CSS pixels (from Settings)
@@ -986,6 +1046,7 @@ class GazeConnectBackend:
         """Setup internal callbacks."""
         # Tobii gaze callback
         self.tobii.on_gaze = self._on_gaze_data
+        self.tobii.on_status = self._on_tracker_status
 
         # Break callbacks
         self.breaks.on_warning = lambda: self._broadcast('break_warning', {
@@ -1130,18 +1191,7 @@ class GazeConnectBackend:
         if self.physical_width <= 0 or self.physical_height <= 0:
             return x_norm, y_norm
 
-        dpr_val = max(1.0, self.dpr if self.dpr else 1.0)
-
-        css_screen_width = float(self.physical_width)
-        css_screen_height = float(self.physical_height)
-        width_ratio = (self.physical_width / self.screen_width) if self.screen_width else 1.0
-        reports_physical_px = (
-            self.screen_units != 'css' and dpr_val > 1.01 and
-            abs(width_ratio - dpr_val) < 0.20
-        )
-        if reports_physical_px:
-            css_screen_width = css_screen_width / dpr_val
-            css_screen_height = css_screen_height / dpr_val
+        css_screen_width, css_screen_height = self._css_screen_size()
 
         screen_x_css = x_norm * css_screen_width + self.screen_origin_x
         screen_y_css = y_norm * css_screen_height + self.screen_origin_y
@@ -1169,6 +1219,74 @@ class GazeConnectBackend:
             out_y = max(0.0, min(1.0, out_y))
         return out_x, out_y
 
+    def _css_screen_size(self) -> tuple:
+        """The tracked display's size in the CSS pixels the window geometry uses."""
+        dpr_val = max(1.0, self.dpr if self.dpr else 1.0)
+        css_screen_width = float(self.physical_width)
+        css_screen_height = float(self.physical_height)
+        width_ratio = (self.physical_width / self.screen_width) if self.screen_width else 1.0
+        reports_physical_px = (
+            self.screen_units != 'css' and dpr_val > 1.01 and
+            abs(width_ratio - dpr_val) < 0.20
+        )
+        if reports_physical_px:
+            css_screen_width = css_screen_width / dpr_val
+            css_screen_height = css_screen_height / dpr_val
+        return css_screen_width, css_screen_height
+
+    def _geometry_payload(self) -> Dict[str, Any]:
+        """The window and screen geometry in use, for diagnostic listeners."""
+        css_width, css_height = self._css_screen_size()
+        return {
+            'content_width': float(self.content_width or self.screen_width),
+            'content_height': float(self.content_height or self.screen_height),
+            'screen_width': css_width, 'screen_height': css_height,
+            'window_x': float(self.window_x) - float(self.screen_origin_x),
+            'window_y': float(self.window_y) - float(self.screen_origin_y),
+            'reported': bool(self.content_width and self.content_height),
+            'edge_band_px': self.SCREEN_EDGE_BAND_PX,
+        }
+
+    def _screen_edge_band(self, x_norm, y_norm) -> Optional[tuple]:
+        """Screen-normalised gaze pulled back onto a physical screen edge, or None.
+
+        None means the sample is left exactly as the tracker reported it: it is
+        on the screen, malformed, farther out than SCREEN_EDGE_BAND_PX, or past
+        an edge where the window does not reach the edge of the screen.
+        """
+        try:
+            x_norm, y_norm = float(x_norm), float(y_norm)
+        except (TypeError, ValueError):
+            return None
+        if not (math.isfinite(x_norm) and math.isfinite(y_norm)):
+            return None
+        if 0.0 <= x_norm <= 1.0 and 0.0 <= y_norm <= 1.0:
+            return None
+        if not (self.content_width and self.content_height):
+            return None  # Only with window geometry the interface reported, never a default.
+        if min(self.screen_width, self.screen_height, self.physical_width, self.physical_height) <= 0:
+            return None
+        css_width, css_height = self._css_screen_size()
+        left = float(self.window_x) - float(self.screen_origin_x)
+        top = float(self.window_y) - float(self.screen_origin_y)
+        right = left + float(self.content_width or self.screen_width)
+        bottom = top + float(self.content_height or self.screen_height)
+        aligned = self.SCREEN_EDGE_ALIGNED_PX
+        banded = []
+        for value, size, near_edge, far_edge in ((x_norm, css_width, left, right),
+                                                 (y_norm, css_height, top, bottom)):
+            position = value * size
+            if position < 0.0:
+                if abs(near_edge) > aligned or -position > self.SCREEN_EDGE_BAND_PX:
+                    return None
+                position = self.SCREEN_EDGE_INSET_PX
+            elif position > size:
+                if abs(far_edge - size) > aligned or position - size > self.SCREEN_EDGE_BAND_PX:
+                    return None
+                position = size - self.SCREEN_EDGE_INSET_PX
+            banded.append(position / size)
+        return banded[0], banded[1]
+
     def _clear_gaze_target_state(self):
         self._sticky_magnet_target = None
         self._on_key_target_id = None
@@ -1177,10 +1295,22 @@ class GazeConnectBackend:
         if hasattr(self, '_last_magnet_raw'):
             del self._last_magnet_raw
 
-    def _invalidate_gaze(self, reason: str, timestamp: Optional[float] = None):
-        """A held display position is never a fresh, selectable measurement."""
+    def _invalidate_gaze(self, reason: str, timestamp: Optional[float] = None,
+                         rejected: Optional[tuple] = None):
+        """A held display position is never a fresh, selectable measurement.
+
+        `rejected` is where a well-formed sample fell outside the window, in
+        window-normalised units. It is diagnostic only (how far out do edge
+        losses land?) and is never a position: x, y keep the held display point.
+        """
         first_loss = not self._tracking_lost
         self._tracking_lost = True
+        self._last_inside_px = None
+        self._edge_outside_since = None
+        if reason not in self.DISPLAY_RESUMABLE_LOSSES:
+            self._suspended_display = None
+        elif first_loss:
+            self._suspended_display = self._suspend_display_state(timestamp)
         self.cursor_filter.reset()
         self.gaze_classifier.mark_tracking_lost()
         self._clear_gaze_target_state()
@@ -1193,10 +1323,101 @@ class GazeConnectBackend:
         # timestamp must never make the previous position appear newly sampled.
         payload.pop('intent_x', None)
         payload.pop('intent_y', None)
+        payload.pop('rejected_x', None)
+        payload.pop('rejected_y', None)
+        if rejected is not None and all(math.isfinite(value) for value in rejected):
+            payload['rejected_x'], payload['rejected_y'] = round(rejected[0], 5), round(rejected[1], 5)
         self._last_gaze_payload = payload
         if first_loss:
             self._broadcast('gaze_lost', {'reason': reason})
         self._broadcast('gaze', payload)
+
+    def _edge_sample_is_tolerated(self, x_norm: float, y_norm: float, stamp: float) -> bool:
+        """True while an out-of-window sample may still be tracker noise at an edge.
+
+        A tolerated sample changes nothing: no position is published, nothing
+        is clamped onto a border control, and the filter and target state
+        survive. Anything else is invalidated exactly as before.
+        """
+        last = self._last_inside_px
+        if self._tracking_lost or last is None or not (math.isfinite(x_norm) and math.isfinite(y_norm)):
+            return False
+        px, py = x_norm * self.screen_width, y_norm * self.screen_height
+        for value, limit, previous in ((px, self.screen_width, last[0]), (py, self.screen_height, last[1])):
+            beyond = max(-value, value - limit, 0.0)
+            if beyond > self.EDGE_NOISE_MARGIN_PX:
+                return False
+            if beyond and (previous if value < 0 else limit - previous) > self.EDGE_NOISE_NEAR_PX:
+                return False  # Gaze was not resting beside this edge: a real departure.
+        if self._edge_outside_since is None:
+            self._edge_outside_since = stamp
+        return 0 <= stamp - self._edge_outside_since <= self.EDGE_NOISE_HOLD_SECONDS
+
+    def _suspend_display_state(self, timestamp: Optional[float]) -> Optional[Dict[str, Any]]:
+        """Display-only state worth resuming after a brief loss, or None."""
+        if self.cursor_filter.estimate is None:
+            return None
+        return {
+            'since': timestamp if timestamp is not None else time.time(),
+            'screen': self.current_screen,
+            'preset': self.active_filter_preset,
+            'filter': self.cursor_filter.snapshot(),
+            'on_key_target_id': self._on_key_target_id,
+            'cursor_on_target': bool(getattr(self, '_cursor_on_target', False)),
+            'on_key_last_true': self._on_key_last_true,
+            'sticky_magnet_target': self._sticky_magnet_target,
+            'last_magnet_raw': getattr(self, '_last_magnet_raw', None),
+        }
+
+    def _resume_display_state(self, stamp: float):
+        """Restore a suspended display state once, if it is still about the same thing."""
+        suspended, self._suspended_display = self._suspended_display, None
+        if (suspended is None or not 0 <= stamp - suspended['since'] <= self.DISPLAY_RESUME_SECONDS
+                or suspended['screen'] != self.current_screen
+                or suspended['preset'] != self.active_filter_preset):
+            return
+        detector = self.target_registry.screens.get(self.current_screen)
+        targets = getattr(detector, 'targets', {}) if detector else {}
+        self.cursor_filter.restore(suspended['filter'])
+        target_id = suspended['on_key_target_id']
+        target = targets.get(target_id) if target_id else None
+        if target is not None and target.enabled:
+            self._on_key_target_id = target_id
+            self._cursor_on_target = suspended['cursor_on_target']
+            self._on_key_last_true = suspended['on_key_last_true']
+        sticky = suspended['sticky_magnet_target']
+        if sticky is not None and targets.get(getattr(sticky, 'id', None)) is sticky and sticky.enabled:
+            self._sticky_magnet_target = sticky
+            if suspended['last_magnet_raw'] is not None:
+                self._last_magnet_raw = suspended['last_magnet_raw']
+
+    def _tracker_status_payload(self) -> Dict[str, Any]:
+        """Why gaze is or is not arriving, for the interface to explain."""
+        status = self.tobii.last_status or {}
+        if self.config.tobii_simulated:
+            state = 'simulated'
+        elif not self.config.tobii_enabled:
+            state = 'disabled'
+        elif not self.tobii.is_connected:
+            state = 'helper_unavailable'
+        else:
+            state = str(status.get('stream_state') or 'unknown')
+        return {
+            'stream_state': state,
+            'device_status': status.get('device_status'),
+            'user_presence': status.get('user_presence'),
+            'gaze_tracking': status.get('gaze_tracking'),
+            'recoveries': status.get('recoveries', 0),
+            'stream_mode': status.get('stream_mode'),
+        }
+
+    def _on_tracker_status(self, _status: Optional[Dict[str, Any]]):
+        payload = self._tracker_status_payload()
+        # The estimator confirms a jump for one sample on the unsmoothed stream only.
+        self.cursor_filter.raw_stream = payload.get('stream_mode') == 'Unfiltered'
+        if payload != self._last_tracker_status:
+            self._last_tracker_status = payload
+            self._broadcast('tracker_status', payload)
 
     def _on_gaze_data(self, point: GazePoint):
         """Validate -> map -> optional calibration -> one filter -> target assistance."""
@@ -1210,19 +1431,41 @@ class GazeConnectBackend:
             self._invalidate_gaze('stale')
             return
         if self._last_sample_timestamp is not None and stamp <= self._last_sample_timestamp:
+            if self._tracking_lost and not point.is_valid:
+                # A second report of a loss already in force, not reordered gaze.
+                # The helper and the receiver each report 150 ms of silence; the
+                # helper stamps whole milliseconds, so its report often arrives
+                # second carrying the older stamp. It holds no measurement. Treated
+                # as out_of_order it discarded the display state kept for the
+                # blink, and the cursor hopped when the eyes reopened (four times
+                # in a 100 s recording, 21 Sep 2026).
+                return
             self._invalidate_gaze('out_of_order')
             return
         gap = stamp - self._last_sample_timestamp if self._last_sample_timestamp is not None else 0
         self._last_sample_timestamp = stamp
-        self._last_sample_received = time.monotonic()
+        received = time.monotonic()
+        # Gaze reported just past a physical screen edge is at that edge (see
+        # SCREEN_EDGE_BAND_PX). Done before validation so the conditioner's own
+        # blink/loss bookkeeping sees one coherent stream.
+        gaze_x, gaze_y = self._screen_edge_band(point.x, point.y) or (point.x, point.y)
         conditioned = self.signal_conditioner.process({
-            'x': point.x, 'y': point.y, 'timestamp': stamp,
+            'x': gaze_x, 'y': gaze_y, 'timestamp': stamp,
             'left_valid': point.left_valid, 'right_valid': point.right_valid,
             'confidence': point.confidence, 'is_valid': point.is_valid,
             'validity_source': point.validity_source,
         })
+        rejected = None
+        if conditioned.state == GazeValidity.OUT_OF_BOUNDS:
+            # A genuine measurement that landed off the screen, beyond the edge
+            # band: the same edge question as leaving the window, asked in
+            # window coordinates.
+            rejected = self._screen_to_window_normalized(conditioned.raw_x, conditioned.raw_y, clamp=False)
+            if self._edge_sample_is_tolerated(*rejected, stamp):
+                return
         if conditioned.state != GazeValidity.VALID:
-            self._invalidate_gaze(conditioned.state.value, stamp)
+            self._last_sample_received = received
+            self._invalidate_gaze(conditioned.state.value, stamp, rejected)
             self.fatigue.update_gaze(conditioned.x, conditioned.y, False, stamp)
             return
         if gap > self.FRAME_GAP_HOLD_SECONDS:
@@ -1230,11 +1473,20 @@ class GazeConnectBackend:
             self.gaze_classifier.reset()
             self._clear_gaze_target_state()
         raw_x, raw_y = self._screen_to_window_normalized(conditioned.x, conditioned.y, clamp=False)
-        # Looking at the title bar, another window, or off-screen must never
-        # collapse onto a selectable border target.
+        # Looking at the title bar, the taskbar or another window must never
+        # collapse onto a selectable border target. (The only clamping is the
+        # narrow band past a physical screen edge, applied above.)
         if not (0 <= raw_x <= 1 and 0 <= raw_y <= 1):
-            self._invalidate_gaze('outside_window', stamp)
+            if self._edge_sample_is_tolerated(raw_x, raw_y, stamp):
+                return
+            self._last_sample_received = received
+            self._invalidate_gaze('outside_window', stamp, (raw_x, raw_y))
             return
+        # Only a published sample refreshes the stale guard, so a run of
+        # tolerated edge samples is also bounded by POINT_TTL_SECONDS.
+        self._last_sample_received = received
+        self._edge_outside_since = None
+        self._resume_display_state(stamp)
         if self.calibration_active and self.calibration_session:
             self.calibration_session.update(raw_x, raw_y, conditioned.confidence)
         calibration_applied = not self.calibration_active and self.calibration_corrector.enabled
@@ -1244,9 +1496,15 @@ class GazeConnectBackend:
         measured_rate = self._update_sample_rate(stamp)
         gaze_class = self.gaze_classifier.classify(conditioned.x, conditioned.y, stamp)
         raw_px, raw_py = raw_x * self.screen_width, raw_y * self.screen_height
-        on_key = self._update_on_key_state_impl(raw_px, raw_py)
+        self._last_inside_px = (raw_px, raw_py)
+        # The hold's target identity comes from the position it stabilises.
+        # Taken from the raw sample it flipped between neighbouring keys with
+        # tracker noise while the displayed cursor stood still, and every flip
+        # restarted the hold. The filter still releases on raw distance, so a
+        # real departure moves the estimate, and with it the identity, at once.
         filtered_x, filtered_y = self.cursor_filter.update(
-            raw_px, raw_py, stamp, self._on_key_target_id if on_key else None)
+            raw_px, raw_py, stamp, self._on_key_target_id if self._cursor_on_target else None)
+        on_key = self._update_on_key_state_impl(filtered_x, filtered_y)
         screen_x, screen_y = self._apply_magnetism(filtered_x, filtered_y)
         magnet_px = math.hypot(screen_x - filtered_x, screen_y - filtered_y)
         x = max(0.0, min(1.0, screen_x / self.screen_width))
@@ -1704,6 +1962,7 @@ class GazeConnectBackend:
                 # B1-BE — live magnetism tuning for on-rig A/B sessions
                 # (shipped defaults are code constants; restart restores them).
                 'set_magnet_params': lambda: self._set_magnet_params(data),
+                'renderer_latency': lambda: self._relay_renderer_latency(websocket, data),
                 'automation_execute': lambda: self._handle_automation_execute(websocket, data),
                 'update_text': lambda: self._update_text(data.get('text', '')),
                 'save_survey': lambda: self._save_survey(data.get('survey_data', {})),
@@ -1740,6 +1999,33 @@ class GazeConnectBackend:
             logger.error(f"Invalid JSON: {message[:100]}")
         except Exception as e:
             logger.error(f"Message handling error: {e}")
+
+    RENDERER_LATENCY_MAX_FIELDS = 24
+
+    def _relay_renderer_latency(self, sender, data: Dict):
+        """Pass the interface's own timing summary on to a diagnostic listener.
+
+        The interface measures what the backend cannot see: delivery of a gaze
+        frame to it, and the time until that frame is painted. It sends a few
+        percentiles every ten seconds. They go only to OTHER connected clients
+        (tools/gaze_live_observer.py); with none connected nothing happens.
+        Numbers only, nothing is stored, and nothing here can affect gaze.
+        """
+        summary = data.get('summary')
+        if not isinstance(summary, dict):
+            return
+        clean = {}
+        for key, value in summary.items():
+            if len(clean) >= self.RENDERER_LATENCY_MAX_FIELDS:
+                break
+            if (isinstance(key, str) and 0 < len(key) <= 32 and not isinstance(value, bool)
+                    and isinstance(value, (int, float)) and math.isfinite(value)):
+                clean[key] = round(float(value), 1)
+        if not clean:
+            return
+        for client in tuple(self.connected_clients):
+            if client is not sender:
+                self._send(client, 'renderer_latency', {'summary': clean})
 
     def _send(self, websocket: WebSocketServerProtocol, msg_type: str, data: Dict = None):
         """Send message to specific client."""
@@ -3226,6 +3512,8 @@ class GazeConnectBackend:
             'gaze_enabled': self.gaze_enabled,
             'current_screen': self.current_screen,
             'tobii_connected': self.tobii.is_connected,
+            'tracker_status': self._tracker_status_payload(),
+            'geometry': self._geometry_payload(),
             # Lets the frontend route speech to browser speechSynthesis when
             # the backend voice cannot produce audio (otherwise the patient
             # would be silently mute while the connection shows healthy).
