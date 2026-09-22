@@ -31,8 +31,12 @@ import {
 const DEBOUNCE_MS = 500;
 // English-only release. Legacy translation data stays in saved profiles, but old
 // flags and imports cannot enable a bilingual interface or a Hindi voice mode.
+// The manual gaze offset is retired too: the measured tracker error changes
+// direction across the screen, so one global shift only moved the fault and
+// made a strip along the opposite edge unreachable. A saved offset must not
+// keep acting invisibly now that its control is gone; recalibrate instead.
 const englishOnlySettings = (settings: AppSettings): AppSettings => ({
-  ...settings, showHindi: false, ttsLanguage: 'english',
+  ...settings, showHindi: false, ttsLanguage: 'english', gazeOffsetX: 0, gazeOffsetY: 0,
 });
 const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
 

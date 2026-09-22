@@ -1,5 +1,5 @@
 // =============================================
-// GazeCursor.tsx - v10.0 ACCURACY FIX + ONSET DELAY + FIXATION TTL
+// GazeCursor.tsx - v18 TARGET-CENTRED GAZE BUBBLE (on v10 accuracy/onset/TTL)
 // =============================================
 // Key improvements:
 // 1. Screen-to-window coordinate transformation
@@ -10,6 +10,8 @@
 // 6. v10: Onset delay prevents drive-by activations (OptiKey-inspired)
 // 7. v10: Incomplete fixation TTL preserves progress during brief gaze excursions
 // 8. v10: Center-weighted keyboard hit zone expansion
+// 9. v18: the cursor is a Tobii-style bubble drawn at the centre of the target
+//    the eyes are on, moving centre to centre (utils/gazeFocus)
 // =============================================
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -22,10 +24,12 @@ import { collectSnapTargets, computeSnap, type SnapTarget } from '../../utils/ga
 import { computeEdgeExpansion, isPointInExpandedRect } from '../../utils/edgeHitZone';
 import { computeScreenProfile } from '../../utils/screenProfile';
 import { useTheme } from '../../contexts/ThemeContext';
-import { collectKeyboardKeys, findBestKeyboardKey, type KeyRect } from '../../utils/hitZoneExpansion';
+import { collectKeyboardKeys, distanceToRect, findBestKeyboardKey, isCloserTarget, type KeyRect } from '../../utils/hitZoneExpansion';
+import { BubbleMotion, FreeAnchor, GazeFocus, rectCentre, type Point } from '../../utils/gazeFocus';
 import { recordDwellEvent, recordDwellInterrupt, recordFreeze, recordGazeLatency, type GazeLatencySample } from '../../utils/gazeTelemetry';
 import { gazeFlags } from '../../utils/gazeFlags';
 import { GazeFreshness, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../../utils/gazeSafety';
+import { TrackerStatusNotice } from './TrackerStatusNotice';
 import { KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT, dwellForContext, fixedDwell, type KeyboardCadence } from '../../config/dwellTimeConfig';
 
 // Match native pointer hit testing: an opaque/noninteractive surface blocks targets
@@ -45,16 +49,70 @@ function isGazeTargetAvailable(target: HTMLElement): boolean {
   return Boolean(top && target.contains(top));
 }
 
+// Within this distance of a target's box the gaze still reads as being at it.
+const NEAR_TARGET_PX = 40;
+function isNearElement(el: HTMLElement, x: number, y: number, pad: number = NEAR_TARGET_PX): boolean {
+  if (!el.isConnected) return false;
+  const r = el.getBoundingClientRect();
+  return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+}
+type Candidate = { element: HTMLElement | null; isToggle: boolean; isAlwaysActive: boolean };
+const NO_CANDIDATE: Candidate = { element: null, isToggle: false, isAlwaysActive: false };
+
 // === TUNING PARAMETERS ===
-const CURSOR_SIZES: Record<string, number> = { small: 50, medium: 70, large: 90 };
-const DEFAULT_CURSOR_SIZE = 70;
+// The gaze bubble: a light ring with a clear centre, modelled on Tobii
+// Experience's "Preview my gaze" (about 150 px across at 1920 px). The outer
+// diameter is a share of the window width kept within [min, max] CSS px, so it
+// scales from 13" to 27" screens: 108 px at 1920 px for the default size.
+const CURSOR_SIZES: Record<string, { share: number; min: number; max: number }> = {
+  small: { share: 0.044, min: 64, max: 96 },
+  medium: { share: 0.056, min: 80, max: 124 },
+  large: { share: 0.071, min: 100, max: 156 },
+};
+function bubbleSize(setting: string): number {
+  const s = CURSOR_SIZES[setting] || CURSOR_SIZES.medium;
+  return Math.round(Math.min(s.max, Math.max(s.min, window.innerWidth * s.share)));
+}
+// Ring width as a share of the diameter (7 px at 108 px).
+const BUBBLE_RING_SHARE = 0.065;
+// A non-keyboard target is acquired from at most this far outside its box
+// (keyboard keys: KEYBOARD_SNAP_MARGIN). Small controls are limited sooner by
+// their centre-based range; this bounds the large cards.
+const SNAP_EDGE_REACH_PX = 60;
+// A target that has only just taken the focus is credited the samples that
+// confirmed it (utils/gazeFocus FOCUS_CONFIRM_MS) if its onset starts within
+// this long of that decision, so deciding the target first never lengthens the
+// time to select. A later start (after a cooldown, say) begins at that moment.
+const ONSET_CREDIT_WINDOW_MS = 50;
 const DWELL_TIME = 1000;         // v10: 1.0s base dwell (was 0.7s) — less overwhelming for Papa
 const CLICK_COOLDOWN = 1300;     // v10: 1.3s cooldown (was 0.9s) — prevents rapid re-fire
 const TOGGLE_LOCKOUT_MS = 2500;  // v10: ignore toggle for 2.5s after any toggle fires
+// A caregiver clicking a control usually LOOKS at it too, so a gaze dwell is
+// running on the very control under the mouse. Without arbitration one press
+// typed the letter twice. A physical press therefore abandons any dwell and
+// starts the usual cooldown, and a physical click on a control that gaze
+// pressed within this window is the same intention, not a second one.
+const DUPLICATE_INPUT_MS = 500;
 // Acquire the display lock after 10% of the configured dwell duration.
 // This is GazeConnect behavior, not an OptiKey default or a hardware accuracy claim.
 const LOCK_THRESHOLD = 0.10;
+// The lock is also what lets gaze LEAVE a target: the release test runs only
+// once locked, and until then the cursor is pinned and hit-tested on the target
+// itself. As a fraction of the dwell, that came later with every slower timing
+// set (250 ms of a 2500 ms dwell) and the cursor would not follow the eyes off
+// a key. 50 ms is what the original 500 ms typing dwell gave.
+const LOCK_AFTER_MS = 50;
 const LOCK_BREAK_DISTANCE = 80;  // px to break lock — easier escape since backend handles stickiness
+// Leaving a locked selection is judged on the RAW sample, which the backend
+// estimator never smooths. One wild sample is not a look-away: near the bottom
+// of the screen the raw stream flashes somewhere and straight back ~120 times a
+// minute (live recording, 21 Sep 2026), and each flash broke the lock, flipping
+// the locked cursor for a frame and sometimes starting a neighbour's onset. A
+// look-away is taken once the gaze has stayed away this long by the tracker's
+// clock (the third consecutive sample at 33 Hz). From the first away sample the
+// ring stops filling, so the wait can never complete a selection the user is
+// looking away from.
+const LOCK_BREAK_CONFIRM_MS = 45;
 
 // === ONSET DELAY (OptiKey-inspired two-phase fixation) ===
 // Phase 1: Cursor must remain on the SAME element for ONSET_DELAY_MS before dwell begins.
@@ -139,7 +197,11 @@ export const GazeCursor: React.FC = () => {
   useEffect(() => {
     lastNavigationTimestampRef.current = gazeControl.lastNavigationTimestamp;
   }, [gazeControl.lastNavigationTimestamp]);
-  const CURSOR_SIZE = CURSOR_SIZES[settings.gazeCursorSize] || DEFAULT_CURSOR_SIZE;
+  const CURSOR_SIZE = bubbleSize(settings.gazeCursorSize);
+  // The bubble is optional. While a selection is dwelling it sits at that
+  // target's centre and carries the progress ring, so it always shows then:
+  // that ring is what lets the user look away in time to cancel.
+  const showRoamingCursor = settings.showGazeCursor !== false;
   const { isLight, isWarm } = useTheme();
   const isMouseMode = gazeControl.isMouseMode;
 
@@ -170,12 +232,34 @@ export const GazeCursor: React.FC = () => {
     left: number; top: number; width: number; height: number;
   } | null>(null);
 
+  // No usable gaze for GAZE_RECOVERY_MS, or none yet: the bubble is hidden.
+  // When gaze returns it is placed afresh once its target is decided: never a
+  // glide from a stale spot, never a recentring after it has appeared.
+  const [gazeAbsent, setGazeAbsent] = useState(true);
+  const gazeAbsentRef = useRef(true);
+
   // Refs for high-performance updates
+  // posRef: where the bubble is DRAWN (display loop, drawBubble). estRef: the
+  // gaze estimate itself (backend x/y after the legacy smoothing in
+  // handleGaze). Targets are decided on the estimate, never on the drawn
+  // bubble, which rests at a target's centre.
   const posRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  const estRef = useRef<Point>({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const lockPosRef = useRef({ x: 0, y: 0 });
+  // Tracker time (ms) of the first raw sample away from a locked target, 0 when
+  // none is pending (see LOCK_BREAK_CONFIRM_MS).
+  const lockAwaySinceRef = useRef(0);
+  // The target the eyes are on (with hysteresis), the bubble's spring, and
+  // where the bubble rests while no target has the focus (utils/gazeFocus).
+  const focusRef = useRef(new GazeFocus<HTMLElement>());
+  const bubbleRef = useRef(new BubbleMotion());
+  const freeAnchorRef = useRef(new FreeAnchor());
+  const lastDrawAtRef = useRef(0);
+  const drawnRef = useRef({ x: NaN, y: NaN });
   const dwellTargetRef = useRef<HTMLElement | null>(null);
   const dwellStartTimeRef = useRef<number>(0);
   const lastClickTimeRef = useRef<number>(0);
+  const lastGazeActivationRef = useRef<{ element: HTMLElement; at: number } | null>(null);
   const frameRef = useRef<number>(0);
   const msgCountRef = useRef(0);
   const lastSecRef = useRef(Date.now());
@@ -457,6 +541,7 @@ export const GazeCursor: React.FC = () => {
     savedDwellRef.current = null;
     savedDwellExpiryRef.current = 0;
     isLockedRef.current = false;
+    lockAwaySinceRef.current = 0;
     preSmoothInitRef.current = false;
     setDwellProgress(0);
     setIsLocked(false);
@@ -464,95 +549,12 @@ export const GazeCursor: React.FC = () => {
     setHighlightRect(null);
   }, []);
 
-  const dwellFrame = useCallback(() => {
-    const now = Date.now();
-
-    // === FREEZE INSTRUMENTATION (always on, measurement only) ===
-    // frameDt is also reused by the flagged pause-on-gap block below.
-    const frameDt = lastDwellTickRef.current > 0 ? now - lastDwellTickRef.current : 0;
-    lastDwellTickRef.current = now;
-    if (frameDt > FREEZE_RECORD_MS) {
-      try { recordFreeze('raf_stall', frameDt); } catch { /* never block the loop */ }
-    }
-
-    // Mouse-Only Mode: no dwell detection at all
-    if (isMouseMode) {
-      if (dwellTargetRef.current) {
-        dwellTargetRef.current = null;
-        dwellStartTimeRef.current = 0;
-        setDwellProgress(0);
-        setTargetName('');
-        setIsLocked(false);
-        isLockedRef.current = false;
-        setHighlightRect(null);
-      }
-      frameRef.current = requestAnimationFrame(dwellFrame);
-      return;
-    }
-
-    // No onset, hit-test, or click may run on invalid or stale input. Short
-    // interruptions pause; a one-second loss expires progress in real time.
-    // A stalled renderer must also not credit unobserved wall-clock time.
-    const fresh = freshnessRef.current.allowsDwell(performance.now());
-    if (!fresh || frameDt > GAZE_STALE_MS || frameDt < 0) {
-      if (freshnessRef.current.age(performance.now()) > GAZE_RECOVERY_MS ||
-          frameDt > GAZE_RECOVERY_MS || frameDt < 0) {
-        resetSelection();
-      } else {
-        if (dwellStartTimeRef.current > 0) dwellStartTimeRef.current += Math.max(0, frameDt);
-        if (onsetStartTimeRef.current > 0) onsetStartTimeRef.current += Math.max(0, frameDt);
-      }
-      frameRef.current = requestAnimationFrame(dwellFrame);
-      return;
-    }
-
-    // Cooldown check — uses configurable cooldown from DwellTimeContext
-    const s = dwellSettingsRef.current;
-    // B1 keyboardCadence (default OFF): when the previous click was a keyboard
-    // target, use the stage's keyboard cooldown base INSTEAD of the hidden
-    // +1000ms floor — this is where most of the typing dead time hides. Only
-    // applies to keyboard-after-keyboard clicks; every other cooldown (nav,
-    // home, emergency, and the first click after leaving the keyboard) keeps
-    // the +1000ms floor. With the flag OFF this is exactly today's value.
-    const cadenceForCooldown = getKeyboardCadence();
-    const effectiveCooldown = (cadenceForCooldown && lastClickWasKeyboardRef.current)
-      ? cadenceForCooldown.cooldown
-      : s.cooldownAfterActivation + 1000; // base 1000ms + configurable
-    const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
-
-    // === v17.9: UNIFIED HIT-TEST POSITION (cursor render == hit test) ====
-    // CRITICAL FIX for the persistent corner-button loop the patient
-    // reported even after v17.5–v17.8. Logs revealed Tobii ET5 frame
-    // gaps of 100–500 ms (occasionally multi-second), and the real bug
-    // was that the cursor RENDER position (posRef = post-snap, post-EMA,
-    // post-R2-anchor) and the HIT-TEST position diverged on keyboard
-    // screens: the v18 code used `rawPt` (post-3-tap MA, pre-snap)
-    // because of an old concern that EMA lag would cause wrong-key
-    // selection during fast scanning.
-    //
-    // The cost of that divergence was exactly the patient's symptom:
-    //   • User sees the cursor sitting on key K (rendered via posRef)
-    //   • Raw gaze drifts 30–60 px off K's rect (Tobii ET5 noise)
-    //   • Hit test runs on raw gaze → misses K → clickable = null
-    //   • Onset target reset → dwell loop forever
-    //
-    // Unifying on posRef:
-    //   • Cursor and hit test are now the SAME point. What you see is
-    //     what you select. No more "cursor on K but test off K".
-    //   • Pre-onset: posRef ≈ EMA-smoothed gaze with snap applied —
-    //     stable representation of where the user is looking.
-    //   • Post-onset: posRef ≈ R2 anchor at target center (Option B).
-    //   • Frame gaps from the tracker: posRef just stays where it was
-    //     until the next gaze sample arrives, so dwell continues
-    //     uninterrupted through brief tracking drops.
-    //
-    // The v18 concern (EMA lag during scanning) is mitigated by the
-    // classifier-driven alpha — during saccades alpha jumps to 0.90,
-    // so the EMA actually catches up within ~1 frame of a saccade.
-    // For ALS users, scanning is slow enough that this works fine.
-    const cx = isLockedRef.current ? lockPosRef.current.x : posRef.current.x;
-    const cy = isLockedRef.current ? lockPosRef.current.y : posRef.current.y;
-
+  // === v18: THE TARGET UNDER A POINT OF THE GAZE ESTIMATE ================
+  // Before any hysteresis. Moved here from the dwell loop, rules unchanged:
+  // keyboard keys by containment then nearest edge, other targets likewise
+  // within their reach, then a small multi-point hit test. The v17.8 sticky
+  // tolerances now live in GazeFocus's margins (utils/gazeFocus).
+  const pickCandidate = useCallback((cx: number, cy: number): Candidate => {
     // Multi-point hit test: check center + 4 nearby points
     // v11: Larger offset for always-active elements (gaze toggle buttons are hard to reach)
     // v17.5: Widened the "actively-dwelling" radius from 35 → 70 px. This
@@ -565,7 +567,9 @@ export const GazeCursor: React.FC = () => {
     // during real transitions (the regression in v17.4). Hit test still
     // returns the FIRST element found, so adjacent buttons that the
     // user is genuinely moving to still win the race.
-    const HIT_OFFSET = dwellTargetRef.current ? 70 : 20;
+    // v18: while dwelling the focus's margins hold the target; the probe
+    // itself stays small so a neighbour is only found where it really is.
+    const HIT_OFFSET = 20;
     const TOGGLE_HIT_OFFSET = 64; // Extra-large for gaze toggles — they must be easy to hit
     const useToggleHit = !dwellTargetRef.current; // Only expand when not already dwelling
     const hitPoints = [
@@ -637,6 +641,7 @@ export const GazeCursor: React.FC = () => {
       // elements that are actually visible at their center — prevents selecting keyboard keys
       // hidden beneath the QuickWords overlay or other modal overlays.
       let bestDist = Infinity;
+      let bestEdge = Infinity;
       let bestTarget: import('../../utils/gazeSnapping').SnapTarget | null = null;
       for (const target of snapTargetsRef.current) {
         const tcx = target.rect.left + target.rect.width / 2;
@@ -660,8 +665,18 @@ export const GazeCursor: React.FC = () => {
         const acquisitionMargin =
           (gazeFlags.toggleCalmFrontend && enabled && target.priority >= 3) ? 0 : 30;
         const maxRange = Math.hypot(target.rect.width, target.rect.height) * 0.5 + acquisitionMargin;
-        if (dist < maxRange && dist < bestDist && target.element && isGazeTargetAvailable(target.element)) {
+        // Within range, the target that CONTAINS the point wins, then the
+        // nearest edge; centre distance only breaks ties. Centre distance
+        // alone handed most of a wide target to its smaller neighbours.
+        const edge = distanceToRect(cx, cy, target.rect);
+        // v18: and never more than SNAP_EDGE_REACH_PX outside its box. The
+        // centre-based range alone reached ~125 px past a large Home card; with
+        // the bubble drawn at the chosen target's centre, that read as the
+        // cursor being pulled onto a card the eyes were not on.
+        if (dist < maxRange && edge <= SNAP_EDGE_REACH_PX && isCloserTarget(edge, dist, bestEdge, bestDist)
+          && target.element && isGazeTargetAvailable(target.element)) {
           bestDist = dist;
+          bestEdge = edge;
           bestTarget = target;
         }
       }
@@ -702,62 +717,133 @@ export const GazeCursor: React.FC = () => {
       }
     }
 
-    // === v17.8: UNIFIED STICKY TARGET (onset + dwell phases, edge-aware) ===
-    // Extended from v17.5 to also cover the ONSET phase, which is where
-    // the patient's "continuous loop on corner buttons" actually lives.
-    // Mechanism:
-    //   • In dwell phase (dwellTargetRef.current set): tolerance 35 px,
-    //     90 px if button is near a viewport edge (Tobii ET5 noise at
-    //     screen corners can exceed 50 px even with EDGE_MODE off).
-    //   • In onset phase (only onsetTargetRef.current set): tolerance
-    //     60 px, 100 px near edges. Wider because there's no R2 anchor
-    //     yet — the onset candidate needs more tolerance to survive
-    //     gaze noise until onset completes and Option B kicks in.
-    //   • When clickable is already set (hit test found something
-    //     valid), sticky doesn't fire — real transitions still win
-    //     instantly.
-    //   • Adjacent-button risk: keyboard inter-key spacing is ~100 px,
-    //     so a 90 px tolerance never reaches another key's center. A
-    //     neighbouring key always wins disambiguation via its own
-    //     hit test, not sticky.
-    if (!clickable) {
-      const stickyTarget = dwellTargetRef.current || onsetTargetRef.current;
-      if (stickyTarget && isGazeTargetAvailable(stickyTarget)) {
-        const sRect = stickyTarget.getBoundingClientRect();
-        if (sRect.width > 0 && sRect.height > 0) {
-          const inDwellPhase = !!dwellTargetRef.current;
-          // Edge detection — within 80 px of any viewport edge counts as
-          // an edge button, where Tobii ET5 noise is empirically worst.
-          const EDGE_THRESHOLD_PX = 80;
-          const nearEdge = (
-            sRect.left < EDGE_THRESHOLD_PX
-            || sRect.top < EDGE_THRESHOLD_PX
-            || sRect.right > window.innerWidth - EDGE_THRESHOLD_PX
-            || sRect.bottom > window.innerHeight - EDGE_THRESHOLD_PX
-          );
-          // v17.9: tolerances widened slightly to absorb Tobii ET5
-          // frame drops (logs show 100–500 ms gaps routinely, with
-          // occasional multi-second gaps). During a gap, posRef may
-          // be slightly off the rect when the next frame arrives.
-          let STICKY_TOLERANCE: number;
-          if (inDwellPhase) {
-            STICKY_TOLERANCE = nearEdge ? 110 : 50;
-          } else {
-            STICKY_TOLERANCE = nearEdge ? 130 : 80;
-          }
-          if (
-            cx >= sRect.left - STICKY_TOLERANCE
-            && cx <= sRect.right + STICKY_TOLERANCE
-            && cy >= sRect.top - STICKY_TOLERANCE
-            && cy <= sRect.bottom + STICKY_TOLERANCE
-          ) {
-            clickable = stickyTarget;
-            isToggle = stickyTarget.getAttribute('data-gaze-toggle') === 'true';
-            isAlwaysActive = isToggle || stickyTarget.getAttribute('data-gaze-always') === 'true';
-          }
-        }
+    return { element: clickable, isToggle, isAlwaysActive };
+  }, [enabled, findClickableElement]);
+
+  // === v18: DRAW THE BUBBLE (display clock) ===============================
+  // At the centre of the focused target. While a new target is still being
+  // confirmed the bubble waits where it is: it never heads for an unconfirmed
+  // landing point and then turns to a centre. With no target it rests at the
+  // free anchor. Every move is one spring glide (utils/gazeFocus BubbleMotion).
+  // With no usable gaze for GAZE_RECOVERY_MS it is hidden; it reappears
+  // directly at its decided place.
+  const drawBubble = useCallback((now: number) => {
+    const motion = bubbleRef.current;
+    const focus = focusRef.current;
+    if (!(freshnessRef.current.age(performance.now()) <= GAZE_RECOVERY_MS)) {
+      if (!gazeAbsentRef.current) {
+        gazeAbsentRef.current = true;
+        setGazeAbsent(true);
       }
+      focus.reset();
+      freeAnchorRef.current.reset();
+      motion.placed = false;
+      lastDrawAtRef.current = now;
+      return;
     }
+    const target = focus.current;
+    const rect = target && target.isConnected ? target.getBoundingClientRect() : null;
+    let goal: Point;
+    if (rect && rect.width > 0 && rect.height > 0) {
+      goal = rectCentre(rect);
+    } else if (focus.acquiring) {
+      if (!motion.placed) { lastDrawAtRef.current = now; return; }   // Decide before showing.
+      goal = { x: motion.x, y: motion.y };
+    } else {
+      goal = freeAnchorRef.current.point || estRef.current;
+    }
+    const dt = lastDrawAtRef.current > 0 ? now - lastDrawAtRef.current : 0;
+    lastDrawAtRef.current = now;
+    const p = motion.step(goal, dt);
+    posRef.current = { x: p.x, y: p.y };
+    if (p.x !== drawnRef.current.x || p.y !== drawnRef.current.y) {
+      drawnRef.current = { x: p.x, y: p.y };
+      applyCursorTransform(p.x, p.y);
+    }
+    if (gazeAbsentRef.current) {
+      gazeAbsentRef.current = false;
+      setGazeAbsent(false);
+    }
+  }, [applyCursorTransform]);
+
+  const dwellFrame = useCallback(() => {
+    const now = Date.now();
+
+    // === FREEZE INSTRUMENTATION (always on, measurement only) ===
+    // frameDt is also reused by the flagged pause-on-gap block below.
+    const frameDt = lastDwellTickRef.current > 0 ? now - lastDwellTickRef.current : 0;
+    lastDwellTickRef.current = now;
+    if (frameDt > FREEZE_RECORD_MS) {
+      try { recordFreeze('raf_stall', frameDt); } catch { /* never block the loop */ }
+    }
+
+    // The bubble is drawn on the display clock, whatever the dwell does below.
+    drawBubble(now);
+
+    // Mouse-Only Mode: no dwell detection at all
+    if (isMouseMode) {
+      if (dwellTargetRef.current) {
+        dwellTargetRef.current = null;
+        dwellStartTimeRef.current = 0;
+        setDwellProgress(0);
+        setTargetName('');
+        setIsLocked(false);
+        isLockedRef.current = false;
+        setHighlightRect(null);
+      }
+      frameRef.current = requestAnimationFrame(dwellFrame);
+      return;
+    }
+
+    // No onset, hit-test, or click may run on invalid or stale input. Short
+    // interruptions pause; a one-second loss expires progress in real time.
+    // A stalled renderer must also not credit unobserved wall-clock time.
+    const fresh = freshnessRef.current.allowsDwell(performance.now());
+    if (!fresh || frameDt > GAZE_STALE_MS || frameDt < 0) {
+      if (freshnessRef.current.age(performance.now()) > GAZE_RECOVERY_MS ||
+          frameDt > GAZE_RECOVERY_MS || frameDt < 0) {
+        resetSelection();
+      } else {
+        if (dwellStartTimeRef.current > 0) dwellStartTimeRef.current += Math.max(0, frameDt);
+        if (onsetStartTimeRef.current > 0) onsetStartTimeRef.current += Math.max(0, frameDt);
+      }
+      frameRef.current = requestAnimationFrame(dwellFrame);
+      return;
+    }
+
+    // Raw gaze has just left a locked target (handleGaze). Until it comes back
+    // or the look-away is confirmed, the selection holds still: no progress.
+    if (isLockedRef.current && lockAwaySinceRef.current > 0) {
+      if (dwellStartTimeRef.current > 0) dwellStartTimeRef.current += Math.max(0, frameDt);
+      frameRef.current = requestAnimationFrame(dwellFrame);
+      return;
+    }
+
+    // Cooldown check — uses configurable cooldown from DwellTimeContext
+    const s = dwellSettingsRef.current;
+    // B1 keyboardCadence (default OFF): when the previous click was a keyboard
+    // target, use the stage's keyboard cooldown base INSTEAD of the hidden
+    // +1000ms floor — this is where most of the typing dead time hides. Only
+    // applies to keyboard-after-keyboard clicks; every other cooldown (nav,
+    // home, emergency, and the first click after leaving the keyboard) keeps
+    // the +1000ms floor. With the flag OFF this is exactly today's value.
+    const cadenceForCooldown = getKeyboardCadence();
+    const effectiveCooldown = (cadenceForCooldown && lastClickWasKeyboardRef.current)
+      ? cadenceForCooldown.cooldown
+      : s.cooldownAfterActivation + 1000; // base 1000ms + configurable
+    const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
+
+    // === v18: THE DWELL TARGET IS THE FOCUSED TARGET (utils/gazeFocus) ====
+    // handleGaze decides which target the eyes are on from the gaze estimate,
+    // with hysteresis (pickCandidate + GazeFocus), and the bubble is drawn at
+    // that target's centre, so what is shown is exactly what is selected
+    // (v17.9's rule, kept). While the estimate is leaving the focused target
+    // (a change being confirmed) nothing dwells: progress is saved, not
+    // advanced.
+    const focus = focusRef.current;
+    let clickable: HTMLElement | null = focus.leaving ? null : focus.current;
+    let isToggle = clickable ? isGazeToggleElement(clickable) : false;
+    let isAlwaysActive = clickable ? (isToggle || isAlwaysActiveElement(clickable)) : false;
 
     // Every acquisition path (including keyboard and cached sticky targets) must
     // respect the currently visible layer and the current READY state.
@@ -871,7 +957,12 @@ export const GazeCursor: React.FC = () => {
       //   • be replaced when onset starts on a different element.
       const hasActiveSave = didCaptureSave
         || (savedDwellRef.current && now <= savedDwellExpiryRef.current);
-      if (!hasActiveSave) {
+      // ...and only while the gaze is still beside that target: a ring riding
+      // along on the cursor elsewhere reads as one more jump (22 Sep 2026).
+      // The saved progress itself stays for a quick return.
+      const keepVisuals = hasActiveSave && !!savedDwellRef.current
+        && isNearElement(savedDwellRef.current.element, estRef.current.x, estRef.current.y);
+      if (!keepVisuals) {
         setDwellProgress(0);
         setTargetName('');
         setHighlightRect(null);
@@ -885,9 +976,12 @@ export const GazeCursor: React.FC = () => {
     // Phase 1: Cursor must remain on SAME element for ONSET_DELAY_MS.
     // No visual feedback during onset — prevents "drive-by" activations.
     if (clickable !== onsetTargetRef.current) {
-      // New target — start onset phase
+      // New target — start onset phase. A target that has only just taken
+      // the focus is credited the samples that confirmed it
+      // (ONSET_CREDIT_WINDOW_MS): the onset is as long as it always was.
       onsetTargetRef.current = clickable;
-      onsetStartTimeRef.current = now;
+      const justFocused = clickable === focus.current && now - focus.acquiredAt <= ONSET_CREDIT_WINDOW_MS;
+      onsetStartTimeRef.current = justFocused ? Math.min(now, focus.since) : now;
       onsetCompletedRef.current = false;
 
       // Check if this is a saved target that can be resumed (fixation TTL)
@@ -982,25 +1076,9 @@ export const GazeCursor: React.FC = () => {
         isLockedRef.current = false;
         const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
         setTargetName(name);
-        // v16: SNAP CURSOR TO ELEMENT CENTER on dwell start.
-        // OptiKey insight: cursor stability comes from freezing at a stable position.
-        // Snapping to center gives immediate "locked on target" feel and prevents
-        // the cursor from dwelling at the edge of a key/button.
-        // B1-FE extension: for the TOGGLE with gaze ON this teleport IS the
-        // "magnetically takes the cursor to the toggle centre" the patient
-        // reported — skip the jump (the softened anchor in handleGaze
-        // settles the cursor gradually instead); the highlight still marks
-        // the acquisition so intent stays visible.
+        // The bubble is already at this target's centre (drawBubble); the
+        // highlight marks the start of the selection.
         const rect = clickable.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const calmToggleCapture = gazeFlags.toggleCalmFrontend && isToggle && enabled;
-        if (!calmToggleCapture) {
-          posRef.current.x = centerX;
-          posRef.current.y = centerY;
-          applyCursorTransform(centerX, centerY);
-        }
-        // v16: Show visual highlight around the selected element
         setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
       }
     }
@@ -1013,16 +1091,7 @@ export const GazeCursor: React.FC = () => {
       isLockedRef.current = false;
       const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
       setTargetName(name);
-      // v16: Also snap when dwell target changes mid-fixation
-      // (B1-FE extension: same calm-toggle teleport skip as above.)
       const rect = clickable.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      if (!(gazeFlags.toggleCalmFrontend && isToggle && enabled)) {
-        posRef.current.x = centerX;
-        posRef.current.y = centerY;
-        applyCursorTransform(centerX, centerY);
-      }
       setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
 
@@ -1035,9 +1104,11 @@ export const GazeCursor: React.FC = () => {
     setDwellProgress(progress);
 
     // Progressive lock
-    if (progress >= LOCK_THRESHOLD && !isLockedRef.current) {
+    if ((progress >= LOCK_THRESHOLD || elapsed >= LOCK_AFTER_MS) && !isLockedRef.current) {
       isLockedRef.current = true;
-      lockPosRef.current = { ...posRef.current };
+      // Leaving is judged from the target's centre, where the bubble rests.
+      lockPosRef.current = rectCentre(clickable.getBoundingClientRect());
+      lockAwaySinceRef.current = 0;
       setIsLocked(true);
     }
 
@@ -1104,6 +1175,7 @@ export const GazeCursor: React.FC = () => {
         });
       } catch { /* never let telemetry block the click */ }
 
+      lastGazeActivationRef.current = { element: dwellTargetRef.current, at: now };
       dwellTargetRef.current.click();
       dwellTargetRef.current = null;
       dwellStartTimeRef.current = 0;
@@ -1119,7 +1191,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, findClickableElement, isGazeToggleElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection]);
+  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {
@@ -1320,7 +1392,20 @@ export const GazeCursor: React.FC = () => {
         }
       }
 
+      // A single wild sample must not break the lock (LOCK_BREAK_CONFIRM_MS).
+      // While a look-away is pending, dwellFrame holds the progress still.
+      const sampleMs = Number.isFinite(data.t_helper_ms) && data.t_helper_ms > 0 ? data.t_helper_ms : now;
+      if (!shouldBreakLock || !gazeFlags.lockBreakConfirm) {
+        lockAwaySinceRef.current = 0;
+      } else if (lockAwaySinceRef.current === 0) {
+        lockAwaySinceRef.current = sampleMs;
+        shouldBreakLock = false;
+      } else if (sampleMs - lockAwaySinceRef.current < LOCK_BREAK_CONFIRM_MS) {
+        shouldBreakLock = false;
+      }
+
       if (shouldBreakLock) {
+        lockAwaySinceRef.current = 0;
         // === LOCK-BREAK PROGRESS RETENTION (flag, default ON) =============
         // Mirror the hit-test-miss save path: preserve dwell progress in
         // the fixation-TTL store so re-fixating the same target within
@@ -1366,23 +1451,28 @@ export const GazeCursor: React.FC = () => {
           onsetStartTimeRef.current = 0;
           onsetCompletedRef.current = false;
         }
-        if (!lockBreakSaved) {
-          // Baseline behavior: clear visuals. With a save active, keep the
-          // ring/highlight for visual continuity (v17.6 Option A semantics);
-          // the dwellFrame expiry check clears them if no resume happens.
+        // With a save active, the ring and highlight stay for visual
+        // continuity (v17.6 Option A) only while the gaze is still beside
+        // that target. Gone elsewhere, a half-filled ring riding along on
+        // the cursor to the next card was one more jump for the eyes; the
+        // saved progress is kept (invisibly) for a quick return either way.
+        if (!lockBreakSaved || !brokenTarget || !isNearElement(brokenTarget, rawX, rawY)) {
           setDwellProgress(0);
           setTargetName('');
           setHighlightRect(null);
         }
-        posRef.current = { x: rawX, y: rawY };
-        applyCursorTransform(rawX, rawY);
+        // The eyes really left. The focus now follows the estimate without
+        // hysteresis; the bubble stays on this target until the next one is
+        // decided, then glides straight there (no hop to the gaze and back).
+        focusRef.current.leave();
       }
-      return; // Don't move cursor while locked
     }
 
-    // === STATE-AWARE VELOCITY-ADAPTIVE SMOOTHING ===
-    const dx = rawX - posRef.current.x;
-    const dy = rawY - posRef.current.y;
+    // === STATE-AWARE VELOCITY-ADAPTIVE SMOOTHING (the gaze ESTIMATE) ===
+    // Legacy pipelines only: with the adaptive backend alpha is 1 below and the
+    // estimate is the backend's own. The estimate is not what is drawn.
+    const dx = rawX - estRef.current.x;
+    const dy = rawY - estRef.current.y;
     const distance = Math.hypot(dx, dy);
 
     let alpha: number;
@@ -1432,10 +1522,10 @@ export const GazeCursor: React.FC = () => {
       const EDGE_BOOST_ZONE = 100;
       const EDGE_BOOST_ALPHA = 0.55;
       const nearEdge = (
-        (posRef.current.x < EDGE_BOOST_ZONE && dx < 0) ||
-        (posRef.current.x > window.innerWidth - EDGE_BOOST_ZONE && dx > 0) ||
-        (posRef.current.y < EDGE_BOOST_ZONE && dy < 0) ||
-        (posRef.current.y > window.innerHeight - EDGE_BOOST_ZONE && dy > 0)
+        (estRef.current.x < EDGE_BOOST_ZONE && dx < 0) ||
+        (estRef.current.x > window.innerWidth - EDGE_BOOST_ZONE && dx > 0) ||
+        (estRef.current.y < EDGE_BOOST_ZONE && dy < 0) ||
+        (estRef.current.y > window.innerHeight - EDGE_BOOST_ZONE && dy > 0)
       );
       if (nearEdge) {
         alpha = Math.max(alpha, EDGE_BOOST_ALPHA);
@@ -1446,8 +1536,8 @@ export const GazeCursor: React.FC = () => {
     if (data.active_pipeline === 'adaptive_cursor_v1') alpha = 1;
 
     // Apply EMA
-    posRef.current.x += alpha * dx;
-    posRef.current.y += alpha * dy;
+    estRef.current.x += alpha * dx;
+    estRef.current.y += alpha * dy;
 
     // Minimal frontend assist only for gaze-toggle targets.
     // Main magnetism/stability now lives in backend to avoid dual-pull drift.
@@ -1458,7 +1548,7 @@ export const GazeCursor: React.FC = () => {
       for (const t of toggleTargets) {
         const cx = t.rect.left + t.rect.width / 2;
         const cy = t.rect.top + t.rect.height / 2;
-        const d = Math.hypot(posRef.current.x - cx, posRef.current.y - cy);
+        const d = Math.hypot(estRef.current.x - cx, estRef.current.y - cy);
         if (d < bestDist) {
           bestDist = d;
           bestToggle = t;
@@ -1475,91 +1565,35 @@ export const GazeCursor: React.FC = () => {
         const cx = bestToggle.rect.left + bestToggle.rect.width / 2;
         const cy = bestToggle.rect.top + bestToggle.rect.height / 2;
         const strength = assistStrength * Math.pow(1 - bestDist / assistRadius, 1.35);
-        posRef.current.x += (cx - posRef.current.x) * strength;
-        posRef.current.y += (cy - posRef.current.y) * strength;
+        estRef.current.x += (cx - estRef.current.x) * strength;
+        estRef.current.y += (cy - estRef.current.y) * strength;
       }
     }
 
     // Clamp final position — allow slight overshoot for edge button visibility
-    posRef.current.x = Math.max(-30, Math.min(window.innerWidth + 30, posRef.current.x));
-    posRef.current.y = Math.max(-30, Math.min(window.innerHeight + 30, posRef.current.y));
+    estRef.current.x = Math.max(-30, Math.min(window.innerWidth + 30, estRef.current.x));
+    estRef.current.y = Math.max(-30, Math.min(window.innerHeight + 30, estRef.current.y));
 
-    // === v17.3 R2: TWO-PHASE VISUAL ANCHOR =============================
-    // Decouples perceived center accuracy from selection accuracy on
-    // hardware whose true residual is ≥12–20 px at this viewing distance.
-    //
-    // Phase A — DWELL ANCHOR (hard snap):
-    //   Once onset confirms a dwell target, every frame snaps posRef to
-    //   the target's bounding-rect center. This stays in effect through
-    //   the rest of the dwell so the cursor visibly "sits" at center
-    //   even when the backend lock has clamped at a gaze-corner position.
-    //   v17.3: REMOVED the previous !backendLocked guard — when the
-    //   backend GravityWell locked at a gaze sample that happened to be
-    //   off-center (e.g. corner of a card), the guard caused the cursor
-    //   to freeze at that off-center spot. The anchor should override
-    //   the backend's visual position regardless.
-    //
-    // Phase B — ONSET PREVIEW ANCHOR (smooth pull):
-    //   During the 250 ms onset phase (before dwell commits), gently
-    //   interpolate posRef toward the candidate target's center. The
-    //   pull ramps from 0 → ~0.30 between 100 ms and 250 ms of stable
-    //   gaze on the candidate. This kills the "drift to corner before
-    //   lock-in" panic the patient reported — the cursor visibly
-    //   homes in on the key center *during* onset instead of jittering
-    //   on the edge.
-    //
-    // Selection logic remains unaffected throughout: rawX/rawY drive
-    // lock-break and the dwellFrame loop's candidate search.
-    if (dwellTargetRef.current) {
-      const target = dwellTargetRef.current;
-      const rect = target.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        const anchorX = rect.left + rect.width / 2;
-        const anchorY = rect.top + rect.height / 2;
-        // B1-FE extension: for the TOGGLE with gaze ON, settle toward the
-        // centre gradually (25%/frame ≈ visually complete in ~5 frames)
-        // instead of pinning it there — the hard pin plus the onset
-        // teleport read as "a strong magnet grabbed the cursor".
-        if (gazeFlags.toggleCalmFrontend && enabled && isGazeToggleElement(target)) {
-          posRef.current.x += (anchorX - posRef.current.x) * 0.25;
-          posRef.current.y += (anchorY - posRef.current.y) * 0.25;
-        } else {
-          posRef.current.x = anchorX;
-          posRef.current.y = anchorY;
-        }
-        // Keep the highlight rect synced — covers layout shift mid-dwell.
-        // v17.22: value-gated. This runs on EVERY gaze frame while
-        // dwelling, and an always-fresh object re-rendered the component
-        // at gaze rate even though the rect almost never changes.
-        // Returning the previous object when values match lets React
-        // bail out; a real layout shift still updates immediately.
-        setHighlightRect((prev) => (
-          prev
-          && prev.left === rect.left && prev.top === rect.top
-          && prev.width === rect.width && prev.height === rect.height
-        ) ? prev : { left: rect.left, top: rect.top, width: rect.width, height: rect.height });
-      }
-    } else if (onsetTargetRef.current && onsetStartTimeRef.current > 0) {
-      // Onset preview: gradually pull cursor toward candidate center.
-      // Ramp starts at 100 ms of stable onset, reaches full strength
-      // at the standard 250 ms onset completion point.
-      const onsetElapsed = now - onsetStartTimeRef.current;
-      if (onsetElapsed > 100) {
-        const target = onsetTargetRef.current;
-        const rect = target.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const anchorX = rect.left + rect.width / 2;
-          const anchorY = rect.top + rect.height / 2;
-          // Ramp from 0 → 1 over 100 → 250 ms onset progress.
-          const t = Math.min(1, (onsetElapsed - 100) / 150);
-          const pullStrength = 0.30 * t;
-          posRef.current.x += (anchorX - posRef.current.x) * pullStrength;
-          posRef.current.y += (anchorY - posRef.current.y) * pullStrength;
-        }
-      }
-    }
-
-    applyCursorTransform(posRef.current.x, posRef.current.y);
+    // === v18: WHICH TARGET ARE THE EYES ON (utils/gazeFocus) ===============
+    // Decided here, per sample, on the estimate; drawBubble then shows the
+    // bubble at that target's centre. With gaze selection off only the
+    // always-active controls can be chosen, so the bubble does not settle on
+    // anything else. A locked dwell owns the focus until its lock breaks.
+    const est = estRef.current;
+    let candidate = pickCandidate(est.x, est.y);
+    if (candidate.element && !enabled && !candidate.isAlwaysActive) candidate = NO_CANDIDATE;
+    const focus = focusRef.current;
+    const dwellLocked = isLockedRef.current && dwellTargetRef.current !== null
+      && dwellTargetRef.current === focus.current;
+    focus.update(candidate.element, est, now, {
+      rectOf: (el) => (isGazeTargetAvailable(el) ? el.getBoundingClientRect() : null),
+      hold: dwellLocked,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    });
+    // Where the bubble rests while no target has the focus: it follows only a
+    // lasting move, and starts from where the eyes are when a focus ends.
+    if (focus.current) freeAnchorRef.current.reset(est);
+    else freeAnchorRef.current.update(est, now);
 
     // A5 — sampled paint delta: every 8th recorded frame, one rAF after the
     // transform write measures WS-receive -> next-composited-frame time.
@@ -1573,7 +1607,7 @@ export const GazeCursor: React.FC = () => {
         });
       }
     }
-  }, [enabled, reportGazeReceived, applyCursorTransform, isGazeToggleElement, resetSelection]);
+  }, [enabled, reportGazeReceived, isGazeToggleElement, resetSelection, pickCandidate]);
 
   // v17: Handle gaze_lost events — pause dwell during blink/stale/gap
   // When backend detects blink or tracking loss, we freeze dwell progress
@@ -1583,6 +1617,32 @@ export const GazeCursor: React.FC = () => {
     window.addEventListener('gaze_lost', handleGazeLost);
     return () => window.removeEventListener('gaze_lost', handleGazeLost);
   }, []);
+
+  // Mouse, touch and pen stay available beside gaze (see DUPLICATE_INPUT_MS).
+  // Gaze presses are programmatic, so isTrusted tells the two apart. Capture
+  // phase on window: this runs before React's delegated handlers.
+  useEffect(() => {
+    const handlePointerDown = (event: Event) => {
+      if (!event.isTrusted) return;
+      resetSelection();
+      lastClickTimeRef.current = Date.now();
+    };
+    const handleClick = (event: Event) => {
+      const recent = lastGazeActivationRef.current;
+      if (!event.isTrusted || !recent || Date.now() - recent.at > DUPLICATE_INPUT_MS) return;
+      const target = event.target as Node | null;
+      if (target && (recent.element === target || recent.element.contains(target))) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('click', handleClick, true);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('click', handleClick, true);
+    };
+  }, [resetSelection]);
 
   // Startup
   useEffect(() => {
@@ -1608,6 +1668,10 @@ export const GazeCursor: React.FC = () => {
   // especially with longer dwell times (800-1000ms vs old 500ms before ring appears)
   const CURSOR_COLOR_IDLE = '#8899AA'; // Muted steel blue — visible on dark bg without being distracting
   const cursorColor = isLocked ? CURSOR_COLOR_LOCKED : (enabled || dwellProgress > 0 ? CURSOR_COLOR_NORMAL : CURSOR_COLOR_IDLE);
+  const ringPx = Math.max(5, Math.round(CURSOR_SIZE * BUBBLE_RING_SHARE));
+  const arcR = (CURSOR_SIZE - ringPx) / 2;
+  const arcLen = 2 * Math.PI * arcR;
+  const bubbleVisible = !gazeAbsent && (showRoamingCursor || dwellProgress > 0);
 
   return (
     <>
@@ -1635,73 +1699,65 @@ export const GazeCursor: React.FC = () => {
         />
       )}
 
-      {/* Gaze Cursor — position is driven by direct DOM transform writes
-          (applyCursorTransform) at gaze rate; the transform below only
-          covers the initial mount and re-derives the SAME value from
-          posRef on React re-renders, so the two writers stay consistent. */}
+      {/* The gaze bubble (v18). Position: direct DOM transform writes from the
+          display loop (drawBubble); the transform below only covers the
+          initial mount and re-derives the SAME value from posRef on React
+          re-renders, so the two writers stay consistent. A light ring with a
+          clear centre and a soft dark edge, so it reads on light and dark
+          screens alike (Tobii Experience's "Preview my gaze"); the dwell
+          fills the ring in teal. No centre dot: nothing small to jitter. */}
       <div
         ref={cursorElRef}
         data-cursor="true"
-        className={`gaze-cursor-ring${dwellProgress > 0 ? ' dwelling' : ''}${isLocked ? ' locked' : ''}`}
+        className={`gaze-bubble${dwellProgress > 0 ? ' dwelling' : ''}${isLocked ? ' locked' : ''}${enabled ? '' : ' gaze-off'}`}
         style={{
           position: 'fixed',
           left: 0,
           top: 0,
           transform: `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0) translate(-50%, -50%)`,
-          willChange: 'transform',
+          willChange: 'transform, opacity',
           width: CURSOR_SIZE,
           height: CURSOR_SIZE,
           borderRadius: '50%',
-          border: `4px solid ${cursorColor}`,
-          backgroundColor: dwellProgress > 0
-            ? `${cursorColor}20` // 12% opacity
-            : `${cursorColor}10`, // 6% opacity
           pointerEvents: 'none',
+          opacity: bubbleVisible ? (enabled || dwellProgress > 0 ? 1 : 0.55) : 0,
           zIndex: 2147483647, // MAX Z-INDEX (Cursor must be on top of everything)
-          boxShadow: dwellProgress > 0
-            ? `0 0 ${15 + dwellProgress * 25}px ${cursorColor}60` // Intense glow
-            : `0 0 8px ${cursorColor}30`, // v10: Subtle idle glow — always visible on dark bg
-          transition: 'border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease',
+          transition: 'opacity 140ms ease',
         }}
       >
-        {/* Dwell ring */}
-        {dwellProgress > 0 && (
-          <svg className="dwell-ring-svg" style={{
+        <div
+          className="gaze-bubble-ring"
+          style={{
             position: 'absolute',
-            top: -4, left: -4,
-            width: CURSOR_SIZE + 8,
-            height: CURSOR_SIZE + 8,
-            transform: 'rotate(-90deg)',
-          }}>
+            inset: 0,
+            borderRadius: '50%',
+            boxSizing: 'border-box',
+            border: `${ringPx}px solid rgba(255, 255, 255, 0.82)`,
+            background: 'transparent',
+            boxShadow: '0 0 0 1.5px rgba(0, 0, 0, 0.32), 0 2px 12px rgba(0, 0, 0, 0.45), '
+              + 'inset 0 0 0 1.5px rgba(0, 0, 0, 0.30), inset 0 0 8px rgba(0, 0, 0, 0.22)',
+          }}
+        />
+        {dwellProgress > 0 && (
+          <svg
+            className="gaze-bubble-progress"
+            width={CURSOR_SIZE}
+            height={CURSOR_SIZE}
+            style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)', overflow: 'visible' }}
+          >
             <circle
-              cx={(CURSOR_SIZE + 8) / 2}
-              cy={(CURSOR_SIZE + 8) / 2}
-              r={(CURSOR_SIZE - 4) / 2}
+              cx={CURSOR_SIZE / 2}
+              cy={CURSOR_SIZE / 2}
+              r={arcR}
               fill="none"
-              stroke={cursorColor}
-              strokeWidth="6"
+              stroke={CURSOR_COLOR_LOCKED}
+              strokeWidth={ringPx}
               strokeLinecap="round"
-              strokeDasharray={Math.PI * (CURSOR_SIZE - 4)}
-              strokeDashoffset={Math.PI * (CURSOR_SIZE - 4) * (1 - dwellProgress)}
-              style={{ transition: 'stroke 200ms ease' }}
+              strokeDasharray={arcLen}
+              strokeDashoffset={arcLen * (1 - dwellProgress)}
             />
           </svg>
         )}
-
-        {/* Center dot */}
-        <div
-          className={`gaze-cursor-dot${dwellProgress > 0 ? ' dwelling' : ''}${isLocked ? ' locked' : ''}`}
-          style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: isLocked ? 24 : (dwellProgress > 0 ? 20 : 8),
-            height: isLocked ? 24 : (dwellProgress > 0 ? 20 : 8),
-            borderRadius: '50%',
-            backgroundColor: cursorColor,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'width 100ms, height 100ms',
-          }} />
       </div>
 
       {/* Compact status indicator */}
@@ -1724,6 +1780,7 @@ export const GazeCursor: React.FC = () => {
           {hasRealGaze ? 'Gaze' : 'Mouse'}
         </span>
       </div>
+      <TrackerStatusNotice status={ws.trackerStatus} />
     </>
   );
 };

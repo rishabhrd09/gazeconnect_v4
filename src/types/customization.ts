@@ -188,17 +188,19 @@ export interface AppSettings {
   showHindi: boolean; // Legacy storage field; normalized to false for this English-only release.
   dwellTime: number;
   filterPreset: string;
+  dwellTimingSet: 'quick' | 'balanced' | 'relaxed'; // One complete set of the five selection durations
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';
   ttsRate: number;
   ttsVolume: number;
   breakReminderInterval: number;   // minutes (10–60, default 20)
   ttsLanguage: string;             // Legacy storage field; normalized to 'english'.
   gazeCursorSize: string;          // 'small' | 'medium' | 'large'
+  showGazeCursor: boolean;         // Moving circle that follows the eyes (default true)
   soundEffects: boolean;
   userName: string;                // Name shown on splash screen (default: 'Papa')
   // Gaze accuracy settings
-  gazeOffsetX: number;             // Manual X offset correction in px (-100 to +100, default 0)
-  gazeOffsetY: number;             // Manual Y offset correction in px (-100 to +100, default 0)
+  gazeOffsetX: number;             // Legacy storage field; normalized to 0 (see CustomizationService).
+  gazeOffsetY: number;             // Legacy storage field; normalized to 0.
   gazeDebugOverlay: boolean;       // Show gaze debug overlay (default false)
   homeEmergencyLaunchMode?: 'cards' | 'alert'; // Home left panel: four emergency cards or one Alert Mode launcher
 }

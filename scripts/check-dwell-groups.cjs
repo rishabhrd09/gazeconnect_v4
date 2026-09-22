@@ -1,4 +1,4 @@
-// Regression coverage for the fixed selection model and legacy safeguard loading.
+// Regression coverage for the three fixed timing sets and legacy safeguard loading.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -14,36 +14,70 @@ function loadTs(relative) {
 }
 const dwell = loadTs('src/config/dwellTimeConfig.ts');
 const filters = loadTs('src/config/gazeFilterConfig.ts');
-const allowed = [500, 1000, 1250, 1500, 2000];
+const SETS = {
+  quick: [500, 1000, 1250, 1500, 2000],       // The durations this app shipped with.
+  balanced: [900, 1300, 1600, 1900, 2500],
+  relaxed: [1300, 1700, 2000, 2400, 3000],
+};
+const union = [...new Set(Object.values(SETS).flat())].sort((a, b) => a - b);
+const eachSet = fn => { for (const name of Object.keys(SETS)) { dwell.setDwellTimingSet(name); fn(name, SETS[name]); } dwell.setDwellTimingSet('balanced'); };
 const storage = values => ({ getItem: key => values[key] ?? null });
 let passed = 0;
 function test(name, fn) { fn(); passed++; console.log(`PASS ${name}`); }
-test('every action resolves to one of exactly five durations', () => {
-  const durations = Object.keys(dwell.DWELL_ACTION_GROUPS).map(dwell.dwellForAction);
-  assert.deepEqual([...new Set(durations)].sort((a, b) => a - b), allowed);
+test('there are exactly three timing sets, Balanced is the default, Quick is the previous timing', () => {
+  assert.deepEqual(Object.keys(dwell.DWELL_TIMING_SETS), Object.keys(SETS));
+  assert.equal(dwell.DEFAULT_DWELL_TIMING_SET, 'balanced');
+  assert.equal(dwell.getDwellTimingSet(), 'balanced');
+  for (const [name, values] of Object.entries(SETS)) assert.deepEqual(Object.values(dwell.DWELL_TIMING_SETS[name].ms), values);
+  assert.deepEqual(dwell.ALL_DWELL_DURATIONS_MS, union);
 });
-test('typing, communication, navigation and deliberate actions stay distinct', () => {
-  for (const context of ['keyboard', 'keyboardKey']) assert.equal(dwell.dwellForContext(context), 500);
-  for (const context of ['prediction', 'predictionButton', 'spatialZone']) assert.equal(dwell.dwellForContext(context), 1000);
-  for (const context of ['quickWord', 'medicalUrgent', 'phrases']) assert.equal(dwell.dwellForContext(context), 1250);
-  for (const context of ['surveyOption', 'compass-map', 'settings', 'navigation']) assert.equal(dwell.dwellForContext(context), 1500);
-  for (const context of ['gazeToggle', 'deliberateAction', 'emergency']) assert.equal(dwell.dwellForContext(context), 2000);
+test('every set is slower group by group than the one before, and ordered within itself', () => {
+  const [quick, balanced, relaxed] = Object.values(SETS);
+  for (let i = 0; i < 5; i++) assert(quick[i] < balanced[i] && balanced[i] < relaxed[i]);
+  for (const values of Object.values(SETS)) assert.deepEqual([...values].sort((a, b) => a - b), values);
 });
-test('unknown DOM contexts cannot access object prototype properties', () => {
-  for (const context of ['__proto__', 'constructor', 'unknown', '']) assert.equal(dwell.dwellForContext(context), 1500);
-});
-test('legacy explicit overrides cannot create extra durations', () => {
-  for (let ms = 1; ms < 6000; ms += 37) assert(allowed.includes(dwell.fixedDwell(ms)));
-  for (const invalid of [NaN, Infinity, -20, 0]) assert.equal(dwell.fixedDwell(invalid, 1250), 1250);
-  assert.equal(dwell.fixedDwell(1755), 2000);
-  assert.equal(dwell.fixedDwell(2500), 2000);
-});
-test('native browser accepts exactly the same five durations', () => {
-  for (const file of ['electron/main.ts', 'electron/browser/browserGazeController.ts']) {
-    const source = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
-    assert(source.includes('[' + allowed.join(', ') + '].includes('), file);
+test('unknown, malformed or hostile set names select the default', () => {
+  for (const name of [undefined, null, '', 'fast', '__proto__', 'constructor', 7, {}, 'QUICK']) {
+    assert.equal(dwell.normalizeDwellTimingSet(name), 'balanced');
+    assert.equal(dwell.setDwellTimingSet(name), 'balanced');
   }
 });
+test('every action resolves to one of exactly five durations in every set', () => eachSet((name, allowed) => {
+  const durations = Object.keys(dwell.DWELL_ACTION_GROUPS).map(dwell.dwellForAction);
+  assert.deepEqual([...new Set(durations)].sort((a, b) => a - b), allowed, name);
+  assert.deepEqual(Object.values(dwell.DWELL_GROUPS).map(group => group.ms), allowed, name);
+}));
+test('typing, words, communication, navigation and deliberate actions stay distinct in every set', () => eachSet((name, [typing, words, communication, navigation, deliberate]) => {
+  for (const context of ['keyboard', 'keyboardKey']) assert.equal(dwell.dwellForContext(context), typing, name);
+  for (const context of ['prediction', 'predictionButton', 'spatialZone']) assert.equal(dwell.dwellForContext(context), words, name);
+  for (const context of ['quickWord', 'medicalUrgent', 'phrases']) assert.equal(dwell.dwellForContext(context), communication, name);
+  for (const context of ['surveyOption', 'compass-map', 'settings', 'navigation']) assert.equal(dwell.dwellForContext(context), navigation, name);
+  for (const context of ['gazeToggle', 'deliberateAction', 'emergency']) assert.equal(dwell.dwellForContext(context), deliberate, name);
+}));
+test('unknown DOM contexts cannot access object prototype properties', () => eachSet((name, allowed) => {
+  for (const context of ['__proto__', 'constructor', 'unknown', '']) assert.equal(dwell.dwellForContext(context), allowed[3], name);
+}));
+test('legacy explicit overrides cannot create extra durations in any set', () => eachSet((name, allowed) => {
+  for (let ms = 1; ms < 6000; ms += 37) assert(allowed.includes(dwell.fixedDwell(ms)), `${name} ${ms}`);
+  for (const invalid of [NaN, Infinity, -20, 0]) assert.equal(dwell.fixedDwell(invalid, allowed[2]), allowed[2]);
+  assert.equal(dwell.fixedDwell(allowed[3] + 1), allowed[4]);     // Rounded up, never down.
+  assert.equal(dwell.fixedDwell(99999), allowed[4]);
+}));
+test('native browser accepts exactly the durations the three sets can produce', () => {
+  for (const file of ['electron/main.ts', 'electron/browser/browserGazeController.ts']) {
+    const source = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
+    assert(source.includes('[' + union.join(', ') + '].includes('), file);
+    assert(!source.includes('[500, 1000, 1250, 1500, 2000].includes('), `${file} still has the old list`);
+    assert(source.includes('dwellMs: 1900,'), `${file} default is not the Balanced navigation time`);
+  }
+});
+test('the active set reaches the per-action table that components read', () => eachSet((name, allowed) => {
+  const result = dwell.loadDwellPreferences(storage({}));
+  assert.equal(result.settings.keyboardKey, allowed[0], name);
+  assert.equal(result.settings.navigationButton, allowed[3], name);
+  assert.equal(result.settings.gazeToggle, allowed[4], name);
+  assert.deepEqual(dwell.dwellTimesFor(name), Object.fromEntries(Object.keys(dwell.DWELL_ACTION_GROUPS).map(a => [a, dwell.dwellForAction(a)])));
+}));
 test('old per-button sliders and repeat arrays cannot override fixed durations', () => {
   const saved = Object.fromEntries(Object.keys(dwell.DWELL_ACTION_GROUPS).map(key => [key, 99999]));
   const result = dwell.loadDwellPreferences(storage({ gazeconnect_dwell_settings: JSON.stringify({ ...saved, repeatDwellEnabled: true, repeatDwellTimes: [0, 50], onsetDelay: 450, cooldownAfterActivation: 600 }), gazeconnect_als_stage: 'late_als' }));
@@ -67,9 +101,9 @@ test('stage-only installations keep their existing guard and keyboard cadence', 
 });
 test('malformed or unavailable storage has usable defaults', () => {
   for (const value of ['null', '[]', '{broken', '"text"']) {
-    assert.equal(dwell.loadDwellPreferences(storage({ gazeconnect_dwell_settings: value })).settings.keyboardKey, 500);
+    assert.equal(dwell.loadDwellPreferences(storage({ gazeconnect_dwell_settings: value })).settings.keyboardKey, SETS.balanced[0]);
   }
-  assert.equal(dwell.loadDwellPreferences({ getItem() { throw new Error('denied'); } }).settings.gazeToggle, 2000);
+  assert.equal(dwell.loadDwellPreferences({ getItem() { throw new Error('denied'); } }).settings.gazeToggle, SETS.balanced[4]);
 });
 test('guard values are finite and bounded, even with corrupted preferences', () => {
   const result = dwell.loadDwellPreferences(storage({ gazeconnect_dwell_settings: JSON.stringify({ onsetDelay: '450', cooldownAfterActivation: -5, progressStyle: 'invalid' }), gazeconnect_als_stage: '__proto__' }));

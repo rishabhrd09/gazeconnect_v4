@@ -33,6 +33,13 @@ export interface GazeFlags {
    */
   lockBreakProgressRetention: boolean;
   /**
+   * A locked selection is left only once raw gaze has stayed away for
+   * LOCK_BREAK_CONFIRM_MS (GazeCursor.tsx), not on one wild sample; the ring
+   * stops filling from the first away sample. Default ON since 22 Sep 2026.
+   * Revert: window.__gazeFlags.set('lockBreakConfirm', false)
+   */
+  lockBreakConfirm: boolean;
+  /**
    * In-page BROWSER cursor (YouTube / quick search): save dwell progress
    * across stability breaks and resume within 1s on the same target.
    * Forwarded into the BrowserView via browserGazeConfig
@@ -113,6 +120,10 @@ const STORAGE_KEY = 'gazeconnect_gaze_flags';
 const DEFAULTS: GazeFlags = {
   dwellPauseOnGap: true,
   lockBreakProgressRetention: true,
+  // lockBreakConfirm: DEFAULT ON since 2026-09-22. The maintainer reported the
+  // cursor juggling on the bottom rows; there the raw stream flashes somewhere
+  // and back ~120 times a minute and each flash broke a locked selection.
+  lockBreakConfirm: true,
   browserProgressRetention: true,
   browserGapPause: true,
   // toggleCalmFrontend: DEFAULT ON since 2026-07-07. The patient reported the

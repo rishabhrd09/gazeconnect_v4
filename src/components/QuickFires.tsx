@@ -5,6 +5,7 @@
  */
 
 import { DWELL_GROUPS } from '../config/dwellTimeConfig';
+import { useDwellTime } from '../contexts/DwellTimeContext';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { darkColors, lightColors } from '../utils/design';
 
@@ -55,6 +56,7 @@ const QuickFireButton: React.FC<{
   const [progress, setProgress] = useState(0);
   const [isActivated, setIsActivated] = useState(false);
   const colors = isDarkMode ? darkColors : lightColors;
+  useDwellTime();   // Re-render when the timing set changes.
   const dwellTime = DWELL_GROUPS.communication.ms;
   const dwellTimerRef = useRef<NodeJS.Timeout | null>(null);
   const progressTimerRef = useRef<number | null>(null);

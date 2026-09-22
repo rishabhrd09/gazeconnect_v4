@@ -14,6 +14,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { GazeFreshness } from '../utils/gazeSafety';
+import { getLatencyReport } from '../utils/gazeTelemetry';
 import type { SentenceSuggestion, WordPredictionMeta } from '../utils/wordPredictionSlots';
 
 const DEBUG_GAZE_LOGS = false;
@@ -98,10 +99,20 @@ export interface BreakReminder {
   seconds_until_break?: number;
 }
 
+/** What the eye tracker itself reports, so the interface can say why gaze is absent. */
+export interface TrackerStatus {
+  stream_state: string;
+  device_status?: string | null;
+  user_presence?: string | null;
+  gaze_tracking?: string | null;
+  recoveries?: number;
+}
+
 export interface WebSocketContextValue {
   isConnected: boolean;
   isGazeEnabled: boolean;
   tobiiConnected: boolean;
+  trackerStatus: TrackerStatus | null;
   // v17.18: backend TTS health from the 'connected' handshake. When false,
   // speech must keep using browser speechSynthesis even though the socket is
   // up — otherwise a healthy connection with a dead pyttsx3 leaves the
@@ -246,6 +257,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const [isGazeEnabled, setIsGazeEnabled] = useState(false);
   const [currentScreen, setCurrentScreen] = useState('home');
   const [tobiiConnected, setTobiiConnected] = useState(false);
+  const [trackerStatus, setTrackerStatus] = useState<TrackerStatus | null>(null);
   // Default true: an older backend that doesn't send tts_available must not
   // demote speech to the browser fallback.
   const [ttsAvailable, setTtsAvailable] = useState(true);
@@ -466,8 +478,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           setIsGazeEnabled(data.gaze_enabled || false);
           setCurrentScreen(data.current_screen || 'home');
           setTobiiConnected(data.tobii_connected || false);
+          setTrackerStatus(data.tracker_status && typeof data.tracker_status.stream_state === 'string'
+            ? data.tracker_status : null);
           // Absent field (older backend) => assume available.
           setTtsAvailable(data.tts_available !== false);
+          break;
+
+        case 'tracker_status':
+          if (typeof data.stream_state === 'string') setTrackerStatus(data as TrackerStatus);
           break;
 
         case 'gaze_enabled':
@@ -626,6 +644,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         console.log('WebSocket disconnected');
         setIsConnected(false);
         setTobiiConnected(false);
+        setTrackerStatus(null);
         freshnessRef.current.lose();
         window.dispatchEvent(new CustomEvent('gaze_lost', { detail: { reason: 'disconnected' } }));
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
@@ -696,7 +715,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   useEffect(() => {
     const interval = setInterval(() => { if (isConnected) send('ping'); }, 30000);
-    return () => clearInterval(interval);
+    // Diagnostics: the interface's own timing percentiles (frame delivery and
+    // time to paint), which the backend cannot measure. Numbers only.
+    const report = setInterval(() => {
+      const summary = isConnected ? getLatencyReport() : null;
+      if (summary) send('renderer_latency', { summary });
+    }, 10000);
+    return () => { clearInterval(interval); clearInterval(report); };
   }, [isConnected, send]);
 
   const value: WebSocketContextValue = {
@@ -704,6 +729,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     isGazeEnabled,
     currentScreen,
     tobiiConnected,
+    trackerStatus,
     ttsAvailable,
     setGazeEnabled: (enabled) => send('set_gaze_enabled', { enabled }),
     setScreen: (screen) => send('set_screen', { screen }),

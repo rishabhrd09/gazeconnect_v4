@@ -64,14 +64,38 @@ export function collectKeyboardKeys(): KeyRect[] {
   return keys;
 }
 
+/** Distance from a point to a rectangle: 0 anywhere inside it. */
+export function distanceToRect(
+  x: number, y: number,
+  rect: { left: number; top: number; right: number; bottom: number },
+): number {
+  return Math.hypot(Math.max(rect.left - x, 0, x - rect.right), Math.max(rect.top - y, 0, y - rect.bottom));
+}
+
 /**
- * Find the best keyboard key for a given gaze point using center-weighted
- * distance with expanded hit zones.
+ * True when candidate (edge, centre) beats the best so far. The key that
+ * CONTAINS the point wins outright; outside every key the nearest key EDGE
+ * wins; centre distance only breaks ties (overlapping rects, exact gaps).
+ *
+ * Ranking by centre distance alone is wrong for keys of unequal size: most of
+ * a wide key (the space bar is five to seven keys wide) lies nearer to a
+ * neighbour's centre than to its own, so looking at the space bar selected
+ * the letter above it, and the winner flipped between neighbours with noise.
+ */
+export function isCloserTarget(edge: number, centre: number, bestEdge: number, bestCentre: number): boolean {
+  const EDGE_TIE_PX = 0.5;
+  if (edge < bestEdge - EDGE_TIE_PX) return true;
+  return Math.abs(edge - bestEdge) <= EDGE_TIE_PX && centre < bestCentre;
+}
+
+/**
+ * Find the best keyboard key for a given gaze point within expanded hit zones.
  *
  * Algorithm:
  * 1. Inflate each key's bounds by snapMargin
  * 2. Filter to keys whose inflated bounds contain the gaze point
- * 3. Among candidates, select the one whose CENTER is closest to the gaze point
+ * 3. Among candidates, the key containing the point wins; otherwise the key
+ *    whose rectangle is nearest (see isCloserTarget)
  *
  * @param gazeX - Gaze X position in window pixels
  * @param gazeY - Gaze Y position in window pixels
@@ -86,7 +110,8 @@ export function findBestKeyboardKey(
   snapMargin: number = DEFAULT_SNAP_MARGIN
 ): HTMLElement | null {
   let bestKey: HTMLElement | null = null;
-  let bestWeight = -1;
+  let bestEdge = Infinity;
+  let bestCentre = Infinity;
 
   for (const key of keys) {
     // Check if gaze is within inflated bounds
@@ -99,14 +124,11 @@ export function findBestKeyboardKey(
 
     if (!inExpandedBounds) continue;
 
-    // Center-distance weighting: closer to center = higher weight
-    const dx = gazeX - key.centerX;
-    const dy = gazeY - key.centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const weight = 1 / (distance + 1);
-
-    if (weight > bestWeight) {
-      bestWeight = weight;
+    const edge = distanceToRect(gazeX, gazeY, key);
+    const centre = Math.hypot(gazeX - key.centerX, gazeY - key.centerY);
+    if (isCloserTarget(edge, centre, bestEdge, bestCentre)) {
+      bestEdge = edge;
+      bestCentre = centre;
       bestKey = key.element;
     }
   }

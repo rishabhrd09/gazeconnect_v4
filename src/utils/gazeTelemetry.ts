@@ -429,6 +429,45 @@ export function getLatencySamples(): GazeLatencySample[] {
   return latencySamples.slice();
 }
 
+const LATENCY_REPORT_MIN_FRAMES = 100;
+const LATENCY_REPORT_STALL_WINDOW_MS = 60000;
+
+/**
+ * A flat, numbers-only timing report. The interface sends it to the backend
+ * every ten seconds, which passes it to a listening diagnostic tool
+ * (tools/gaze_live_observer.py) and otherwise drops it. Percentiles over the
+ * bounded rings above: no positions, targets or text. Null until enough frames
+ * exist for percentiles to mean anything.
+ */
+export function getLatencyReport(): Record<string, number> | null {
+  if (latencySamples.length < LATENCY_REPORT_MIN_FRAMES) return null;
+  const latency = getLatencyAggregate();
+  const since = Date.now() - LATENCY_REPORT_STALL_WINDOW_MS;
+  let stalls = 0;
+  let stallMax = 0;
+  let gaps = 0;
+  let gapMax = 0;
+  for (const freeze of freezeEvents) {
+    if (freeze.ts < since) continue;
+    if (freeze.kind === 'raf_stall') {
+      stalls++;
+      stallMax = Math.max(stallMax, freeze.durationMs);
+    } else if (freeze.kind === 'gaze_gap') {
+      gaps++;
+      gapMax = Math.max(gapMax, freeze.durationMs);
+    }
+  }
+  return {
+    frames: latency.count,
+    ws_p50: latency.ws.p50, ws_p95: latency.ws.p95, ws_max: latency.ws.max,
+    e2e_p50: latency.e2e.p50, e2e_p95: latency.e2e.p95, e2e_max: latency.e2e.max,
+    paint_p50: latency.paint.p50, paint_p95: latency.paint.p95, paint_max: latency.paint.max,
+    paint_sampled: latency.paint.sampled,
+    raf_stalls_60s: stalls, raf_stall_max_ms: stallMax,
+    gaze_gaps_60s: gaps, gaze_gap_max_ms: gapMax,
+  };
+}
+
 /** Return a copy of the interruption ring. */
 export function getInterruptEvents(): DwellInterruptEvent[] {
   return interruptEvents.slice();

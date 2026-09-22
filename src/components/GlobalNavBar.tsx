@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { DWELL_GROUPS } from '../config/dwellTimeConfig';
+import { useDwellTime } from '../contexts/DwellTimeContext';
 import { LiveClock } from './LiveClock';
 import { darkColors, warmColors } from '../utils/design';
 import { useGazeControl } from './core/GazeControlToggle';
@@ -77,6 +78,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     const { isGazeEnabled, toggleGaze } = useGazeControl();
     const { isFocusMode } = useFocusMode();
     const { theme } = useTheme();
+    useDwellTime();   // Re-render (through React.memo) when the timing set changes.
     const navigationColors = colors.navigation;
 
     // Keyboard/spatial screens get enhanced nav bar (taller buttons, dead zones, shifted pill)

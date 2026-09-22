@@ -6,13 +6,16 @@ import SliderSetting from '../shared/SliderSetting';
 import SelectSetting from '../shared/SelectSetting';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { DWELL_GROUPS } from '../../../config/dwellTimeConfig';
+import { DWELL_GROUPS, DWELL_TIMING_SETS, normalizeDwellTimingSet, type DwellTimingSet } from '../../../config/dwellTimeConfig';
+import { useDwellTime } from '../../../contexts/DwellTimeContext';
 
-// Five fixed groups; no independent per-screen tuning or hidden multipliers.
-const DwellTimeSection: React.FC = () => (
+// Three complete timing sets of five groups; no per-screen tuning or hidden multipliers.
+const DwellTimeSection: React.FC = () => {
+  const { timingSet } = useDwellTime();
+  return (
   <div className="settings-section dwell-guide">
-    <h3>Dwell Timings</h3>
-    <p>Five fixed selection times, automatically matched to each action.</p>
+    <h3>Dwell Timings: {DWELL_TIMING_SETS[timingSet].label.replace(' (default)', '')}</h3>
+    <p>How long to look at something to select it. Five times, matched to each kind of action.</p>
     <div className="dwell-guide-grid">
       {Object.entries(DWELL_GROUPS).map(([key, group]) => (
         <div key={key} className="dwell-guide-card">
@@ -23,13 +26,15 @@ const DwellTimeSection: React.FC = () => (
       ))}
     </div>
   </div>
-);
+  );
+};
 
 // Preserve saved smoothing profiles, including legacy choices. No raw filter
 // coefficients or duplicate stage controls in the everyday settings panel.
 const GazeFilterTuningSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
   const { settings, updateSetting } = useCustomization();
-  return <SelectSetting label="Gaze Smoothing" description="Balance cursor steadiness and movement speed"
+  return <SelectSetting label="Gaze Smoothing"
+    description="Balanced and Responsive follow the eyes at once. Steady and Gentle wait a moment first, so a stray glance never moves the cursor."
     value={normalizeFilterPreset(settings.filterPreset)}
     options={[...GAZE_FILTER_MODES]}
     onChange={value => updateSetting('filterPreset', value)}
@@ -162,10 +167,27 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
             onChange={v => updateSetting('gazeOnNavigate', v as 'smart-pause' | 'full-pause' | 'always-active')}
             isDarkMode={isDarkMode}
           />
+          <SelectSetting
+            label="Selection Speed"
+            description="How long to look at a key or button before it is selected. Quick suits a practised user. Choose Relaxed if selections happen too fast: it gives more time to settle, and to look away from a wrong choice."
+            value={normalizeDwellTimingSet(settings.dwellTimingSet)}
+            options={(Object.keys(DWELL_TIMING_SETS) as DwellTimingSet[]).map(key => ({
+              value: key, label: DWELL_TIMING_SETS[key].label,
+            }))}
+            onChange={v => updateSetting('dwellTimingSet', normalizeDwellTimingSet(v))}
+            isDarkMode={isDarkMode}
+          />
           <DwellTimeSection />
+          <ToggleSetting
+            label="Show Gaze Cursor"
+            description="A ring at the centre of the key or card your eyes are on; it moves from item to item. When off, the highlight and dwell ring still show on the item being selected."
+            value={settings.showGazeCursor !== false}
+            onChange={v => updateSetting('showGazeCursor', v)}
+            isDarkMode={isDarkMode}
+          />
           <SelectSetting
             label="Gaze Cursor Size"
-            description="Size of the eye-tracking cursor"
+            description="Size of the gaze ring"
             value={settings.gazeCursorSize}
             options={[
               { value: 'small', label: 'Small' },
@@ -176,28 +198,6 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
             isDarkMode={isDarkMode}
           />
           <GazeFilterTuningSection isDarkMode={isDarkMode} />
-          <SliderSetting
-            label="Gaze Offset X"
-            description="Manual horizontal correction for systematic drift (negative = move cursor left)"
-            value={settings.gazeOffsetX ?? 0}
-            min={-100}
-            max={100}
-            step={5}
-            unit=" px"
-            onChange={v => updateSetting('gazeOffsetX', v)}
-            isDarkMode={isDarkMode}
-          />
-          <SliderSetting
-            label="Gaze Offset Y"
-            description="Manual vertical correction for systematic drift (negative = move cursor up)"
-            value={settings.gazeOffsetY ?? 0}
-            min={-100}
-            max={100}
-            step={5}
-            unit=" px"
-            onChange={v => updateSetting('gazeOffsetY', v)}
-            isDarkMode={isDarkMode}
-          />
         </div>
       </section>
 
