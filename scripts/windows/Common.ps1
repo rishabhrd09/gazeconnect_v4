@@ -13,8 +13,7 @@ function Assert-Windows {
     if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) {
         throw 'This workflow requires Windows 10/11 x64. Cross-compiling PyInstaller is unsupported.'
     }
-    $windowsVersion = [version]((Get-CimInstance Win32_OperatingSystem).Version)
-    if ($windowsVersion -lt [version]'10.0') {
+    if ([Environment]::OSVersion.Version -lt [version]'10.0') {
         throw 'Windows 10 or Windows 11 is required.'
     }
 }
@@ -115,6 +114,50 @@ function Stop-ProjectProcesses {
     }
     return $stopped
 }
+function Test-HelperUpToDate {
+    # True when the built helper is newer than every file it is built from. The
+    # .NET build is incremental already, but starting it costs about five seconds
+    # on every launch and the helper changes rarely. Touch a source file, or delete
+    # its bin folder, to force a rebuild.
+    $exe = Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net8.0-windows\win-x64\TobiiGazeHelper.exe'
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { return $false }
+    $built = (Get-Item -LiteralPath $exe).LastWriteTimeUtc
+    $buildable = @('.cs', '.csproj', '.props', '.targets', '.dll', '.json')
+    $sources = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'tobii-helper') -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' -and $buildable -contains $_.Extension }
+    foreach ($source in $sources) {
+        if ($source.LastWriteTimeUtc -gt $built) { return $false }
+    }
+    return $true
+}
+function Test-InterfaceBuildUpToDate {
+    # True when dist/ is newer than every file the interface is built from.
+    $built = Join-Path $ProjectRoot 'dist\index.html'
+    if (-not (Test-Path -LiteralPath $built -PathType Leaf)) { return $false }
+    $builtAt = (Get-Item -LiteralPath $built).LastWriteTimeUtc
+    $watched = @('src', 'public') | ForEach-Object { Join-Path $ProjectRoot $_ } | Where-Object { Test-Path -LiteralPath $_ }
+    foreach ($file in (Get-ChildItem -LiteralPath $watched -Recurse -File -ErrorAction SilentlyContinue)) {
+        if ($file.LastWriteTimeUtc -gt $builtAt) { return $false }
+    }
+    foreach ($name in @('index.html', 'vite.config.ts', 'package.json', 'tsconfig.json')) {
+        $path = Join-Path $ProjectRoot $name
+        if ((Test-Path -LiteralPath $path) -and (Get-Item -LiteralPath $path).LastWriteTimeUtc -gt $builtAt) { return $false }
+    }
+    return $true
+}
+function Test-ElectronBuildUpToDate {
+    # True when dist-electron is newer than every TypeScript file it is built from.
+    $built = Join-Path $ProjectRoot 'dist-electron\main.js'
+    if (-not (Test-Path -LiteralPath $built -PathType Leaf)) { return $false }
+    $builtAt = (Get-Item -LiteralPath $built).LastWriteTimeUtc
+    $sources = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'electron') -Recurse -File -Filter *.ts -ErrorAction SilentlyContinue
+    foreach ($file in $sources) {
+        if ($file.LastWriteTimeUtc -gt $builtAt) { return $false }
+    }
+    $config = Join-Path $ProjectRoot 'tsconfig.electron.json'
+    if ((Test-Path -LiteralPath $config) -and (Get-Item -LiteralPath $config).LastWriteTimeUtc -gt $builtAt) { return $false }
+    return $true
+}
 function Get-PortListeners([int]$Port) {
     @(Get-NetTCPConnection -ErrorAction SilentlyContinue |
         Where-Object { $_.State -eq 'Listen' -and $_.LocalPort -eq $Port } |
@@ -129,8 +172,48 @@ function Get-PortOwnerText([int]$Port) {
     return ($parts -join '; ')
 }
 function Find-FreePort([int]$Preferred, [int]$Last) {
+    $listening = @(Get-NetTCPConnection -ErrorAction SilentlyContinue |
+        Where-Object { $_.State -eq 'Listen' } | Select-Object -ExpandProperty LocalPort -Unique)
     for ($port = $Preferred; $port -le $Last; $port++) {
-        if (@(Get-PortListeners $port).Count -eq 0) { return $port }
+        if ($listening -notcontains $port) { return $port }
     }
     throw "No free port between $Preferred and $Last. $Preferred is held by: $(Get-PortOwnerText $Preferred)"
+}
+
+# The ports a development launch uses. 8765 and 5555 are fixed: the interface always
+# dials 8765 (the default in src/hooks/useWebSocket.tsx) and the helper's port is
+# compiled in, so a held one blocks the launch rather than moving it elsewhere. The
+# other two move to the next free port and are listed only so the picture is complete.
+$script:DevPorts = @(
+    [pscustomobject]@{ Port = 8765; Purpose = 'backend'; Fixed = $true }
+    [pscustomobject]@{ Port = 5555; Purpose = 'eye tracker helper'; Fixed = $true }
+    [pscustomobject]@{ Port = 5173; Purpose = 'interface server'; Fixed = $false }
+    [pscustomobject]@{ Port = 5050; Purpose = 'floor plan server'; Fixed = $false }
+)
+
+function Get-DevPortState {
+    # One row per port with its listeners, and whether each one is part of this
+    # checkout (or the installed app) - which is what decides who may stop it.
+    $ours = @{}
+    foreach ($process in (Get-ProjectProcesses -IncludeInstalled)) { $ours[[int]$process.ProcessId] = $true }
+    foreach ($entry in $script:DevPorts) {
+        $holders = foreach ($id in (Get-PortListeners $entry.Port)) {
+            $owner = Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue
+            $name = "PID $id"
+            $path = ''
+            if ($owner) { $name = [string]$owner.Name; $path = [string]$owner.ExecutablePath }
+            [pscustomobject]@{ ProcessId = [int]$id; Name = $name; Path = $path; IsOurs = $ours.ContainsKey([int]$id) }
+        }
+        [pscustomobject]@{ Port = $entry.Port; Purpose = $entry.Purpose; Fixed = $entry.Fixed; Holders = @($holders) }
+    }
+}
+
+function Format-DevPortRow([object]$Row) {
+    if ($Row.Holders.Count -eq 0) { return ('{0,-5} {1,-19} free' -f $Row.Port, $Row.Purpose) }
+    $who = ($Row.Holders | ForEach-Object {
+        $tag = 'not part of this checkout'
+        if ($_.IsOurs) { $tag = 'this checkout' }
+        '{0} (PID {1}, {2})' -f $_.Name, $_.ProcessId, $tag
+    }) -join '; '
+    return ('{0,-5} {1,-19} held by {2}' -f $Row.Port, $Row.Purpose, $who)
 }
