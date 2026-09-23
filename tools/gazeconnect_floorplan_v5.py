@@ -30,7 +30,7 @@ INT_W = 0.375          # interior wall thickness (ft) — 115mm
 DOOR_FT = 2.8          # door opening width
 WIN_FT = 3.0           # window opening width
 MARGIN = 4.2           # margin around plot (ft) - tighter to use more drawing area
-TITLE_H = 3.2          # title block height (ft)
+TITLE_H = 3.8          # separate title block below the drawing (ft)
 LEG_W = 6.8            # legend column width (ft)
 
 # ═══════════════════════  ROOM DATABASE  ═══════════════════════
@@ -105,12 +105,16 @@ class Rm:
     name:str; rid:str; x1:float=0; y1:float=0; x2:float=0; y2:float=0
     area:float=0; doors:list=field(default_factory=list); windows:list=field(default_factory=list)
     hatch:str=None; fur:str=None; color:tuple=(120,144,156); is_void:bool=False
+    placement_id:str=""
 
 @dataclass
 class Fl:
     w:float=40; d:float=60; facing:str="South"; ptype:str="Middle Plot"
     rooms:list=field(default_factory=list); rows:int=4; cols:int=4; label:str="Ground Floor"
     no_wall_edges:list=field(default_factory=list)  # list of ((x,y),(x,y)) edge segments to skip
+    door_openings:list=field(default_factory=list)
+    has_explicit_doors:bool=False
+    gate_position:str="Center"
 
 _CELL_RE = re.compile(r"r(\d+)_c(\d+)")
 
@@ -153,6 +157,18 @@ def _rectangles_from_cells(cells_rc, rows, cols):
 
 def _placement_rects(p, W, D, rows, cols):
     """Return list of non-overlapping rect dicts for a placement using cells/cellRects when available."""
+    exact = p.get("geometryRects")
+    if isinstance(exact, list) and exact:
+        rects = []
+        for raw in exact:
+            x1, y1, x2, y2 = (float(raw[k]) for k in ("x1", "y1", "x2", "y2"))
+            if not (0 <= x1 < x2 <= W and 0 <= y1 < y2 <= D):
+                raise ValueError("Candidate geometry must stay inside the plot")
+            rects.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2, "area": (x2 - x1) * (y2 - y1)})
+        # geometryRects describe final geometry; coarse cells are only anchors.
+        rects.sort(key=lambda r: r["area"], reverse=True)
+        return rects
+
     cells = set()
     for c in p.get("cells", []) or []:
         rc = _parse_cell_key(c)
@@ -227,26 +243,41 @@ def _apply_refinements(rooms, refinements, W, D, rows, cols):
 
     for e in refinements.get("customEdges", []):
         if e.get("type") == "no_wall":
-            c1, c2 = e.get("cells", [None, None])
-            if c1 and c2:
-                rc1, rc2 = _parse_cell_key(c1), _parse_cell_key(c2)
-                if rc1 and rc2:
-                    r1x1, r1y1 = (rc1[1]-1)*cw, (rc1[0]-1)*cd
-                    r2x1, r2y1 = (rc2[1]-1)*cw, (rc2[0]-1)*cd
-                    if rc1[0] == rc2[0]:  # same row
-                        sx = max(r1x1, r2x1)
-                        no_wall_edges.append(((sx, r1y1), (sx, r1y1 + cd)))
-                    elif rc1[1] == rc2[1]:  # same col
-                        sy = max(r1y1, r2y1)
-                        no_wall_edges.append(((r1x1, sy), (r1x1 + cw, sy)))
+            boundary = e.get("boundary") or []
+            if len(boundary) == 2:
+                rc = _parse_cell_key(boundary[0])
+                side = str(boundary[1]).lower()
+                if rc and 1 <= rc[0] <= rows and 1 <= rc[1] <= cols:
+                    x1, y1 = (rc[1] - 1) * cw, (rc[0] - 1) * cd
+                    if side in ("top", "north"):
+                        no_wall_edges.append(((x1, y1 + cd), (x1 + cw, y1 + cd)))
+                        continue
+                    if side in ("bottom", "south"):
+                        no_wall_edges.append(((x1, y1), (x1 + cw, y1)))
+                        continue
+                    if side in ("left", "west"):
+                        no_wall_edges.append(((x1, y1), (x1, y1 + cd)))
+                        continue
+                    if side in ("right", "east"):
+                        no_wall_edges.append(((x1 + cw, y1), (x1 + cw, y1 + cd)))
+                        continue
+            # Older maps used a pair of neighboring cell IDs instead.
+            cells = e.get("cells") or []
+            if len(cells) == 2:
+                rc1, rc2 = _parse_cell_key(cells[0]), _parse_cell_key(cells[1])
+                if rc1 and rc2 and abs(rc1[0] - rc2[0]) + abs(rc1[1] - rc2[1]) == 1:
+                    if rc1[0] == rc2[0]:
+                        x = max(rc1[1], rc2[1]) * cw - cw
+                        y = (rc1[0] - 1) * cd
+                        no_wall_edges.append(((x, y), (x, y + cd)))
+                    else:
+                        x = (rc1[1] - 1) * cw
+                        y = max(rc1[0], rc2[0]) * cd - cd
+                        no_wall_edges.append(((x, y), (x + cw, y)))
 
     # ── Step 1: Decompose rooms into cell-level fragments ──
     # A fragment is (roomId, x1, y1, x2, y2, is_void)
     fragments = []
-    print(f"[REFINE] split_map keys: {list(split_map.keys())}")
-    print(f"[REFINE] void_set: {void_set}")
-    print(f"[REFINE] no_wall_edges count: {len(no_wall_edges)}")
-    print(f"[REFINE] input rooms: {[(r.name, r.rid, round(r.x1,1), round(r.y1,1), round(r.x2,1), round(r.y2,1)) for r in rooms]}")
 
     processed_cells = set()
 
@@ -329,8 +360,8 @@ def _apply_refinements(rooms, refinements, W, D, rows, cols):
                     split_y = cy2 - (cd * pctA)
                     fragments.append((roomA_id, cx1, split_y, cx2, cy2, False))
                     fragments.append((roomB_id, cx1, cy1, cx2, split_y, False))
-            except Exception as e:
-                print(f"[REFINE] Failed to parse orphan split cell {cell_key}: {e}")
+            except (ValueError, TypeError):
+                continue
 
     # ORPHAN VOIDS: If user placed a void on an empty cell
     for cell_key in void_set:
@@ -341,8 +372,8 @@ def _apply_refinements(rooms, refinements, W, D, rows, cols):
                 cx1, cy1 = (c - 1) * cw, (r - 1) * cd
                 cx2, cy2 = cx1 + cw, cy1 + cd
                 fragments.append(("void", cx1, cy1, cx2, cy2, True))
-            except Exception as e:
-                print(f"[REFINE] Failed to parse orphan void {cell_key}: {e}")
+            except (ValueError, TypeError):
+                continue
 
     # ── Step 2: Group fragments by roomId ──
     from collections import defaultdict
@@ -391,7 +422,6 @@ def _apply_refinements(rooms, refinements, W, D, rows, cols):
 
     # ── Step 4: Create Rm objects ──
     new_rooms = []
-    print(f"[REFINE] groups: {[(rid, len(rects)) for rid, rects in groups.items()]}")
     for rid, rects in groups.items():
         m = RDEF.get(rid, dict(d=["S"], w=[], h=None, fur=None, c=(120,144,156)))
         merged = _merge_rects(rects)
@@ -402,8 +432,9 @@ def _apply_refinements(rooms, refinements, W, D, rows, cols):
             if orig_rm.rid == rid and orig_rm.name:
                 display_name = orig_rm.name
                 break
+        group_area = sum((x2 - x1) * (y2 - y1) for x1, y1, x2, y2 in merged)
         for i, (x1, y1, x2, y2) in enumerate(merged):
-            area = (x2 - x1) * (y2 - y1)
+            area = group_area if i == 0 else 0
             new_rooms.append(Rm(
                 display_name, rid, x1, y1, x2, y2, area,
                 m["d"] if i == 0 else [],
@@ -412,19 +443,20 @@ def _apply_refinements(rooms, refinements, W, D, rows, cols):
                 m["fur"] if i == 0 else None,
                 m["c"],
             ))
-            print(f"[REFINE] room: {display_name} ({rid}) rect=({round(x1,1)},{round(y1,1)},{round(x2,1)},{round(y2,1)}) area={round(area,1)}")
 
     # Void cells
     for (x1, y1, x2, y2) in void_frags:
         new_rooms.append(Rm("VOID", "void", x1, y1, x2, y2, 0, [], [], None, None, (180,180,180), True))
 
-    print(f"[REFINE] total rooms after refinement: {len(new_rooms)}")
     return new_rooms, no_wall_edges
 
 def parse(data):
     cm=data.get("compass_map",data); pr=cm.get("plot",{}); gr=cm.get("grid_size",{})
     W,D=pr.get("width_ft",40),pr.get("depth_ft",60)
     facing,pt=pr.get("facing","South"),pr.get("type","Middle Plot")
+    gate_position = str(pr.get("gate_position") or pr.get("gatePosition") or "Center").strip().title()
+    if gate_position not in {"Left", "Center", "Right"}:
+        gate_position = "Center"
     R,C=gr.get("rows",4),gr.get("cols",4)
     floors=[]
     for fk,lb in [("ground_floor","Ground Floor"),("first_floor","First Floor")]:
@@ -432,8 +464,15 @@ def parse(data):
         if not fd and fk=="ground_floor" and "placements" in cm: fd=cm
         if not fd: continue
         rooms=[]
-        for p in fd.get("placements",[]):
+        placements = fd.get("placements", [])
+        has_final_geometry = any(p.get("geometryRects") for p in placements)
+        if has_final_geometry and not all(p.get("geometryRects") for p in placements):
+            raise ValueError("Candidate floor mixes exact and coarse room geometry")
+        if has_final_geometry and "doorOpenings" not in fd:
+            raise ValueError("Candidate floor must include validated door openings")
+        for placement_index, p in enumerate(placements):
             rid=p.get("roomId",p.get("room_id",""))
+            placement_id=str(p.get("placementId") or f"{fk}:{placement_index}")
             m=RDEF.get(rid,dict(d=["S"],w=[],h=None,fur=None,c=(120,144,156)))
             name=p.get("room",rid)
             rects=_placement_rects(p,W,D,R,C)
@@ -445,28 +484,128 @@ def parse(data):
                             name if primary else "",
                             rid,
                             rc["x1"], rc["y1"], rc["x2"], rc["y2"],
-                            p.get("area_sqft",0) if primary else 0,
+                            sum(part["area"] for part in rects) if primary else 0,
                             m["d"] if primary else [],
                             m["w"] if primary else [],
                             m["h"] if primary else None,
                             m["fur"] if primary else None,
                             m["c"],
+                            False,
+                            placement_id,
                         )
                     )
             else:
                 c=p.get("coords",{})
                 rooms.append(Rm(name,rid,c.get("x1",0),c.get("y1",0),c.get("x2",0),c.get("y2",0),
-                               p.get("area_sqft",0),m["d"],m["w"],m["h"],m["fur"],m["c"]))
-        fl = Fl(W,D,facing,pt,rooms,R,C,lb)
+                               p.get("area_sqft",0),m["d"],m["w"],m["h"],m["fur"],m["c"],False,placement_id))
+        fl = Fl(W,D,facing,pt,rooms,R,C,lb,gate_position=gate_position)
+        fl.has_explicit_doors = "doorOpenings" in fd
+        fl.door_openings = fd.get("doorOpenings") or []
         # Cell keys repeat on each floor. Prefer that floor's own refinements,
         # including an explicit empty set, while retaining older payloads that
         # stored a shared top-level set.
         adv = fd.get("advanced_refinements", cm.get("advanced_refinements", {}))
-        if adv:
+        if adv and not has_final_geometry:
             fl.rooms, fl.no_wall_edges = _apply_refinements(fl.rooms, adv, W, D, R, C)
         floors.append(fl)
 
-    return floors or [Fl(W,D,facing,pt)]
+    return floors or [Fl(W,D,facing,pt,gate_position=gate_position)]
+
+
+OPEN_ROOM_IDS = {
+    "lawn", "porch", "verandah", "backyard", "balcony", "terrace",
+    "ff_balcony", "ff_terrace", "garden", "void",
+}
+
+
+def _room_key(room):
+    return room.placement_id or room.rid
+
+
+def _enclosed(room):
+    return room is not None and not room.is_void and room.rid.lower() not in OPEN_ROOM_IDS
+
+
+def _wall_segments(fl):
+    """Build each exposed/shared wall once from the union of room rectangles.
+
+    `low` is the room left of a vertical line or below a horizontal line;
+    `high` is the opposite side. Splitting at every rectangle coordinate makes
+    L-shaped footprints and partial shared walls exact without rasterization.
+    """
+    rooms = [r for r in fl.rooms if not r.is_void and r.x2 > r.x1 and r.y2 > r.y1]
+    xs = sorted({0.0, float(fl.w), *(v for r in rooms for v in (r.x1, r.x2))})
+    ys = sorted({0.0, float(fl.d), *(v for r in rooms for v in (r.y1, r.y2))})
+    eps = 1e-5
+
+    def room_at(x, y):
+        if not (0 <= x <= fl.w and 0 <= y <= fl.d):
+            return None
+        for room in rooms:
+            if room.x1 + eps < x < room.x2 - eps and room.y1 + eps < y < room.y2 - eps:
+                return room
+        return None
+
+    def suppressed(x1, y1, x2, y2):
+        for a, b in fl.no_wall_edges:
+            if x1 == x2 and abs(a[0] - x1) < eps and abs(b[0] - x1) < eps:
+                if min(a[1], b[1]) <= y1 + eps and max(a[1], b[1]) >= y2 - eps:
+                    return True
+            if y1 == y2 and abs(a[1] - y1) < eps and abs(b[1] - y1) < eps:
+                if min(a[0], b[0]) <= x1 + eps and max(a[0], b[0]) >= x2 - eps:
+                    return True
+        return False
+
+    result = []
+    for x in xs:
+        for y1, y2 in zip(ys, ys[1:]):
+            if y2 - y1 <= eps or suppressed(x, y1, x, y2):
+                continue
+            low, high = room_at(x - eps * 2, (y1 + y2) / 2), room_at(x + eps * 2, (y1 + y2) / 2)
+            if low and high and _room_key(low) == _room_key(high):
+                continue
+            if not (_enclosed(low) or _enclosed(high)):
+                continue
+            kind = "interior" if _enclosed(low) and _enclosed(high) else "exterior"
+            result.append({"x1": x, "y1": y1, "x2": x, "y2": y2, "low": low, "high": high, "kind": kind})
+    for y in ys:
+        for x1, x2 in zip(xs, xs[1:]):
+            if x2 - x1 <= eps or suppressed(x1, y, x2, y):
+                continue
+            low, high = room_at((x1 + x2) / 2, y - eps * 2), room_at((x1 + x2) / 2, y + eps * 2)
+            if low and high and _room_key(low) == _room_key(high):
+                continue
+            if not (_enclosed(low) or _enclosed(high)):
+                continue
+            kind = "interior" if _enclosed(low) and _enclosed(high) else "exterior"
+            result.append({"x1": x1, "y1": y, "x2": x2, "y2": y, "low": low, "high": high, "kind": kind})
+    def signature(segment):
+        vertical = segment["x1"] == segment["x2"]
+        fixed = segment["x1"] if vertical else segment["y1"]
+        return (vertical, fixed, segment["kind"],
+                _room_key(segment["low"]) if segment["low"] else "",
+                _room_key(segment["high"]) if segment["high"] else "")
+
+    result.sort(key=lambda s: (signature(s), s["y1"] if s["x1"] == s["x2"] else s["x1"]))
+    merged = []
+    for segment in result:
+        vertical = segment["x1"] == segment["x2"]
+        start = segment["y1"] if vertical else segment["x1"]
+        if merged and signature(merged[-1]) == signature(segment):
+            previous_end = merged[-1]["y2"] if vertical else merged[-1]["x2"]
+            if abs(previous_end - start) < eps:
+                merged[-1]["y2" if vertical else "x2"] = segment["y2" if vertical else "x2"]
+                continue
+        merged.append(segment.copy())
+    return merged
+
+
+def _segment_side(segment, placement_id):
+    if segment["low"] and _room_key(segment["low"]) == placement_id:
+        return "E" if segment["x1"] == segment["x2"] else "N"
+    if segment["high"] and _room_key(segment["high"]) == placement_id:
+        return "W" if segment["x1"] == segment["x2"] else "S"
+    return None
 
 # ═══════════════════════  CAIRO RENDERER  ═══════════════════════
 class CairoFloorPlan:
@@ -479,6 +618,7 @@ class CairoFloorPlan:
         self.cw=int(self.pw+2*self.mx+self.lw)
         self.ch=int(self.ph+2*self.mx+self.ty)
         self.ox=self.mx; self.oy=self.mx  # plot origin offset
+        self.wall_segments = _wall_segments(fl)
 
     def ft(self, x, y):
         """Feet to canvas pixels. Y flipped (0=bottom in arch, 0=top in cairo)."""
@@ -510,14 +650,15 @@ class CairoFloorPlan:
 
     def _render_all(self, ctx):
         self._bg(ctx)
+        self._unassigned_fills(ctx)
         self._grid(ctx)
         self._room_fills(ctx)
         self._hatching(ctx)
         self._furniture(ctx)
         self._int_walls(ctx)
+        self._ext_walls(ctx)
         self._doors(ctx)
         self._windows(ctx)
-        self._ext_walls(ctx)
         self._room_labels(ctx)
         self._room_dimensions(ctx)
         self._dimensions(ctx)
@@ -532,6 +673,61 @@ class CairoFloorPlan:
     def _bg(self, ctx):
         self.sc(ctx, *self.T["bg"])
         ctx.rectangle(0, 0, self.cw, self.ch); ctx.fill()
+
+    def _unassigned_regions(self):
+        rooms = [r for r in self.fl.rooms if not r.is_void and r.x2 > r.x1 and r.y2 > r.y1]
+        xs = sorted({0.0, float(self.fl.w), *(v for r in rooms for v in (r.x1, r.x2))})
+        ys = sorted({0.0, float(self.fl.d), *(v for r in rooms for v in (r.y1, r.y2))})
+        empty = set()
+        for i, (x1, x2) in enumerate(zip(xs, xs[1:])):
+            for j, (y1, y2) in enumerate(zip(ys, ys[1:])):
+                cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+                if not any(r.x1 <= cx <= r.x2 and r.y1 <= cy <= r.y2 for r in rooms):
+                    empty.add((i, j))
+        regions = []
+        while empty:
+            stack = [empty.pop()]
+            component = []
+            while stack:
+                i, j = stack.pop()
+                rect = (xs[i], ys[j], xs[i + 1], ys[j + 1])
+                component.append(rect)
+                for neighbor in ((i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1)):
+                    if neighbor in empty:
+                        empty.remove(neighbor)
+                        stack.append(neighbor)
+            regions.append(component)
+        return regions
+
+    def _unassigned_fills(self, ctx):
+        for component in self._unassigned_regions():
+            area = 0.0
+            largest = None
+            for x1, y1, x2, y2 in component:
+                piece_area = (x2 - x1) * (y2 - y1)
+                area += piece_area
+                if largest is None or piece_area > largest[0]:
+                    largest = (piece_area, x1, y1, x2, y2)
+                tl, br = self.ft(x1, y2), self.ft(x2, y1)
+                self.sc(ctx, *self.T["text2"], 0.055)
+                ctx.rectangle(tl[0], tl[1], br[0] - tl[0], br[1] - tl[1]); ctx.fill()
+            if largest is None or area < 40:
+                continue
+            _, x1, y1, x2, y2 = largest
+            if min(x2 - x1, y2 - y1) < 6:
+                continue
+            center = self.ft((x1 + x2) / 2, (y1 + y2) / 2)
+            self.sc(ctx, *self.T["text2"], 0.65)
+            ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            ctx.set_font_size(self.ftl(0.38))
+            label = "UNASSIGNED"
+            width = ctx.text_extents(label).width
+            ctx.move_to(center[0] - width / 2, center[1]); ctx.show_text(label)
+            ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            ctx.set_font_size(self.ftl(0.31))
+            subtitle = f"{area:.0f} ft²"
+            width = ctx.text_extents(subtitle).width
+            ctx.move_to(center[0] - width / 2, center[1] + self.ftl(0.46)); ctx.show_text(subtitle)
 
     # ──── Grid ────
     def _grid(self, ctx):
@@ -573,154 +769,184 @@ class CairoFloorPlan:
 
     # ──── Interior Walls (filled rectangles) ────
     def _int_walls(self, ctx):
-        wt=max(2.0, self.ftl(INT_W))
         self.sc(ctx, *self.T["inwall"])
-        open_spaces = {"lawn", "porch", "verandah", "backyard", "balcony", "terrace", "ff_balcony", "ff_terrace", "garden"}
-        for r in self.fl.rooms:
-            if r.x2<=r.x1 or r.y2<=r.y1: continue
-            if getattr(r, 'is_void', False): continue  # skip void cells
-            if r.rid in open_spaces: continue # skip open spaces
-            tl=self.ft(r.x1,r.y2); br=self.ft(r.x2,r.y1)
-            x1,y1,x2,y2=tl[0],tl[1],br[0],br[1]
-            hw=wt/2
-
-            # Check if each edge should be skipped due to no_wall
-            def _edge_skip(ex1, ey1, ex2, ey2):
-                for (e1, e2) in self.fl.no_wall_edges:
-                    # Compare in plot coordinates (before ft transform)
-                    if (abs(ex1 - e1[0]) < 0.1 and abs(ey1 - e1[1]) < 0.1 and
-                        abs(ex2 - e2[0]) < 0.1 and abs(ey2 - e2[1]) < 0.1):
-                        return True
-                    if (abs(ex1 - e2[0]) < 0.1 and abs(ey1 - e2[1]) < 0.1 and
-                        abs(ex2 - e1[0]) < 0.1 and abs(ey2 - e1[1]) < 0.1):
-                        return True
-                return False
-
-            # Top wall (r.y2 in plot coords)
-            if not _edge_skip(r.x1, r.y2, r.x2, r.y2):
-                ctx.rectangle(x1-hw, y1-hw, x2-x1+wt, wt); ctx.fill()
-            # Bottom wall (r.y1 in plot coords)
-            if not _edge_skip(r.x1, r.y1, r.x2, r.y1):
-                ctx.rectangle(x1-hw, y2-hw, x2-x1+wt, wt); ctx.fill()
-            # Left wall (r.x1)
-            if not _edge_skip(r.x1, r.y1, r.x1, r.y2):
-                ctx.rectangle(x1-hw, y1, wt, y2-y1); ctx.fill()
-            # Right wall (r.x2)
-            if not _edge_skip(r.x2, r.y1, r.x2, r.y2):
-                ctx.rectangle(x2-hw, y1, wt, y2-y1); ctx.fill()
+        ctx.set_line_width(max(2.0, self.ftl(INT_W)))
+        for segment in self.wall_segments:
+            if segment["kind"] != "interior":
+                continue
+            p1 = self.ft(segment["x1"], segment["y1"])
+            p2 = self.ft(segment["x2"], segment["y2"])
+            ctx.move_to(*p1); ctx.line_to(*p2); ctx.stroke()
 
     # ──── Exterior Walls ────
     def _ext_walls(self, ctx):
-        wt=max(4.0, self.ftl(EXT_W))
+        # The plot boundary is a survey outline, not a building wall. Built
+        # exterior walls follow only exposed enclosed-room edges.
         tl=self.ft(0,self.fl.d); br=self.ft(self.fl.w,0)
-        x1,y1,x2,y2=tl[0],tl[1],br[0],br[1]
-
-        # Filled bands
-        self.sc(ctx, *self.T["wallfill"])
-        ctx.rectangle(x1-wt, y1-wt, x2-x1+2*wt, wt); ctx.fill()  # top
-        ctx.rectangle(x1-wt, y2, x2-x1+2*wt, wt); ctx.fill()      # bottom
-        ctx.rectangle(x1-wt, y1, wt, y2-y1); ctx.fill()             # left
-        ctx.rectangle(x2, y1, wt, y2-y1); ctx.fill()                # right
-
-        # Outer edge
-        self.sc(ctx, *self.T["wall"]); ctx.set_line_width(2.5)
-        ctx.rectangle(x1-wt, y1-wt, x2-x1+2*wt, y2-y1+2*wt); ctx.stroke()
-        # Inner edge (dashed)
-        ctx.set_line_width(0.8); ctx.set_dash([6,3])
-        ctx.rectangle(x1, y1, x2-x1, y2-y1); ctx.stroke()
+        self.sc(ctx, *self.T["border"]); ctx.set_line_width(1.2)
+        ctx.set_dash([self.ftl(0.18), self.ftl(0.12)])
+        ctx.rectangle(tl[0], tl[1], br[0]-tl[0], br[1]-tl[1]); ctx.stroke()
         ctx.set_dash([])
+        self.sc(ctx, *self.T["wallfill"])
+        ctx.set_line_width(max(4.0, self.ftl(EXT_W)))
+        for segment in self.wall_segments:
+            if segment["kind"] != "exterior":
+                continue
+            p1 = self.ft(segment["x1"], segment["y1"])
+            p2 = self.ft(segment["x2"], segment["y2"])
+            ctx.move_to(*p1); ctx.line_to(*p2); ctx.stroke()
 
     # ──── Doors ────
     def _doors(self, ctx):
-        for r in self.fl.rooms:
-            if r.x2<=r.x1 or r.y2<=r.y1: continue
-            for wall in r.doors:
-                self._draw_door(ctx, r, wall)
+        self.door_spans = []
+        if self.fl.has_explicit_doors:
+            for opening in self.fl.door_openings:
+                span = self._opening_coordinates(opening)
+                segment = self._matching_wall(span)
+                if segment is None:
+                    raise ValueError("Door opening is not on a built wall")
+                owner = segment["high"] if _enclosed(segment["high"]) else segment["low"]
+                side = _segment_side(segment, _room_key(owner))
+                self._draw_door_span(ctx, span, side)
+                self.door_spans.append(span)
+            return
 
-    def _draw_door(self, ctx, r, wall):
-        cx=(r.x1+r.x2)/2; cy=(r.y1+r.y2)/2
-        hd=DOOR_FT/2; dp=self.ftl(DOOR_FT)
-        wt=max(4, self.ftl(INT_W))+4
+        # Legacy maps have only room-type hints. Draw a hinted door only when
+        # that side actually has a sufficiently long shared/exposed wall.
+        for room in self.fl.rooms:
+            if not _enclosed(room):
+                continue
+            for side in room.doors:
+                options = [segment for segment in self.wall_segments
+                           if _segment_side(segment, _room_key(room)) == side
+                           and self._segment_length(segment) >= DOOR_FT + 0.4]
+                options.sort(key=lambda segment: (segment["kind"] == "interior",
+                                                  self._segment_length(segment)), reverse=True)
+                for segment in options:
+                    span = self._centered_span(segment, DOOR_FT)
+                    if any(self._spans_overlap(span, used) for used in self.door_spans):
+                        continue
+                    self._draw_door_span(ctx, span, side)
+                    self.door_spans.append(span)
+                    break
 
-        # Clear wall gap (draw bg rect)
+    @staticmethod
+    def _segment_length(segment):
+        return max(segment["x2"] - segment["x1"], segment["y2"] - segment["y1"])
+
+    @staticmethod
+    def _centered_span(segment, width):
+        if segment["x1"] == segment["x2"]:
+            mid = (segment["y1"] + segment["y2"]) / 2
+            return segment["x1"], mid - width / 2, segment["x2"], mid + width / 2
+        mid = (segment["x1"] + segment["x2"]) / 2
+        return mid - width / 2, segment["y1"], mid + width / 2, segment["y2"]
+
+    @staticmethod
+    def _opening_coordinates(opening):
+        try:
+            span = tuple(float(opening[key]) for key in ("x1", "y1", "x2", "y2"))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Door opening coordinates are invalid") from exc
+        x1, y1, x2, y2 = span
+        if not (math.isfinite(x1) and math.isfinite(y1) and math.isfinite(x2) and math.isfinite(y2)):
+            raise ValueError("Door opening coordinates must be finite")
+        if not ((x1 == x2 and y2 > y1) or (y1 == y2 and x2 > x1)):
+            raise ValueError("Door opening must be a straight wall span")
+        return span
+
+    def _matching_wall(self, span):
+        x1, y1, x2, y2 = span
+        for segment in self.wall_segments:
+            if x1 == x2 and segment["x1"] == segment["x2"]:
+                if abs(x1 - segment["x1"]) < 0.02 and segment["y1"] - 0.02 <= y1 < y2 <= segment["y2"] + 0.02:
+                    return segment
+            if y1 == y2 and segment["y1"] == segment["y2"]:
+                if abs(y1 - segment["y1"]) < 0.02 and segment["x1"] - 0.02 <= x1 < x2 <= segment["x2"] + 0.02:
+                    return segment
+        return None
+
+    @staticmethod
+    def _spans_overlap(first, second):
+        ax1, ay1, ax2, ay2 = first
+        bx1, by1, bx2, by2 = second
+        if ax1 == ax2 and bx1 == bx2 and abs(ax1 - bx1) < 0.02:
+            return min(ay2, by2) > max(ay1, by1)
+        if ay1 == ay2 and by1 == by2 and abs(ay1 - by1) < 0.02:
+            return min(ax2, bx2) > max(ax1, bx1)
+        return False
+
+    def _clear_opening(self, ctx, span):
+        x1, y1, x2, y2 = span
+        thickness = max(4, self.ftl(EXT_W)) / 2 + 3
         self.sc(ctx, *self.T["bg"])
-        if wall=="S":
-            g=self.ft(cx-hd, r.y1); g2=self.ft(cx+hd, r.y1)
-            ctx.rectangle(g[0], g[1]-wt, g2[0]-g[0], wt*2); ctx.fill()
-        elif wall=="N":
-            g=self.ft(cx-hd, r.y2); g2=self.ft(cx+hd, r.y2)
-            ctx.rectangle(g[0], g[1]-wt, g2[0]-g[0], wt*2); ctx.fill()
-        elif wall=="W":
-            g=self.ft(r.x1, cy+hd); g2=self.ft(r.x1, cy-hd)
-            ctx.rectangle(g[0]-wt, g[1], wt*2, g2[1]-g[1]); ctx.fill()
-        elif wall=="E":
-            g=self.ft(r.x2, cy+hd); g2=self.ft(r.x2, cy-hd)
-            ctx.rectangle(g[0]-wt, g[1], wt*2, g2[1]-g[1]); ctx.fill()
+        if x1 == x2:
+            p1, p2 = self.ft(x1, y2), self.ft(x1, y1)
+            ctx.rectangle(p1[0] - thickness, p1[1], thickness * 2, p2[1] - p1[1])
+        else:
+            p1, p2 = self.ft(x1, y1), self.ft(x2, y1)
+            ctx.rectangle(p1[0], p1[1] - thickness, p2[0] - p1[0], thickness * 2)
+        ctx.fill()
 
-        # Draw door leaf + arc
+    def _draw_door_span(self, ctx, span, side):
+        x1, y1, x2, y2 = span
+        self._clear_opening(ctx, span)
         self.sc(ctx, *self.T["door"]); ctx.set_line_width(1.5)
-        if wall=="S":
-            p=self.ft(cx-hd, r.y1)
-            # Leaf (vertical line going into room)
-            ctx.move_to(p[0], p[1]); ctx.line_to(p[0], p[1]-dp); ctx.stroke()
-            # Arc swing
-            ctx.set_line_width(0.8); ctx.set_dash([4,3])
-            ctx.arc(p[0], p[1], dp, -math.pi/2, 0); ctx.stroke()
-            ctx.set_dash([])
-        elif wall=="N":
-            p=self.ft(cx+hd, r.y2)
-            ctx.move_to(p[0], p[1]); ctx.line_to(p[0], p[1]+dp); ctx.stroke()
-            ctx.set_line_width(0.8); ctx.set_dash([4,3])
-            ctx.arc(p[0], p[1], dp, math.pi/2, math.pi); ctx.stroke()
-            ctx.set_dash([])
-        elif wall=="W":
-            p=self.ft(r.x1, cy+hd)
-            ctx.move_to(p[0], p[1]); ctx.line_to(p[0]+dp, p[1]); ctx.stroke()
-            ctx.set_line_width(0.8); ctx.set_dash([4,3])
-            ctx.arc(p[0], p[1], dp, -math.pi/2, 0); ctx.stroke()
-            ctx.set_dash([])
-        elif wall=="E":
-            p=self.ft(r.x2, cy-hd)
-            ctx.move_to(p[0], p[1]); ctx.line_to(p[0]-dp, p[1]); ctx.stroke()
-            ctx.set_line_width(0.8); ctx.set_dash([4,3])
-            ctx.arc(p[0], p[1], dp, math.pi/2, math.pi); ctx.stroke()
-            ctx.set_dash([])
+        radius = self.ftl(max(x2 - x1, y2 - y1))
+        if y1 == y2:
+            if side == "S":
+                hinge = self.ft(x1, y1)
+                ctx.move_to(*hinge); ctx.line_to(hinge[0], hinge[1] - radius); ctx.stroke()
+                angles = (-math.pi / 2, 0)
+            else:
+                hinge = self.ft(x2, y1)
+                ctx.move_to(*hinge); ctx.line_to(hinge[0], hinge[1] + radius); ctx.stroke()
+                angles = (math.pi / 2, math.pi)
+        elif side == "W":
+            hinge = self.ft(x1, y2)
+            ctx.move_to(*hinge); ctx.line_to(hinge[0] + radius, hinge[1]); ctx.stroke()
+            angles = (-math.pi / 2, 0)
+        else:
+            hinge = self.ft(x1, y1)
+            ctx.move_to(*hinge); ctx.line_to(hinge[0] - radius, hinge[1]); ctx.stroke()
+            angles = (math.pi / 2, math.pi)
+        ctx.set_line_width(0.8); ctx.set_dash([4, 3])
+        ctx.arc(hinge[0], hinge[1], radius, *angles); ctx.stroke()
+        ctx.set_dash([])
 
     # ──── Windows ────
     def _windows(self, ctx):
-        for r in self.fl.rooms:
-            if r.x2<=r.x1 or r.y2<=r.y1: continue
-            for wall in r.windows:
-                self._draw_win(ctx, r, wall)
+        used = list(getattr(self, "door_spans", []))
+        for room in self.fl.rooms:
+            if not _enclosed(room):
+                continue
+            for side in room.windows:
+                options = [segment for segment in self.wall_segments
+                           if segment["kind"] == "exterior"
+                           and _segment_side(segment, _room_key(room)) == side
+                           and self._segment_length(segment) >= WIN_FT + 0.4]
+                options.sort(key=self._segment_length, reverse=True)
+                for segment in options:
+                    span = self._centered_span(segment, WIN_FT)
+                    if any(self._spans_overlap(span, other) for other in used):
+                        continue
+                    self._draw_window_span(ctx, span)
+                    used.append(span)
+                    break
 
-    def _draw_win(self, ctx, r, wall):
-        cx=(r.x1+r.x2)/2; cy=(r.y1+r.y2)/2
-        hw=WIN_FT/2; gap=self.ftl(0.12)
-        wt=max(4, self.ftl(INT_W))+4
-
-        # Clear gap
-        self.sc(ctx, *self.T["bg"])
-        if wall in ("S","N"):
-            wy=r.y1 if wall=="S" else r.y2
-            g=self.ft(cx-hw, wy); g2=self.ft(cx+hw, wy)
-            ctx.rectangle(g[0], g[1]-wt, g2[0]-g[0], wt*2); ctx.fill()
-        else:
-            wx=r.x1 if wall=="W" else r.x2
-            g=self.ft(wx, cy+hw); g2=self.ft(wx, cy-hw)
-            ctx.rectangle(g[0]-wt, g[1], wt*2, g2[1]-g[1]); ctx.fill()
-
-        # Draw 3 parallel lines
+    def _draw_window_span(self, ctx, span):
+        x1, y1, x2, y2 = span
+        self._clear_opening(ctx, span)
         self.sc(ctx, *self.T["win"]); ctx.set_line_width(2.0)
-        if wall in ("S","N"):
-            wy=r.y1 if wall=="S" else r.y2
-            p1=self.ft(cx-hw, wy); p2=self.ft(cx+hw, wy)
-            for off in [-gap, 0, gap]:
-                ctx.move_to(p1[0], p1[1]+off); ctx.line_to(p2[0], p1[1]+off); ctx.stroke()
-        else:
-            wx=r.x1 if wall=="W" else r.x2
-            p1=self.ft(wx, cy+hw); p2=self.ft(wx, cy-hw)
-            for off in [-gap, 0, gap]:
-                ctx.move_to(p1[0]+off, p1[1]); ctx.line_to(p1[0]+off, p2[1]); ctx.stroke()
+        gap = self.ftl(0.12)
+        p1 = self.ft(x1, y2 if x1 == x2 else y1)
+        p2 = self.ft(x2, y1)
+        for offset in (-gap, 0, gap):
+            if x1 == x2:
+                ctx.move_to(p1[0] + offset, p1[1]); ctx.line_to(p2[0] + offset, p2[1])
+            else:
+                ctx.move_to(p1[0], p1[1] + offset); ctx.line_to(p2[0], p2[1] + offset)
+            ctx.stroke()
 
     # ──── Hatching ────
     def _hatching(self, ctx):
@@ -1024,8 +1250,17 @@ class CairoFloorPlan:
     # ──── Room Dimensions ────
     def _room_dimensions(self, ctx):
         """Draw W × D dimensions inside each room."""
+        fragment_count = {}
+        for room in self.fl.rooms:
+            key = _room_key(room)
+            fragment_count[key] = fragment_count.get(key, 0) + 1
         for r in self.fl.rooms:
             if r.x2 <= r.x1 or not r.name: continue
+            # A room made from several rectangles may be L-shaped. A dimension
+            # on one fragment would falsely describe the whole room; its exact
+            # combined area is already shown in the main label and legend.
+            if fragment_count[_room_key(r)] > 1:
+                continue
             rw = r.x2 - r.x1
             rd = r.y2 - r.y1
             if rw < 4 or rd < 4: continue  # too small to annotate
@@ -1070,16 +1305,6 @@ class CairoFloorPlan:
         ctx.move_to((p1[0]+p2[0])/2-te.width/2, dy+tick+te.height+4)
         ctx.show_text(label)
 
-        # Cell ticks along bottom
-        cw=pw/self.fl.cols; ctx.set_font_size(self.ftl(0.31))
-        for c in range(self.fl.cols):
-            mp=self.ft(c*cw+cw/2, 0)
-            t=f"{cw:.0f}'"
-            te=ctx.text_extents(t)
-            self.sc(ctx, *self.T["dim"], 0.5)
-            ctx.move_to(mp[0]-te.width/2, dy-tick-2)
-            ctx.show_text(t)
-
         # Left (depth) — vertical
         self.sc(ctx, *self.T["dim"]); ctx.set_line_width(1.0)
         p1=self.ft(0,0); p2=self.ft(0,pd)
@@ -1116,6 +1341,46 @@ class CairoFloorPlan:
         label=f"▬▬  ROAD ({self.fl.facing} Facing) — {self.fl.w:.0f} ft  ▬▬"
         te=ctx.text_extents(label)
         ctx.move_to((p1[0]+p2[0])/2-te.width/2, ry+self.ftl(1.0))
+        ctx.show_text(label)
+        self._gate_marker(ctx)
+
+    def _gate_span(self):
+        """Symbolic gate position along the front (plot y=0), in feet."""
+        fraction = {"Left": 0.125, "Center": 0.5, "Right": 0.875}[self.fl.gate_position]
+        center = self.fl.w * fraction
+        width = min(6.0, self.fl.w * 0.22)
+        return center - width / 2, center + width / 2
+
+    def _gate_marker(self, ctx):
+        # The gate is a site/frontage annotation, separate from the actual
+        # building door openings. Upper-floor sheets keep the road reference
+        # but do not suggest that a gate exists on that floor.
+        if self.fl.label != "Ground Floor":
+            return
+        left_ft, right_ft = self._gate_span()
+        left = self.ft(left_ft, 0)[0]
+        right = self.ft(right_ft, 0)[0]
+        center = (left + right) / 2
+        frontage_y = self.ft(0, 0)[1]
+        top = frontage_y + self.ftl(0.10)
+        bottom = frontage_y + self.ftl(1.00)
+
+        self.sc(ctx, *self.T["accent"])
+        post = self.ftl(0.11)
+        ctx.rectangle(left - post / 2, top, post, bottom - top); ctx.fill()
+        ctx.rectangle(right - post / 2, top, post, bottom - top); ctx.fill()
+        ctx.set_line_width(2.2)
+        ctx.move_to(left + post, top + self.ftl(0.16))
+        ctx.line_to(center - self.ftl(0.13), top + self.ftl(0.35))
+        ctx.move_to(right - post, top + self.ftl(0.16))
+        ctx.line_to(center + self.ftl(0.13), top + self.ftl(0.35))
+        ctx.stroke()
+
+        ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        ctx.set_font_size(self.ftl(0.31))
+        label = "MAIN GATE"
+        width = ctx.text_extents(label).width
+        ctx.move_to(center - width / 2, top + self.ftl(0.78))
         ctx.show_text(label)
 
     # ──── Compass Rose & North Arrow ────
@@ -1170,17 +1435,17 @@ class CairoFloorPlan:
 
     # ──── Scale Bar ────
     def _scale_bar(self, ctx):
-        # Position bottom right in margin
-        sx = self.pw + self.ox - self.ftl(15)
-        sy = self.ch - self.ty/2
+        # Keep the scale in the legend column, clear of the title and road.
+        sx = self.ox + self.pw + self.ftl(2)
+        sy = self.oy + self.ph - self.ftl(2.2)
         
         self.sc(ctx, *self.T["text"]); ctx.set_line_width(1.5)
         
         # Draw line
-        ctx.move_to(sx, sy); ctx.line_to(sx + self.ftl(10), sy); ctx.stroke()
+        ctx.move_to(sx, sy); ctx.line_to(sx + self.ftl(4), sy); ctx.stroke()
         
         # Ticks and labels
-        ticks = [(0, "0"), (self.ftl(5), "5'"), (self.ftl(10), "10'")]
+        ticks = [(0, "0"), (self.ftl(2), "2'"), (self.ftl(4), "4'")]
         ctx.set_font_size(self.ftl(0.35))
         ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         
@@ -1193,7 +1458,7 @@ class CairoFloorPlan:
             ctx.show_text(label)
             
         # Metric labels below
-        metric_ticks = [(0, "0"), (self.ftl(5), "1.5m"), (self.ftl(10), "3.0m")]
+        metric_ticks = [(0, "0"), (self.ftl(2), "0.6m"), (self.ftl(4), "1.2m")]
         self.sc(ctx, *self.T["text2"])
         ctx.set_font_size(self.ftl(0.28))
         for t_x, label in metric_ticks:
@@ -1205,20 +1470,26 @@ class CairoFloorPlan:
     def _legend(self, ctx):
         lx=self.ox+self.pw+self.ftl(2); ly=self.oy+self.ftl(3)
         ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        ctx.set_font_size(self.ftl(0.50))
+        ctx.set_font_size(self.ftl(0.58))
         self.sc(ctx, *self.T["text"])
-        ctx.move_to(lx,ly); ctx.show_text("ROOM LEGEND")
+        listed_rooms = [room for room in self.fl.rooms if room.name and not room.is_void]
+        ctx.move_to(lx,ly); ctx.show_text(f"ROOMS  /  {len(listed_rooms):02d}")
         ly+=self.ftl(0.6)
         self.sc(ctx, *self.T["text2"]); ctx.set_line_width(0.5)
         ctx.move_to(lx,ly); ctx.line_to(lx+self.ftl(8),ly); ctx.stroke()
         ly+=self.ftl(0.6)
 
         ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        ctx.set_font_size(self.ftl(0.36))
+        ctx.set_font_size(self.ftl(0.46))
         sw=self.ftl(0.62)
 
         _TRIV = {"open", "area", "open area", "zone", "unit"}
-        for rm in self.fl.rooms[:14]:
+        available_text = self.ftl(LEG_W - 2.85)
+        max_y = self.oy + self.ph - self.ftl(7)
+        drawn = 0
+        for rm in listed_rooms:
+            if ly > max_y:
+                break
             if not rm.name or getattr(rm, 'is_void', False):
                 continue
             ctx.set_source_rgba(rm.color[0]/255, rm.color[1]/255, rm.color[2]/255, 0.8)
@@ -1235,43 +1506,72 @@ class CairoFloorPlan:
                 short_nm = raw_nm.split("+")[0].strip()
             else:
                 short_nm = raw_nm
-            short_nm = short_nm[:22]   # cap for legend width
-            area_str = f" ({round(rm.area, 2)})" if rm.area else ""
+            short_nm = short_nm[:26]
+            original_short = short_nm
+            while short_nm and ctx.text_extents(short_nm + ("…" if short_nm != original_short else "")).width > available_text:
+                short_nm = short_nm[:-1]
+            if short_nm != original_short:
+                short_nm = short_nm.rstrip() + "…"
             ctx.move_to(lx+sw+5, ly)
-            ctx.show_text(f"{short_nm}{area_str}")
-            ly+=self.ftl(0.8)
+            ctx.show_text(short_nm)
+            if rm.area:
+                self.sc(ctx, *self.T["text2"])
+                ctx.set_font_size(self.ftl(0.31))
+                ctx.move_to(lx+sw+5, ly+self.ftl(0.40))
+                ctx.show_text(f"{rm.area:.0f} ft²")
+                ctx.set_font_size(self.ftl(0.46))
+            ly+=self.ftl(1.08)
+            drawn += 1
+
+        remaining = len(listed_rooms) - drawn
+        if remaining > 0:
+            self.sc(ctx, *self.T["text2"])
+            ctx.move_to(lx, ly); ctx.show_text(f"+ {remaining} more rooms")
+            ly += self.ftl(0.8)
+
+        unassigned = self._unassigned_area()
+        if unassigned >= 0.5:
+            ly += self.ftl(0.45)
+            self.sc(ctx, *self.T["text2"])
+            ctx.set_font_size(self.ftl(0.31))
+            ctx.move_to(lx, ly); ctx.show_text("UNASSIGNED PLOT AREA")
+            ctx.set_font_size(self.ftl(0.41))
+            ctx.move_to(lx, ly+self.ftl(0.5)); ctx.show_text(f"{unassigned:.0f} ft²")
+
+    def _unassigned_area(self):
+        return sum((x2 - x1) * (y2 - y1)
+                   for component in self._unassigned_regions()
+                   for x1, y1, x2, y2 in component)
 
 
     # ──── Title Block ────
     def _titleblock(self, ctx):
-        ty=self.ch-self.ty+self.ftl(0.8)
-        cx=self.cw/2
+        ty=self.ch-self.ty+self.ftl(0.55)
+        left=self.ox
 
         # Separator
         self.sc(ctx, *self.T["accent"]); ctx.set_line_width(2)
-        ctx.move_to(self.ftl(0.5),ty-self.ftl(0.3))
-        ctx.line_to(self.cw-self.ftl(0.5),ty-self.ftl(0.3)); ctx.stroke()
+        ctx.move_to(left,ty-self.ftl(0.32))
+        ctx.line_to(self.cw-left,ty-self.ftl(0.32)); ctx.stroke()
 
         # Title
         ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        ctx.set_font_size(self.ftl(0.82))
-        title=f"GAZECONNECT PRO  —  {self.fl.label.upper()}  —  FLOOR PLAN"
+        ctx.set_font_size(self.ftl(0.76))
+        title=f"GAZECONNECT PRO  /  {self.fl.label.upper()}"
         self.sc(ctx, *self.T["title"])
-        te=ctx.text_extents(title)
-        ctx.move_to(cx-te.width/2, ty+self.ftl(0.6)); ctx.show_text(title)
+        ctx.move_to(left, ty+self.ftl(0.65)); ctx.show_text(title)
 
         # Info
         ctx.select_font_face(self.T["font"], cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         ctx.set_font_size(self.ftl(0.38))
-        info=f"Plot: {self.fl.w:.0f}' × {self.fl.d:.0f}'  |  Type: {self.fl.ptype}  |  Rooms: {len(self.fl.rooms)}  |  Grid: {self.fl.rows}×{self.fl.cols}  |  Scale 1:100"
+        room_count = sum(1 for room in self.fl.rooms if room.name and not room.is_void)
+        info=f"{self.fl.w:g}' × {self.fl.d:g}' plot  ·  {self.fl.ptype}  ·  {room_count} rooms  ·  {self.fl.facing} facing"
         self.sc(ctx, *self.T["text2"])
-        te2=ctx.text_extents(info)
-        ctx.move_to(cx-te2.width/2, ty+self.ftl(1.4)); ctx.show_text(info)
+        ctx.move_to(left, ty+self.ftl(1.45)); ctx.show_text(info)
 
         ctx.set_font_size(self.ftl(0.30))
-        std="Drawing conventions per IS 962:1989 / ISO 128-20  •  Generated by GazeConnect Pro v5.0"
-        te3=ctx.text_extents(std)
-        ctx.move_to(cx-te3.width/2, ty+self.ftl(2.0)); ctx.show_text(std)
+        note="Concept layout  ·  Dimensions are indicative  ·  Graphic scale shown beside drawing"
+        ctx.move_to(left, ty+self.ftl(2.20)); ctx.show_text(note)
 
     # ──── Border Frame ────
     def _borderframe(self, ctx):
@@ -1631,4 +1931,3 @@ def main():
 
 if __name__=="__main__":
     main()
-

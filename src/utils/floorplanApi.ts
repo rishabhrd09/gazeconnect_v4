@@ -67,6 +67,7 @@ export interface FloorPlanFusionContext {
 // ─── Types ─────────────────────────────────────────────────
 
 export interface CompassMapPayload {
+  layout_candidate_id?: string;
   grid_size: { rows: number; cols: number };
   plot: {
     width_ft: number;
@@ -74,6 +75,7 @@ export interface CompassMapPayload {
     facing: string;
     type: string;
     num_floors?: string;
+    gate_position?: 'Left' | 'Center' | 'Right';
   };
   cell_size_ft?: { width: number; depth: number };
   ground_floor?: FloorPayload;
@@ -84,15 +86,53 @@ export interface FloorPayload {
   placements: PlacementEntry[];
   coverage_percent?: number;
   empty_cells?: string[];
+  advanced_refinements?: Record<string, unknown>;
+  cell_layouts?: Record<string, unknown>;
 }
 
 export interface PlacementEntry {
   room: string;
   roomId: string;
+  placementId?: string;
   cells: string[];
   coords: { x1: number; y1: number; x2: number; y2: number };
   cellRects?: Record<string, { x1: number; y1: number; x2: number; y2: number }>;
+  geometryRects?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   area_sqft: number;
+}
+
+export type PlanDirection = 'N' | 'E' | 'S' | 'W';
+
+export interface PlanAdjustment {
+  floor: 'ground' | 'first';
+  placementId: string;
+  action: 'room_size';
+  direction: PlanDirection;
+  amount_ft: 1 | 2;
+}
+
+export interface PlanCandidate {
+  id: string;
+  label: string;
+  summary: string;
+  changes: string[];
+  metrics?: Record<string, number>;
+  previews: { ground?: string; first?: string };
+  compassData: CompassMapPayload;
+  valid: true;
+  editableActions?: Array<'room_size'>;
+  allowedAdjustments?: Partial<Record<'ground' | 'first', Record<string, PlanDirection[]>>>;
+}
+
+export interface PlanCandidatesResult {
+  candidates: PlanCandidate[];
+  warnings?: string[];
+  sourceHash?: string;
+}
+
+export interface PlanApiError extends GenerateError {
+  code?: string;
+  details?: string[];
 }
 
 export interface GenerateResult {
@@ -118,6 +158,66 @@ export async function checkBackendHealth(): Promise<boolean> {
     return resp.ok;
   } catch {
     return false;
+  }
+}
+
+async function readPlanApiError(resp: Response): Promise<PlanApiError> {
+  try {
+    const body = await resp.json() as { error?: string; code?: string; status?: string; details?: unknown };
+    return {
+      error: body.error || `Floor plan request failed (${resp.status}).`,
+      code: body.code || body.status,
+      details: Array.isArray(body.details) ? body.details.filter((detail): detail is string => typeof detail === 'string') : undefined,
+    };
+  } catch {
+    return { error: `Floor plan request failed (${resp.status}).` };
+  }
+}
+
+/** Generate distinct geometry choices; the existing four display styles are separate. */
+export async function generatePlanCandidates(
+  compassData: CompassMapPayload,
+  context?: FloorPlanFusionContext,
+): Promise<PlanCandidatesResult | PlanApiError> {
+  try {
+    await ensureFloorplanServerReady();
+    const resp = await floorplanFetch('/api/floorplan/candidates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        compass_map: compassData,
+        survey_data: context?.surveyData || undefined,
+        user_notes: context?.userNotes?.trim() || undefined,
+      }),
+    });
+    if (!resp.ok) return readPlanApiError(resp);
+    return await resp.json() as PlanCandidatesResult;
+  } catch (error) {
+    return { error: `Unable to generate layout choices: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/** Preview a precise room adjustment without changing the accepted candidate. */
+export async function previewPlanAdjustment(
+  candidate: PlanCandidate,
+  adjustment: PlanAdjustment,
+): Promise<PlanCandidate | PlanApiError> {
+  try {
+    await ensureFloorplanServerReady();
+    const resp = await floorplanFetch('/api/floorplan/candidates/adjust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        compass_map: candidate.compassData,
+        candidate_id: candidate.id,
+        adjustment,
+      }),
+    });
+    if (!resp.ok) return readPlanApiError(resp);
+    const body = await resp.json() as { candidate: PlanCandidate };
+    return body.candidate;
+  } catch (error) {
+    return { error: `Unable to preview adjustment: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
@@ -258,8 +358,10 @@ export function compileCompassPayload(
     plotDepth: number | null;
     plotType: string | null;
     numFloors: string | null;
+    gatePosition?: string | null;
   },
   placements: Array<{
+    placementId?: string;
     roomId: string;
     roomLabel: string;
     occupiedCells: string[];
@@ -279,15 +381,19 @@ export function compileCompassPayload(
   const cellD = Math.round(pd / gridRows);
 
   const mkPlacements = (pls: any[]): PlacementEntry[] =>
-    pls.map((p) => ({
+    pls.map((p, index) => ({
       room: p.roomLabel || p.room || p.roomId,
       roomId: p.roomId,
+      placementId: p.placementId || `${p.roomId}_${index}`,
       cells: p.occupiedCells || p.cells || [],
       coords: p.coords || { x1: 0, y1: 0, x2: 0, y2: 0 },
       cellRects: p.cellRects || {},
+      geometryRects: p.geometryRects,
       area_sqft: p.area_sqft || (() => {
-        const c = p.coords || { x1: 0, y1: 0, x2: 0, y2: 0 };
-        return Math.round((c.x2 - c.x1) * (c.y2 - c.y1));
+        const rects = Object.values(p.cellRects || {}) as Array<{ x1: number; y1: number; x2: number; y2: number }>;
+        if (rects.length) return Math.round(rects.reduce((total, rect) => total + (rect.x2 - rect.x1) * (rect.y2 - rect.y1), 0));
+        const rect = p.coords || { x1: 0, y1: 0, x2: 0, y2: 0 };
+        return Math.round((rect.x2 - rect.x1) * (rect.y2 - rect.y1));
       })(),
     }));
 
@@ -299,6 +405,8 @@ export function compileCompassPayload(
       facing: foundation.facing || 'South',
       type: foundation.plotType || 'Middle Plot',
       num_floors: foundation.numFloors || 'Single Floor',
+      gate_position: foundation.gatePosition === 'Left' || foundation.gatePosition === 'Right'
+        ? foundation.gatePosition : 'Center',
     },
     cell_size_ft: { width: cellW, depth: cellD },
   };
@@ -340,7 +448,7 @@ export function enrichWithSurveyData(
   surveyAnswers: Record<string, any>,
 ): CompassMapPayload {
   // Survey can override/enrich plot data
-  const enriched = { ...compassPayload };
+  const enriched = { ...compassPayload, plot: { ...compassPayload.plot } };
 
   if (surveyAnswers.plot_width_ft) {
     enriched.plot.width_ft = parseInt(surveyAnswers.plot_width_ft, 10) || enriched.plot.width_ft;

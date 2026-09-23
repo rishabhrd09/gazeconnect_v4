@@ -1,6 +1,14 @@
 import * as http from 'http';
 
-const ROUTES = new Set(['/api/health', '/api/floorplan/generate', '/api/floorplan/generate-advanced', '/api/floorplan/generate-all', '/api/floorplan/preview']);
+const ROUTES = new Set([
+  '/api/health',
+  '/api/floorplan/generate',
+  '/api/floorplan/generate-advanced',
+  '/api/floorplan/generate-all',
+  '/api/floorplan/preview',
+  '/api/floorplan/candidates',
+  '/api/floorplan/candidates/adjust',
+]);
 export interface FloorplanRequest { endpoint: string; body?: string; }
 export interface FloorplanReply { status: number; contentType: string; bytes: Uint8Array; }
 

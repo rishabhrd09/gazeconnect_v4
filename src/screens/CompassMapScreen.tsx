@@ -18,9 +18,12 @@ import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
 import { ArchitecturalCell } from '../components/ArchitecturalCell';
 import { FloorPlanViewerModal } from '../components/FloorPlanViewerModal';
+import { PlanReviewModal } from '../components/PlanReviewModal';
 import {
   compileCompassPayload,
   CompassMapPayload,
+  generatePlanCandidates,
+  PlanCandidate,
 } from '../utils/floorplanApi';
 import {
   GridCellKey,
@@ -83,6 +86,7 @@ const THEME = {
 const UI_FONT = typography.fontFamily.primary;
 
 const COMPASS_DRAFT_KEY = 'gazeconnect_compass_progress_v1';
+const COMPASS_ACCEPTED_PLAN_KEY = 'gazeconnect_compass_accepted_plan_v1';
 const COMPASS_PRIMARY_BACKUP_KEY = 'compass_persistent_backup';
 const COMPASS_LAST_BACKUP_KEY = 'compass_last_session_backup';
 const COMPASS_DRAFT_VERSION = 1;
@@ -285,6 +289,47 @@ export function attachCompassFloorRefinements(payload: any, floors: CompassFloor
     ...(payload.ground_floor ? { ground_floor: { ...payload.ground_floor, ...metadata.gnd } } : {}),
     ...(payload.first_floor ? { first_floor: { ...payload.first_floor, ...metadata['1f'] } } : {}),
   };
+}
+
+interface AcceptedCompassPlan {
+  sourceFingerprint: string;
+  candidate: PlanCandidate;
+  selectedFloor?: 'ground' | 'first';
+}
+
+function compassPlanFingerprint(payload: CompassMapPayload, notes: string): string {
+  const source = payload as CompassMapPayload & { advanced_refinements?: AdvancedRefinements };
+  const floor = (which: 'ground' | 'first') => {
+    const data = which === 'ground' ? payload.ground_floor : payload.first_floor;
+    return data ? {
+      placements: data.placements.map(placement => ({
+        id: placement.placementId,
+        room: placement.roomId,
+        cells: [...placement.cells].sort(),
+      })),
+      advanced_refinements: data.advanced_refinements,
+      cell_layouts: data.cell_layouts,
+    } : null;
+  };
+  return JSON.stringify({
+    plot: payload.plot,
+    grid_size: payload.grid_size,
+    ground: floor('ground'),
+    first: floor('first'),
+    legacy_refinements: source.advanced_refinements,
+    notes,
+  });
+}
+
+function readAcceptedCompassPlan(): AcceptedCompassPlan | null {
+  try {
+    const raw = localStorage.getItem(COMPASS_ACCEPTED_PLAN_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as AcceptedCompassPlan;
+    return value?.sourceFingerprint && value.candidate?.compassData ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 interface CompassDraftPayload {
@@ -953,7 +998,19 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // built-in DwellProgressRing/Shrink. Keeping the state would leak memory
   // and add no-op renders.
   const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
+  const [viewerInitialFloor, setViewerInitialFloor] = useState<'ground' | 'first'>('ground');
   const [compiledPayload, setCompiledPayload] = useState<CompassMapPayload | null>(null);
+  const [showPlanReview, setShowPlanReview] = useState(false);
+  const [planReviewSource, setPlanReviewSource] = useState<CompassMapPayload | null>(null);
+  const [planCandidates, setPlanCandidates] = useState<PlanCandidate[]>([]);
+  const [planReviewWarnings, setPlanReviewWarnings] = useState<string[]>([]);
+  const [planReviewLoading, setPlanReviewLoading] = useState(false);
+  const [planReviewError, setPlanReviewError] = useState<string | null>(null);
+  const [planReviewErrorDetails, setPlanReviewErrorDetails] = useState<string[]>([]);
+  const [planReviewErrorCode, setPlanReviewErrorCode] = useState<string | null>(null);
+  const [planReviewStartInArea, setPlanReviewStartInArea] = useState(false);
+  const [acceptedCompassPlan, setAcceptedCompassPlan] = useState<AcceptedCompassPlan | null>(readAcceptedCompassPlan);
+  const planReviewRequestId = useRef(0);
   const [foundationReady, setFoundationReady] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
@@ -1095,7 +1152,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   };
   // The full-screen editor owns gaze input while open. Background map targets
   // must not remain armed underneath its non-interactive preview and labels.
-  const isConfirmationOpen = !!confirmReplace || !!confirmGenerate || showRestoreConfirm || showRestartConfirm || cellEditorOpen;
+  const isConfirmationOpen = !!confirmReplace || !!confirmGenerate || showRestoreConfirm || showRestartConfirm || cellEditorOpen || showPlanReview;
 
   const surveyProcessed = useRef(false);
   const prevPhaseRef = useRef<CompassPhase>(state.phase);
@@ -1155,6 +1212,12 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       .filter((v) => typeof v === 'string' && v.trim())
       .join('\n');
   }, [ws.surveyData]);
+  const savedPlanForCurrentMap = useMemo(() => {
+    if (!acceptedCompassPlan || !planReviewSource) return null;
+    return acceptedCompassPlan.sourceFingerprint === compassPlanFingerprint(planReviewSource, viewerSeedNotes)
+      ? acceptedCompassPlan.candidate
+      : null;
+  }, [acceptedCompassPlan, planReviewSource, viewerSeedNotes]);
 
   const startWithDefaultFoundation = useCallback((speakMsg: string, numFloors = 'Single Floor') => {
     if (surveyProcessed.current) return;
@@ -1446,10 +1509,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // ── Save Handler ────────────────────────────────────────
   const handleSave = useCallback(() => {
     const mkPlacements = (pl: PlacementRecord[]) => pl.map((p) => ({
-      room: p.roomLabel, roomId: p.roomId, cells: p.occupiedCells,
+      room: p.roomLabel, roomId: p.roomId, placementId: p.placementId, cells: p.occupiedCells,
       coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
       cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-      area_sqft: (() => { const r = cellsToBoundingRect(p.occupiedCells, pw, pd); return Math.round((r.x2 - r.x1) * (r.y2 - r.y1)); })(),
+      area_sqft: Math.round(p.occupiedCells.reduce((area, cell) => {
+        const rect = cellToRect(cell, pw, pd);
+        return area + (rect.x2 - rect.x1) * (rect.y2 - rect.y1);
+      }, 0)),
     }));
 
     let payload: any = {
@@ -1490,10 +1556,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     // Debounce and save only when there is meaningful new layout data.
     const t = setTimeout(() => {
       const mkPlacements = (pl: PlacementRecord[]) => pl.map((p) => ({
-        room: p.roomLabel, roomId: p.roomId, cells: p.occupiedCells,
+        room: p.roomLabel, roomId: p.roomId, placementId: p.placementId, cells: p.occupiedCells,
         coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
         cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-        area_sqft: (() => { const r = cellsToBoundingRect(p.occupiedCells, pw, pd); return Math.round((r.x2 - r.x1) * (r.y2 - r.y1)); })(),
+        area_sqft: Math.round(p.occupiedCells.reduce((area, cell) => {
+          const rect = cellToRect(cell, pw, pd);
+          return area + (rect.x2 - rect.x1) * (rect.y2 - rect.y1);
+        }, 0)),
       }));
       let payload: any = {
         grid_size: { rows: GRID_ROWS, cols: GRID_COLS },
@@ -1579,16 +1648,53 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     setCellEditorOpen(false);
     setCellEditorTool(null);
     setRefinementArmed(false);
+    setAcceptedCompassPlan(null);
+    try { localStorage.removeItem(COMPASS_ACCEPTED_PLAN_KEY); } catch { /* Storage may be unavailable. */ }
     setFoundationReady(false);
     setShowRestartConfirm(false);
     onSpeak('Map reset. Please answer the foundation questions again.');
   }, [initialQueue, onSpeak]);
 
-  // Generate floor plan payload and open renderer modal.
-  const handleGenerateFloorPlan = useCallback(() => {
+  const requestPlanCandidates = useCallback(async (payload: CompassMapPayload) => {
+    const requestId = ++planReviewRequestId.current;
+    setPlanReviewLoading(true);
+    setPlanReviewError(null);
+    setPlanReviewErrorDetails([]);
+    setPlanReviewErrorCode(null);
+    setPlanCandidates([]);
+    setPlanReviewWarnings([]);
+    const result = await generatePlanCandidates(payload, {
+      surveyData: (ws.surveyData || null) as Record<string, any> | null,
+      userNotes: viewerSeedNotes,
+      useAdvancedFusion: true,
+    });
+    if (requestId !== planReviewRequestId.current) return;
+    setPlanReviewLoading(false);
+    if ('error' in result) {
+      setPlanReviewError(result.error);
+      setPlanReviewErrorDetails(result.details || []);
+      setPlanReviewErrorCode(result.code || null);
+      onSpeak(result.code === 'unsupported_refinements'
+        ? 'These saved refinements need the original plan viewer. You can open it here.'
+        : 'No valid plan was produced. You can adjust the map or try again.');
+      return;
+    }
+    if (!result.candidates.length) {
+      setPlanReviewError('The generator found no valid layouts for this map.');
+      onSpeak('No valid layouts were found. Adjust the map or try again.');
+      return;
+    }
+    setPlanCandidates(result.candidates);
+    setPlanReviewWarnings(result.warnings || []);
+    onSpeak(`${result.candidates.length} geometry-checked ${result.candidates.length === 1 ? 'design' : 'designs'} ready. Review the first design.`);
+  }, [onSpeak, viewerSeedNotes, ws.surveyData]);
+
+  // Compile the unchanged Compass Map choices, then review validated plans.
+  const handleGenerateFloorPlan = useCallback((startInArea = false) => {
     const payload = compileCompassPayload(
       state.foundation,
       state.placements.map((p) => ({
+        placementId: p.placementId,
         roomId: p.roomId,
         roomLabel: p.roomLabel,
         occupiedCells: p.occupiedCells,
@@ -1600,6 +1706,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       coveragePercent,
       state.groundFloorData ? {
         placements: state.groundFloorData.placements.map((p) => ({
+          placementId: p.placementId,
           roomId: p.roomId,
           roomLabel: p.roomLabel,
           occupiedCells: p.occupiedCells,
@@ -1610,6 +1717,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       } : null,
       state.firstFloorData ? {
         placements: state.firstFloorData.placements.map((p) => ({
+          placementId: p.placementId,
           roomId: p.roomId,
           roomLabel: p.roomLabel,
           occupiedCells: p.occupiedCells,
@@ -1620,10 +1728,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       } : null,
       state.currentFloor,
     );
-    setCompiledPayload(attachCompassFloorRefinements(payload, floorRefinements, state.currentFloor));
-    setShowFloorPlanViewer(true);
-    onSpeak('Generating architectural floor plan...');
-  }, [state, pw, pd, coveragePercent, onSpeak, refinements, floorRefinements]);
+    const source = attachCompassFloorRefinements(payload, floorRefinements, state.currentFloor);
+    setCompiledPayload(source);
+    setPlanReviewSource(source);
+    setPlanReviewStartInArea(startInArea);
+    setShowPlanReview(true);
+    onSpeak('Generating architectural layout choices...');
+    void requestPlanCandidates(source);
+  }, [state, pw, pd, coveragePercent, onSpeak, floorRefinements, requestPlanCandidates]);
 
   // ── Refinement Handlers ────────────────────────────────
 
@@ -2168,17 +2280,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             isDarkMode
             dwellCategory="compassMapAction"
             onClick={() => {
-              if (refinementMode) {
-                setRefinementMode(false);
-                setSelectedRefinementCell(null);
-                setRefinementTool('overview');
-                setCellEditorOpen(false);
-                setCellEditorTool(null);
-                onSpeak('Refinement off.');
-              } else {
-                setRefinementMode(true);
-                onSpeak('Refinement mode. Select a cell.');
+              if (state.placements.length < 1) {
+                onSpeak('Place a room before adjusting the plan.');
+                return;
               }
+              handleGenerateFloorPlan(true);
             }}
             style={{
               ...stripBtnStyle(refinementMode),
@@ -2216,7 +2322,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             MAP REFINEMENT READY GATE
             Blocks grid clicking until user is ready
         ========================================================= */}
-      {!mapRefinementArmed && (state.phase === 'review' || state.phase === 'floor_transition') && (
+      {refinementMode && !mapRefinementArmed && (state.phase === 'review' || state.phase === 'floor_transition') && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: T_overlayDim }}>
           <div style={{ background: T_panelBg, padding: '40px 60px', borderRadius: '24px', border: `2px solid ${T_panelBorder}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30 }}>
             <div style={{ fontSize: 24, fontWeight: 800, color: T_textSub, textAlign: 'center', maxWidth: 400 }}>
@@ -2867,11 +2973,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         <div className="compass-confirmation" role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 6000, background: T_overlayDeep, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
           <div style={{ background: T_panelBg, border: `4px solid ${T_panelBorder}`, borderRadius: '32px', padding: '70px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
             <div style={{ fontSize: '90px', marginBottom: '30px' }}>⚠️</div>
-            <div style={{ fontSize: '42px', fontWeight: 900, color: T_textMain, marginBottom: '32px' }}>Finalize Floor Plan?</div>
+            <div style={{ fontSize: '42px', fontWeight: 900, color: T_textMain, marginBottom: '32px' }}>Review floor plan designs?</div>
             <div style={{ fontSize: '28px', color: T_textSub, marginBottom: '50px', lineHeight: 1.6 }}>
-              Are you sure you have completed and filled all the cells?
+              Your room choices will be checked for valid layouts.
               <br />
-              Do you really want to generate the floor plan now?
+              Empty cells will stay unassigned, and you can return to this map.
             </div>
             <div style={{ display: 'flex', gap: '50px', justifyContent: 'center' }}>
               <GazeButton id="confirm-gen-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="deliberateAction"
@@ -3506,10 +3612,64 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         )
       }
 
+      {showPlanReview && (
+        <PlanReviewModal
+          startInArea={planReviewStartInArea}
+          candidates={planCandidates}
+          loading={planReviewLoading}
+          error={planReviewError}
+          errorDetails={planReviewErrorDetails}
+          warnings={planReviewWarnings}
+          onRetry={() => { if (planReviewSource) void requestPlanCandidates(planReviewSource); }}
+          showOriginalOnError={planReviewErrorCode === 'unsupported_refinements'}
+          onOpenOriginalPlan={planReviewSource ? () => {
+            planReviewRequestId.current += 1;
+            setCompiledPayload(planReviewSource);
+            setViewerInitialFloor((planReviewSource as any).editor_active_floor === '1f' ? 'first' : 'ground');
+            setShowPlanReview(false);
+            setShowFloorPlanViewer(true);
+            onSpeak('Opening the original plan with saved refinements.');
+          } : undefined}
+          onOpenSavedPlan={savedPlanForCurrentMap ? () => {
+            planReviewRequestId.current += 1;
+            setCompiledPayload(savedPlanForCurrentMap.compassData);
+            setViewerInitialFloor(acceptedCompassPlan?.selectedFloor || 'ground');
+            setShowPlanReview(false);
+            setShowFloorPlanViewer(true);
+            onSpeak('Opening your saved plan.');
+          } : undefined}
+          onClose={() => {
+            planReviewRequestId.current += 1;
+            setShowPlanReview(false);
+            onSpeak('Back to Compass Map.');
+          }}
+          onAccept={(selected, selectedFloor) => {
+            planReviewRequestId.current += 1;
+            if (planReviewSource) {
+              const saved: AcceptedCompassPlan = {
+                sourceFingerprint: compassPlanFingerprint(planReviewSource, viewerSeedNotes),
+                candidate: { ...selected, previews: {} },
+                selectedFloor,
+              };
+              setAcceptedCompassPlan(saved);
+              try { localStorage.setItem(COMPASS_ACCEPTED_PLAN_KEY, JSON.stringify(saved)); }
+              catch { onSpeak('The plan is open, but this browser could not save it locally.'); }
+            }
+            setCompiledPayload(selected.compassData);
+            setViewerInitialFloor(selectedFloor);
+            setShowPlanReview(false);
+            setShowFloorPlanViewer(true);
+            onSpeak(`${selected.label} selected. Opening the plan viewer.`);
+          }}
+          onSpeak={onSpeak}
+        />
+      )}
+
       {
         showFloorPlanViewer && compiledPayload && (
           <FloorPlanViewerModal
             compassData={compiledPayload}
+            initialFloor={viewerInitialFloor}
             onClose={() => setShowFloorPlanViewer(false)}
             onSpeak={onSpeak}
             surveyData={(ws.surveyData || null) as Record<string, any> | null}

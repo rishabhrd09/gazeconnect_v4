@@ -29,4 +29,13 @@ from .room_adjacency_graph import (  # noqa: F401
     build_room_adjacency_graph,
     infer_root_room,
 )
-from .engine import GazePlanV5Engine, generate_floorplan_v5  # noqa: F401
+from .candidates import adjust_layout_candidate, generate_layout_candidates  # noqa: F401
+
+
+def __getattr__(name):
+    """Load the Cairo renderer only when the rendering API is requested."""
+    if name in {"GazePlanV5Engine", "generate_floorplan_v5"}:
+        from .engine import GazePlanV5Engine, generate_floorplan_v5
+
+        return {"GazePlanV5Engine": GazePlanV5Engine, "generate_floorplan_v5": generate_floorplan_v5}[name]
+    raise AttributeError(name)

@@ -15,6 +15,8 @@
 import os
 import sys
 import json
+import base64
+import copy
 import tempfile
 import time
 import traceback
@@ -77,8 +79,14 @@ def _prepare_fused_payload(data: dict):
     compass_data = data.get("compass_map", data)
     if not isinstance(compass_data, dict):
         compass_data = {}
+    compass_data = copy.deepcopy(compass_data)
     survey_data = data.get("survey_data")
     user_notes = data.get("user_notes")
+
+    # A selected candidate already contains the exact, validated geometry.
+    # Re-running survey fusion here could change its rooms before export.
+    if compass_data.get("layout_candidate_id"):
+        return compass_data, {"style_hint": "modern", "candidate_geometry": True}
 
     # Ensure minimum required structure exists
     if "plot" not in compass_data:
@@ -251,6 +259,143 @@ def generate_all_styles():
         except:
             pass
         return jsonify({"error": str(e), "trace": t}), 500
+
+
+def _candidate_previews(compass_map: dict) -> dict:
+    """Render the very same vector geometry used by selected-plan exports."""
+    floors = parse({"compass_map": compass_map})
+    previews = {}
+    with tempfile.TemporaryDirectory(prefix="gc_plan_review_") as directory:
+        for floor in floors:
+            key = "first" if "first" in floor.label.lower() else "ground"
+            path = Path(directory) / f"{key}.svg"
+            CairoFloorPlan(floor, "modern").render_svg(str(path))
+            encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+            previews[key] = f"data:image/svg+xml;base64,{encoded}"
+    return previews
+
+
+def _candidate_card(candidate: dict, index: int) -> dict:
+    if candidate.get("validation", {}).get("valid") is not True:
+        raise ValueError("An unvalidated layout cannot be shown as a candidate.")
+    compass_map = copy.deepcopy(candidate.get("compass_map") or {})
+    if not isinstance(compass_map, dict) or not compass_map:
+        raise ValueError("Candidate has no renderable compass map.")
+    candidate_id = str(candidate.get("id") or f"layout-{index}")
+    compass_map["layout_candidate_id"] = candidate_id
+    allowed = candidate.get("allowed_adjustments") or {}
+    allowed_ui = {
+        "ground": allowed.get("ground_floor", allowed.get("ground", {})),
+        "first": allowed.get("first_floor", allowed.get("first", {})),
+    }
+    has_room_size = any(bool(directions) for floor in allowed_ui.values() for directions in floor.values())
+    changes = candidate.get("changes") or []
+    if isinstance(changes, str):
+        changes = [changes]
+    change_labels = []
+    for change in changes:
+        if isinstance(change, dict) and "area_delta_sqft" in change:
+            delta = float(change["area_delta_sqft"])
+            floor_label = "first floor" if change.get("floor") == "first_floor" else "ground floor"
+            change_labels.append(f"{change.get('room') or 'Room'} {delta:+g} sq ft on {floor_label}.")
+        elif isinstance(change, str):
+            change_labels.append(change)
+    if not change_labels:
+        change_labels = ["Room boundaries follow the selected compass cells."]
+    raw_metrics = candidate.get("metrics") or {}
+    metrics = {str(key): value for key, value in raw_metrics.items() if isinstance(value, (int, float)) and not isinstance(value, bool)}
+    return {
+        "id": candidate_id,
+        "label": str(candidate.get("title") or candidate.get("profile") or f"Plan {index}"),
+        "summary": str(candidate.get("description") or "Layout based on your Compass Map."),
+        "changes": change_labels,
+        "metrics": metrics,
+        "previews": _candidate_previews(compass_map),
+        "compassData": compass_map,
+        "valid": True,
+        "editableActions": ["room_size"] if has_room_size else [],
+        "allowedAdjustments": allowed_ui,
+    }
+
+
+@app.route("/api/floorplan/candidates", methods=["POST"])
+def generate_candidates_api():
+    """Generate up to four validated geometry choices for sequential review."""
+    try:
+        from gazeplan_engine_v5.candidates import generate_layout_candidates
+    except ImportError as error:
+        return jsonify({"error": f"Layout engine unavailable: {error}", "code": "engine_unavailable"}), 503
+
+    try:
+        data = request.get_json(force=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({"error": "A JSON object is required."}), 400
+        # Candidate review must validate the user's actual Compass Map. Fusion
+        # can replace plot answers from a survey and silently reassign duplicate
+        # cells, so keep it out of this path. Survey data remains available to
+        # the existing single-plan renderer, but it cannot alter candidate
+        # geometry before the candidate validator sees the source map.
+        source_map = data.get("compass_map", data)
+        if not isinstance(source_map, dict):
+            return jsonify({"error": "compass_map must be a JSON object."}), 400
+        compass_map = copy.deepcopy(source_map)
+        result = generate_layout_candidates(compass_map, max_candidates=4, timeout_seconds=8)
+        status = str(result.get("status") or "error")
+        if status != "ok":
+            code = "unsupported_refinements" if status == "unsupported_refinements" else status
+            rejected = result.get("rejected") or []
+            first_rejection = rejected[0] if rejected else {}
+            return jsonify({
+                "error": result.get("error") or "No valid layout choices could be generated.",
+                "code": code,
+                "details": result.get("details") or first_rejection.get("issues") or result.get("report") or [],
+            }), 422 if status in {"unsupported_refinements", "infeasible", "invalid_input"} else 500
+
+        candidates = [_candidate_card(raw, index) for index, raw in enumerate(result.get("candidates") or [], 1)]
+        if not candidates:
+            return jsonify({"error": "No validated layout choices were found.", "code": "infeasible"}), 422
+        return jsonify({
+            "candidates": candidates,
+            "warnings": result.get("warnings") or [],
+            "sourceHash": result.get("source_hash"),
+        })
+    except (TypeError, ValueError, KeyError) as error:
+        return jsonify({"error": str(error), "code": "invalid_plan"}), 422
+    except Exception as error:
+        return jsonify({"error": f"Layout generation failed: {error}", "code": "engine_error"}), 500
+
+
+@app.route("/api/floorplan/candidates/adjust", methods=["POST"])
+def adjust_candidate_api():
+    """Preview one bounded room edit; caller decides whether to apply it."""
+    try:
+        from gazeplan_engine_v5.candidates import adjust_layout_candidate
+    except ImportError as error:
+        return jsonify({"error": f"Layout engine unavailable: {error}", "code": "engine_unavailable"}), 503
+
+    try:
+        data = request.get_json(force=True) or {}
+        compass_map = data.get("compass_map")
+        adjustment = data.get("adjustment")
+        if not isinstance(compass_map, dict) or not isinstance(adjustment, dict):
+            return jsonify({"error": "Candidate geometry and adjustment are required."}), 400
+        if adjustment.get("action") != "room_size" or adjustment.get("direction") not in {"N", "E", "S", "W"} or adjustment.get("amount_ft") not in {1, 2}:
+            return jsonify({"error": "Unsupported room adjustment."}), 400
+        engine_adjustment = {**adjustment, "floor": {
+            "ground": "ground_floor", "first": "first_floor",
+        }.get(adjustment.get("floor"), adjustment.get("floor"))}
+        result = adjust_layout_candidate(compass_map, engine_adjustment)
+        if result.get("status") != "ok":
+            return jsonify({
+                "error": result.get("error") or "That adjustment does not fit this layout.",
+                "code": result.get("status") or "invalid_adjustment",
+            }), 422
+        raw = result.get("candidate") or result
+        return jsonify({"candidate": _candidate_card(raw, 1)})
+    except (TypeError, ValueError, KeyError) as error:
+        return jsonify({"error": str(error), "code": "invalid_adjustment"}), 422
+    except Exception as error:
+        return jsonify({"error": f"Adjustment preview failed: {error}", "code": "engine_error"}), 500
 
 
 # ── Preview (low-res quick render) ────────────────────────

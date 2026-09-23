@@ -63,7 +63,7 @@
 :root[data-theme] .advanced-room-controls > div span:last-child { color: var(--ui-muted) !important; font-size: clamp(15px, 1.8vh, 20px) !important; }
 :root[data-theme] .advanced-sidebar #room-ready span { opacity: 1 !important; font-size: clamp(15px, 1.8vh, 19px) !important; }
 
-/* Viewer details are paged with gaze targets; the image never sits underneath its toolbar. */
+/* Viewer controls live in paged side panels so the drawing stays unobstructed. */
 :root[data-theme] .floor-plan-viewer { color: var(--ui-ink); font-family: var(--ui-font) !important; }
 :root[data-theme] .floor-plan-viewer button {
   min-height: 80px !important; min-width: 80px !important; border-radius: 12px !important;
@@ -95,18 +95,13 @@
 :root[data-theme] .plan-detail-page-count { grid-column: 1 / -1; text-align: center; color: var(--ui-muted); font-size: 15px; font-variant-numeric: tabular-nums; }
 :root[data-theme] .plan-details > div:last-child span { font-size: 14px !important; }
 :root[data-theme] .plan-image-area { min-width: 0; }
-:root[data-theme] .plan-image-layout { display: grid !important; grid-template-columns: minmax(0, 1fr) clamp(130px, 12vw, 200px); gap: 16px; }
+:root[data-theme] .plan-image-layout { display: flex !important; }
 :root[data-theme] .plan-image-layout > img { width: 100%; max-height: 100%; min-height: 0; box-shadow: none !important; }
-:root[data-theme] .plan-actions {
-  position: static !important; width: auto !important; padding: 12px !important; gap: 12px !important;
-  box-shadow: none !important; align-self: center; border-width: 1px !important;
-}
-:root[data-theme] .plan-actions > div { font-size: clamp(14px, 1.6vh, 18px) !important; letter-spacing: .03em !important; font-weight: 600 !important; }
-:root[data-theme] .floor-plan-viewer #magnify-btn {
-  position: static !important; width: 100% !important; height: clamp(80px, 10vh, 108px) !important;
-  font-size: 42px !important; color: var(--ui-accent-ink) !important;
-}
-:root[data-theme] .floor-plan-viewer #minimize-btn { font-size: 56px !important; }
+:root[data-theme] .plan-style-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1vh, 12px); }
+:root[data-theme] .plan-style-grid button { min-height: clamp(80px, 11vh, 112px) !important; }
+:root[data-theme] .plan-export-list { display: grid; gap: clamp(8px, 1vh, 12px); }
+:root[data-theme] .plan-export-list button { width: 100%; min-height: clamp(80px, 11vh, 112px) !important; }
+:root[data-theme] .plan-inspect-controls button { font-size: clamp(15px, 1.7vh, 19px) !important; }
 :root[data-theme] .plan-image-area > div:not(.plan-image-layout) { max-width: 650px !important; }
 :root[data-theme] .plan-image-area > div:not(.plan-image-layout) > div { font-size: clamp(17px, 1.9vh, 22px) !important; }
 @media (max-height: 800px) {
@@ -114,7 +109,7 @@
   :root[data-theme] .advanced-context-tools button[id^='stair-'] { height: 110px !important; }
   :root[data-theme] .advanced-context-tools button[id^='stair-combo-'] { height: 88px !important; }
   :root[data-theme] .advanced-refinement-actions button { height: 88px !important; min-height: 80px !important; }
-  :root[data-theme] .floor-plan-viewer .plan-viewer-header { min-height: 112px !important; }
+  :root[data-theme] .floor-plan-viewer .plan-viewer-header { min-height: 88px !important; }
 }
 :root[data-theme] .advanced-auto-flags > span { color: var(--ui-muted) !important; font-size: 14px !important; font-weight: 600 !important; }
 :root[data-theme] .advanced-auto-flags > div:not(.advanced-flag-pager) { color: var(--ui-muted) !important; background: var(--ui-surface) !important; border-color: var(--ui-border) !important; font-size: 15px !important; height: auto !important; min-height: 32px; line-height: 1.35; }

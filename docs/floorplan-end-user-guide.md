@@ -1,46 +1,21 @@
 # Floor Plan End User Guide (Installed App)
 
-This guide is for users using the installed app, not running developer scripts.
+## Make and review a plan
 
-## 1) Standard Workflow
+1. Open **Design Home**, complete the survey if desired, and place rooms on the Compass Map.
+2. Select **GENERATE PLAN**. The app checks the map and presents up to four valid designs, one at a time. The first follows the placed rooms; later designs make small room-boundary adjustments.
+3. Select **Yes, choose this** to save the design, or **No, show next** to review another. **Inspect design** offers fixed views without dragging.
+4. To change one room, select **Adjust an area**, choose an occupied compass cell, choose an available edge, compare the before and after drawings, then select **Apply this change**. **Undo area edit** restores the previous design.
+5. The plan viewer provides floor and drawing views, styles, and downloads. Download a PNG, PDF, or SVG to keep a permanent file.
 
-1. Open **Design Home**.
-2. Fill Survey (recommended).
-3. Build layout in Compass map.
-4. Click **Generate Floor Plan**.
-5. Review style/floor in viewer.
-6. Click **Download** for permanent file.
+**REFINE MAP** opens the same review and goes to area selection when an adjustment is available. It does not alter the initial Compass Map placement screen. If no valid plan can be made, the app explains which part of the map needs attention.
 
-## 2) If App Closes Accidentally
+## Resume after closing the app
 
-Yes, Compass work can usually be resumed.
+The Compass Map draft saves automatically. On the next launch, use the restore prompt or **LOAD PREVIOUS SESSION** if needed. A chosen plan can be reopened with **Open saved plan** while its source Compass Map is unchanged. Changing the map requires reviewing and choosing a plan again.
 
-Why:
-1. App auto-saves map draft continuously.
-2. On next launch, it attempts auto-restore.
-3. Manual **LOAD PREVIOUS SESSION** is also available.
-4. If user pressed restart by mistake, app keeps a last-session fallback backup for restore.
+## Files and limits
 
-## 3) Where Files Actually Go
+Preview files are temporary and may be cleaned from `%TEMP%\gazeconnect_floorplans`. A permanent export is created when you download from the viewer.
 
-### Temporary preview files
-
-Generated during preview in:
-1. `%TEMP%\gazeconnect_floorplans`
-
-These are cache files and may be cleaned.
-
-### Permanent user files
-
-Permanent files are created only when user clicks viewer download.
-
-## 4) Important Clarification
-
-1. Continuing Compass map state: supported.
-2. Automatically keeping generated images forever: not supported unless downloaded.
-
-## 5) Practical Tips
-
-1. After finalizing layout, always click **Download**.
-2. If something looks outdated, click save/regenerate once.
-3. If restore prompt appears, use **LOAD PREVIOUS SESSION**.
+The design options and area changes are checked for geometric fit and room access. They are design aids, not construction approvals. Stairs remain in the grid cells you selected. Maps with disconnected rooms or unsupported earlier refinements may need changes on the Compass Map before design options can be generated.

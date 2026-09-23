@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -229,27 +230,74 @@ def _sanitize_floor(
             if r is not None:
                 cell_rects[c] = r
 
-        coords = _cells_to_bounding_rect(owned_cells, plot_w, plot_d, rows, cols)
-        area = max(0.0, (coords["x2"] - coords["x1"]) * (coords["y2"] - coords["y1"]))
-
-        sanitized.append(
-            {
-                "room": room_name,
-                "roomId": room_id,
-                "cells": owned_cells,
-                "coords": coords,
-                "cellRects": cell_rects,
-                "area_sqft": int(round(area)),
+        # The coarse compass cells remain semantic anchors. Candidate plans may
+        # also carry finer, exact rectangles; keep those for the renderer instead
+        # of replacing them with a bounding box around the selected cells.
+        geometry_rects = p.get("geometryRects")
+        if isinstance(geometry_rects, list) and geometry_rects:
+            exact_rects = []
+            for rect in geometry_rects:
+                if not isinstance(rect, dict):
+                    raise ValueError("Candidate geometry rectangle must be an object")
+                try:
+                    x1, y1 = float(rect["x1"]), float(rect["y1"])
+                    x2, y2 = float(rect["x2"]), float(rect["y2"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ValueError("Candidate geometry coordinates are invalid") from exc
+                if not (all(math.isfinite(v) for v in (x1, y1, x2, y2))
+                        and 0 <= x1 < x2 <= plot_w and 0 <= y1 < y2 <= plot_d):
+                    raise ValueError("Candidate geometry must stay inside the plot")
+                if any(min(x2, other["x2"]) - max(x1, other["x1"]) > 1e-6
+                       and min(y2, other["y2"]) - max(y1, other["y1"]) > 1e-6
+                       for other in exact_rects):
+                    raise ValueError("Candidate geometry rectangles overlap")
+                exact_rect = deepcopy(rect)
+                exact_rect.update({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
+                exact_rects.append(exact_rect)
+            coords = {
+                "x1": min(r["x1"] for r in exact_rects),
+                "y1": min(r["y1"] for r in exact_rects),
+                "x2": max(r["x2"] for r in exact_rects),
+                "y2": max(r["y2"] for r in exact_rects),
             }
-        )
+            area = sum((r["x2"] - r["x1"]) * (r["y2"] - r["y1"]) for r in exact_rects)
+        else:
+            exact_rects = []
+            coords = _cells_to_bounding_rect(owned_cells, plot_w, plot_d, rows, cols)
+            area = sum((r["x2"] - r["x1"]) * (r["y2"] - r["y1"]) for r in cell_rects.values())
+
+        placement = deepcopy(p)
+        placement.update({
+            "room": room_name,
+            "roomId": room_id,
+            "cells": owned_cells,
+            "coords": coords,
+            "cellRects": cell_rects,
+            "area_sqft": round(area, 2),
+        })
+        if exact_rects:
+            placement["geometryRects"] = exact_rects
+        else:
+            placement.pop("geometryRects", None)
+        sanitized.append(placement)
 
     unique_cell_count = len(owner_by_cell)
     coverage = round((unique_cell_count / float(rows * cols)) * 100.0, 1) if rows > 0 and cols > 0 else 0.0
 
-    output = {
+    # Preserve floor-local refinements, cell layouts, and future compatible
+    # metadata. Cell keys are repeated between floors, so dropping this data
+    # silently applies the wrong edits after fusion.
+    output = deepcopy(floor_payload)
+    output.update({
         "placements": sanitized,
         "coverage_percent": coverage,
-    }
+        "empty_cells": [
+            f"r{row}_c{col}"
+            for row in range(1, rows + 1)
+            for col in range(1, cols + 1)
+            if f"r{row}_c{col}" not in owner_by_cell
+        ],
+    })
 
     report = {
         "input_placements": len(placements),
@@ -360,4 +408,3 @@ def pick_style_from_context(requested_style: Optional[str], fusion_report: Dict[
     if hinted in valid:
         return hinted
     return "modern"
-

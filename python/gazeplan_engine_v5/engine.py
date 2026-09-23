@@ -126,6 +126,11 @@ class GazePlanV5Engine:
     ) -> Dict[str, Any]:
         style = (style or "both").strip().lower()
         fmt = (fmt or "png").strip().lower()
+        if variants != 1:
+            return {
+                "status": "error",
+                "error": "The legacy v5 renderer produces one layout. Use generate_layout_candidates for validated alternatives.",
+            }
         if style not in SUPPORTED_STYLES:
             style = "both"
         if fmt not in SUPPORTED_FORMATS:
@@ -177,13 +182,20 @@ class GazePlanV5Engine:
         if not seed.get("rooms"):
             return {"status": "error", "error": "Seed generation failed (no rooms)."}
 
-        # Stage 3: CP-SAT solve (fallback inside solver)
+        # Stage 3: CP-SAT solve. A seed is only a starting geometry, never a
+        # successful floor plan when the solver is unavailable or infeasible.
         solved = solve_layout(
             seed,
             adjacency_graph=rag,
             config=SolverConfig(timeout_seconds=self.config.timeout_seconds),
         )
-        rooms = list(solved.get("rooms") or seed.get("rooms") or [])
+        if solved.get("status") != "solved":
+            return {
+                "status": "infeasible" if solved.get("status") == "infeasible" else "error",
+                "error": solved.get("message") or "The layout solver did not produce a valid result.",
+                "report": {"feasibility": feas_report, "solver": solved},
+            }
+        rooms = list(solved["rooms"])
 
         # Stage 4: walls
         from .wall_geometry import build_wall_geometry
