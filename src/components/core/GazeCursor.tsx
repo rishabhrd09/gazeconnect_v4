@@ -26,6 +26,7 @@ import { computeScreenProfile } from '../../utils/screenProfile';
 import { useTheme } from '../../contexts/ThemeContext';
 import { collectKeyboardKeys, distanceToRect, findBestKeyboardKey, isCloserTarget, type KeyRect } from '../../utils/hitZoneExpansion';
 import { BubbleMotion, FreeAnchor, GazeFocus, rectCentre, type Point } from '../../utils/gazeFocus';
+import { DwellProgressBank } from '../../utils/dwellProgressBank';
 import { recordDwellEvent, recordDwellInterrupt, recordFreeze, recordGazeLatency, type GazeLatencySample } from '../../utils/gazeTelemetry';
 import { gazeFlags } from '../../utils/gazeFlags';
 import { GazeFreshness, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../../utils/gazeSafety';
@@ -125,6 +126,12 @@ const ONSET_DELAY_ALWAYS_ACTIVE_MS = 100;  // Shorter onset for emergency/toggle
 // If user looks back at SAME element within TTL, resume from saved progress.
 const FIXATION_TTL_MS = 1000;       // Time to preserve incomplete progress (ms)
 const FIXATION_TTL_MIN_PROGRESS = 0.05;  // Minimum progress to save (below this, reset to 0)
+// v18.1: progress is banked PER TARGET for FIXATION_TTL_MS (utils/dwellProgressBank),
+// so looking at a neighbour no longer throws away what this one had reached.
+// It is only handed back once the RAW gaze is on the target again, within its
+// box grown by this much: the estimate alone lags, and a ring must never creep
+// on while the eyes are somewhere else.
+const RESUME_RAW_TOLERANCE_PX = 45;
 
 // === KEYBOARD HIT ZONE EXPANSION ===
 // v15: Increased from 15 to 35 — now primary selection mechanism (not fallback)
@@ -323,6 +330,11 @@ export const GazeCursor: React.FC = () => {
   // the dwell circle + highlight stay visible (don't reset to 0) until
   // either gaze returns (resume) OR this timestamp passes (hard clear).
   const savedDwellExpiryRef = useRef<number>(0);
+  // v18.1: what every recently left target had reached (utils/dwellProgressBank).
+  const progressBankRef = useRef(new DwellProgressBank<HTMLElement>());
+  // The live ring, readable from handleGaze: a selection already under way
+  // resists being taken over by a neighbour (gazeFocus commitment).
+  const dwellProgressRef = useRef(0);
 
   // B1 keyboardCadence: whether the previous click was a keyboard-context
   // target — gates the keyboard cooldown base for the next click's cooldown.
@@ -532,6 +544,16 @@ export const GazeCursor: React.FC = () => {
 
   }, []);
 
+  // v18.1: the progress this target had before the eyes left it, but only once
+  // the RAW gaze is back on it (within RESUME_RAW_TOLERANCE_PX of its box).
+  // The estimate alone lags behind by a sample or two, and a ring must never
+  // continue while the eyes are somewhere else. Taking it also clears it.
+  const takeBankedProgress = useCallback((el: HTMLElement, now: number): number | null => {
+    const raw = lastRawPointRef.current;
+    if (!isNearElement(el, raw.x, raw.y, RESUME_RAW_TOLERANCE_PX)) return null;
+    return progressBankRef.current.take(el, now);
+  }, []);
+
   const resetSelection = useCallback(() => {
     dwellTargetRef.current = null;
     dwellStartTimeRef.current = 0;
@@ -540,6 +562,8 @@ export const GazeCursor: React.FC = () => {
     onsetCompletedRef.current = false;
     savedDwellRef.current = null;
     savedDwellExpiryRef.current = 0;
+    progressBankRef.current.clear();
+    dwellProgressRef.current = 0;
     isLockedRef.current = false;
     lockAwaySinceRef.current = 0;
     preSmoothInitRef.current = false;
@@ -921,6 +945,7 @@ export const GazeCursor: React.FC = () => {
             timestamp: now,
           };
           savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
+          progressBankRef.current.save(dwellTargetRef.current, currentProgress, now);
           didCaptureSave = true;
           // Telemetry: dwell progress suspended mid-fixation (measurement only)
           try {
@@ -984,13 +1009,14 @@ export const GazeCursor: React.FC = () => {
       onsetStartTimeRef.current = justFocused ? Math.min(now, focus.since) : now;
       onsetCompletedRef.current = false;
 
-      // Check if this is a saved target that can be resumed (fixation TTL)
-      if (savedDwellRef.current
-        && savedDwellRef.current.element === clickable
-        && (now - savedDwellRef.current.timestamp) < FIXATION_TTL_MS) {
-        // Resume from saved progress — skip onset since target was already validated
+      // v18.1: what this target had reached before the eyes left it, banked
+      // per target, so a glance at a neighbour no longer costs a nearly full
+      // ring (utils/dwellProgressBank).
+      const bankedProgress = takeBankedProgress(clickable, now);
+      if (bankedProgress !== null) {
+        // Resume from banked progress — skip onset since target was already validated
         onsetCompletedRef.current = true;
-        const savedProgress = savedDwellRef.current.progress;
+        const savedProgress = bankedProgress;
         // Telemetry: successful resume (recovery, not a loss — measurement only)
         try {
           recordDwellInterrupt({
@@ -1006,6 +1032,7 @@ export const GazeCursor: React.FC = () => {
         // continuity expiry so the next save-and-resume cycle starts
         // from a clean slate.
         savedDwellExpiryRef.current = 0;
+        dwellProgressRef.current = savedProgress;
 
         dwellTargetRef.current = clickable;
         const effectiveDwell = _getEffectiveDwell(clickable,
@@ -1016,17 +1043,14 @@ export const GazeCursor: React.FC = () => {
         const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
         setTargetName(name);
       } else {
-        // Fresh onset — clear any saved dwell for different elements
-        // v17.6 Option A: also clear the visual-continuity expiry —
-        // a different element is now the focus, so the saved visuals
-        // should be reset before the new dwell starts drawing.
+        // Fresh onset — the previous target's VISUALS give way to this one.
+        // v18.1: its progress stays in the bank (it is not this target's), so
+        // looking back at it continues where it was.
         if (savedDwellRef.current) {
           savedDwellExpiryRef.current = 0;
-          // The line below already clears savedDwellRef in the next
-          // statement; calling setDwellProgress(0)/highlight null in
-          // the inner `if` block below covers the visual reset.
         }
         savedDwellRef.current = null;
+        dwellProgressRef.current = 0;
         // Reset dwell state during onset
         if (dwellTargetRef.current !== clickable) {
           dwellTargetRef.current = null;
@@ -1072,6 +1096,27 @@ export const GazeCursor: React.FC = () => {
       if (dwellTargetRef.current !== clickable) {
         dwellTargetRef.current = clickable;
         dwellStartTimeRef.current = now;
+        // v18.1: the eyes were here a moment ago and the raw gaze is back:
+        // continue that ring instead of starting again from nothing. (The
+        // first chance is at acquisition, before this onset; the raw is often
+        // a sample or two behind the estimate, hence this second one.)
+        const banked = takeBankedProgress(clickable, now);
+        if (banked !== null) {
+          const effDwell = _getEffectiveDwell(clickable,
+            (getTargetAttr(clickable, 'data-gaze-context') || '').trim().toLowerCase(),
+            s, isToggle, isKeyboardScreenRef.current, isCompassScreenRef.current, getTargetAttr);
+          dwellStartTimeRef.current = now - banked * effDwell;
+          dwellProgressRef.current = banked;
+          try {
+            recordDwellInterrupt({
+              kind: 'resumed',
+              targetId: clickable.id || (clickable.textContent || '').trim().slice(0, 40),
+              screen: ws.currentScreen || 'unknown',
+              progress: banked,
+              nearEdge: isRectNearEdge(clickable.getBoundingClientRect()),
+            });
+          } catch { /* measurement only */ }
+        }
         setIsLocked(false);
         isLockedRef.current = false;
         const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
@@ -1101,6 +1146,7 @@ export const GazeCursor: React.FC = () => {
     const contextKey = targetContext.toLowerCase();
     const effectiveDwell = _getEffectiveDwell(clickable, contextKey, s, isToggle, isKeyboardScreenRef.current, isCompassScreenRef.current, getTargetAttr);
     const progress = Math.min(1, elapsed / effectiveDwell);
+    dwellProgressRef.current = progress;
     setDwellProgress(progress);
 
     // Progressive lock
@@ -1175,6 +1221,10 @@ export const GazeCursor: React.FC = () => {
         });
       } catch { /* never let telemetry block the click */ }
 
+      // Selected: nothing carries over to the next dwell, here or on any
+      // other target the eyes passed (OptiKey clears its banked keys too).
+      progressBankRef.current.clear();
+      dwellProgressRef.current = 0;
       lastGazeActivationRef.current = { element: dwellTargetRef.current, at: now };
       dwellTargetRef.current.click();
       dwellTargetRef.current = null;
@@ -1191,7 +1241,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble]);
+  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble, takeBankedProgress]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {
@@ -1424,6 +1474,7 @@ export const GazeCursor: React.FC = () => {
             && brokenProgress >= FIXATION_TTL_MIN_PROGRESS && brokenProgress < 1) {
             savedDwellRef.current = { element: brokenTarget, progress: brokenProgress, timestamp: now };
             savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
+            progressBankRef.current.save(brokenTarget, brokenProgress, now);
             lockBreakSaved = true;
           }
           // Telemetry: lock-break interruption (measurement only, always on)
@@ -1465,6 +1516,7 @@ export const GazeCursor: React.FC = () => {
         // hysteresis; the bubble stays on this target until the next one is
         // decided, then glides straight there (no hop to the gaze and back).
         focusRef.current.leave();
+        dwellProgressRef.current = 0;
       }
     }
 
@@ -1588,6 +1640,8 @@ export const GazeCursor: React.FC = () => {
     focus.update(candidate.element, est, now, {
       rectOf: (el) => (isGazeTargetAvailable(el) ? el.getBoundingClientRect() : null),
       hold: dwellLocked,
+      // A ring already filling holds its target harder (gazeFocus COMMIT_*).
+      commitment: dwellTargetRef.current === focus.current ? dwellProgressRef.current : 0,
       viewport: { width: window.innerWidth, height: window.innerHeight },
     });
     // Where the bubble rests while no target has the focus: it follows only a

@@ -21,6 +21,7 @@ const dwell = load('src/config/dwellTimeConfig.ts');
 // control a dwell belongs to, so they are part of selection safety.
 const hitZones = load('src/utils/hitZoneExpansion.ts', { Math, HTMLElement: class {}, document: { querySelectorAll: () => [] } });
 const focus = load('src/utils/gazeFocus.ts', { Math, Number });
+const bank = load('src/utils/dwellProgressBank.ts', { Math, Number });
 let tests = 0;
 function test(name, fn) { fn(); tests++; console.log(`PASS ${name}`); }
 const base = { x: .5, y: .5, is_valid: true, signal_state: 'valid' };
@@ -86,6 +87,7 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
     '../../contexts/ThemeContext':{useTheme:()=>({isLight:false,isWarm:false})},
     '../../utils/hitZoneExpansion':{...hitZones,collectKeyboardKeys:()=>[],findBestKeyboardKey:()=>null},
     '../../utils/gazeFocus':focus,
+    '../../utils/dwellProgressBank':bank,
     // Measurement only; dwell interruptions are kept so a test can see a lock break.
     '../../utils/gazeTelemetry':new Proxy({}, {get:(_,name)=>name==='recordDwellInterrupt'?(event=>interrupts.push(event.kind)):()=>{}}),
     '../../utils/gazeFlags':{gazeFlags:{keyboardCadence:true,dwellPauseOnGap:false,lockBreakProgressRetention:true,lockBreakConfirm:true,...flags}},
@@ -226,6 +228,50 @@ test('the bubble glides to its goal in one smooth move, never overshoots and com
   const s = new focus.BubbleMotion(); s.place({ x: 0, y: 0 });             // A stalled frame is not a jump.
   const q = s.step({ x: 1000, y: 0 }, 600);
   assert(q.x > 0 && q.x < 970, `advanced to ${q.x.toFixed(0)} in one stalled frame`);
+});
+test('progress is banked per target, the strongest kept, and only while it is fresh', () => {
+  const b = new bank.DwellProgressBank();
+  const a = { isConnected: true }, c = { isConnected: true };
+  b.save(a, 0.4, 1000); b.save(c, 0.2, 1000);
+  assert.equal(b.peek(a, 1200), 0.4);
+  assert.equal(b.peek(a, 1200), 0.4);                                     // Looking does not spend it.
+  b.save(a, 0.3, 1300); assert.equal(b.peek(a, 1300), 0.4);              // Never lowered.
+  assert.equal(b.take(a, 1300), 0.4);
+  assert.equal(b.peek(a, 1300), null);                                    // Handed over once only.
+  assert.equal(b.peek(c, 1000 + bank.BANK_TTL_MS), null);                // A second away and it is gone.
+  b.clear();
+  b.save(a, 0, 2000); b.save(a, 1, 2000); b.save(null, 0.5, 2000);
+  assert.equal(b.size, 0, 'nothing to bank was banked');                  // Empty and finished rings: nothing.
+  b.save(a, 0.5, 3000); a.isConnected = false;
+  assert.equal(b.peek(a, 3000), null, 'a target that left the screen was kept');
+  b.clear();
+  for (let i = 0; i < 20; i++) b.save({ isConnected: true }, 0.5, 4000 + i);
+  assert.equal(b.size, bank.BANK_MAX_ENTRIES, 'a scan across the screen filled the bank');
+  b.clear(); assert.equal(b.size, 0);
+});
+test('a filling ring holds its target through a wider zone and a longer look at a neighbour', () => {
+  assert.equal(focus.commitmentRamp(undefined), 0);
+  assert.equal(focus.commitmentRamp(focus.COMMIT_FROM), 0);              // Below it: exactly as before.
+  assert.equal(focus.commitmentRamp(1), 1);
+  assert(focus.commitmentRamp(0.7) > 0 && focus.commitmentRamp(0.7) < 1);
+  const edge = A.left + A.width;                                          // 280: B starts 10 px on.
+  const full = { commitment: 0.98 };
+  const { f, up } = focusDriver();
+  up(A, 150, 150, 1000); up(A, 150, 150, 1030);
+  for (let t = 1060; t < 1500; t += 30) up(B, edge + focus.EXIT_MARGIN_PX + 20, 150, t, full);
+  assert.equal(f.current, A, 'a nearly full ring was lost inside the wider keep-zone');
+  let t = 1500;                                                           // Past the wider zone as well:
+  up(B, edge + focus.COMMIT_EXIT_MARGIN_PX + 5, 150, t, full);
+  assert.equal(f.leaving, true);
+  while (t + 30 < 1500 + focus.COMMIT_CONFIRM_MS) { t += 30; up(B, edge + focus.COMMIT_EXIT_MARGIN_PX + 5, 150, t, full); }
+  assert.equal(f.current, A, 'switched before the neighbour had held the gaze');
+  up(B, edge + focus.COMMIT_EXIT_MARGIN_PX + 5, 150, 1500 + focus.COMMIT_CONFIRM_MS, full);
+  assert.equal(f.current, B, 'a real move to the neighbour never arrived');
+  const g = focusDriver();                                                // An empty ring keeps the old margin.
+  g.up(A, 150, 150, 1000); g.up(A, 150, 150, 1030);
+  g.up(B, edge + focus.EXIT_MARGIN_PX + 20, 150, 1060, { commitment: 0 });
+  g.up(B, edge + focus.EXIT_MARGIN_PX + 20, 150, 1090, { commitment: 0 });
+  assert.equal(g.f.current, B);
 });
 test('the free bubble holds still through fixation noise and follows only a lasting move', () => {
   const a = new focus.FreeAnchor();
@@ -380,6 +426,47 @@ for (const height of [768,1080]) {
     h.run(300,true,gazeAt(g));assert(h.interrupts.includes('resumed'));             // ...progress kept for a return.
     assert(h.ringProgress>0.3,`resumed at ${h.ringProgress.toFixed(2)}, not from zero`);
     h.run(dwellMs*0.6,true,gazeAt(g));assert.equal(h.clicks,1);
+  });
+  test(`a glance at the neighbouring card no longer costs the ring at ${height}px`,()=>{
+    // His keyboard is the reason: the space bar is 124 px tall with letters 9 px
+    // above and suggestions 2 px below, and rings were cancelled at 96 % (22 Sep).
+    const dwellMs=dwell.DWELL_GROUPS.navigation.ms;
+    const h=cursorHarness(height,{},{},cardA,{others:[cardB]});
+    const on={x:260,y:height/2-100},over={x:1300,y:height/2+110};
+    h.run(250+dwellMs*0.6,true,gazeAt(on));
+    const reached=h.ringProgress;assert(reached>0.4,`only reached ${reached}`);
+    h.run(160,true,gazeAt(over));                                                  // The eyes touch the other card:
+    assert.equal(h.ringProgress,0);                                                // its ring is not carried over...
+    h.run(120,true,gazeAt(on));                                                    // ...and coming straight back
+    assert(h.interrupts.includes('resumed'));
+    assert(h.ringProgress>=reached,`came back at ${h.ringProgress.toFixed(2)}, not ${reached.toFixed(2)}`);
+    h.run(dwellMs*0.5,true,gazeAt(on));
+    assert.deepEqual(h.clickLog,['test-button']);                                  // continues to the selection wanted.
+  });
+  test(`nothing carries over from one selection to the next at ${height}px`,()=>{
+    const dwellMs=dwell.DWELL_GROUPS.navigation.ms;
+    const h=cursorHarness(height,{},{},cardA,{others:[cardB]});
+    const on={x:260,y:height/2-100},over={x:1300,y:height/2+110};
+    h.run(250+dwellMs*0.6,true,gazeAt(on));assert(h.ringProgress>0.4);
+    while(h.clicks===0&&h.now<30000)h.frame(16,true,gazeAt(over));                 // The other card is selected.
+    assert.deepEqual(h.clickLog,['other-0']);
+    const after=h.interrupts.length;
+    let guard=0;while(h.ringProgress===0&&guard++<600)h.frame(16,true,gazeAt(on)); // Back to the first card:
+    assert(h.ringProgress<0.15,`started at ${h.ringProgress.toFixed(2)}, not from nothing`);
+    assert.equal(h.interrupts.slice(after).includes('resumed'),false);
+  });
+  test(`progress older than a second is not resumed, and no ring fills while the eyes are away at ${height}px`,()=>{
+    const dwellMs=dwell.DWELL_GROUPS.navigation.ms;
+    const h=cursorHarness(height,{},{},card);
+    h.run(250+dwellMs*0.5,true,gazeAt(g));assert(h.ringProgress>0.3);
+    const before=h.interrupts.length;
+    h.run(1400,true,gazeAt({x:1700,y:g.y}));                                       // Away, longer than the bank keeps it.
+    assert.equal(h.ringProgress,0);assert.equal(h.clicks,0);
+    const t0=h.now;
+    while(h.clicks===0&&h.now<t0+6000)h.frame(16,true,gazeAt(g));
+    assert.equal(h.clicks,1);
+    assert(h.now-t0>=250+dwellMs-32,`stale progress was resumed: ${h.now-t0} ms`); // A full onset and dwell again.
+    assert.equal(h.interrupts.slice(before).includes('resumed'),false);
   });
   test(`after a selection the bubble stays on the card through drift, and a real move leaves in one glide at ${height}px`,()=>{
     const dwellMs=dwell.DWELL_GROUPS.navigation.ms;const c=centre(card);

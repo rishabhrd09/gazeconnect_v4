@@ -23,6 +23,14 @@
  *    grown by EXIT_MARGIN_PX when another target competes for the point, or by
  *    the sticky margin when nothing else is there (the old sticky tolerance).
  *    Noise at a boundary therefore never flips the bubble between neighbours;
+ *  - a selection already under way resists being taken over, the further its
+ *    ring has filled: past COMMIT_FROM the margin grows towards
+ *    COMMIT_EXIT_MARGIN_PX and a competitor must hold the point for up to
+ *    COMMIT_CONFIRM_MS. The maintainer's recording of 22 Sep 2026 lost rings at
+ *    96 % and 98 % on the space bar to a wobble into the key above (the bar is
+ *    124 px tall, the letters start 9 px above it). This never completes a
+ *    selection by itself: the renderer still stops the ring on the first raw
+ *    sample away and cancels it when the gaze has really gone;
  *  - with nothing under the gaze, the focus is released after RELEASE_MS;
  *  - a locked dwell owns the focus (`hold`); only the renderer's lock break,
  *    judged on the raw sample, ends it, and then leave() removes the hysteresis
@@ -43,6 +51,11 @@ export interface RectLike { left: number; top: number; width: number; height: nu
 export const FOCUS_CONFIRM_MS = 25;
 export const RELEASE_MS = 180;
 export const EXIT_MARGIN_PX = 30;
+/** A ring this full starts to resist a neighbour taking its target... */
+export const COMMIT_FROM = 0.4;
+/** ...growing its margin and the time a competitor must hold the point. */
+export const COMMIT_EXIT_MARGIN_PX = 70;
+export const COMMIT_CONFIRM_MS = 120;
 export const STICKY_MARGIN_PX = 60;
 export const STICKY_EDGE_MARGIN_PX = 110;
 const EDGE_ZONE_PX = 80;
@@ -69,7 +82,15 @@ export interface FocusUpdate<T> {
   rectOf: (target: T) => RectLike | null;
   /** A locked dwell owns the focus: keep it whatever the estimate does. */
   hold?: boolean;
+  /** How far the focused target's own selection has filled, 0 to 1. */
+  commitment?: number;
   viewport?: { width: number; height: number };
+}
+
+/** 0 below COMMIT_FROM, rising to 1 at a full ring. */
+export function commitmentRamp(progress: number | undefined): number {
+  if (!progress || progress <= COMMIT_FROM) return 0;
+  return Math.min(1, (progress - COMMIT_FROM) / (1 - COMMIT_FROM));
 }
 
 export class GazeFocus<T> {
@@ -102,10 +123,12 @@ export class GazeFocus<T> {
       this.current = current = null;
       this.strict = false;
     }
+    const commitment = current === null ? 0 : commitmentRamp(opts.commitment);
     if (current !== null && rect) {
       if (opts.hold) { this.pending = undefined; return false; }
       if (candidate === current) { this.pending = undefined; this.strict = false; return false; }
-      const pad = candidate === null ? stickyMargin(rect, opts.viewport) : EXIT_MARGIN_PX;
+      const pad = candidate === null ? stickyMargin(rect, opts.viewport)
+        : EXIT_MARGIN_PX + (COMMIT_EXIT_MARGIN_PX - EXIT_MARGIN_PX) * commitment;
       if (!this.strict && within(rect, estimate, pad)) { this.pending = undefined; return false; }
     } else if (candidate === null) {
       this.pending = undefined;
@@ -115,7 +138,9 @@ export class GazeFocus<T> {
       this.pending = candidate;
       this.pendingSince = now;
     }
-    if (now - this.pendingSince < (candidate === null ? RELEASE_MS : FOCUS_CONFIRM_MS)) return false;
+    const need = candidate === null ? RELEASE_MS
+      : FOCUS_CONFIRM_MS + (COMMIT_CONFIRM_MS - FOCUS_CONFIRM_MS) * commitment;
+    if (now - this.pendingSince < need) return false;
     this.current = candidate;
     this.since = this.pendingSince;
     this.acquiredAt = now;

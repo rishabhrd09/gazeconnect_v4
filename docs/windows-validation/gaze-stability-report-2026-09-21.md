@@ -14,6 +14,86 @@ a full-screen start **broke the app on the rig** and was withdrawn (§00.3, item
 that hang's most likely real cause, a logging loop once the launching console is gone (§000.0), fixed it,
 and made full screen the default. Round 5 (§0000) changes what the cursor shows: a bubble at the centre
 of the target the eyes are on, moving centre to centre; round 4's "rest at the gaze" is withdrawn.
+Round 6 (§00000) keeps a ring's progress for the target it belongs to, so a glance at the key next to
+the space bar no longer sends it back to zero.
+
+---
+
+## 00000. Round 6 — 23 September 2026 (the space bar: progress is kept per target)
+
+After round 5 the maintainer moved the tracker closer to his eyes, which fixed the tracking losses
+(99.5 % valid samples, 3.6 losses/min in the live recording of 22 Sep, against 23–39/min before). What
+remained was his original complaint about the bottom-centre controls: *"normally when I try concentrating
+on it initially it starts dwelling but before even completing the circle it keeps on deviating to nearby
+circles."*
+
+### 00000.1 What the recording shows
+On the traditional keyboard the space bar is **124 px tall** (letters are 180 px), the letter row ends
+**9 px above** it and the word suggestions start **2 px below**. In his 3.3-minute live recording only
+**39 %** of the samples near the bar fall inside it, there were **13 dwell interruptions**, and two rings
+were cancelled at **96 %** and **98 %**. At every break the gaze *estimate* itself had left the bar, so
+this is not a false break to be tightened away: the eyes really did drift onto the neighbour for a moment.
+The loss was in what happened next — the progress was thrown away as soon as a neighbour began its onset,
+so each attempt restarted from nothing.
+
+### 00000.2 Changes
+1. **`src/utils/dwellProgressBank.ts` (new).** Dwell progress is banked **per target** for one second
+   (`BANK_TTL_MS`, matching the existing `FIXATION_TTL_MS`), at most 8 targets, the strongest value kept,
+   and the whole bank cleared when something is selected or the dwell state is reset. Before, only the
+   single last target's progress was kept and a fresh onset on any other target discarded it. OptiKey
+   3.2.5 with his settings does the same thing per key for 750 ms.
+   It is handed back **only when the raw gaze is back within 45 px of that target's box**
+   (`RESUME_RAW_TOLERANCE_PX` in `GazeCursor.tsx`), and taking it spends it. There are two chances — when
+   the target is acquired and again when its onset completes, because the raw sample lags the estimate by
+   a sample or two. A ring can therefore never continue while the eyes are somewhere else; the raw-sample
+   lock break remains the guard it always was.
+2. **Commitment hysteresis in `src/utils/gazeFocus.ts`.** Past `COMMIT_FROM` (40 % of a ring) a target
+   becomes harder to take: its keep-zone grows from 30 px towards `COMMIT_EXIT_MARGIN_PX` 70 px, and a
+   competing target must hold the gaze for up to `COMMIT_CONFIRM_MS` 120 ms instead of 25 ms, both ramped
+   by how full the ring is. It applies only to the target that owns the live dwell; after a lock break the
+   ring is zero, so a real look away is as quick to act on as before.
+
+### 00000.3 Measured, by replaying the recordings through the real renderer
+Same method as round 5 (his recorded backend payloads, the real `GazeCursor.tsx` on a fake DOM built from
+the measured layout, virtual clock). The live 22 Sep recording, before → after:
+
+| | before | after |
+|---|---|---|
+| resumed rings (3.3 min) | 3 | **20** |
+| of those, on the space bar | 0 | 6, including the **96 %** and **98 %** attempts |
+| selections | 49 | 50 |
+| bubble moves/min (top/mid/bottom) | 16.4/19.8/23.4 | 16.1/19.8/23.4 |
+| path travelled/min | 39,842 px | 39,828 px |
+| shimmer (RMS) · still frames · off-centre | 1.16 · 74.3 % · 7.9 px | 1.17 · 74.3 % · 7.9 px |
+
+The two 21 Sep recordings behave the same way: 16 → 18 selections on one (where the letters he was typing
+came out as `O W` before and `B R O W` after — he was typing "brown"), 28 → 29 on the other, with every
+stability figure unchanged to within a rounding step.
+
+**Safety, checked on the recordings:** at all 20 resumes the raw gaze was inside the target's box or at
+most **39 px** outside it (the gate is 45 px). None of them continued a ring while the eyes were on
+another control.
+
+### 00000.4 What this evidence does not say
+- **A replay stops being a prediction once the behaviour diverges.** After the recovered press the recorded
+  gaze is no longer a response to what is on screen: in the live recording it stays on the bar and a second
+  space is typed 1.75 s later. In use he would have moved on. Nothing carries over between selections (the
+  bank is cleared on every click, and a second press still needs a fresh onset and a full dwell — a test
+  covers it), so this is a replay artefact, not a double-press risk.
+- **The unit harness cannot exercise the 45 px raw gate**, because with the adaptive backend the estimate
+  equals the raw sample there. That guard is evidenced from the recordings above, not from a unit test.
+- Nothing here has been used on the tracker by the maintainer yet.
+
+### 00000.5 Tests
+`scripts/check-gaze-safety.cjs` grows from 45 to **53** checks: the bank itself (per target, strongest
+kept, spent once, expired after a second, capped at 8, dropped when the target leaves the screen, cleared
+on demand), the commitment ramp and its wider keep-zone and longer confirmation, and three through the
+real cursor loop — *a glance at the neighbouring card no longer costs the ring*, *nothing carries over from
+one selection to the next*, and *progress older than a second is not resumed, and no ring fills while the
+eyes are away*. Restoring the old behaviour (discard the bank on a fresh onset elsewhere) makes the first
+of those fail and leaves the rest passing, so the new check is what it claims to be. `check:dwell-groups`
+(15), `check:browser-gaze-safety` (24), `check:browser-cursor` (21/21) and both TypeScript projects are
+unchanged and clean.
 
 ---
 
