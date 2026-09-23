@@ -22,6 +22,10 @@ For mouse-only testing, use `setup.bat -Simulate`, `check-windows.bat -Simulate`
 
 The readiness check writes `tools/reports/windows-check-*.log`; the development launcher writes `tools/reports/dev-*.log`. Keep high-frequency gaze debugging off unless investigating a specific issue. An occupied port reports its owner without terminating it. Close your already-running app before rerunning the checks.
 
+The app opens straight on the interface. There is no welcome screen: it was removed on 23 Sep 2026 because it held the app back for ten seconds, and on a slow first boot the patient was left looking at an empty window instead. The window now appears when the interface has painted, which is also why the launch runs the built interface by default (`--hot` brings back the development server and its live reloading).
+
+`.\status-dev.bat` answers both questions in one place: what is running from this checkout, and who holds 8765 (backend), 5555 (eye tracker helper), 5173 (interface) and 5050 (floor plan). Closing the app's window only hides it in the notification area, and a hidden app still holds its ports. `.\stop-dev.bat` closes it and then reports those ports; `.\stop-dev.bat --force` also stops a program outside this checkout that is holding 8765 or 5555, naming it first. The backend and the helper both exit on their own when the app that started them goes away, so a crash or a closed launcher window cannot leave a port held; the backend refuses to start on any other port, because the interface always connects to 8765.
+
 ## Build and installed app
 
 ```powershell
