@@ -20,6 +20,8 @@ Architecture:
 
 import asyncio
 import os
+import socket
+import sys
 import datetime
 import json
 import time
@@ -341,6 +343,9 @@ class ServerConfig:
     retain_spoken_logs: bool = False
     keyboard_chat_keep_files: int = 5
     enable_datamuse: bool = False
+    # Set by Electron (--parent-pid): stop when that process ends, so a killed or
+    # crashed app never leaves this process holding its port. 0 = not watched.
+    parent_pid: int = 0
     # Word prediction: 'deterministic' (GazeCompass port, default) or 'legacy'
     # (previous n-gram + ONNX engine, kept only as a rollback).
     prediction_engine: str = 'deterministic'
@@ -357,18 +362,83 @@ class ServerConfig:
 # PORT UTILITIES
 # ============================================
 
-def find_available_port(preferred: int, max_attempts: int = 10) -> int:
-    """Find an available port starting from the preferred port."""
-    import socket
-    for offset in range(max_attempts):
-        port = preferred + offset
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+class PortInUseError(RuntimeError):
+    """The fixed WebSocket port is held by something else."""
+
+
+def ensure_port_available(host: str, port: int) -> None:
+    """Refuse to start when the port is taken, instead of moving to another one.
+
+    The interface always connects to the configured port (the default in
+    `src/hooks/useWebSocket.tsx`), so a backend that quietly moved elsewhere
+    would look healthy while the app talked to whatever still holds this one --
+    usually a stale backend from an earlier launch, with its own state and no
+    eye tracker. That failure is silent, which is worse than not starting.
+
+    The probe deliberately sets no SO_REUSEADDR: on Windows that option lets a
+    second socket bind a port that is already listening, which is exactly the
+    situation being detected.
+    """
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind((host, port))
+    except OSError as exc:
+        raise PortInUseError(
+            f"Port {port} is already in use, so the backend did not start. "
+            f"Another GazeConnect backend is the usual reason: run status-dev.bat to see "
+            f"what holds it, then stop-dev.bat. ({exc})"
+        ) from exc
+    finally:
+        probe.close()
+
+
+def watch_parent_process(parent_pid: int, on_gone) -> threading.Thread:
+    """Call `on_gone` once the process `parent_pid` has ended.
+
+    Electron passes its own process id. When Electron goes away without running
+    its own shutdown -- killed, crashed, or its launcher window closed -- this is
+    the only notice the backend gets; without it the backend keeps its WebSocket
+    port, and the next launch either refuses to start or connects to it.
+
+    It waits on the process itself and never reads stdin. The first version
+    (23 Sep 2026) waited for the stdin pipe to close instead, and on Windows a
+    thread blocked reading stdin made the prediction worker fail to start
+    ("Access is denied" inside multiprocessing.spawn): the keyboard showed no
+    word predictions at all. python/tests/test_port_contract.py now asks a
+    backend started exactly this way for predictions.
+
+    On Windows the wait holds a handle to the process, so a reused process id
+    can never be mistaken for the parent.
+    """
+    def wait() -> None:
+        if sys.platform == 'win32':
+            import _winapi
             try:
-                s.bind(('localhost', port))
-                return port
-            except OSError:
-                continue
-    raise RuntimeError(f"No available port found near {preferred}")
+                handle = _winapi.OpenProcess(_winapi.SYNCHRONIZE, False, parent_pid)
+            except OSError as exc:
+                if getattr(exc, 'winerror', None) == 87:      # No such process: already gone.
+                    on_gone()
+                else:
+                    logger.warning(f"Cannot watch the parent process {parent_pid}: {exc}")
+                return
+            try:
+                _winapi.WaitForSingleObject(handle, _winapi.INFINITE)
+            finally:
+                _winapi.CloseHandle(handle)
+        else:
+            while True:
+                try:
+                    os.kill(parent_pid, 0)
+                except ProcessLookupError:
+                    break
+                except PermissionError:
+                    pass                  # Alive, owned by someone else.
+                time.sleep(1.0)
+        on_gone()
+
+    thread = threading.Thread(target=wait, name='parent-process-watch', daemon=True)
+    thread.start()
+    return thread
 
 # ============================================
 # TOBII INTEGRATION (via TobiiHelper .NET)
@@ -922,6 +992,8 @@ class GazeConnectBackend:
 
     def __init__(self, config: Optional[ServerConfig] = None):
         self.config = config or ServerConfig()
+        self._event_loop = None
+        self._shutdown = None
         self._active_session_id = self._generate_session_id()
         self._session_save_seq = 0
         self._last_survey_fingerprint = ''
@@ -3565,8 +3637,16 @@ class GazeConnectBackend:
         """Start the backend server."""
         logger.info("Starting GazeConnect Pro Backend...")
 
+        # Before anything is loaded or connected: the port is the contract with
+        # the interface, so a held port is a refusal, not a search for another.
+        if WEBSOCKETS_AVAILABLE:
+            ensure_port_available(self.config.websocket_host, self.config.websocket_port)
+
         # Store event loop reference for thread-safe WebSocket sends
         self._event_loop = asyncio.get_running_loop()
+        self._shutdown = asyncio.Event()
+        if self.config.parent_pid > 0:
+            watch_parent_process(self.config.parent_pid, self.request_shutdown)
 
         # Connect to Tobii
         if self.config.tobii_enabled:
@@ -3595,7 +3675,6 @@ class GazeConnectBackend:
 
         # Start WebSocket server
         if WEBSOCKETS_AVAILABLE:
-            # Try preferred port, fall back if occupied
             actual_port = self.config.websocket_port
             try:
                 server = await websockets.serve(
@@ -3604,22 +3683,13 @@ class GazeConnectBackend:
                     actual_port
                 )
             except OSError as e:
+                # The port was taken between the check above and this bind.
                 if e.errno == 10048 or 'address already in use' in str(e).lower():
-                    logger.warning(f"Port {actual_port} is in use, searching for available port...")
-                    try:
-                        actual_port = find_available_port(actual_port + 1)
-                        server = await websockets.serve(
-                            self._websocket_handler,
-                            self.config.websocket_host,
-                            actual_port
-                        )
-                        logger.info(f"Using fallback port {actual_port}")
-                    except RuntimeError:
-                        logger.error(f"No available ports found near {self.config.websocket_port}!")
-                        logger.error("Another instance is likely already running.")
-                        return
-                else:
-                    raise
+                    raise PortInUseError(
+                        f"Port {actual_port} was taken while the backend was starting; "
+                        f"run status-dev.bat to see what holds it. ({e})"
+                    ) from e
+                raise
             logger.info(f"WebSocket server started on ws://{self.config.websocket_host}:{actual_port}")
 
             # Start periodic tasks
@@ -3632,7 +3702,9 @@ class GazeConnectBackend:
             news_refresh = asyncio.create_task(self._news_refresh_loop())
 
             try:
-                await asyncio.Future()  # Run forever
+                # Runs until stopped: Ctrl+C, or the parent process ending when
+                # --parent-pid is set (watch_parent_process).
+                await self._shutdown.wait()
             except asyncio.CancelledError:
                 pass
             finally:
@@ -3643,6 +3715,13 @@ class GazeConnectBackend:
                 await server.wait_closed()
         else:
             logger.error("Cannot start server without websockets package")
+
+    def request_shutdown(self, reason: str = 'the parent process ended') -> None:
+        """Ask the running server to stop. Safe to call from another thread."""
+        logger.info(f"Shutting down: {reason}")
+        loop, event = self._event_loop, self._shutdown
+        if loop is not None and event is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(event.set)
 
     def stop(self):
         """Stop the backend."""
@@ -3673,6 +3752,11 @@ def main():
     parser.add_argument('--port', type=int, default=8765, help='WebSocket port')
     parser.add_argument('--simulate', action='store_true', help='Simulate Tobii data')
     parser.add_argument('--no-tobii', action='store_true', help='Disable Tobii')
+    parser.add_argument('--parent-pid', type=int, default=0,
+                        help='Stop when this process ends (Electron passes its own id)')
+    # Accepted and ignored: an app compiled before the fix may still pass it, and
+    # an unknown argument would stop the backend from starting at all.
+    parser.add_argument('--exit-with-parent', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--data-dir', default='./data', help='Data directory')
     parser.add_argument('--survey-data-dir', default='./survey_data', help='Survey data directory')
     def env_choice(name: str, choices: tuple, default: str) -> str:
@@ -3700,6 +3784,7 @@ def main():
         survey_data_dir=args.survey_data_dir,
         prediction_engine=args.prediction_engine,
         prediction_execution=args.prediction_execution,
+        parent_pid=args.parent_pid,
     )
 
     backend = GazeConnectBackend(config)
@@ -3708,6 +3793,11 @@ def main():
         asyncio.run(backend.start())
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
+    except PortInUseError as exc:
+        # Exit code 3: the app reports this one instead of retrying the launch.
+        logger.error(str(exc))
+        backend.stop()
+        sys.exit(3)
     finally:
         backend.stop()
 

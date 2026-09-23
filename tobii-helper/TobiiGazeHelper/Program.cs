@@ -99,6 +99,10 @@ namespace TobiiGazeHelper
             // stalled-stream recovery can be exercised against a live tracker.
             _testStallFirstHost = Array.Exists(args, a => a == "--test-stall-first-host");
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; _running = false; };
+            // Electron passes --exit-with-parent. Without it a killed or crashed app
+            // leaves this helper holding port 5555 for ever, and the next launch has
+            // to hunt it down before it can start.
+            if (Array.Exists(args, a => a == "--exit-with-parent")) WatchParentPipe();
             EnableDpiAwareness();
             Thread? worker = null;
             try
@@ -126,6 +130,30 @@ namespace TobiiGazeHelper
                 worker?.Join(500);
                 CloseHost();
             }
+        }
+
+        // The parent starts this helper with its stdio piped, so the read end
+        // breaking is the only notice it gets that the app has gone. Ctrl+C and the
+        // stalled-stream watchdog still stop it in their own ways.
+        private static void WatchParentPipe()
+        {
+            var watcher = new Thread(() =>
+            {
+                try
+                {
+                    using Stream input = Console.OpenStandardInput();
+                    var buffer = new byte[256];
+                    while (input.Read(buffer, 0, buffer.Length) > 0) { }
+                }
+                catch
+                {
+                    // A broken pipe says the same thing as end of file.
+                }
+                Console.WriteLine("[TOBII] Parent process ended; stopping.");
+                _running = false;
+            })
+            { IsBackground = true, Name = "Parent pipe watch" };
+            watcher.Start();
         }
 
         private static void OpenHost(string reason)
