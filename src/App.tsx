@@ -32,24 +32,57 @@ import './warmmode.css';
 import './refinement.css';
 
 import HomeScreen from './screens/HomeScreen';
-import KeyboardScreen from './screens/KeyboardScreen';
-import PhrasesScreen from './screens/PhrasesScreen';
-import SettingsScreen from './screens/SettingsScreen';
-
-import MedicalScreen from './screens/MedicalScreen';
-import FeelingScreen from './screens/FeelingScreen';
-import BasicNeedsScreen from './screens/BasicNeedsScreen';
-import PeopleScreen from './screens/PeopleScreen';
-import ActivitiesScreen from './screens/ActivitiesScreen';
-import SpatialKeyboardScreen from './screens/SpatialKeyboardScreen';
-import WebBrowsingScreen from './screens/WebBrowsingScreen';
-import FloorPlanSurveyScreen from './screens/FloorPlanSurveyScreen';
-import CompassMapScreen from './screens/CompassMapScreen';
-import DesignHomeLandingScreen from './screens/DesignHomeLandingScreen';
-import CustomizeScreen from './screens/CustomizeScreen';
-import AdvancedMapScreen from './screens/AdvancedMapScreen';
-import QuickWordsScreen from './screens/QuickWordsScreen';
 import AlertModeScreen from './screens/AlertModeScreen';
+
+// Home is what starts, and Alert Mode is the emergency screen, so both are part
+// of the first load. The rest arrive on their own a moment later (SCREEN_LOADERS
+// below): measured 23 Sep 2026, loading all nineteen before the first paint kept
+// the window empty for 17.9 s on a fresh development server, because every
+// module is a separate request and a browser only makes six at a time.
+const KeyboardScreen = React.lazy(() => import('./screens/KeyboardScreen'));
+const PhrasesScreen = React.lazy(() => import('./screens/PhrasesScreen'));
+const SettingsScreen = React.lazy(() => import('./screens/SettingsScreen'));
+const MedicalScreen = React.lazy(() => import('./screens/MedicalScreen'));
+const FeelingScreen = React.lazy(() => import('./screens/FeelingScreen'));
+const BasicNeedsScreen = React.lazy(() => import('./screens/BasicNeedsScreen'));
+const PeopleScreen = React.lazy(() => import('./screens/PeopleScreen'));
+const ActivitiesScreen = React.lazy(() => import('./screens/ActivitiesScreen'));
+const SpatialKeyboardScreen = React.lazy(() => import('./screens/SpatialKeyboardScreen'));
+const WebBrowsingScreen = React.lazy(() => import('./screens/WebBrowsingScreen'));
+const FloorPlanSurveyScreen = React.lazy(() => import('./screens/FloorPlanSurveyScreen'));
+const CompassMapScreen = React.lazy(() => import('./screens/CompassMapScreen'));
+const DesignHomeLandingScreen = React.lazy(() => import('./screens/DesignHomeLandingScreen'));
+const CustomizeScreen = React.lazy(() => import('./screens/CustomizeScreen'));
+const AdvancedMapScreen = React.lazy(() => import('./screens/AdvancedMapScreen'));
+const QuickWordsScreen = React.lazy(() => import('./screens/QuickWordsScreen'));
+
+// Pulled in quietly once the first screen is on the glass, most used first, so
+// moving between screens never waits for a download.
+const SCREEN_LOADERS: Array<() => Promise<unknown>> = [
+  () => import('./screens/KeyboardScreen'),
+  () => import('./screens/PhrasesScreen'),
+  () => import('./screens/QuickWordsScreen'),
+  () => import('./screens/MedicalScreen'),
+  () => import('./screens/BasicNeedsScreen'),
+  () => import('./screens/FeelingScreen'),
+  () => import('./screens/PeopleScreen'),
+  () => import('./screens/ActivitiesScreen'),
+  () => import('./screens/SettingsScreen'),
+  () => import('./screens/SpatialKeyboardScreen'),
+  () => import('./screens/CustomizeScreen'),
+  () => import('./screens/WebBrowsingScreen'),
+  () => import('./screens/DesignHomeLandingScreen'),
+  () => import('./screens/FloorPlanSurveyScreen'),
+  () => import('./screens/CompassMapScreen'),
+  () => import('./screens/AdvancedMapScreen'),
+];
+
+const ScreenLoading: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
+  <div style={{
+    width: '100%', height: '100%',
+    background: isDarkMode ? darkColors.background.primary : lightColors.background.primary,
+  }} />
+);
 
 type Screen = 'home' | 'keyboard' | 'phrases' | 'feelings' | 'needs' |
   'people' | 'medical' | 'settings' | 'activities' | 'spatial' | 'web' |
@@ -183,6 +216,26 @@ const InnerApp: React.FC = () => {
     if (api?.app?.rendererReady) {
       api.app.rendererReady().catch(() => { /* ignore */ });
     }
+  }, []);
+
+  // The first screen is on the glass; bring in the others now, one after the
+  // other so they never compete with what is being looked at.
+  useEffect(() => {
+    let cancelled = false;
+    const loadNext = (index: number) => {
+      if (cancelled || index >= SCREEN_LOADERS.length) return;
+      SCREEN_LOADERS[index]()
+        .catch(() => { /* it will be fetched again when the screen is opened */ })
+        .then(() => { if (!cancelled) loadNext(index + 1); });
+    };
+    const idle = (window as any).requestIdleCallback as
+      undefined | ((cb: () => void, options?: { timeout: number }) => number);
+    const handle = idle ? idle(() => loadNext(0), { timeout: 2000 }) : window.setTimeout(() => loadNext(0), 400);
+    return () => {
+      cancelled = true;
+      const cancelIdle = (window as any).cancelIdleCallback as undefined | ((id: number) => void);
+      if (idle && cancelIdle) cancelIdle(handle as number); else window.clearTimeout(handle as number);
+    };
   }, []);
 
   /** Navigation handler — v11: ALWAYS disable gaze on navigation.
@@ -444,7 +497,9 @@ const InnerApp: React.FC = () => {
       {/* Screen content */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         <ErrorBoundary>
-          {renderScreen()}
+          <React.Suspense fallback={<ScreenLoading isDarkMode={isDarkMode} />}>
+            {renderScreen()}
+          </React.Suspense>
         </ErrorBoundary>
       </div>
 

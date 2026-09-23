@@ -48,7 +48,6 @@ installStdioGuard(() => {
 // ============================================
 
 let mainWindow: BrowserWindow | null = null;
-let splashWindow: BrowserWindow | null = null;
 let pythonProcess: ChildProcess | null = null;
 let floorplanProcess: ChildProcess | null = null;
 let tobiiProcess: ChildProcess | null = null;
@@ -112,8 +111,11 @@ let edgeScrollStartedAt = 0;
 // acquiring/committing so the page can't slide out from under the target.
 let lastBrowserDwellState = 'idle';
 let highContrastEnabled = false;
-let rendererBootReady = false;
-let splashTransitionStarted = false;
+// The interface is shown the moment it can paint. There is no welcome screen in
+// between: it was removed on 23 Sep 2026 at the maintainer's request because it
+// held the app back for ten seconds, and when the interface took longer than
+// that to boot the patient was left looking at an empty window instead.
+let mainWindowShown = false;
 let browserDiagnosticsInterval: NodeJS.Timeout | null = null;
 
 type BrowserGazeConfig = {
@@ -784,7 +786,10 @@ function startTobiiHelper(): void {
 
   const startedAt = Date.now();
   try {
-    tobiiProcess = spawn(helperPath, [], {
+    // --exit-with-parent: if this app is killed or crashes, the helper must not
+    // stay behind holding port 5555 (its port is compiled in, so nothing else can
+    // take over). It watches the stdio pipe below for that.
+    tobiiProcess = spawn(helperPath, ['--exit-with-parent'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: false,
       windowsHide: true,
@@ -887,6 +892,11 @@ function startPythonBackend(): void {
   const managedPaths = getManagedRuntimePaths();
   const shouldUseManagedPaths = app.isPackaged || process.env.GAZECONNECT_USE_MANAGED_DATA === '1';
   args.push('--host', '127.0.0.1');
+  // Same contract as the helper: no orphan may keep the WebSocket port, or the
+  // next launch will refuse to start (python/main.py ensure_port_available). The
+  // backend waits on this process rather than on its stdin pipe: a thread reading
+  // stdin broke its prediction worker (python/main.py watch_parent_process).
+  args.push('--parent-pid', String(process.pid));
   if (process.env.GAZE_SIMULATE === '1') args.push('--simulate');
   if (shouldUseManagedPaths) {
     args.push('--data-dir', managedPaths.dataDir);
@@ -916,6 +926,14 @@ function startPythonBackend(): void {
   pythonProcess.on('close', (code) => {
     console.log(`Python process exited with code ${code}`);
     pythonProcess = null;
+    // Exit code 3 (python/main.py): the WebSocket port is held by something
+    // else, usually a backend left over from an earlier launch. Retrying cannot
+    // help, and staying quiet is what made this confusing: the app would open
+    // with everything dead. Say so once, and stop trying.
+    if (code === PORT_IN_USE_EXIT_CODE) {
+      reportBackendPortInUse();
+      return;
+    }
 
     // Restart if not quitting
     scheduleRuntimeRetry('python', startPythonBackend, startedAt);
@@ -924,6 +942,24 @@ function startPythonBackend(): void {
   pythonProcess.on('error', (err) => {
     console.error('Failed to start Python process:', err);
   });
+}
+
+// python/main.py exits with this when its port is already taken.
+const PORT_IN_USE_EXIT_CODE = 3;
+let reportedBackendPortInUse = false;
+
+function reportBackendPortInUse(): void {
+  const message = 'Another GazeConnect backend is already using port 8765, so this one stopped.\n\n'
+    + 'Close the other copy of GazeConnect, or run stop-dev.bat (status-dev.bat shows what is holding '
+    + 'the port), then start the app again.';
+  console.error(`[Python] ${message.replace(/\n+/g, ' ')}`);
+  if (reportedBackendPortInUse || isQuitting) return;
+  reportedBackendPortInUse = true;
+  try {
+    dialog.showErrorBox('GazeConnect could not start its backend', message);
+  } catch {
+    /* A message box is a courtesy; the log above is the record. */
+  }
 }
 
 function stopPythonBackend(): void {
@@ -1084,12 +1120,12 @@ function buildAppMenu(): void {
 // screen every window edge is a physical screen edge, where the backend accepts
 // gaze reported slightly off the glass (python/main.py, SCREEN_EDGE_BAND_PX).
 //
-// Calling setFullScreen(true) on the still hidden, transparent window during the
-// splash was followed by this process hanging at 100 % CPU on the rig (21 Sep
-// 2026). A rehearsal of this exact start-up on the rig (22 Sep: same Electron,
-// same window options and splash hand-off) could not reproduce that hang on any
-// path, but full screen is still only requested the way the right-click menu and
-// the Zone Board request it: on the visible, opaque window, after it has settled.
+// Calling setFullScreen(true) on a window that was still hidden and transparent
+// was followed by this process hanging at 100 % CPU on the rig (21 Sep 2026). A
+// rehearsal of that start-up on the rig (22 Sep: same Electron, same window
+// options) could not reproduce the hang on any path, but full screen is still
+// only requested the way the right-click menu and the Zone Board request it: on
+// the visible, opaque window, after it has settled.
 // GAZECONNECT_START_FULLSCREEN=0 starts maximised as before.
 const START_FULL_SCREEN = process.env.GAZECONNECT_START_FULLSCREEN !== '0';
 const START_FULL_SCREEN_SETTLE_MS = 400;
@@ -1098,6 +1134,21 @@ let startupFullScreenScheduled = false;
 function presentMainWindow(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.maximize();
+}
+
+// How long to wait for the interface before showing the window regardless.
+const MAIN_WINDOW_SHOW_TIMEOUT_MS = 12000;
+
+function showMainWindow(reason: string): void {
+  if (mainWindowShown) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindowShown = true;
+  console.log(`[Window] Showing the interface (${reason})`);
+  presentMainWindow();
+  mainWindow.setOpacity(1);
+  mainWindow.show();
+  mainWindow.focus();
+  enterStartupFullScreen();
 }
 
 function enterStartupFullScreen(): void {
@@ -1259,8 +1310,12 @@ function createWindow(): void {
     void closeActiveBrowserView('interface-renderer-gone');
   });
 
-  // Load app
-  const isDev = !app.isPackaged;
+  // Load app. GAZECONNECT_UI=dist (what .\start-dev.bat --fast sets) runs the
+  // built interface from dist/ instead of the development server: it is one
+  // bundle rather than a hundred separate requests, so the window has the app on
+  // it seconds sooner. Hot reloading is what it costs, which is why it is a flag
+  // and not the default.
+  const isDev = !app.isPackaged && process.env.GAZECONNECT_UI !== 'dist';
   if (isDev) {
     // The development launcher passes the interface port it chose (5173 unless that was taken).
     const vitePort = Number(process.env.GAZECONNECT_VITE_PORT) || 5173;
@@ -1281,32 +1336,14 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  // Show when ready — if splash is active, signal it instead of showing directly
-  mainWindow.once('ready-to-show', () => {
-    mainWindowReady = true;
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      console.log('[Main] mainWindow ready-to-show');
-      maybeBeginSplashTransition('window-ready');
-    } else {
-      // No splash (already closed or never created) — show immediately
-      presentMainWindow();
-      mainWindow?.show();
-      mainWindow?.focus();
-      enterStartupFullScreen();
-    }
-  });
+  // Whichever comes first: the first painted frame, or React reporting that it
+  // has mounted (ipcMain 'app:renderer-ready'). Both mean there is something to
+  // look at; showMainWindow only acts once.
+  mainWindow.once('ready-to-show', () => showMainWindow('first paint'));
 
-  // Fallback: if ready-to-show doesn't fire within 20s, show anyway
-  setTimeout(() => {
-    if (mainWindow && !mainWindow.isVisible()) {
-      console.log('ready-to-show timeout - forcing window visible');
-      closeSplashWindow();
-      presentMainWindow();
-      mainWindow.show();
-      mainWindow.focus();
-      enterStartupFullScreen();
-    }
-  }, 20000);
+  // Safety net only. The window must appear even if the interface never reports
+  // in -- a blank window the patient can right-click is better than no window.
+  setTimeout(() => showMainWindow('timeout'), MAIN_WINDOW_SHOW_TIMEOUT_MS);
 
   // Handle close
   mainWindow.on('close', (event) => {
@@ -1456,8 +1493,9 @@ function setupIpcHandlers(): void {
   });
 
   ipcMain.handle('app:renderer-ready', () => {
-    rendererBootReady = true;
-    maybeBeginSplashTransition('renderer-ready');
+    // React has mounted. This arrives even while the window is still hidden,
+    // which is why it is the signal that matters on a slow first boot.
+    showMainWindow('interface ready');
     return true;
   });
 
@@ -2554,161 +2592,6 @@ function setupIpcHandlers(): void {
 }
 
 // ============================================
-// SPLASH SCREEN
-// ============================================
-
-let splashStartTime = 0;
-let mainWindowReady = false; // Track if main window content is painted and ready
-const SPLASH_MIN_DURATION_MS = 10000;  // Keep welcome splash visible around 10s
-const SPLASH_MAX_DURATION_MS = 25000;  // Safety fallback: force-close after 25 seconds
-
-function maybeBeginSplashTransition(reason: string): void {
-  if (splashTransitionStarted) return;
-  if (!splashWindow || splashWindow.isDestroyed()) return;
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (!mainWindowReady || !rendererBootReady) return;
-  splashTransitionStarted = true;
-  console.log(`[Splash] Transition triggered by ${reason}`);
-  transitionFromSplash();
-}
-
-function createSplashWindow(): void {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  splashTransitionStarted = false;
-  mainWindowReady = false;
-  rendererBootReady = false;
-
-  // Splash should be full screen but NOT alwaysOnTop so user can alt-tab away
-  splashWindow = new BrowserWindow({
-    width,
-    height,
-    frame: false,
-    transparent: false,
-    backgroundColor: '#0c1520',
-    show: false,          // Don't show until HTML content is ready
-    resizable: false,
-    skipTaskbar: false,
-    alwaysOnTop: false,   // Prevents locking the desktop
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-
-  splashWindow.maximize();
-
-  const splashPath = path.join(__dirname, '..', 'electron', 'splash.html');
-  const prodSplashPath = path.join(__dirname, 'splash.html');
-  const resolvedPath = fs.existsSync(splashPath) ? splashPath : prodSplashPath;
-
-  console.log(`[Splash] Loading: ${resolvedPath}`);
-  splashWindow.loadFile(resolvedPath);
-
-  // Read saved userName from settings.json so splash can display it
-  let savedUserName = 'Papa';
-  try {
-    const settingsFilePath = path.join(app.getPath('userData'), 'settings.json');
-    if (fs.existsSync(settingsFilePath)) {
-      const raw = fs.readFileSync(settingsFilePath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (parsed?.settings?.userName) {
-        savedUserName = parsed.settings.userName;
-      }
-    }
-  } catch {
-    // Ignore — default to 'Papa'
-  }
-
-  // Only show splash once its HTML content has rendered — avoids blank screen flash
-  splashWindow.once('ready-to-show', () => {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.webContents.executeJavaScript(
-        `document.getElementById('userName').textContent = ${JSON.stringify(savedUserName)};`
-      ).catch(() => { /* ignore */ });
-      splashWindow.show();
-      splashWindow.focus();
-      console.log(`[Splash] Content ready — showing with name: ${savedUserName}`);
-    }
-  });
-
-  splashStartTime = Date.now();
-
-  splashWindow.on('closed', () => {
-    splashWindow = null;
-  });
-
-  // Safety fallback: force-close splash after max duration
-  setTimeout(() => {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      console.log('[Splash] Max duration reached — force closing');
-      closeSplashWindow();
-      if (mainWindow && !mainWindow.isVisible()) {
-        mainWindow.setOpacity(1);
-        presentMainWindow();
-        mainWindow.show();
-        mainWindow.focus();
-        enterStartupFullScreen();
-      }
-    }
-  }, SPLASH_MAX_DURATION_MS);
-}
-
-function closeSplashWindow(): void {
-  if (splashWindow && !splashWindow.isDestroyed()) {
-    try {
-      splashWindow.close();
-    } catch { /* ignore */ }
-    splashWindow = null;
-  }
-}
-
-function transitionFromSplash(): void {
-  // Allow main window to paint in the background by showing it, but invisible
-  // This completely solves Chromium background rendering pauses (black screens)
-  if (mainWindow) {
-    mainWindow.setOpacity(0);
-    presentMainWindow();
-    mainWindow.showInactive();
-  }
-
-  // Ensure splash stays visually on top of main window within the app's Z-order
-  if (splashWindow && !splashWindow.isDestroyed()) {
-    splashWindow.moveTop();
-    splashWindow.focus();
-  }
-
-  const elapsed = Date.now() - splashStartTime;
-  const remaining = Math.max(0, SPLASH_MIN_DURATION_MS - elapsed);
-
-  console.log(`[Splash] Elapsed: ${elapsed}ms, waiting ${remaining}ms more before transition`);
-
-  // Wait for minimum splash duration (10s) while user can use other desktop apps
-  setTimeout(() => {
-    // Reveal fully rendered main window instantly (no black flash)
-    if (mainWindow) mainWindow.setOpacity(1);
-
-    // Trigger fade-out animation in splash HTML
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      try {
-        splashWindow.webContents.executeJavaScript('window.startFadeOut && window.startFadeOut()');
-      } catch { /* ignore */ }
-    }
-
-    // After fade-out animation completes (~900ms), focus main and close splash
-    setTimeout(() => {
-      mainWindow?.focus();
-
-      // Brief delay before closing splash so there's no flash
-      setTimeout(() => {
-        closeSplashWindow();
-        enterStartupFullScreen();
-      }, 300);
-    }, 950);
-  }, remaining);
-}
-
-// ============================================
 // APP LIFECYCLE
 // ============================================
 
@@ -2726,9 +2609,6 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     console.log('GazeConnect Pro starting...');
-
-    // 0. Show splash screen IMMEDIATELY
-    createSplashWindow();
 
     // 1. Start Tobii Helper first (needs time to init TCP server)
     startTobiiHelper();
