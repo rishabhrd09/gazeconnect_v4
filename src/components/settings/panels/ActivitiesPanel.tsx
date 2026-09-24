@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import type { ActivityCategory, ActivityItem } from '../../../types/customization';
@@ -294,6 +295,7 @@ const ActivitiesPanel: React.FC<ActivitiesPanelProps> = ({ isDarkMode }) => {
   // Dirty tracking
   const originalSnapshot = JSON.stringify(activityCategories);
   const isDirty = JSON.stringify(editCats) !== originalSnapshot;
+  useReportUnsavedChanges(isDirty);
 
   // Sync external when clean
   React.useEffect(() => {
@@ -360,7 +362,7 @@ const ActivitiesPanel: React.FC<ActivitiesPanelProps> = ({ isDarkMode }) => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{
+          <div className="settings-panel-title" style={{
             fontSize: typography.fontSize.xl,
             color: colors.text.primary,
             fontWeight: typography.fontWeight.bold,

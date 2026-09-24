@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
@@ -150,6 +151,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
   const [headingDraft, setHeadingDraft] = useState('');
 
   const isDirty = JSON.stringify(editCategories) !== JSON.stringify(originalCategories);
+  useReportUnsavedChanges(isDirty);
 
   // Sync external changes when not dirty
   React.useEffect(() => {
@@ -273,7 +275,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{
+          <div className="settings-panel-title" style={{
             fontSize: typography.fontSize.xl,
             color: colors.text.primary,
             fontWeight: typography.fontWeight.bold,
@@ -295,7 +297,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="qwp-btn qwp-btn-danger" onClick={() => setShowResetConfirm(true)}>
-            Reset All
+            Reset this page
           </button>
           <button
             className="qwp-btn qwp-btn-success"
@@ -328,6 +330,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
         const isExpanded = expandedCatId === cat.id;
         const enabledCount = cat.words.filter(w => w.enabled).length;
         const form = newWordText[cat.id] ?? { en: '', hi: '' };
+        const toggleExpanded = () => setExpandedCatId(isExpanded ? '' : cat.id);
 
         return (
           <div key={cat.id} style={{
@@ -335,9 +338,26 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
             border: `1px solid ${colors.border.main}`,
             overflow: 'hidden',
           }}>
-            {/* Category header — click to expand/collapse */}
-            <button
-              onClick={() => setExpandedCatId(isExpanded ? '' : cat.id)}
+            {/* Category header — click to expand/collapse. A div rather than a <button>:
+                the rename pencil and field inside it may not be nested in a <button>. */}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
+              onClick={toggleExpanded}
+              onKeyDown={e => {
+                // Only the header's own keys; Enter and Space in the rename field or on the pencil are theirs.
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  toggleExpanded();
+                } else if (e.key === ' ') {
+                  e.preventDefault(); // no page scroll; Space toggles on release, as on a <button>
+                }
+              }}
+              onKeyUp={e => {
+                if (e.target === e.currentTarget && e.key === ' ') toggleExpanded();
+              }}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -349,6 +369,10 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
                 borderLeft: `6px solid ${catStyle.accent}`,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
+                // A <button> sets these itself; inherited from the page they would change the header's height and type.
+                lineHeight: 'normal',
+                fontStretch: 'normal',
+                textRendering: 'auto',
                 transition: 'all 150ms',
               }}
             >
@@ -442,7 +466,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
               }}>
                 {enabledCount} active / {cat.words.length} total
               </span>
-            </button>
+            </div>
 
             {/* Expanded content */}
             {isExpanded && (

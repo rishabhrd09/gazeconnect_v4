@@ -67,49 +67,6 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
         App Settings
       </div>
 
-      {/* User Profile */}
-      <section>
-        <h3 style={sectionHeading}>User Profile</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 16px',
-            background: 'rgba(255,255,255,0.04)',
-            borderRadius: '12px',
-            border: `1px solid ${colors.border.main}`,
-          }}>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: colors.text.primary }}>
-                Display Name
-              </div>
-              <div style={{ fontSize: '12px', color: colors.text.secondary, marginTop: '2px' }}>
-                Shown on the welcome screen when app starts
-              </div>
-            </div>
-            <input
-              type="text"
-              value={settings.userName ?? ''}
-              onChange={e => updateSetting('userName', e.target.value)}
-              placeholder="Papa"
-              style={{
-                width: '180px',
-                padding: '10px 14px',
-                fontSize: '15px',
-                fontWeight: 600,
-                borderRadius: '8px',
-                border: `1px solid ${colors.border.main}`,
-                background: 'rgba(255,255,255,0.06)',
-                color: colors.text.primary,
-                outline: 'none',
-                textAlign: 'center',
-              }}
-            />
-          </div>
-        </div>
-      </section>
-
       {/* Appearance */}
       <section>
         <h3 style={sectionHeading}>Appearance</h3>
@@ -226,31 +183,6 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
             step={5}
             unit="%"
             onChange={v => updateSetting('ttsVolume', v / 100)}
-            isDarkMode={isDarkMode}
-          />
-          <ToggleSetting
-            label="Sound Effects"
-            description="Enable/disable button click sounds"
-            value={settings.soundEffects}
-            onChange={v => updateSetting('soundEffects', v)}
-            isDarkMode={isDarkMode}
-          />
-        </div>
-      </section>
-
-      {/* Wellness */}
-      <section>
-        <h3 style={sectionHeading}>Wellness</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
-          <SliderSetting
-            label="Break Reminder Interval"
-            description="How often to remind you to rest your eyes"
-            value={settings.breakReminderInterval}
-            min={10}
-            max={60}
-            step={5}
-            unit=" min"
-            onChange={v => updateSetting('breakReminderInterval', v)}
             isDarkMode={isDarkMode}
           />
         </div>

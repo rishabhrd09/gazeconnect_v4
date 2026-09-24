@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
@@ -176,6 +177,7 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
   // Track dirty
   const originalSnapshot = JSON.stringify(phraseCategories);
   const isDirty = JSON.stringify(editCats) !== originalSnapshot;
+  useReportUnsavedChanges(isDirty);
 
   // Sync external changes when not dirty
   React.useEffect(() => {
@@ -321,7 +323,7 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{
+          <div className="settings-panel-title" style={{
             fontSize: typography.fontSize.xl,
             color: colors.text.primary,
             fontWeight: typography.fontWeight.bold,

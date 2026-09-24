@@ -199,7 +199,7 @@ const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
-      <div style={{
+      <div className="settings-panel-title" style={{
         fontSize: typography.fontSize.xl,
         color: colors.text.primary,
         fontWeight: typography.fontWeight.bold,
@@ -268,7 +268,7 @@ const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
           gazeEnabledTimestamp={0}
           style={{ minWidth: 160 }}
         >
-          Reset to Defaults
+          Reset this page
         </GazeButton>
       </div>
 

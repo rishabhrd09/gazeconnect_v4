@@ -46,6 +46,22 @@ const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
     const [sentenceCount, setSentenceCount] = useState(0);
 
     const builtinData = ws.builtinData;
+
+    // The saved lists (words, shortcuts, sentences), asked for on open and on each tab
+    // change. Without this the lists showed only what was added during this visit.
+    const dictionaryData = ws.dictionaryData;
+    useEffect(() => {
+        if (!dictionaryData || typeof dictionaryData !== 'object') return;
+        const words: string[] = Array.isArray(dictionaryData.custom_words)
+            ? dictionaryData.custom_words.filter((w: unknown): w is string => typeof w === 'string')
+            : [];
+        setCustomWords(words);
+        setWordCount(Number.isFinite(dictionaryData.word_count) ? dictionaryData.word_count : words.length);
+        if (dictionaryData.abbreviations && typeof dictionaryData.abbreviations === 'object') setAbbreviations(dictionaryData.abbreviations);
+        if (dictionaryData.custom_abbreviations && typeof dictionaryData.custom_abbreviations === 'object') setCustomAbbreviations(dictionaryData.custom_abbreviations);
+        if (Array.isArray(dictionaryData.sentence_history)) setSentenceHistory(dictionaryData.sentence_history);
+        if (Number.isFinite(dictionaryData.sentence_count)) setSentenceCount(dictionaryData.sentence_count);
+    }, [dictionaryData]);
     const [showBuiltin, setShowBuiltin] = useState(false);
     const [showBuiltinSentences, setShowBuiltinSentences] = useState(false);
     const [wordFilter, setWordFilter] = useState('');
@@ -169,7 +185,7 @@ const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, color: c.text.primary, margin: 0, letterSpacing: '-0.01em' }}>
+                <h2 className="settings-panel-title" style={{ fontSize: '18px', fontWeight: 700, color: c.text.primary, margin: 0, letterSpacing: '-0.01em' }}>
                     Dictionary & Shortcuts
                 </h2>
                 <p style={{ fontSize: '12px', color: mutedText, margin: '3px 0 0', lineHeight: 1.4 }}>

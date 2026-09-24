@@ -143,6 +143,7 @@ export interface WebSocketContextValue {
   getDictionaryData: () => void;
   getBuiltinData: () => void;
   builtinData: any;
+  dictionaryData: any;
   addAbbreviation: (abbrev: string, expansion: string) => void;
   removeAbbreviation: (abbrev: string) => void;
   addSentenceTemplate: (sentence: string) => void;
@@ -279,6 +280,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   // Built-in data (on-demand for Settings)
   const [builtinData, setBuiltinData] = useState<any>(null);
+  // Saved dictionary lists for Settings (reply to get_dictionary_data).
+  const [dictionaryData, setDictionaryData] = useState<any>(null);
 
   // Web Hub state (additive — no impact on gaze)
   const [newsItems, setNewsItems] = useState<any[]>([]);
@@ -536,6 +539,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           setBuiltinData(data);
           break;
 
+        case 'dictionary_data':
+          setDictionaryData(data);
+          break;
+
         case 'phrases':
           setPhrases(data.phrases || []);
           break;
@@ -746,6 +753,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     getDictionaryData: () => send('get_dictionary_data'),
     getBuiltinData: () => send('get_builtin_data'),
     builtinData,
+    dictionaryData,
     addAbbreviation: (abbrev, expansion) => send('add_abbreviation', { abbrev, expansion }),
     removeAbbreviation: (abbrev) => send('remove_abbreviation', { abbrev }),
     addSentenceTemplate: (sentence) => send('add_sentence_template', { sentence }),

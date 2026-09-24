@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, layout, typography, spacing, screenThemes } from '../../../utils/design';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
@@ -209,6 +210,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
   // Track dirty
   const originalSnapshot = JSON.stringify(medicalSections);
   const isDirty = JSON.stringify(editSections) !== originalSnapshot;
+  useReportUnsavedChanges(isDirty);
 
   // Sync external changes when not dirty
   React.useEffect(() => {
@@ -372,7 +374,7 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{
+          <div className="settings-panel-title" style={{
             fontSize: typography.fontSize.xl,
             color: colors.text.primary,
             fontWeight: typography.fontWeight.bold,
