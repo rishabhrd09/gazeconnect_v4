@@ -28,6 +28,10 @@ import AppSettingsPanel from '../components/settings/panels/AppSettingsPanel';
 import DictionaryPanel from '../components/settings/panels/DictionaryPanel';
 import QuickWordsPanel from '../components/settings/panels/QuickWordsPanel';
 import AlertModePanel from '../components/settings/panels/AlertModePanel';
+import { SettingsDirtyContext } from '../components/settings/shared/unsavedChanges';
+import { isGazeSpellLook } from '../config/look';
+import GroupedSettingsLayout from '../components/settings/grouped/GroupedSettingsLayout';
+import { GROUPED_PAGES, isGroupedPageId, type GroupedPageId } from '../components/settings/grouped/settingsPages';
 
 // ============================================
 // TYPES
@@ -40,7 +44,8 @@ interface SettingsScreenProps {
   showHindi?: boolean;
 }
 
-type SectionId = 'appsettings' | 'dictionary' | 'people' | 'phrases' | 'medical' | 'home' | 'quickwords' | 'activities' | 'alertmode';
+// The grouped Settings (GazeSpell look) adds its own pages to the classic sections.
+type SectionId = 'appsettings' | 'dictionary' | 'people' | 'phrases' | 'medical' | 'home' | 'quickwords' | 'activities' | 'alertmode' | GroupedPageId;
 
 interface SidebarSection {
   id: SectionId;
@@ -56,7 +61,7 @@ const SECTIONS: SidebarSection[] = [
   { id: 'medical', label: 'Medical', icon: MedicalCrossIcon },
   { id: 'home', label: 'Home Layout', icon: HomeIcon },
   { id: 'quickwords', label: 'Quick Words', icon: ChatBubblesIcon },
-  { id: 'alertmode', label: 'Alert Mode', icon: SettingsIcon },
+  { id: 'alertmode', label: 'Urgent Needs', icon: SettingsIcon },
   { id: 'activities', label: 'Activities', icon: TVIcon },
 ];
 
@@ -112,7 +117,7 @@ function validateBackupJSON(data: any): { valid: boolean; error?: string } {
   }
   const knownKeys = [
     'people', 'phraseCategories', 'medicalSections', 'quickWords',
-    'homeQuickActions', 'homeEmergencyCards', 'activityCategories', 'aacCategories',
+    'homeQuickActions', 'homeEmergencyCards', 'homeWordBar', 'activityCategories', 'aacCategories',
     'feelings', 'basicNeeds', 'alertModeCards', 'settings', 'version',
   ];
   const hasKnownKey = knownKeys.some(k => k in data);
@@ -136,11 +141,26 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const colors = isWarm ? warmColors : isDarkMode ? darkColors : lightColors;
   const THEME = isWarm ? THEME_WARM : THEME_DARK;
 
-  const [selectedSection, setSelectedSection] = useState<SectionId>('appsettings');
+  const [selectedSection, setSelectedSection] = useState<SectionId>(isGazeSpellLook ? 'gaze' : 'appsettings');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  // A page with a Save button reports unsaved edits; opening another page then asks first.
+  const [pageDirty, setPageDirty] = useState(false);
+  const [pendingSection, setPendingSection] = useState<SectionId | null>(null);
+  // Bumped after an import or a factory reset so the open page drops its old draft.
+  const [panelEpoch, setPanelEpoch] = useState(0);
+  const requestSection = useCallback((id: SectionId) => {
+    if (id === selectedSection) return;
+    if (pageDirty) { setPendingSection(id); return; }
+    setSelectedSection(id);
+  }, [pageDirty, selectedSection]);
+  const discardAndOpen = useCallback(() => {
+    if (pendingSection) setSelectedSection(pendingSection);
+    setPageDirty(false);
+    setPendingSection(null);
+  }, [pendingSection]);
 
   const showToast = useCallback((message: string, type: ToastState['type'] = 'success') => {
     setToast({ message, type });
@@ -228,6 +248,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     if (pendingImportData) {
       try {
         importJSON(JSON.stringify(pendingImportData));
+        setPageDirty(false);
+        setPanelEpoch(e => e + 1);
         showToast('Settings restored from backup');
       } catch {
         showToast('Failed to apply backup data.', 'error');
@@ -245,6 +267,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // ---- RESET ----
   const handleReset = useCallback(() => {
     resetToDefaults();
+    setPageDirty(false);
+    setPanelEpoch(e => e + 1);
     setShowResetConfirm(false);
     showToast('All settings reset to factory defaults');
   }, [resetToDefaults, showToast]);
@@ -260,8 +284,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       case 'activities': return <ActivitiesPanel isDarkMode={isDarkMode} />;
       case 'appsettings': return <AppSettingsPanel isDarkMode={isDarkMode} />;
       case 'dictionary': return <DictionaryPanel isDarkMode={isDarkMode} />;
+      default: return null;
     }
   };
+  const sectionLabel = (id: SectionId) => (
+    isGazeSpellLook && isGroupedPageId(id) ? GROUPED_PAGES[id].title : SECTIONS.find(s => s.id === id)?.label
+  );
+  const panelForSection = (
+    <SettingsDirtyContext.Provider value={setPageDirty}>
+      <React.Fragment key={`${selectedSection}-${panelEpoch}`}>{renderPanel()}</React.Fragment>
+    </SettingsDirtyContext.Provider>
+  );
 
   return (
     <div className={`settings-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
@@ -281,7 +314,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         />
       </div>
 
-      {/* Main content: sidebar + panel — gaze-disabled zone */}
+      {isGazeSpellLook ? (
+        <GroupedSettingsLayout
+          page={isGroupedPageId(selectedSection) ? selectedSection : 'gaze'}
+          onOpenPage={requestSection}
+          pageDirty={pageDirty}
+          panel={panelForSection}
+          onExport={handleExport}
+          onImport={handleImport}
+          onFactoryReset={() => setShowResetConfirm(true)}
+          onSpeak={onSpeak}
+          isDarkMode={isDarkMode}
+        />
+      ) : (
+      /* Main content: sidebar + panel — gaze-disabled zone */
       <div data-gaze="false" style={{
         flex: 1,
         display: 'flex',
@@ -319,7 +365,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   id={`sidebar-${section.id}`}
                   size="sm"
                   variant="default"
-                  onClick={() => setSelectedSection(section.id)}
+                  onClick={() => requestSection(section.id)}
                   isDarkMode={isDarkMode}
                   gazeEnabled={false}
                   gazeEnabledTimestamp={0}
@@ -428,7 +474,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 fontSize: typography.fontSize.sm,
               }}
             >
-              Reset to Defaults
+              Factory Reset
             </GazeButton>
           </div>
         </div>
@@ -458,9 +504,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           }}>
             Mouse-only page - use mouse click to change settings. Navigation bar above remains gaze-enabled.
           </div>
-          {renderPanel()}
+          <SettingsDirtyContext.Provider value={setPageDirty}>
+            <React.Fragment key={`${selectedSection}-${panelEpoch}`}>{renderPanel()}</React.Fragment>
+          </SettingsDirtyContext.Provider>
         </div>
       </div>
+      )}
 
       {/* Toast notification */}
       {toast && (
@@ -479,12 +528,26 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         />
       )}
 
+      {/* Unsaved edits on the page being left */}
+      {pendingSection && (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          message={`Your changes on ${sectionLabel(selectedSection) ?? 'this page'} are not saved yet. Discard them and open ${sectionLabel(pendingSection) ?? 'the other page'}?`}
+          confirmLabel="Discard changes"
+          cancelLabel="Keep editing"
+          onConfirm={discardAndOpen}
+          onCancel={() => setPendingSection(null)}
+          isDarkMode={isDarkMode}
+          variant="warning"
+        />
+      )}
+
       {/* Reset All confirmation */}
       {showResetConfirm && (
         <ConfirmDialog
-          title="Reset EVERYTHING to Factory Defaults?"
-          message="This will permanently erase all your customizations - people, phrases, medical items, home layout, activities, and settings - and restore factory defaults. This cannot be undone."
-          confirmLabel="Reset Everything"
+          title="Factory reset: erase everything?"
+          message="This erases everything set up here (people, phrases, Assistance items, Urgent Needs cards, the Home layout, activities and every setting) and restores the factory defaults. It cannot be undone, so export a backup first if you might want any of it back."
+          confirmLabel="Erase everything"
           onConfirm={handleReset}
           onCancel={() => setShowResetConfirm(false)}
           isDarkMode={isDarkMode}

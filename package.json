@@ -23,6 +23,8 @@
     "check:browser-cursor": "node scripts/check-injected-script.js && node scripts/browser-cursor-replay.js",
     "check:dwell-groups": "node scripts/check-dwell-groups.cjs",
     "check:home-layout": "node scripts/check-home-layout.cjs",
+    "check:settings": "node scripts/check-settings.cjs",
+    "check:look": "node scripts/check-look.cjs",
     "check:gaze-safety": "node scripts/check-gaze-safety.cjs",
     "check:browser-gaze-safety": "node scripts/check-browser-gaze-safety.cjs",
     "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs"
