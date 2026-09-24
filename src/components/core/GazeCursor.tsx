@@ -1722,6 +1722,10 @@ export const GazeCursor: React.FC = () => {
   // especially with longer dwell times (800-1000ms vs old 500ms before ring appears)
   const CURSOR_COLOR_IDLE = '#8899AA'; // Muted steel blue — visible on dark bg without being distracting
   const cursorColor = isLocked ? CURSOR_COLOR_LOCKED : (enabled || dwellProgress > 0 ? CURSOR_COLOR_NORMAL : CURSOR_COLOR_IDLE);
+  // The bubble's ring. Dark: amber (24 Sep 2026), because a light ring was lost among the Dark
+  // keyboard's near-white letters; amber stands apart from them and from the teal dwell fill.
+  // Warm keeps the light ring, whose soft dark edge reads on its pale keys.
+  const BUBBLE_RING_COLOR = isWarm || isLight ? 'rgba(255, 255, 255, 0.82)' : '#FFC247';
   const ringPx = Math.max(5, Math.round(CURSOR_SIZE * BUBBLE_RING_SHARE));
   const arcR = (CURSOR_SIZE - ringPx) / 2;
   const arcLen = 2 * Math.PI * arcR;
@@ -1756,10 +1760,10 @@ export const GazeCursor: React.FC = () => {
       {/* The gaze bubble (v18). Position: direct DOM transform writes from the
           display loop (drawBubble); the transform below only covers the
           initial mount and re-derives the SAME value from posRef on React
-          re-renders, so the two writers stay consistent. A light ring with a
-          clear centre and a soft dark edge, so it reads on light and dark
-          screens alike (Tobii Experience's "Preview my gaze"); the dwell
-          fills the ring in teal. No centre dot: nothing small to jitter. */}
+          re-renders, so the two writers stay consistent. A ring with a clear
+          centre and a soft dark edge (Tobii Experience's "Preview my gaze"):
+          light in Warm, amber in Dark (BUBBLE_RING_COLOR); the dwell fills the
+          ring in teal. No centre dot: nothing small to jitter. */}
       <div
         ref={cursorElRef}
         data-cursor="true"
@@ -1786,7 +1790,7 @@ export const GazeCursor: React.FC = () => {
             inset: 0,
             borderRadius: '50%',
             boxSizing: 'border-box',
-            border: `${ringPx}px solid rgba(255, 255, 255, 0.82)`,
+            border: `${ringPx}px solid ${BUBBLE_RING_COLOR}`,
             background: 'transparent',
             boxShadow: '0 0 0 1.5px rgba(0, 0, 0, 0.32), 0 2px 12px rgba(0, 0, 0, 0.45), '
               + 'inset 0 0 0 1.5px rgba(0, 0, 0, 0.30), inset 0 0 8px rgba(0, 0, 0, 0.22)',
