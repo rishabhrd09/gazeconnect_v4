@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { DEFAULT_CUSTOMIZATION } from '../../../services/defaultCustomization';
@@ -19,6 +20,13 @@ interface AlertModePanelProps {
 
 const MAX_CARDS = 5;
 
+/** The editor always shows exactly five rows. */
+const padCards = (list: AlertModeCard[]): AlertModeCard[] => {
+    const base = [...list];
+    while (base.length < MAX_CARDS) base.push({ label: '', enabled: false });
+    return base.slice(0, MAX_CARDS);
+};
+
 const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
     const colors = isDarkMode ? darkColors : lightColors;
     const { data, updateAlertModeCards } = useCustomization();
@@ -26,11 +34,9 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
     const savedCards = data.alertModeCards ?? DEFAULT_CUSTOMIZATION.alertModeCards;
 
     // Local draft state padded to exactly 5 slots
-    const [cards, setCards] = useState<AlertModeCard[]>(() => {
-        const base = [...savedCards];
-        while (base.length < MAX_CARDS) base.push({ label: '', enabled: false });
-        return base.slice(0, MAX_CARDS);
-    });
+    const [cards, setCards] = useState<AlertModeCard[]>(() => padCards(savedCards));
+    const isDirty = JSON.stringify(cards) !== JSON.stringify(padCards(savedCards));
+    useReportUnsavedChanges(isDirty);
 
     const [saved, setSaved] = useState(false);
 
@@ -45,16 +51,15 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
     }, []);
 
     const handleSave = useCallback(() => {
-        updateAlertModeCards(cards.filter(c => c.label.trim() !== '' || c.enabled));
+        const kept = cards.filter(c => c.label.trim() !== '' || c.enabled);
+        updateAlertModeCards(kept);
+        setCards(padCards(kept));
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
     }, [cards, updateAlertModeCards]);
 
     const handleReset = useCallback(() => {
-        const defaults = DEFAULT_CUSTOMIZATION.alertModeCards;
-        const base = [...defaults];
-        while (base.length < MAX_CARDS) base.push({ label: '', enabled: false });
-        setCards(base.slice(0, MAX_CARDS));
+        setCards(padCards(DEFAULT_CUSTOMIZATION.alertModeCards));
         setSaved(false);
     }, []);
 
@@ -62,11 +67,11 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
             {/* Header */}
             <div>
-                <div style={{ fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-                    Alert Mode Cards
+                <div className="settings-panel-title" style={{ fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                    Urgent Needs Cards
                 </div>
                 <div style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginTop: 4 }}>
-                    Configure the 5 care-action cards shown on the Alert Mode lock screen. The SOS Emergency card is always present.
+                    Choose the 5 care-action cards shown on the Urgent Needs screen. The SOS Emergency card is always there.
                 </div>
             </div>
 
@@ -76,8 +81,8 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                 background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
                 fontSize: 13, color: colors.text.secondary, lineHeight: 1.5,
             }}>
-                <strong style={{ color: '#EF4444' }}>Alert Mode</strong> is activated via right-click menu on the home screen.
-                When active, the app shows a full-screen lock screen with the SOS card and your configured cards below.
+                <strong style={{ color: '#EF4444' }}>Urgent Needs</strong> opens from its card on the Home screen, or from the right-click menu.
+                It fills the screen with the SOS card and your chosen cards, and can be locked from the right-click menu.
             </div>
 
             {/* SOS card: fixed, read-only */}
@@ -186,10 +191,10 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                         fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
                     }}
                 >
-                    Reset to Defaults
+                    Reset this page
                 </button>
                 <span style={{ fontSize: 12, color: colors.text.tertiary, marginLeft: 8 }}>
-                    Changes take effect immediately on next Alert Mode activation
+                    Changes show the next time Urgent Needs opens
                 </span>
             </div>
         </div>

@@ -368,3 +368,22 @@
 :root[data-theme] .survey-summary-panel { min-height: 0; }
 :root[data-theme] .survey-summary-pager { display: flex; gap: 16px; padding: 14px 24px; border-top: 1px solid var(--ui-border); flex-shrink: 0; }
 :root[data-theme] .survey-summary-pager button { flex: 1; min-height: 80px; height: 80px; background: var(--ui-surface) !important; border: 1px solid var(--ui-border) !important; color: var(--ui-ink) !important; font-size: 17px !important; box-shadow: none !important; transform: none !important; }
+/* ── HOME FOOTER (24 Sep 2026) ── the optional word bar: one connected row on the
+   bottom edge, divided by hairlines. Paint only; size and position live in HomeScreen.tsx. */
+:root[data-theme] .home-screen .home-footer {
+  background: var(--ui-panel);
+  border-top: 1px solid var(--ui-border);
+}
+:root[data-theme] .home-screen .home-footer-divider { background: var(--ui-border); }
+:root[data-theme] .home-screen .home-footer-cell {
+  background: transparent !important; border: none !important; border-radius: 0 !important;
+  box-shadow: none !important; transform: none !important;
+  transition: background-color 120ms !important;
+}
+:root[data-theme] .home-screen .home-footer-cell:hover { background: var(--ui-hover) !important; }
+:root[data-theme] .home-screen .home-footer-cell.is-activated { background: var(--ui-selected) !important; }
+:root[data-theme] .home-screen .home-footer-label { font-family: var(--ui-font) !important; letter-spacing: 0 !important; }
+:root[data-theme] .home-screen .home-footer-word .home-footer-label { font-weight: 650 !important; color: var(--ui-accent-ink) !important; }
+:root[data-theme] .home-screen .home-footer-phrase .home-footer-label { font-weight: 600 !important; color: var(--ui-ink) !important; }
+/* The status badge would sit on the footer's last cell: lift it above the footer. */
+:root[data-theme] body:has(.home-screen--word-bar) .connection-indicator { bottom: calc(clamp(104px, 14vh, 164px) + 10px) !important; /* = HOME_FOOTER_HEIGHT */ }

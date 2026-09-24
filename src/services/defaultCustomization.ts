@@ -409,6 +409,16 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   // ============================================
   // HOME EMERGENCY CARDS (independent from Quick Words)
   // ============================================
+  // Off until a caregiver turns it on (Settings > Home Layout). Filled with the
+  // app's own core words and the first two emergency cards, so switching it on
+  // shows something useful straight away.
+  homeWordBar: {
+    enabled: false,
+    layout: '3+2',
+    words: ['Yes', 'No', 'Help', 'Water'],
+    phrases: ['TT Suction', 'Ambu Bag'],
+  },
+
   homeEmergencyCards: [
     { en: 'TT Suction', hi: 'TT सक्शन', enabled: true, priority: 'high' },
     { en: 'Ambu Bag', hi: 'अंबू बैग', enabled: true, priority: 'high' },
@@ -589,7 +599,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     filterPreset: 'balanced',
     dwellTimingSet: 'balanced',
     gazeOnNavigate: 'smart-pause',
-    ttsRate: 1.0,
+    ttsRate: 150,  // words per minute (the Voice stepper: 80-250); 150 is the normal pace
     ttsVolume: 0.25,
     breakReminderInterval: 20,
     ttsLanguage: 'english',
@@ -600,7 +610,10 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     gazeOffsetX: 0,
     gazeOffsetY: 0,
     gazeDebugOverlay: false,
-    homeEmergencyLaunchMode: 'cards',
+    // Home's left panel starts as Quick Phrases only (maintainer's choice, 24 Sep 2026).
+    // Settings > Home Layout offers Urgent Needs + Quick Phrases; older saved files keep
+    // their Urgent Needs card (CustomizationService.mergeWithDefaults).
+    homeEmergencyLaunchMode: 'quick',
   },
 
   // ============================================

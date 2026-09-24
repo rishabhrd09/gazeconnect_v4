@@ -1206,7 +1206,7 @@ function createWindow(): void {
         click: (menuItem) => setMouseOnlyMode(menuItem.checked),
       },
       {
-        label: '🚨 Enable Alert Mode',
+        label: '🚨 Show Urgent Needs',
         type: 'checkbox',
         checked: isAlertModeActive,
         click: (menuItem) => {
@@ -1218,7 +1218,7 @@ function createWindow(): void {
       // can't exit; only the caregiver can unlock (or fully disable Alert
       // Mode) via this same right-click menu.
       {
-        label: isAlertModeLocked ? '🔐 Unlock Alert Mode' : '🔒 Lock Alert Mode',
+        label: isAlertModeLocked ? '🔐 Unlock Urgent Needs' : '🔒 Lock Urgent Needs',
         type: 'checkbox',
         checked: isAlertModeLocked,
         enabled: isAlertModeActive,

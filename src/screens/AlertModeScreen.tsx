@@ -9,6 +9,7 @@ import GazeButton from '../components/core/GazeButton';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useAlertMode } from '../contexts/AlertModeContext';
+import { isGazeSpellLook } from '../config/look';
 
 interface AlertModeScreenProps {
   onSpeak: (text: string) => void;
@@ -36,8 +37,9 @@ const CARD_TONES: Array<{
 const ConfirmOverlay: React.FC<{
   label: string;
   tone: typeof CARD_TONES[number];
+  isSos: boolean;
   onDone: () => void;
-}> = ({ label, tone, onDone }) => {
+}> = ({ label, tone, isSos, onDone }) => {
   const [opacity, setOpacity] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,7 +69,7 @@ const ConfirmOverlay: React.FC<{
       opacity,
       transition: 'opacity 240ms ease',
     }}>
-      <div style={{
+      <div className={`alert-confirm-panel${isSos ? ' alert-confirm-sos' : ''}`} style={{
         width: 'min(72vw, 860px)',
         background: tone.background,
         border: 'none',
@@ -164,7 +166,7 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
         userSelect: 'none',
         fontFamily: UI_FONT,
       }}>
-        <div style={{
+        <div className="alert-mode-strip" style={{
           position: 'absolute',
           top: 0,
           left: 0,
@@ -186,7 +188,7 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
             textTransform: 'uppercase',
             fontFamily: UI_FONT,
           }}>
-            Alert Mode Active
+            Urgent Needs
           </span>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6E7A53', opacity: 0.85 }} />
         </div>
@@ -258,7 +260,7 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
         </GazeButton>
 
         <div style={{ marginBottom: 'clamp(18px, 2.6vh, 34px)', textAlign: 'center' }}>
-          <div style={{
+          <div className="alert-mode-title" style={{
             fontSize: 'clamp(22px, 3.1vh, 38px)',
             fontWeight: 700,
             color: '#CEC4B8',
@@ -266,13 +268,13 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           }}>
             Select a care action
           </div>
-          <div style={{
+          <div className="alert-mode-hint" style={{
             marginTop: 8,
             fontSize: 'clamp(12px, 1.3vh, 15px)',
             color: 'rgba(206,196,184,0.52)',
             fontWeight: 500,
           }}>
-            Dwell on a card to activate
+            {isGazeSpellLook ? 'Look at a card to activate it' : 'Dwell on a card to activate'}
           </div>
         </div>
 
@@ -339,7 +341,7 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           })}
         </div>
 
-        <div style={{
+        <div className="alert-mode-footer" style={{
           position: 'absolute',
           bottom: 10,
           fontSize: 11,
@@ -347,8 +349,8 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           letterSpacing: '0.02em',
         }}>
           {isAlertModeLocked
-            ? 'Right-click to unlock or disable Alert Mode'
-            : 'Right-click to disable Alert Mode'}
+            ? 'Right-click to unlock or close Urgent Needs'
+            : 'Right-click to close Urgent Needs'}
         </div>
       </div>
 
@@ -356,6 +358,7 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
         <ConfirmOverlay
           label={confirming.label}
           tone={CARD_TONES[confirming.idx] ?? CARD_TONES[5]}
+          isSos={confirming.idx === 0}
           onDone={handleDone}
         />
       )}

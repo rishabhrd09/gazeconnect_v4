@@ -10,7 +10,7 @@ import type {
   CustomizationData, Person, PhraseCategory,
   MedicalSection, HomeQuickActions, HomeEmergencyCard,
   ActivityCategory, AACCategory, Phrase, AppSettings, QuickWordsConfig,
-  AlertModeCard,
+  AlertModeCard, HomeWordBarConfig,
 } from '../types/customization';
 import { CustomizationService, customizationService } from '../services/CustomizationService';
 
@@ -54,6 +54,7 @@ interface CustomizationContextValue {
   // Home operations
   updateHomeQuickActions: (actions: HomeQuickActions) => void;
   updateHomeEmergencyCards: (cards: HomeEmergencyCard[]) => void;
+  updateHomeWordBar: (config: HomeWordBarConfig) => void;
   updateQuickWords: (quickWords: QuickWordsConfig) => void;
 
   // Activity operations
@@ -135,6 +136,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateHomeQuickActions = useCallback((actions: HomeQuickActions) => customizationService.updateHomeQuickActions(actions), []);
   const updateHomeEmergencyCards = useCallback((cards: HomeEmergencyCard[]) => customizationService.updateHomeEmergencyCards(cards), []);
+  const updateHomeWordBar = useCallback((config: HomeWordBarConfig) => customizationService.updateHomeWordBar(config), []);
   const updateQuickWords = useCallback((qw: QuickWordsConfig) => customizationService.updateQuickWords(qw), []);
 
   const updateActivityCategory = useCallback((id: string, cat: ActivityCategory) => customizationService.updateActivityCategory(id, cat), []);
@@ -173,6 +175,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     updateMedicalSection, removeMedicalSection,
     updateHomeQuickActions,
     updateHomeEmergencyCards,
+    updateHomeWordBar,
     updateQuickWords,
     updateActivityCategory, addActivityCategory, removeActivityCategory,
     updateAACCategories,

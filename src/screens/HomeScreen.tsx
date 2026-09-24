@@ -193,6 +193,9 @@ const MIX_HOME_BADGE_ICON = '#23180C';
 const USE_FILLED_HOME_ICON_BADGES = false;
 
 const PANEL_GAP = 'clamp(12px, 2.2vh, 26px)';
+// The word-bar footer's height: about a seventh of the screen (20% took too much from
+// the tiles). Its cells stay well above the 80 px gaze minimum: 108 px at 768 high.
+const HOME_FOOTER_HEIGHT = 'clamp(104px, 14vh, 164px)';
 
 const HIGH_PRIORITY_HOME_COLORS: Record<string, { bg: string; shadow: string }> = {
   alert_maroon: { bg: '#4A2023', shadow: '#8A3B38' },
@@ -277,7 +280,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { enableAlertMode } = useAlertMode();
-  const { homeQuickActions, data: { quickWords, homeEmergencyCards, settings } } = useCustomization();
+  const { homeQuickActions, data: { homeWordBar, settings } } = useCustomization();
   const { isLight, isMix, isWarm } = useTheme();
 
   const [activatedText, setActivatedText] = useState<string | null>(null);
@@ -298,7 +301,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [onSpeak]);
 
   const handleEnableAlertMode = useCallback(() => {
-    onSpeak('Alert Mode');
+    onSpeak('Urgent needs');
     enableAlertMode();
   }, [enableAlertMode, onSpeak]);
 
@@ -523,55 +526,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     textAlign: 'center' as const,
   };
 
-  // Use independent home emergency cards; fallback to old quickWords behavior if empty
-  const homeCards = homeEmergencyCards?.filter(c => c.enabled) ?? [];
-  const prioritizedEmergencyWords = homeCards.length > 0
-    ? homeCards
-      .map((word, order) => ({ word, order }))
-      .sort((a, b) => {
-        const pa = (a.word.priority ?? 'high') === 'high' ? 0 : 1;
-        const pb = (b.word.priority ?? 'high') === 'high' ? 0 : 1;
-        return pa - pb || a.order - b.order;
-      })
-      .map(({ word }) => word)
-      .slice(0, 4)
-    : (() => {
-      const emergencyQuickWordObjects = quickWords?.categories
-        ?.find((category) => category.id === 'emergency')
-        ?.words
-        ?.filter((word) => word.enabled) ?? [];
-      return [...emergencyQuickWordObjects]
-        .sort((a, b) => {
-          const pa = (a.priority ?? 'high') === 'high' ? 0 : 1;
-          const pb = (b.priority ?? 'high') === 'high' ? 0 : 1;
-          return pa - pb;
-        })
-        .slice(0, 4);
-    })();
-  const useAlertLauncher = settings?.homeEmergencyLaunchMode === 'alert';
-  const selectedHighColor = quickWords?.highColor ?? 'muted_maroon';
-  const selectedMediumColor = quickWords?.mediumColor ?? 'warm_teal';
-  const getEmergencyPriorityColor = useCallback((priority?: 'high' | 'medium') => {
-    if (isWarm) {
-      const isHigh = (priority ?? 'high') === 'high';
-      return isHigh
-        ? { bg: '#8A3B38', shadow: '#5A1F1D' }   // warm maroon
-        : { bg: '#C9A96B', shadow: '#A88B4F' };  // warm gold
-    }
-    if (isLight) {
-      const isHigh = (priority ?? 'high') === 'high';
-      return isHigh
-        ? { bg: '#8A3B38', shadow: '#5A2528' }   // warm maroon
-        : { bg: '#C9A96B', shadow: '#A88B4F' };  // warm gold
-    }
-    if (priority === 'medium') {
-      return MEDIUM_PRIORITY_HOME_COLORS[selectedMediumColor] ?? MEDIUM_PRIORITY_HOME_COLORS.warm_teal;
-    }
-    return HIGH_PRIORITY_HOME_COLORS[selectedHighColor] ?? HIGH_PRIORITY_HOME_COLORS.muted_maroon;
-  }, [isLight, isWarm, selectedHighColor, selectedMediumColor]);
+  // Left panel (Settings > Home Layout). 'quick' shows Quick Phrases on its own;
+  // anything else -- including the four-card mode retired on 24 Sep 2026 -- shows
+  // the Urgent Needs card above it, so Home keeps a one-look path to help unless
+  // a caregiver has chosen otherwise.
+  const quickPhrasesOnly = settings?.homeEmergencyLaunchMode === 'quick';
+
+  // Optional word bar along the bottom (Settings > Home Layout; off by default).
+  // Empty slots are simply left out.
+  const wordBarCells = React.useMemo(() => {
+    if (!homeWordBar?.enabled) return [];
+    const wordCount = homeWordBar.layout === '4+2' ? 4 : 3;
+    const words = homeWordBar.words.slice(0, wordCount)
+      .map((text, i) => ({ id: `home-bar-word-${i}`, text: text.trim(), kind: 'word' as const }));
+    const phrases = homeWordBar.phrases.slice(0, 2)
+      .map((text, i) => ({ id: `home-bar-phrase-${i}`, text: text.trim(), kind: 'phrase' as const }));
+    return [...words, ...phrases].filter(cell => cell.text);
+  }, [homeWordBar]);
+  const showWordBar = wordBarCells.length > 0;
+  // Footer on, both cards shown: the column is shorter, so the two cards become an even
+  // pair -- equal height, top and bottom level with the tiles, the hairline between them.
+  const pairedDock = showWordBar && !quickPhrasesOnly;
+  // The keyboard's own suggestion colours (its word slots and its phrase cell), so
+  // the bar reads as the same kind of thing.
+  const wordBarPalette = isWarm
+    ? { wordBg: '#F4EFE7', wordText: '#285C4D', phraseBg: '#EDEFE6', phraseText: '#26342D', accent: '#285C4D' }
+    : { wordBg: '#1D241F', wordText: '#A5D0B9', phraseBg: '#222B27', phraseText: '#DCE6DD', accent: '#A5D0B9' };
 
   return (
-    <div className={`home-screen${themeClass}`} style={{
+    <div className={`home-screen${themeClass}${showWordBar ? ' home-screen--word-bar' : ''}`} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -592,7 +575,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         alignItems: 'stretch',
         justifyContent: 'flex-start',
         paddingTop: 'clamp(10px, 1.8vh, 22px)',
-        paddingBottom: 'clamp(8px, 1.2vh, 16px)',
+        // With the footer on, it sits on the bottom edge of the screen.
+        paddingBottom: showWordBar ? 0 : 'clamp(8px, 1.2vh, 16px)',
         width: '100%',
         gap: 0,
         minHeight: 0,
@@ -608,7 +592,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           // Horizontal: clamp(18px,2.2vw,36px) → clamp(36px,4.8vw,80px) (+18–44px per side)
           // Vertical:   clamp(8px,1.2vh,16px)  → clamp(12px,1.8vh,24px) (+4–8px per side)
           paddingTop: 'clamp(20px, 3.5vh, 42px)',
-          paddingBottom: 'clamp(70px, 10vh, 120px)',
+          // With the footer on, it takes the space that is otherwise left empty here,
+          // keeping a clear gap between the tiles and the footer.
+          paddingBottom: showWordBar ? 'clamp(14px, 2.4vh, 30px)' : 'clamp(70px, 10vh, 120px)',
           paddingLeft: 'clamp(36px, 4.5vw, 80px)',
           paddingRight: 'clamp(36px, 4.5vw, 80px)',
           marginTop: 'clamp(8px, 1.2vh, 16px)',
@@ -623,38 +609,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           {(() => {
             const NAV_BG = THEME.quickPhrasesBg;
             const alertCardColor = HIGH_PRIORITY_HOME_COLORS.alert_maroon;
-            const DOCK_LABELS = useAlertLauncher ? [
+            const quickPhrasesItem = {
+              text: 'Quick Phrases',
+              textHi: 'बातचीत' as string | undefined,
+              spoken: '__quick_words__',
+              empty: false,
+              bg: undefined as string | undefined,
+              bgShadow: undefined as string | undefined,
+            };
+            const DOCK_LABELS = quickPhrasesOnly ? [quickPhrasesItem] : [
               {
-                text: 'Alert Mode',
+                text: 'Urgent Needs',
                 textHi: undefined as string | undefined,
                 spoken: '__alert_mode__',
                 empty: false,
                 bg: alertCardColor.bg,
                 bgShadow: alertCardColor.shadow,
               },
-              { text: 'Quick Phrases', textHi: 'à¤¬à¤¾à¤¤à¤šà¥€à¤¤', spoken: '__quick_words__', empty: false, bg: undefined as string | undefined, bgShadow: undefined as string | undefined },
-            ] : [
-              ...prioritizedEmergencyWords.map((word) => {
-                const priorityColor = getEmergencyPriorityColor(word.priority);
-                return {
-                  text: word.en.replace(/\s+/g, '\n'),
-                  textHi: word.hi,
-                  spoken: word.en,
-                  empty: false,
-                  bg: priorityColor.bg,
-                  bgShadow: priorityColor.shadow,
-                };
-              }),
-              // Pad to 4 with empty placeholders to keep grid stable
-              ...Array.from({ length: Math.max(0, 4 - prioritizedEmergencyWords.length) }, () => ({
-                text: '',
-                textHi: undefined as string | undefined,
-                spoken: '',
-                empty: true,
-                bg: undefined as string | undefined,
-                bgShadow: undefined as string | undefined,
-              })),
-              { text: 'Quick Phrases', textHi: 'बातचीत', spoken: '__quick_words__', empty: false, bg: undefined as string | undefined, bgShadow: undefined as string | undefined },
+              quickPhrasesItem,
             ];
             return (
               <div style={{
@@ -663,9 +635,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 flexBasis: 'clamp(280px, 32%, 490px)',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, 1fr)',
-                gridTemplateRows: '1fr 1fr clamp(8px, 1.2vh, 14px) 1fr',
+                gridTemplateRows: pairedDock ? '1fr clamp(8px, 1.2vh, 14px) 1fr' : '1fr 1fr clamp(8px, 1.2vh, 14px) 1fr',
                 columnGap: 'clamp(10px, 1.2vw, 16px)',
-                rowGap: 'clamp(8px, 1.2vh, 16px)',
+                rowGap: pairedDock ? 'clamp(10px, 1.6vh, 20px)' : 'clamp(8px, 1.2vh, 16px)',
+                // Level with the tiles' own bottom padding, so the pill ends where they do.
+                paddingBottom: pairedDock ? 'clamp(15px, 2.5vh, 30px)' : undefined,
+                boxSizing: 'border-box',
                 borderRadius: 'clamp(14px, 1.8vh, 20px)',
                 overflow: 'visible',
                 minHeight: 0,
@@ -673,23 +648,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 marginRight: 'clamp(8px, 1vw, 18px)',
                 position: 'relative',
               }}>
-                {/* Spacer row 3 contains the separator line */}
-                <div style={{
-                  gridColumn: '1 / -1',
-                  gridRow: '3',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}>
+                {/* Spacer row 3 contains the separator line (nothing to separate when Quick Phrases is alone) */}
+                {!quickPhrasesOnly && (
                   <div style={{
-                    width: '100%',
-                    height: '1px',
-                    background: THEME.dockSeparator,
-                  }} />
-                </div>
+                    gridColumn: '1 / -1',
+                    gridRow: pairedDock ? '2' : '3',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{
+                      width: '100%',
+                      height: '1px',
+                      background: THEME.dockSeparator,
+                    }} />
+                  </div>
+                )}
                 {DOCK_LABELS.map((item, i) => {
                   const btnId = `dock-${i}`;
                   const isActivated = activatedBtnId === btnId;
                   const isNav = item.spoken === '__quick_words__';
+                  // Quick Phrases on its own: one large card, centred in the column.
+                  const isSoloNav = isNav && quickPhrasesOnly;
                   const isAlertModeCard = item.spoken === '__alert_mode__';
                   const isEmpty = !isNav && !isAlertModeCard && item.empty;
                   const bg = isNav ? undefined : item.bg;
@@ -737,19 +716,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         if (item.spoken === '__alert_mode__') { handleEnableAlertMode(); return; }
                         handleQuickcall(item.spoken, btnId, bgShadow!);
                       }}
-                      className={`quickcall-btn${!isNav && !isAlertModeCard ? ' home-care-card' : ''}${themeClass}`}
+                      className={`quickcall-btn${!isNav && !isAlertModeCard ? ' home-care-card' : ''}${isNav ? (isSoloNav ? ' home-dock-phrases home-dock-solo' : ' home-dock-phrases') : isAlertModeCard ? ' home-dock-urgent' : ''}${themeClass}`}
                       isDarkMode={isDarkMode}
                       gazeEnabled={isGazeEnabled}
                       gazeEnabledTimestamp={lastEnabledTimestamp}
                       dwellCategory={!isNav ? 'emergencyButton' : 'homeScreenTile'}
                       style={{
                         ...({ '--care-tone': bgShadow || THEME.emergencyText } as React.CSSProperties),
-                        width: isNav ? '70%' : '100%',
-                        height: isAlertModeCard ? 'clamp(150px, 24vh, 220px)' : '100%',
-                        gridRow: isNav ? 4 : isAlertModeCard ? '1 / 3' : undefined,
+                        width: isSoloNav ? '82%' : isNav ? (pairedDock ? '100%' : '70%') : '100%',
+                        height: isAlertModeCard
+                          ? (pairedDock ? '100%' : 'clamp(150px, 24vh, 220px)')
+                          : isSoloNav ? 'clamp(170px, 26vh, 240px)' : '100%',
+                        gridRow: isSoloNav ? '1 / -1' : isNav ? (pairedDock ? 3 : 4) : isAlertModeCard ? (pairedDock ? '1' : '1 / 3') : undefined,
                         gridColumn: (isNav || isAlertModeCard) ? '1 / -1' : undefined,
                         justifySelf: isNav ? 'center' : undefined,
-                        alignSelf: isAlertModeCard ? 'center' : undefined,
+                        alignSelf: (isAlertModeCard || isSoloNav) ? 'center' : undefined,
                         borderRadius: isNav ? '999px' : '24px',
                         background: isNav ? NAV_BG : alertLauncherBg,
                         border: isNav
@@ -786,7 +767,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isAlertModeCard ? 'flex-start' : 'center', gap: '0px' }}>
                           <span style={{
-                            fontSize: isAlertModeCard ? 'clamp(31px, 4vh, 46px)' : (!isNav ? 'clamp(24px, 3vh, 32px)' : 'clamp(22px, 2.8vh, 32px)'),
+                            fontSize: isAlertModeCard ? 'clamp(31px, 4vh, 46px)' : isSoloNav ? 'clamp(28px, 3.6vh, 40px)' : (!isNav ? 'clamp(24px, 3vh, 32px)' : pairedDock ? 'clamp(24px, 3.3vh, 38px)' : 'clamp(22px, 2.8vh, 32px)'),
                             fontWeight: isAlertModeCard ? 800 : (!isNav ? ((isLight || isMix || isWarm) ? 600 : 900) : ((isLight || isMix || isWarm) ? 600 : 700)),
                             color: isNav ? THEME.quickPhrasesText : alertLauncherFg,
                             lineHeight: isAlertModeCard ? 1 : 1.1,
@@ -803,7 +784,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         </div>
                         {isNav && (
                           <span style={{
-                            fontSize: 'clamp(20px, 2.5vh, 28px)',
+                            fontSize: isSoloNav ? 'clamp(24px, 3vh, 34px)' : 'clamp(20px, 2.5vh, 28px)',
                             fontWeight: isLight ? 500 : isMix ? 650 : 300,
                             color: isActivated
                               ? (isLight ? THEME.subtleText : isMix ? THEME.subtleText : screenThemes.home.teal)
@@ -825,7 +806,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           <div style={dividerStyle} />
 
           <div style={{
-            flex: '2 1 0',
+            // Its own column gap as the starting size, so its two tiles come out exactly
+            // as wide as the right-hand tiles (flex 2:1 alone left those 12 px wider).
+            flex: `2 1 ${PANEL_GAP}`,
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
             gridTemplateRows: 'repeat(3, minmax(clamp(115px, 13.5vh, 160px), 1fr))',
@@ -944,6 +927,82 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         </div>
 
+        {/* FOOTER -- the optional word bar (Settings > Home Layout): words and phrases
+            that stay on Home; one look speaks them. One connected row along the bottom
+            edge of the screen, the bottom fifth, divided by hairlines, clear of the
+            tiles above. In full screen the backend accepts gaze reported just past the
+            bottom of the glass (SCREEN_EDGE_BAND_PX), so the row can sit on the edge. */}
+        {showWordBar && (
+          <div className="home-footer" role="group" aria-label="Words and phrases" style={{
+            flexShrink: 0,
+            height: HOME_FOOTER_HEIGHT,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'stretch',
+            boxSizing: 'border-box',
+          }}>
+            {wordBarCells.map((cell, index) => {
+              const isPhrase = cell.kind === 'phrase';
+              const letters = Math.max(1, cell.text.length);
+              const isActivated = activatedBtnId === cell.id;
+              return (
+                <React.Fragment key={cell.id}>
+                  {index > 0 && (
+                    <div className="home-footer-divider" aria-hidden="true" style={{
+                      width: 1, flexShrink: 0, alignSelf: 'center', height: '46%',
+                    }} />
+                  )}
+                  <GazeButton
+                    id={cell.id}
+                    className={`home-footer-cell ${isPhrase ? 'home-footer-phrase' : 'home-footer-word'}${isActivated ? ' is-activated' : ''}${themeClass}`}
+                    ariaLabel={`Say ${cell.text}`}
+                    onClick={() => handleQuickcall(cell.text, cell.id, wordBarPalette.accent)}
+                    isDarkMode={isDarkMode}
+                    gazeEnabled={isGazeEnabled}
+                    gazeEnabledTimestamp={lastEnabledTimestamp}
+                    dwellCategory="quickWord"
+                    style={{
+                      flex: isPhrase ? '1.6 1 0' : '1 1 0',
+                      minWidth: 0,
+                      height: '100%',
+                      boxSizing: 'border-box',
+                      border: 'none',
+                      borderRadius: 0,
+                      background: 'transparent',
+                      boxShadow: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: isPhrase ? '0 clamp(14px, 1.4vw, 26px)' : '0 clamp(8px, 0.8vw, 14px)',
+                      overflow: 'hidden',
+                      // The cell is the size container for its label (see the word size below).
+                      containerType: 'inline-size',
+                      cursor: 'pointer',
+                    } as React.CSSProperties}
+                  >
+                    <span className="home-footer-label" style={isPhrase ? {
+                      fontSize: 'clamp(24px, 3.1vh, 36px)',
+                      lineHeight: 1.15,
+                      textAlign: 'center',
+                      display: '-webkit-box',
+                      WebkitBoxOrient: 'vertical',
+                      WebkitLineClamp: 2,
+                      overflow: 'hidden',
+                      whiteSpace: 'normal',
+                    } : {
+                      // As on the keyboard: a long word shrinks to fit instead of being cut off.
+                      fontSize: `min(clamp(30px, 3.9vh, 48px), calc(100cqw / ${(letters * 0.6).toFixed(2)}))`,
+                      lineHeight: 1.1,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {cell.text}
+                    </span>
+                  </GazeButton>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {activatedText && (
@@ -1018,6 +1077,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           [class*="timeDisplay"] {
             display: none !important;
           }
+        }
+
+        /* ── WORD BAR ON ──
+           The tiles give up height to the bar. On short screens their icons shrink
+           so the label (and Assistance's sub-label) still fit: at 1366x768 a tile is
+           115 px tall, and a 72 px icon left "DAILY CARE" cut off. From about 1080 px
+           of height up this is the usual icon size, so the tested layout is unchanged. */
+        .home-screen--word-bar .grid-card svg {
+          width: clamp(44px, 6.6vh, 72px) !important;
+          height: clamp(44px, 6.6vh, 72px) !important;
+        }
+        .home-screen--word-bar .grid-card-communication svg {
+          width: clamp(50px, 7.5vh, 82px) !important;
+          height: clamp(50px, 7.5vh, 82px) !important;
         }
 
         @keyframes gazeconnect-magnify {

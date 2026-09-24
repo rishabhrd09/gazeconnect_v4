@@ -190,19 +190,35 @@ export interface AppSettings {
   filterPreset: string;
   dwellTimingSet: 'quick' | 'balanced' | 'relaxed'; // One complete set of the five selection durations
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';
-  ttsRate: number;
+  ttsRate: number;                 // words per minute, 80-250 (older saves: a multiplier, converted on load)
   ttsVolume: number;
-  breakReminderInterval: number;   // minutes (10–60, default 20)
+  breakReminderInterval: number;   // minutes; not on the Settings page (the reminder is not shown anywhere yet)
   ttsLanguage: string;             // Legacy storage field; normalized to 'english'.
   gazeCursorSize: string;          // 'small' | 'medium' | 'large'
   showGazeCursor: boolean;         // Moving circle that follows the eyes (default true)
-  soundEffects: boolean;
-  userName: string;                // Name shown on splash screen (default: 'Papa')
+  soundEffects: boolean;           // not on the Settings page: the app plays no click sounds
+  userName: string;                // not on the Settings page since the welcome screen went (default: 'Papa')
   // Gaze accuracy settings
   gazeOffsetX: number;             // Legacy storage field; normalized to 0 (see CustomizationService).
   gazeOffsetY: number;             // Legacy storage field; normalized to 0.
   gazeDebugOverlay: boolean;       // Show gaze debug overlay (default false)
-  homeEmergencyLaunchMode?: 'cards' | 'alert'; // Home left panel: four emergency cards or one Alert Mode launcher
+  // Home left panel: 'quick' = Quick Phrases only (the default for new installs and
+  // resets, 24 Sep 2026), 'alert' = the Urgent Needs card above Quick Phrases. 'cards'
+  // (four emergency cards) was retired on 24 Sep 2026; it, or a saved file without this
+  // value, is read as 'alert', so nobody loses the one-look path to help.
+  homeEmergencyLaunchMode?: 'cards' | 'alert' | 'quick';
+}
+
+// ============================================
+// HOME WORD BAR (optional row along the bottom of Home)
+// ============================================
+
+/** Words and phrases that stay on the Home screen; one look speaks them. */
+export interface HomeWordBarConfig {
+  enabled: boolean;          // Off by default
+  layout: '3+2' | '4+2';     // How many words, then two phrases
+  words: string[];           // Always 4 entries, in order; '' = empty
+  phrases: string[];         // Always 2 entries, in order; '' = empty
 }
 
 // ============================================
@@ -227,6 +243,7 @@ export interface CustomizationData {
   quickWords: QuickWordsConfig;
   homeQuickActions: HomeQuickActions;
   homeEmergencyCards: HomeEmergencyCard[];
+  homeWordBar: HomeWordBarConfig;
   activityCategories: ActivityCategory[];
   aacCategories: AACCategory[];
   feelings: Phrase[];

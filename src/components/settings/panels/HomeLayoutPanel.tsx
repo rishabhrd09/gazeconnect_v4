@@ -1,31 +1,30 @@
 /**
- * HomeLayoutPanel - Home Emergency Cards Manager
- * ======================================
- * Allows users to:
- * - Manage a library of up to 15 emergency cards
- * - Choose which 4 are visible on the Home Screen
- * - Add, edit, remove, and prioritize cards
- * Standard HTML/CSS form elements (no GazeButton).
+ * HomeLayoutPanel - what the Home screen shows
+ * ============================================
+ * - Left panel: the Urgent Needs card above Quick Phrases, or Quick Phrases alone.
+ * - Word bar: an optional row of words and phrases along the bottom of Home.
+ * The emergency-card library and its colours left this page on 24 Sep 2026; the
+ * cards themselves stay in the saved data (the word predictor still reads them).
+ * Standard HTML/CSS form elements (no GazeButton): this page is used with a mouse.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 import { DEFAULT_CUSTOMIZATION } from '../../../services/defaultCustomization';
-import type {
-  HomeEmergencyCard,
-  QuickWordHighColor,
-  QuickWordMediumColor,
-  QuickWordPriority,
-} from '../../../types/customization';
+import {
+  HOME_WORD_BAR_PHRASES,
+  HOME_WORD_BAR_WORDS,
+  normalizeHomeWordBar,
+} from '../../../services/CustomizationService';
+import type { HomeWordBarConfig } from '../../../types/customization';
 
 interface HomeLayoutPanelProps {
   isDarkMode: boolean;
 }
-
-const MAX_WORDS = 15;
-const MAX_ACTIVE = 4;
 
 // ============================================
 // SCOPED CSS
@@ -179,291 +178,30 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
 // HELPERS
 // ============================================
 
-function getHomeEmergencyCards(data: any): HomeEmergencyCard[] {
-  const cards: HomeEmergencyCard[] = data?.homeEmergencyCards ?? [];
-  return cards.map(c => ({ ...c, priority: c.priority ?? 'high' }));
-}
+type LeftPanelMode = 'alert' | 'quick';
 
-function getDefaultHomeEmergencyCards(): HomeEmergencyCard[] {
-  return structuredClone(DEFAULT_CUSTOMIZATION.homeEmergencyCards);
-}
+/** 'quick' = Quick Phrases only; everything else (incl. the retired 'cards') = Urgent Needs + Quick Phrases. */
+const readLeftPanelMode = (value: unknown): LeftPanelMode => (value === 'quick' ? 'quick' : 'alert');
 
-// ============================================
-// WORD ROW (editable)
-// ============================================
+const wordCountFor = (layout: HomeWordBarConfig['layout']) => (layout === '4+2' ? 4 : 3);
 
-const PRIORITY_PILL_COLORS: Record<QuickWordPriority, { bg: string; text: string }> = {
-  high:   { bg: '#6B3E3E', text: '#F5C6C6' },
-  medium: { bg: '#4B4430', text: '#E6D7A8' },
-};
-
-type HomeEmergencyLaunchMode = 'cards' | 'alert';
-
-const HIGH_COLOR_OPTIONS: Array<{
-  key: QuickWordHighColor;
-  label: string;
-  swatch: string;
-  border: string;
-}> = [
-  { key: 'alert_maroon', label: 'Alert Maroon (Recommended)', swatch: '#4A2023', border: '#8A3B38' },
-  { key: 'muted_red', label: 'Warm Red', swatch: '#8A3B38', border: '#A65A52' },
-  { key: 'muted_crimson', label: 'Muted Crimson', swatch: '#7A3A4A', border: '#955064' },
-];
-
-const MEDIUM_COLOR_OPTIONS: Array<{
-  key: QuickWordMediumColor;
-  label: string;
-  swatch: string;
-  border: string;
-}> = [
-  { key: 'alert_maroon', label: 'Alert Maroon (Recommended)', swatch: '#4A2023', border: '#8A3B38' },
-  { key: 'warm_maroon', label: 'Warm Red', swatch: '#8A3B38', border: '#A65A52' },
-  { key: 'muted_crimson', label: 'Muted Crimson', swatch: '#7A3A4A', border: '#955064' },
-];
-
-const getHighColorPreview = (key?: QuickWordHighColor) => (
-  HIGH_COLOR_OPTIONS.find(option => option.key === key)
-  ?? HIGH_COLOR_OPTIONS.find(option => option.key === 'alert_maroon')
-  ?? HIGH_COLOR_OPTIONS[0]
-);
-
-const getMediumColorPreview = (key?: QuickWordMediumColor) => (
-  MEDIUM_COLOR_OPTIONS.find(option => option.key === key)
-  ?? MEDIUM_COLOR_OPTIONS.find(option => option.key === 'alert_maroon')
-  ?? MEDIUM_COLOR_OPTIONS[0]
-);
-
-const ALERT_LAUNCHER_PREVIEW =
-  HIGH_COLOR_OPTIONS.find(option => option.key === 'alert_maroon') ?? HIGH_COLOR_OPTIONS[0];
-
-const WordRow: React.FC<{
-  word: HomeEmergencyCard;
-  index: number;
-  activeIndex: number; // -1 if not active, else 0-3
-  isEditingThis: boolean;
-  canActivate: boolean;
-  onToggleActive: () => void;
-  onChangePriority: (priority: QuickWordPriority) => void;
-  onEdit: () => void;
-  onSaveEdit: (en: string, hi: string) => void;
-  onCancelEdit: () => void;
-  onRemove: () => void;
-  colors: typeof darkColors;
-}> = ({ word, activeIndex, isEditingThis, canActivate, onToggleActive, onChangePriority, onEdit, onSaveEdit, onCancelEdit, onRemove, colors }) => {
-  const [editEn, setEditEn] = useState(word.en);
-  const [editHi, setEditHi] = useState(word.hi);
-
-  // Sync when entering edit mode
-  React.useEffect(() => {
-    if (isEditingThis) {
-      setEditEn(word.en);
-      setEditHi(word.hi);
-    }
-  }, [isEditingThis, word.en, word.hi]);
-
-  if (isEditingThis) {
-    return (
-      <div className="hl-word-card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            className="hl-input"
-            value={editEn}
-            onChange={e => setEditEn(e.target.value)}
-            placeholder="English emergency phrase"
-            autoFocus
-            style={{ flex: 1 }}
-            onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(editEn, editHi); if (e.key === 'Escape') onCancelEdit(); }}
-          />
-
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button className="hl-btn" onClick={onCancelEdit} style={{ fontSize: 13, padding: '5px 12px' }}>Cancel</button>
-          <button className="hl-btn hl-btn-success" onClick={() => onSaveEdit(editEn, editHi)} style={{ fontSize: 13, padding: '5px 12px' }}>Save</button>
-        </div>
-      </div>
-    );
+const uniqueTexts = (values: Array<string | undefined>): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const text = (value ?? '').trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
   }
-
-  return (
-    <div className={`hl-word-card${word.enabled ? ' hl-word-card-active' : ''}`}>
-      {/* Active badge or empty space */}
-      {activeIndex >= 0 ? (
-        <span className="hl-active-badge">{activeIndex + 1}</span>
-      ) : (
-        <span style={{ width: 22, height: 22, flexShrink: 0 }} />
-      )}
-
-      {/* Toggle */}
-      <button
-        className={`hl-toggle ${word.enabled ? 'hl-toggle-on' : 'hl-toggle-off'}`}
-        onClick={onToggleActive}
-        disabled={!word.enabled && !canActivate}
-        title={word.enabled ? 'Deactivate' : (canActivate ? 'Activate (show on Home)' : 'Max 4 active cards reached')}
-        style={{ opacity: (!word.enabled && !canActivate) ? 0.4 : 1 }}
-      />
-
-      {/* Word text */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 14, fontWeight: 600, color: colors.text.primary,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {word.en}
-        </div>
-
-      </div>
-
-      {/* Priority toggle */}
-      <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: `1px solid ${colors.border.main}` }}>
-        {(['high', 'medium'] as QuickWordPriority[]).map(p => {
-          const isActive = (word.priority ?? 'high') === p;
-          const pillColors = PRIORITY_PILL_COLORS[p];
-          return (
-            <button
-              key={p}
-              onClick={() => onChangePriority(p)}
-              style={{
-                padding: '3px 10px',
-                fontSize: 11,
-                fontWeight: 700,
-                fontFamily: 'inherit',
-                border: 'none',
-                cursor: 'pointer',
-                background: isActive ? pillColors.bg : 'transparent',
-                color: isActive ? pillColors.text : colors.text.tertiary,
-                textTransform: 'capitalize',
-                transition: 'all 150ms',
-                letterSpacing: '0.3px',
-              }}
-            >
-              {p === 'high' ? 'High' : 'Medium'}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Edit button */}
-      <button
-        className="hl-btn-ghost"
-        onClick={onEdit}
-        style={{
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          color: colors.accent.main, fontSize: 13, fontWeight: 600,
-          padding: '4px 8px', borderRadius: 6, transition: 'all 150ms',
-          fontFamily: 'inherit',
-        }}
-      >
-        Edit
-      </button>
-
-      {/* Delete button */}
-      <button
-        className="hl-slot-del"
-        onClick={onRemove}
-        title="Remove card"
-      >
-        &#x2715;
-      </button>
-    </div>
-  );
+  return out;
 };
 
-// ============================================
-// MINI PREVIEW (4 visible emergency cards)
-// ============================================
-
-const ActivePreview: React.FC<{
-  words: HomeEmergencyCard[];
-  colors: typeof darkColors;
-  highColor: QuickWordHighColor;
-  mediumColor: QuickWordMediumColor;
-  launchMode: HomeEmergencyLaunchMode;
-}> = ({ words, colors, highColor, mediumColor, launchMode }) => {
-  // Auto-sort: high priority first, then medium (stable sort preserves relative order)
-  const active = words
-    .map((word, order) => ({ word, order }))
-    .filter(({ word }) => word.enabled)
-    .sort((a, b) => {
-      const pa = (a.word.priority ?? 'high') === 'high' ? 0 : 1;
-      const pb = (b.word.priority ?? 'high') === 'high' ? 0 : 1;
-      return pa - pb || a.order - b.order;
-    })
-    .map(({ word }) => word)
-    .slice(0, MAX_ACTIVE);
-
-  return (
-    <div style={{
-      padding: 16,
-      background: colors.background.primary,
-      borderRadius: 10,
-      border: `1px solid ${colors.border.main}`,
-    }}>
-      <div style={{ fontSize: 12, color: colors.text.tertiary, fontWeight: 600, marginBottom: 10 }}>
-        Home Screen Preview
-      </div>
-      {launchMode === 'alert' ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          maxWidth: 280,
-          minHeight: 112,
-          borderRadius: 14,
-          background: ALERT_LAUNCHER_PREVIEW.swatch,
-          border: `1px solid ${ALERT_LAUNCHER_PREVIEW.border}`,
-        }}>
-          <span style={{
-            fontSize: 16,
-            fontWeight: 800,
-            color: '#FFF1E3',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}>
-            Alert Mode
-          </span>
-        </div>
-      ) : (
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: 8,
-        maxWidth: 280,
-      }}>
-        {[0, 1, 2, 3].map(i => {
-          const word = active[i];
-          const previewColor = word?.priority === 'medium'
-            ? getMediumColorPreview(mediumColor)
-            : getHighColorPreview(highColor);
-          return (
-            <div key={i} style={{
-              padding: '12px 8px',
-              borderRadius: 12,
-              background: word ? previewColor.swatch : `${colors.border.main}33`,
-              border: word ? `1px solid ${previewColor.border}` : `1px dashed ${colors.border.main}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: 48,
-            }}>
-              <span style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: word ? '#FFF1E3' : colors.text.tertiary,
-                textAlign: 'center',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                lineHeight: 1.3,
-              }}>
-                {word ? word.en : 'Empty'}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      )}
-    </div>
-  );
-};
+// The Home screen's own word bar colours (HomeScreen.tsx), so the preview matches it.
+const barPreviewPalette = (isWarm: boolean) => (isWarm
+  ? { wordBg: '#F4EFE7', wordText: '#285C4D', phraseBg: '#EDEFE6', phraseText: '#26342D', frame: '#FBF7F0' }
+  : { wordBg: '#1D241F', wordText: '#A5D0B9', phraseBg: '#222B27', phraseText: '#DCE6DD', frame: '#161B18' });
 
 // ============================================
 // MAIN COMPONENT
@@ -471,220 +209,100 @@ const ActivePreview: React.FC<{
 
 const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
   const colors = isDarkMode ? darkColors : lightColors;
-  const {
-    data,
-    updateHomeEmergencyCards,
-    updateQuickWords,
-    updateSetting,
-    homeQuickActions,
-    updateHomeQuickActions,
-  } = useCustomization();
+  const { isWarm } = useTheme();
+  const { data, updateSetting, updateHomeWordBar } = useCustomization();
 
-  // Get home emergency cards (independent from quickWords)
-  const originalWords = useMemo(() => getHomeEmergencyCards(data), [data.homeEmergencyCards]);
+  const savedMode = readLeftPanelMode(data.settings?.homeEmergencyLaunchMode);
+  const savedBar = useMemo(
+    () => normalizeHomeWordBar(data.homeWordBar, undefined, DEFAULT_CUSTOMIZATION.homeWordBar),
+    [data.homeWordBar],
+  );
 
-  // Local editable copy
-  const [editWords, setEditWords] = useState<HomeEmergencyCard[]>(() => structuredClone(originalWords));
-  const [editHighColor, setEditHighColor] = useState<QuickWordHighColor>(() => data.quickWords?.highColor ?? 'muted_maroon');
-  const [editMediumColor, setEditMediumColor] = useState<QuickWordMediumColor>(() => data.quickWords?.mediumColor ?? 'warm_teal');
-  const [editLaunchMode, setEditLaunchMode] = useState<HomeEmergencyLaunchMode>(() => data.settings?.homeEmergencyLaunchMode ?? 'cards');
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  // Local editable copy (saved with Save Changes, as elsewhere in Settings)
+  const [editMode, setEditMode] = useState<LeftPanelMode>(savedMode);
+  const [editBar, setEditBar] = useState<HomeWordBarConfig>(() => structuredClone(savedBar));
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  // Add new card form
-  const [newEn, setNewEn] = useState('');
-  const [newHi, setNewHi] = useState('');
-  const [newPriority, setNewPriority] = useState<QuickWordPriority>('high');
+  const isDirty = editMode !== savedMode || JSON.stringify(editBar) !== JSON.stringify(savedBar);
+  useReportUnsavedChanges(isDirty);
 
-  // Track dirty
-  const originalHighColor = data.quickWords?.highColor ?? 'muted_maroon';
-  const originalMediumColor = data.quickWords?.mediumColor ?? 'warm_teal';
-  const originalLaunchMode = data.settings?.homeEmergencyLaunchMode ?? 'cards';
-  const isDirty =
-    JSON.stringify(editWords) !== JSON.stringify(originalWords)
-    || editHighColor !== originalHighColor
-    || editMediumColor !== originalMediumColor
-    || editLaunchMode !== originalLaunchMode;
-  const activeCount = editWords.filter(w => w.enabled).length;
-
-  // Sync external changes when not dirty
+  // Sync external changes (another window, an imported backup) when not dirty
   React.useEffect(() => {
     if (!isDirty) {
-      const freshWords = getHomeEmergencyCards(data);
-      if (JSON.stringify(freshWords) !== JSON.stringify(editWords)) {
-        setEditWords(structuredClone(freshWords));
-      }
-      setEditHighColor(data.quickWords?.highColor ?? 'muted_maroon');
-      setEditMediumColor(data.quickWords?.mediumColor ?? 'warm_teal');
-      setEditLaunchMode(data.settings?.homeEmergencyLaunchMode ?? 'cards');
+      setEditMode(savedMode);
+      setEditBar(structuredClone(savedBar));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.homeEmergencyCards, data.quickWords?.highColor, data.quickWords?.mediumColor, data.settings?.homeEmergencyLaunchMode]);
+  }, [savedMode, savedBar]);
 
-  // Toggle word active/inactive
-  const handleToggle = useCallback((index: number) => {
-    setEditWords(prev => {
-      const updated = [...prev];
-      const word = updated[index];
-      if (word.enabled) {
-        // Deactivate
-        updated[index] = { ...word, enabled: false };
-      } else {
-        // Activate: check limit
-        const currentActive = prev.filter(w => w.enabled).length;
-        if (currentActive >= MAX_ACTIVE) return prev;
-        updated[index] = { ...word, enabled: true };
-      }
-      return updated;
-    });
+  // Suggestions offered while typing: the app's own words and phrases.
+  const wordOptions = useMemo(() => uniqueTexts([
+    ...(data.quickWords?.coreWords ?? []).filter(w => w.enabled).map(w => w.en),
+    ...(data.quickWords?.categories ?? []).flatMap(c => c.words.filter(w => w.enabled).map(w => w.en)),
+  ]), [data.quickWords]);
+  const phraseOptions = useMemo(() => uniqueTexts([
+    ...(data.homeEmergencyCards ?? []).map(c => c.en),
+    ...(data.alertModeCards ?? []).map(c => c.label),
+    ...(data.quickWords?.categories ?? []).flatMap(c => c.words.flatMap(w => (w.phrases ?? []).map(p => p.en))),
+    ...(data.phraseCategories ?? []).flatMap(c => c.phrases.map(p => p.en)),
+  ]), [data.homeEmergencyCards, data.alertModeCards, data.quickWords, data.phraseCategories]);
+
+  const wordCount = wordCountFor(editBar.layout);
+  const setWord = useCallback((index: number, value: string) => {
+    setEditBar(bar => ({ ...bar, words: bar.words.map((w, i) => (i === index ? value : w)) }));
+  }, []);
+  const setPhrase = useCallback((index: number, value: string) => {
+    setEditBar(bar => ({ ...bar, phrases: bar.phrases.map((p, i) => (i === index ? value : p)) }));
   }, []);
 
-  // Change priority
-  const handleChangePriority = useCallback((index: number, priority: QuickWordPriority) => {
-    setEditWords(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], priority };
-      return updated;
-    });
-  }, []);
-
-  // Edit word
-  const handleSaveEdit = useCallback((index: number, en: string, hi: string) => {
-    const trimEn = en.trim();
-    if (!trimEn) {
-      setToast({ msg: 'English card label cannot be empty', type: 'error' });
-      return;
-    }
-    setEditWords(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], en: trimEn, hi: hi.trim() };
-      return updated;
-    });
-    setEditingIndex(null);
-  }, []);
-
-  // Remove word
-  const handleRemove = useCallback((index: number) => {
-    setEditWords(prev => prev.filter((_, i) => i !== index));
-    if (editingIndex === index) setEditingIndex(null);
-  }, [editingIndex]);
-
-  // Add new word
-  const handleAdd = useCallback(() => {
-    const trimEn = newEn.trim();
-    if (!trimEn) {
-      setToast({ msg: 'Please enter an English emergency phrase', type: 'error' });
-      return;
-    }
-    if (editWords.length >= MAX_WORDS) {
-      setToast({ msg: `Maximum ${MAX_WORDS} emergency cards reached`, type: 'error' });
-      return;
-    }
-    // Check duplicate
-    if (editWords.some(w => w.en.toLowerCase() === trimEn.toLowerCase())) {
-      setToast({ msg: 'This emergency card already exists in the library', type: 'error' });
-      return;
-    }
-    const shouldActivate = activeCount < MAX_ACTIVE;
-    setEditWords(prev => [...prev, { en: trimEn, hi: newHi.trim(), enabled: shouldActivate, priority: newPriority }]);
-    setNewEn('');
-    setNewHi('');
-    setNewPriority('high');
-  }, [newEn, newHi, newPriority, editWords, activeCount]);
-
-  // Move word up/down in list
-  const handleMoveUp = useCallback((index: number) => {
-    if (index === 0) return;
-    setEditWords(prev => {
-      const updated = [...prev];
-      [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
-      return updated;
-    });
-  }, []);
-
-  const handleMoveDown = useCallback((index: number) => {
-    setEditWords(prev => {
-      if (index >= prev.length - 1) return prev;
-      const updated = [...prev];
-      [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
-      return updated;
-    });
-  }, []);
-
-  // Save homeEmergencyCards independently from Quick Words
   const handleSave = useCallback(() => {
-    // Validate at least 1 active card
-    const activeCards = editWords.filter(w => w.enabled);
-    if (editLaunchMode === 'cards' && activeCards.length === 0) {
-      setToast({ msg: 'At least 1 card must be active', type: 'error' });
+    const bar = normalizeHomeWordBar(editBar, undefined, DEFAULT_CUSTOMIZATION.homeWordBar);
+    const shown = [...bar.words.slice(0, wordCountFor(bar.layout)), ...bar.phrases].filter(t => t.trim());
+    if (bar.enabled && shown.length === 0) {
+      setToast({ msg: 'Add at least one word or phrase, or turn the word bar off', type: 'error' });
       return;
     }
+    updateSetting('homeEmergencyLaunchMode', editMode);
+    updateHomeWordBar(bar);
+    setEditBar(structuredClone(bar));
+    setToast({ msg: 'Home layout saved', type: 'success' });
+  }, [editBar, editMode, updateHomeWordBar, updateSetting]);
 
-    // Save home emergency cards directly; colors remain shared quick-word tokens.
-    updateHomeEmergencyCards(structuredClone(editWords));
-    updateQuickWords({
-      ...data.quickWords,
-      highColor: editHighColor,
-      mediumColor: editMediumColor,
-    });
-    updateSetting('homeEmergencyLaunchMode', editLaunchMode);
-
-    // Also sync leftSidebar with active cards as fallback
-    const newLeftSidebar = activeCards
-      .map((word, order) => ({ word, order }))
-      .sort((a, b) => {
-        const pa = (a.word.priority ?? 'high') === 'high' ? 0 : 1;
-        const pb = (b.word.priority ?? 'high') === 'high' ? 0 : 1;
-        return pa - pb || a.order - b.order;
-      })
-      .slice(0, MAX_ACTIVE)
-      .map(({ word }) => ({ label: word.en }));
-    updateHomeQuickActions({
-      ...homeQuickActions,
-      leftSidebar: newLeftSidebar,
-    });
-
-    setToast({ msg: 'Home layout settings saved', type: 'success' });
-  }, [
-    data.quickWords,
-    editHighColor,
-    editLaunchMode,
-    editMediumColor,
-    editWords,
-    updateHomeEmergencyCards,
-    updateHomeQuickActions,
-    updateQuickWords,
-    updateSetting,
-    homeQuickActions,
-  ]);
-
-  // Reset
   const handleReset = useCallback(() => {
-    const defaultCards = getDefaultHomeEmergencyCards();
-    setEditWords(structuredClone(defaultCards));
-    setEditHighColor(DEFAULT_CUSTOMIZATION.quickWords.highColor ?? 'muted_maroon');
-    setEditMediumColor(DEFAULT_CUSTOMIZATION.quickWords.mediumColor ?? 'warm_teal');
-    setEditLaunchMode(DEFAULT_CUSTOMIZATION.settings.homeEmergencyLaunchMode ?? 'cards');
+    setEditMode(readLeftPanelMode(DEFAULT_CUSTOMIZATION.settings.homeEmergencyLaunchMode));
+    setEditBar(structuredClone(DEFAULT_CUSTOMIZATION.homeWordBar));
     setShowResetConfirm(false);
-    setToast({ msg: 'Reset to default Home layout', type: 'success' });
+    setToast({ msg: 'Default Home layout restored. Press Save Changes to keep it.', type: 'success' });
   }, []);
 
-  // Compute active index for each word
-  const activeIndices = useMemo(() => {
-    const map = new Map<number, number>();
-    editWords
-      .map((word, index) => ({ word, index }))
-      .filter(({ word }) => word.enabled)
-      .sort((a, b) => {
-        const pa = (a.word.priority ?? 'high') === 'high' ? 0 : 1;
-        const pb = (b.word.priority ?? 'high') === 'high' ? 0 : 1;
-        return pa - pb || a.index - b.index;
-      })
-      .slice(0, MAX_ACTIVE)
-      .forEach(({ index }, activeI) => map.set(index, activeI));
-    return map;
-  }, [editWords]);
+  const sectionStyle: React.CSSProperties = {
+    padding: '14px 16px',
+    background: colors.background.secondary,
+    borderRadius: 10,
+    border: `1px solid ${colors.border.main}`,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  };
+  const optionStyle = (selected: boolean): React.CSSProperties => ({
+    textAlign: 'left',
+    padding: '14px 16px',
+    borderRadius: 10,
+    border: `1.5px solid ${selected ? colors.accent.main : colors.border.main}`,
+    background: selected ? `${colors.accent.main}14` : colors.background.tertiary,
+    color: colors.text.primary,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  });
+  const fieldLabelStyle: React.CSSProperties = {
+    fontSize: 12, fontWeight: 700, color: colors.text.secondary, marginBottom: 4, letterSpacing: '0.02em',
+  };
+  const preview = barPreviewPalette(isWarm);
+  const previewCells = [
+    ...editBar.words.slice(0, wordCount).map(text => ({ text: text.trim(), phrase: false })),
+    ...editBar.phrases.map(text => ({ text: text.trim(), phrase: true })),
+  ].filter(cell => cell.text);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
@@ -693,19 +311,19 @@ const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{
+          <div className="settings-panel-title" style={{
             fontSize: typography.fontSize.xl,
             color: colors.text.primary,
             fontWeight: typography.fontWeight.bold,
           }}>
-            Home Emergency Cards
+            Home Layout
           </div>
           <div style={{
             fontSize: typography.fontSize.sm,
             color: colors.text.secondary,
             marginTop: 4,
           }}>
-            Manage the four large emergency cards shown on the Home Screen
+            Choose what the Home screen shows
             {isDirty && (
               <span style={{ color: colors.accentText.gold, marginLeft: 12, fontWeight: 600 }}>
                 Unsaved changes
@@ -718,7 +336,7 @@ const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
             className="hl-btn hl-btn-danger"
             onClick={() => setShowResetConfirm(true)}
           >
-            Reset to Defaults
+            Reset this page
           </button>
           <button
             className="hl-btn hl-btn-success"
@@ -734,368 +352,171 @@ const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
         </div>
       </div>
 
-      {/* Info banner */}
-      <div style={{
-        padding: '10px 14px',
-        borderRadius: 8,
-        background: `${colors.accent.main}10`,
-        border: `1px solid ${colors.accent.main}30`,
-        fontSize: 13,
-        color: colors.text.secondary,
-        lineHeight: 1.5,
-      }}>
-        Home can show either <strong>{MAX_ACTIVE}</strong> large emergency cards or one large Alert Mode launcher.
-        High and Medium priorities can use different warm muted colors; High cards still appear first for safety.
-        You can save up to {MAX_WORDS} cards and swap them anytime.
-      </div>
-
-      {/* Home left panel behavior */}
-      <div style={{
-        padding: '14px 16px',
-        background: colors.background.secondary,
-        borderRadius: 10,
-        border: `1px solid ${colors.border.main}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}>
+      {/* Left panel */}
+      <div style={sectionStyle}>
         <div style={{ fontSize: 15, fontWeight: 700, color: colors.text.primary }}>
           Home Left Panel
         </div>
         <div style={{ fontSize: 13, color: colors.text.secondary, lineHeight: 1.5 }}>
-          Choose what appears in the emergency area on the Home screen. Quick Phrases stays available below it.
+          What sits in the left column of the Home screen.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
           {([
-            { key: 'cards' as HomeEmergencyLaunchMode, title: 'Four Emergency Cards', desc: 'TT Suction, Ambu Bag, Oral Suction, and other quick calls.' },
-            { key: 'alert' as HomeEmergencyLaunchMode, title: 'Alert Mode Launcher', desc: 'One large card that opens the existing Alert Mode care-action screen.' },
-          ]).map(option => {
-            const selected = editLaunchMode === option.key;
-            return (
-              <button
-                key={option.key}
-                onClick={() => setEditLaunchMode(option.key)}
-                style={{
-                  textAlign: 'left',
-                  padding: '14px 16px',
-                  borderRadius: 10,
-                  border: `1.5px solid ${selected ? colors.accent.main : colors.border.main}`,
-                  background: selected ? `${colors.accent.main}14` : colors.background.tertiary,
-                  color: colors.text.primary,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{option.title}</div>
-                <div style={{ fontSize: 12, color: colors.text.secondary, lineHeight: 1.45 }}>{option.desc}</div>
-              </button>
-            );
-          })}
+            { key: 'alert' as LeftPanelMode, title: 'Urgent Needs + Quick Phrases', desc: 'A large Urgent Needs card opens the care actions (SOS, suction, pain and your own). Quick Phrases sits below it.' },
+            { key: 'quick' as LeftPanelMode, title: 'Quick Phrases only', desc: 'Just the Quick Phrases card, large and centred in the column.' },
+          ]).map(option => (
+            <button
+              key={option.key}
+              onClick={() => setEditMode(option.key)}
+              style={optionStyle(editMode === option.key)}
+            >
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{option.title}</div>
+              <div style={{ fontSize: 12, color: colors.text.secondary, lineHeight: 1.45 }}>{option.desc}</div>
+            </button>
+          ))}
         </div>
-      </div>
-
-      {/* Active count indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{
-          fontSize: 13, fontWeight: 600, color: colors.text.secondary,
-        }}>
-          Visible on Home:
-        </span>
-        <span style={{
-          fontSize: 13, fontWeight: 700,
-          color: activeCount >= MAX_ACTIVE ? colors.warning.main : colors.accent.main,
-          background: activeCount >= MAX_ACTIVE ? `${colors.warning.main}15` : `${colors.accent.main}15`,
-          padding: '2px 10px', borderRadius: 12,
-        }}>
-          {activeCount} / {MAX_ACTIVE}
-        </span>
-        <span style={{ flex: 1 }} />
-        <span style={{
-          fontSize: 12, color: colors.text.tertiary,
-          background: colors.background.tertiary,
-          padding: '2px 10px', borderRadius: 12, fontWeight: 600,
-        }}>
-          {editWords.length} / {MAX_WORDS} cards saved
-        </span>
-      </div>
-
-      {/* Emergency Card Library */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 6,
-        padding: '16px',
-        background: colors.background.secondary,
-        borderRadius: 10,
-        border: `1px solid ${colors.border.main}`,
-      }}>
-        <div style={{
-          fontSize: 15, fontWeight: 600, color: colors.text.primary, marginBottom: 4,
-        }}>
-          Emergency Card Library
-        </div>
-
-        {editWords.length === 0 && (
-          <div style={{
-            padding: 20, textAlign: 'center',
-            color: colors.text.tertiary, fontSize: 13,
+        {editMode === 'quick' && (
+          <div role="alert" style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: `${colors.warning.main}14`,
+            border: `1px solid ${colors.warning.main}55`,
+            fontSize: 13,
+            color: colors.text.primary,
+            lineHeight: 1.5,
           }}>
-            No cards yet. Add your first emergency card below.
+            <strong>No way to call for help from Home.</strong> With Quick Phrases only, the patient cannot
+            open Urgent Needs from the Home screen. Choose this only if urgent needs are covered another way,
+            for example by words in the word bar below.
           </div>
         )}
-
-        {editWords.map((word, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {/* Reorder buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
-              <button
-                onClick={() => handleMoveUp(idx)}
-                disabled={idx === 0}
-                style={{
-                  width: 20, height: 16, border: 'none', borderRadius: 3,
-                  background: 'transparent', cursor: idx === 0 ? 'default' : 'pointer',
-                  color: idx === 0 ? colors.border.main : colors.text.tertiary,
-                  fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'inherit', transition: 'color 150ms',
-                }}
-                title="Move up"
-              >
-                ▲
-              </button>
-              <button
-                onClick={() => handleMoveDown(idx)}
-                disabled={idx === editWords.length - 1}
-                style={{
-                  width: 20, height: 16, border: 'none', borderRadius: 3,
-                  background: 'transparent', cursor: idx === editWords.length - 1 ? 'default' : 'pointer',
-                  color: idx === editWords.length - 1 ? colors.border.main : colors.text.tertiary,
-                  fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'inherit', transition: 'color 150ms',
-                }}
-                title="Move down"
-              >
-                ▼
-              </button>
-            </div>
-
-            {/* Word card */}
-            <div style={{ flex: 1 }}>
-              <WordRow
-                word={word}
-                index={idx}
-                activeIndex={activeIndices.get(idx) ?? -1}
-                isEditingThis={editingIndex === idx}
-                canActivate={activeCount < MAX_ACTIVE}
-                onToggleActive={() => handleToggle(idx)}
-                onChangePriority={(p) => handleChangePriority(idx, p)}
-                onEdit={() => setEditingIndex(idx)}
-                onSaveEdit={(en, hi) => handleSaveEdit(idx, en, hi)}
-                onCancelEdit={() => setEditingIndex(null)}
-                onRemove={() => handleRemove(idx)}
-                colors={colors}
-              />
-            </div>
-          </div>
-        ))}
+        <div style={{ fontSize: 12, color: colors.text.tertiary, lineHeight: 1.5 }}>
+          The Urgent Needs cards themselves are chosen in Settings &gt; Urgent Needs.
+        </div>
       </div>
 
-      {/* Add new card */}
-      {editWords.length < MAX_WORDS && (
-        <div style={{
-          padding: '14px 16px',
-          background: colors.background.secondary,
-          borderRadius: 10,
-          border: `1px solid ${colors.border.main}`,
-          display: 'flex', flexDirection: 'column', gap: 8,
-        }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: colors.text.primary }}>
-            Add Emergency Card
+      {/* Word bar */}
+      <div style={sectionStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: colors.text.primary, flex: 1 }}>
+            Word Bar at the Bottom of Home
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              className="hl-input"
-              value={newEn}
-              onChange={e => setNewEn(e.target.value)}
-              placeholder="English emergency phrase"
-              style={{ flex: 1 }}
-              onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-            />
+          <span style={{ fontSize: 13, fontWeight: 600, color: editBar.enabled ? colors.accent.main : colors.text.tertiary }}>
+            {editBar.enabled ? 'On' : 'Off'}
+          </span>
+          <button
+            className={`hl-toggle ${editBar.enabled ? 'hl-toggle-on' : 'hl-toggle-off'}`}
+            onClick={() => setEditBar(bar => ({ ...bar, enabled: !bar.enabled }))}
+            aria-label={editBar.enabled ? 'Turn the word bar off' : 'Turn the word bar on'}
+            aria-pressed={editBar.enabled}
+          />
+        </div>
+        <div style={{ fontSize: 13, color: colors.text.secondary, lineHeight: 1.5 }}>
+          Words and phrases that stay on the Home screen, along the bottom. One look speaks them.
+        </div>
 
-            {/* Priority selector */}
-            <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: `1px solid ${colors.border.main}` }}>
-              {(['high', 'medium'] as QuickWordPriority[]).map(p => {
-                const isActive = newPriority === p;
-                const pillColors = PRIORITY_PILL_COLORS[p];
-                return (
-                  <button
-                    key={p}
-                    onClick={() => setNewPriority(p)}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      fontFamily: 'inherit',
-                      border: 'none',
-                      cursor: 'pointer',
-                      background: isActive ? pillColors.bg : 'transparent',
-                      color: isActive ? pillColors.text : colors.text.tertiary,
-                      textTransform: 'capitalize',
-                      transition: 'all 150ms',
-                    }}
-                  >
-                    {p === 'high' ? 'High' : 'Medium'}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              className="hl-btn hl-btn-success"
-              onClick={handleAdd}
-              style={{ padding: '8px 16px' }}
-            >
-              + Add
-            </button>
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 12,
+          opacity: editBar.enabled ? 1 : 0.55,
+          transition: 'opacity 150ms',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+            {([
+              { key: '3+2' as const, title: '3 words + 2 phrases' },
+              { key: '4+2' as const, title: '4 words + 2 phrases' },
+            ]).map(option => (
+              <button
+                key={option.key}
+                onClick={() => setEditBar(bar => ({ ...bar, layout: option.key }))}
+                style={{ ...optionStyle(editBar.layout === option.key), padding: '10px 14px' }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{option.title}</div>
+              </button>
+            ))}
           </div>
-          {activeCount < MAX_ACTIVE && (
+
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${wordCount}, minmax(0, 1fr))`, gap: 10 }}>
+            {editBar.words.slice(0, wordCount).map((word, index) => (
+              <label key={`word-${index}`} style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={fieldLabelStyle}>Word {index + 1}</span>
+                <input
+                  className="hl-input"
+                  list="hl-word-options"
+                  value={word}
+                  maxLength={24}
+                  placeholder="Type or pick a word"
+                  onChange={event => setWord(index, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${HOME_WORD_BAR_PHRASES}, minmax(0, 1fr))`, gap: 10 }}>
+            {editBar.phrases.map((phrase, index) => (
+              <label key={`phrase-${index}`} style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={fieldLabelStyle}>Phrase {index + 1}</span>
+                <input
+                  className="hl-input"
+                  list="hl-phrase-options"
+                  value={phrase}
+                  maxLength={60}
+                  placeholder="Type or pick a phrase"
+                  onChange={event => setPhrase(index, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <datalist id="hl-word-options">
+            {wordOptions.map(option => <option key={option} value={option} />)}
+          </datalist>
+          <datalist id="hl-phrase-options">
+            {phraseOptions.map(option => <option key={option} value={option} />)}
+          </datalist>
+          {HOME_WORD_BAR_WORDS > wordCount && editBar.words.slice(wordCount).some(w => w.trim()) && (
             <div style={{ fontSize: 12, color: colors.text.tertiary }}>
-              New cards will be automatically activated (you have {MAX_ACTIVE - activeCount} slot{MAX_ACTIVE - activeCount !== 1 ? 's' : ''} available)
+              Word {wordCount + 1} is kept, and shows again with 4 words + 2 phrases.
             </div>
           )}
-        </div>
-      )}
 
-      {/* Color customization */}
-      <div style={{
-        padding: '16px',
-        background: colors.background.secondary,
-        borderRadius: 10,
-        border: `1px solid ${colors.border.main}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: colors.text.primary }}>
-            Emergency Card Colors
-          </div>
-          <div style={{ fontSize: 13, color: colors.text.secondary, marginTop: 4, lineHeight: 1.5 }}>
-            Pick warm muted color families for High and Medium priorities. These colors apply to the Home emergency cards and preview.
-          </div>
-        </div>
-
-        <div>
-          <div style={{
-            fontSize: 12,
-            fontWeight: 800,
-            color: colors.text.secondary,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            marginBottom: 10,
-          }}>
-            High Priority
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {HIGH_COLOR_OPTIONS.map(option => {
-              const selected = editHighColor === option.key;
-              return (
-                <button
-                  key={option.key}
-                  onClick={() => setEditHighColor(option.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    minHeight: 52,
-                    padding: '9px 14px',
-                    borderRadius: 10,
-                    border: `1.5px solid ${selected ? colors.accent.main : colors.border.main}`,
-                    background: selected ? `${colors.accent.main}12` : colors.background.tertiary,
-                    color: selected ? colors.accent.main : colors.text.primary,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    fontWeight: 700,
-                  }}
-                >
-                  <span style={{
-                    width: 34,
-                    height: 28,
-                    borderRadius: 7,
-                    background: option.swatch,
-                    border: `1px solid ${option.border}`,
-                    flexShrink: 0,
-                  }} />
-                  {option.label}
-                  {selected && <span style={{ marginLeft: 2 }}>✓</span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <div style={{
-            fontSize: 12,
-            fontWeight: 800,
-            color: colors.text.secondary,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            marginBottom: 10,
-          }}>
-            Medium Priority
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {MEDIUM_COLOR_OPTIONS.map(option => {
-              const selected = editMediumColor === option.key;
-              return (
-                <button
-                  key={option.key}
-                  onClick={() => setEditMediumColor(option.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    minHeight: 52,
-                    padding: '9px 14px',
-                    borderRadius: 10,
-                    border: `1.5px solid ${selected ? colors.accent.main : colors.border.main}`,
-                    background: selected ? `${colors.accent.main}12` : colors.background.tertiary,
-                    color: selected ? colors.accent.main : colors.text.primary,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    fontWeight: 700,
-                  }}
-                >
-                  <span style={{
-                    width: 34,
-                    height: 28,
-                    borderRadius: 7,
-                    background: option.swatch,
-                    border: `1px solid ${option.border}`,
-                    flexShrink: 0,
-                  }} />
-                  {option.label}
-                  {selected && <span style={{ marginLeft: 2 }}>✓</span>}
-                </button>
-              );
-            })}
+          {/* Preview */}
+          <div>
+            <div style={{ ...fieldLabelStyle, marginBottom: 6 }}>Preview</div>
+            <div style={{
+              display: 'flex', gap: 8, padding: 10, borderRadius: 10,
+              background: preview.frame, border: `1px solid ${colors.border.main}`, minHeight: 64,
+            }}>
+              {previewCells.length === 0 ? (
+                <div style={{ fontSize: 13, color: colors.text.tertiary, alignSelf: 'center', padding: '0 6px' }}>
+                  Nothing to show yet: add a word or a phrase.
+                </div>
+              ) : previewCells.map((cell, index) => (
+                <div key={index} style={{
+                  flex: cell.phrase ? '1.7 1 0' : '1 1 0',
+                  minWidth: 0,
+                  height: 64,
+                  borderRadius: 8,
+                  background: cell.phrase ? preview.phraseBg : preview.wordBg,
+                  color: cell.phrase ? preview.phraseText : preview.wordText,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 8px',
+                  fontSize: cell.phrase ? 14 : 18,
+                  fontWeight: 720,
+                  textAlign: 'center',
+                  lineHeight: 1.15,
+                  overflow: 'hidden',
+                }}>
+                  {cell.text}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Preview */}
-      <ActivePreview
-        words={editWords}
-        colors={colors}
-        highColor={editHighColor}
-        mediumColor={editMediumColor}
-        launchMode={editLaunchMode}
-      />
 
       {/* Reset confirmation */}
       {showResetConfirm && (
         <ConfirmDialog
-          title="Reset Emergency Cards?"
-          message="This will restore the Home screen emergency cards, color choices, and left-panel mode to their factory defaults. Any custom cards will be lost."
+          title="Reset Home Layout?"
+          message="This restores the left panel (Quick Phrases only) and the word bar (off, with its starting words) to their defaults. Nothing is saved until you press Save Changes."
           confirmLabel="Reset"
           onConfirm={handleReset}
           onCancel={() => setShowResetConfirm(false)}
