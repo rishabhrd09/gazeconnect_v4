@@ -29,9 +29,10 @@
   height: var(--keyboard-nav-height) !important;
   font-size: clamp(20px, 2.3vh, 26px) !important;
 }
+/* The gaze toggle tile is a quarter wider than tall (GAZE_TILE_WIDTH_RATIO in GlobalNavBar.tsx). */
 .keyboard-screen #gaze-toggle-nav {
-  width: var(--keyboard-nav-height) !important;
-  min-width: var(--keyboard-nav-height) !important;
+  width: calc(var(--keyboard-nav-height) * 1.25) !important;
+  min-width: calc(var(--keyboard-nav-height) * 1.25) !important;
   height: var(--keyboard-nav-height) !important;
   margin-right: 0 !important;
 }

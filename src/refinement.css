@@ -387,3 +387,53 @@
 :root[data-theme] .home-screen .home-footer-phrase .home-footer-label { font-weight: 600 !important; color: var(--ui-ink) !important; }
 /* The status badge would sit on the footer's last cell: lift it above the footer. */
 :root[data-theme] body:has(.home-screen--word-bar) .connection-indicator { bottom: calc(clamp(104px, 14vh, 164px) + 10px) !important; /* = HOME_FOOTER_HEIGHT */ }
+
+/* ===== GAZE TOGGLE CARD (24 Sep 2026, maintainer's choice) =====
+   Every gaze toggle wears the Zone Board's gaze card (#spatial-gaze, zone-board.css): the
+   panel surface, a hairline border and an eye over "Enable gaze" while gaze is off; the
+   selected green, a green border and a pause sign over "Pause gaze" while it is on.
+   Face: src/components/core/GazeToggleCardFace.tsx. Each toggle keeps its own size. */
+:root[data-theme] button.gaze-switch-card {
+  background: var(--ui-panel) !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px !important;
+  color: var(--ui-ink) !important;
+  box-shadow: none !important;
+  container-type: inline-size;
+}
+:root[data-theme] button.gaze-switch-card[aria-pressed='true'] {
+  background: var(--ui-selected) !important;
+  border-color: var(--ui-accent-ink) !important;
+  color: var(--ui-accent-ink) !important;
+}
+.gaze-switch-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.2vh, 12px);
+  pointer-events: none;
+  user-select: none;
+}
+.gaze-switch-face svg {
+  width: clamp(24px, 3.3vh, 34px);
+  height: clamp(24px, 3.3vh, 34px);
+  color: var(--ui-accent-ink);
+  flex-shrink: 0;
+}
+.gaze-switch-label {
+  font-family: var(--ui-font);
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  /* The Zone Board's 26 px at 1080, smaller in narrower cards: "Enable gaze" is about
+     5.7 em wide, so 100cqw / 8 keeps it within about 70% of the card's width. */
+  font-size: max(13px, min(clamp(14px, 2.5vh, 26px), calc(100cqw / 8)));
+}
+/* Narrow cards (the keyboard's own toggle is about 85-115 px wide on 13-15" screens): two
+   short lines at a readable size instead of one squeezed line. */
+@container (max-width: 119px) {
+  .gaze-switch-face { gap: 6px; }
+  .gaze-switch-face svg { width: clamp(20px, 2.8vh, 26px); height: clamp(20px, 2.8vh, 26px); }
+  .gaze-switch-label { white-space: normal; text-align: center; max-width: 4.5em; font-size: clamp(14px, calc(100cqw / 5.6), 17px); }
+}

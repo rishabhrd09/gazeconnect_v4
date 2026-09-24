@@ -11,6 +11,7 @@ import React, {
   useReducer, useCallback, useMemo, useEffect, useState, useRef,
 } from 'react';
 import GazeButton from '../components/core/GazeButton';
+import { GazeToggleCardFace } from '../components/core/GazeToggleCardFace';
 import '../styles/compass-workspace.css';
 import '../styles/compass-editor.css';
 import { GlobalNavBar } from '../components/GlobalNavBar';
@@ -3140,9 +3141,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           <GazeButton id="back-map" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
             isDarkMode={!isWarm} dwellCategory="backSkipButton"
             onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}>BACK TO MAP</GazeButton>
-          <GazeButton id="menu-gaze-toggle" gazeEnabled alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp}
-            isDarkMode={!isWarm} dwellCategory="gazeToggle" onClick={toggleGaze} selected={isGazeEnabled}>
-            {isGazeEnabled ? 'PAUSE GAZE' : 'RESUME GAZE'}
+          <GazeButton id="menu-gaze-toggle" className="gaze-switch-card" gazeEnabled alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp}
+            isDarkMode={!isWarm} dwellCategory="gazeToggle" onClick={toggleGaze} selected={isGazeEnabled}
+            ariaLabel={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'}>
+            <GazeToggleCardFace on={isGazeEnabled} />
           </GazeButton>
           <GazeButton id="menu-ready" className="compass-primary" gazeEnabled={isGazeEnabled}
             gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm} dwellCategory="compassMapAction" selected={menuReady}
@@ -3514,9 +3516,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 {refinementArmed && toolItems.map(item => action(`ts-${item.tool}`, `${item.icon} ${item.label}`, () => chooseTool(item.tool), { selected: cellEditorTool === item.tool }))}
                 <div className="compass-editor-tool-spacer" />
                 {refinementArmed && hasCellRefinement && action('ts-reset', '✕ RESET', resetCellRefinements, { deliberate: true, className: 'compass-editor-reset' })}
-                <GazeButton id="ce-gaze-toggle" className="compass-editor-choice gaze-toggle" gazeEnabled={isGazeEnabled}
+                <GazeButton id="ce-gaze-toggle" className="compass-editor-choice gaze-toggle gaze-switch-card" gazeEnabled={isGazeEnabled}
                   gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm} alwaysActive dwellCategory="gazeToggle"
-                  onClick={toggleGaze} selected={isGazeEnabled}>{isGazeEnabled ? 'PAUSE GAZE' : 'RESUME GAZE'}</GazeButton>
+                  onClick={toggleGaze} selected={isGazeEnabled} ariaLabel={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'}>
+                  <GazeToggleCardFace on={isGazeEnabled} />
+                </GazeButton>
                 <GazeButton id="ts-exit" className="compass-editor-choice" gazeEnabled={isGazeEnabled && !readingCooldown}
                   gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm} dwellCategory="backSkipButton"
                   onClick={() => { setCellEditorOpen(false); setCellEditorTool(null); setRefinementArmed(false); onSpeak('Editor closed.'); }}>← EXIT</GazeButton>

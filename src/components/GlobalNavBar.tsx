@@ -6,6 +6,7 @@ import { useDwellTime } from '../contexts/DwellTimeContext';
 import { LiveClock } from './LiveClock';
 import { darkColors, warmColors } from '../utils/design';
 import { useGazeControl } from './core/GazeControlToggle';
+import { GazeToggleCardFace } from './core/GazeToggleCardFace';
 import { gazeFlags } from '../utils/gazeFlags';
 import { useFocusMode } from '../contexts/FocusModeContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -436,7 +437,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                     minWidth: 0,
                     gap: showMoreToggle ? 'clamp(8px, 1vw, 14px)' : 'clamp(18px, 2.5vw, 36px)',
                 }}>
-                    {/* GAZE TOGGLE — spatial: keyboard-style hub with vertical lines; others: circle */}
+                    {/* GAZE TOGGLE — the Zone Board's gaze card; on the spatial keyboard it sits between two lines */}
                     {currentPage === 'spatial' ? (
                         <div style={{
                             display: 'flex', alignItems: 'stretch', height: keyboardNavTargetHeight,
@@ -466,47 +467,21 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     cursor: 'pointer', padding: 0,
                                 }}
                             >
-                                {/* Visual circle hub */}
+                                {/* Visual card (the same face as on every other screen) */}
                                 <div style={{
-                                    width: 'clamp(98px, 12vh, 122px)',
+                                    width: gazeTileWidth('clamp(98px, 12vh, 122px)'),
                                     height: 'clamp(98px, 12vh, 122px)',
-                                    borderRadius: '50%', margin: 0, flexShrink: 0,
+                                    borderRadius: 14, margin: 0, flexShrink: 0,
                                     display: 'flex', flexDirection: 'column',
-                                    alignItems: 'center', justifyContent: 'center', gap: '2px',
-                                    background: isGazeEnabled
-                                        ? (isDarkMode
-                                            ? 'radial-gradient(circle at 50% 45%, rgba(96, 165, 250, 0.24) 0%, rgba(14, 22, 32, 0.92) 72%)'
-                                            : 'radial-gradient(circle at 50% 45%, rgba(212, 202, 184, 0.48) 0%, rgba(253, 252, 250, 0.96) 72%)')
-                                        : (isDarkMode
-                                            ? 'radial-gradient(circle at 50% 45%, rgba(42, 61, 82, 0.45) 0%, rgba(14, 22, 32, 0.94) 72%)'
-                                            : 'radial-gradient(circle at 50% 45%, rgba(232, 223, 208, 0.9) 0%, rgba(255, 255, 255, 0.96) 72%)'),
-                                    border: `2.5px solid ${isGazeEnabled ? navigationColors.gazeBorderOn : navigationColors.gazeBorderOff}`,
-                                    transition: 'all 250ms ease',
-                                    position: 'relative', overflow: 'hidden', pointerEvents: 'none',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    background: isGazeEnabled ? 'var(--ui-selected)' : 'var(--ui-panel)',
+                                    border: `1px solid ${isGazeEnabled ? 'var(--ui-accent-ink)' : 'var(--ui-border)'}`,
+                                    color: isGazeEnabled ? 'var(--ui-accent-ink)' : 'var(--ui-ink)',
+                                    containerType: 'inline-size',
+                                    transition: 'background-color 200ms ease, border-color 200ms ease',
+                                    pointerEvents: 'none',
                                 }}>
-                                    {/* Mid-ring */}
-                                    <div style={{
-                                        position: 'absolute', width: '58%', height: '58%', borderRadius: '50%',
-                                        border: `1.5px solid ${isDarkMode
-                                            ? (isGazeEnabled ? 'rgba(96, 165, 250, 0.2)' : 'rgba(42, 61, 82, 0.28)')
-                                            : (isGazeEnabled ? 'rgba(212, 202, 184, 0.72)' : 'rgba(212, 202, 184, 0.65)')}`,
-                                    }} />
-                                    {/* Center reticle dot */}
-                                    <div style={{
-                                        width: '7px', height: '7px', borderRadius: '50%',
-                                        backgroundColor: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
-                                        transition: 'all 200ms ease', zIndex: 2,
-                                    }} />
-                                    {/* Label */}
-                                    <span style={{
-                                        fontSize: 'clamp(13px, 1.5vh, 17px)', fontWeight: 900,
-                                        letterSpacing: '1.6px',
-                                        color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
-                                        textTransform: 'uppercase', zIndex: 2, marginTop: '1px',
-                                        fontFamily: navFontFamily,
-                                    }}>
-                                        {isGazeEnabled ? 'ON' : 'OFF'}
-                                    </span>
+                                    <GazeToggleCardFace on={isGazeEnabled} />
                                 </div>
                             </button>
                             {/* Right vertical line */}
@@ -520,23 +495,22 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                         <button
                             id="gaze-toggle-nav"
                             onClick={toggleGaze}
-                            className="gaze-button gaze-toggle"
+                            className="gaze-button gaze-toggle gaze-switch-card"
                             data-gaze="true"
                             data-gaze-toggle="true"
                             data-gaze-always="true"
                             data-snap-priority="3"
                             data-gaze-context="gazetoggle"
                             data-gaze-dwell-ms={String(DWELL_GROUPS.deliberate.ms)}
+                            aria-pressed={isGazeEnabled}
+                            aria-label={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'}
                             style={{
                                 padding: '0',
-                                backgroundColor: isGazeEnabled ? navigationColors.gazeBackgroundOn : navigationColors.gazeBackgroundOff,
-                                border: `3px solid ${isGazeEnabled ? navigationColors.gazeBorderOn : navigationColors.gazeBorderOff}`,
-                                boxShadow: isGazeEnabled ? navigationColors.gazeGlow : 'none',
-                                borderRadius: '50%',
-                                color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
-                                width: isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize,
+                                // The Zone Board's gaze card (24 Sep 2026): colours, border and
+                                // radius come from .gaze-switch-card in refinement.css.
+                                width: gazeTileWidth(isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize),
                                 height: isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize,
-                                minWidth: isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize,
+                                minWidth: gazeTileWidth(isKbOrSpatial ? keyboardGazeToggleSize : standardGazeToggleSize),
                                 cursor: 'pointer',
                                 display: 'flex',
                                 flexDirection: 'column' as const,
@@ -547,28 +521,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 marginRight: (currentPage === 'keyboard' || currentPage === 'spatial') ? 'clamp(28px, 3vw, 48px)' : '0px',
                             }}
                         >
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"
-                                style={{
-                                    width: isKbOrSpatial ? 'clamp(38px, 4.8vh, 54px)' : 'clamp(36px, 4.6vh, 50px)',
-                                    height: isKbOrSpatial ? 'clamp(38px, 4.8vh, 54px)' : 'clamp(36px, 4.6vh, 50px)',
-                                }}
-                            >
-                                <circle cx="12" cy="12" r="10" />
-                                <circle cx="12" cy="12" r="3" fill={isGazeEnabled ? navigationColors.gazeBorderOn : "none"} />
-                            </svg>
-                            <span style={{
-                                fontSize: isKbOrSpatial ? 'clamp(14px, 1.65vh, 18px)' : 'clamp(14px, 1.55vh, 17px)',
-                                fontWeight: 900,
-                                letterSpacing: '1.6px',
-                                color: isGazeEnabled ? navigationColors.gazeTextOn : navigationColors.gazeTextOff,
-                                textTransform: 'uppercase' as const,
-                                marginTop: '3px',
-                                userSelect: 'none' as const,
-                                lineHeight: 1,
-                                fontFamily: navFontFamily,
-                            }}>
-                                {isGazeEnabled ? 'ON' : 'OFF'}
-                            </span>
+                            <GazeToggleCardFace on={isGazeEnabled} />
                         </button>
                     )}
 
@@ -666,6 +619,11 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
         </>
     );
 };
+
+// The gaze card is a quarter wider than tall (maintainer, 24 Sep 2026). The keyboard sizes
+// its toggle in src/styles/keyboard-layout.css, which repeats this ratio.
+const GAZE_TILE_WIDTH_RATIO = 1.25;
+const gazeTileWidth = (height: string) => `calc(${height} * ${GAZE_TILE_WIDTH_RATIO})`;
 
 export const GlobalNavBar = React.memo(GlobalNavBarComponent);
 export default GlobalNavBar;
