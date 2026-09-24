@@ -1,0 +1,4 @@
+# Music audio is local only: it is large, and the recordings are not ours to publish.
+# Bring it in with:  node scripts/import-music.cjs "<music folder>"
+*
+!.gitignore

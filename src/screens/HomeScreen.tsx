@@ -15,6 +15,7 @@ import {
   FamilyIcon, SettingsIcon,
   GridIcon, TVIcon, GlobalIcon,
 } from '../components/icons/Icons';
+import { MusicNoteIcon } from '../components/music/MusicNoteIcon';
 // Emergency-card glyphs intentionally NOT used here — the card labels are
 // user-customisable, so a static icon mapping would be misleading for any
 // non-default label. Cards stay text-only on the red Fitzgerald tile.
@@ -464,6 +465,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const rightPanelTiles: HomeTile[] = [
     { id: 'web', label: 'Web Browsing', labelHi: 'वेब ब्राउज़िंग', icon: GlobalIcon, color: HOME_BADGE_FILLS_DARK.web, screen: 'web', cardClass: 'grid-card-web' },
     { id: 'fp', label: 'Design Home', labelHi: 'घर का नक्शा', icon: GridIcon, color: HOME_BADGE_FILLS_DARK.fp, screen: 'floor-plan', cardClass: 'grid-card-design' },
+    { id: 'music', label: 'Music', icon: MusicNoteIcon, color: HOME_BADGE_FILLS_DARK.ac, screen: 'music', cardClass: 'grid-card-music' },
   ];
 
   const iconStyle = {
@@ -923,7 +925,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 </div>
               </GazeButton>
             ))}
-            <div style={{ minHeight: 0 }} />
           </div>
         </div>
 

@@ -1,0 +1,275 @@
+/* Music screens only: every rule starts at #music-view, the Music screen's root, so nothing here
+   reaches Home, the navigation bar or any other screen. Colours from the maintainer's Music
+   references; large Georgia labels, thin dividers, a passive centre, little motion. */
+
+#music-view {
+  --mu-bg: #16181a;
+  --mu-raised: #1d2024;
+  --mu-text: #f2ead9;
+  --mu-muted: rgba(242, 234, 217, 0.66);
+  --mu-faint: rgba(242, 234, 217, 0.14);
+  --mu-accent: #c89b5a;
+  --mu-left: #6e9c94;
+  --mu-right: #c29455;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--mu-bg);
+  color: var(--mu-text);
+  font-family: var(--ui-font);
+}
+:root[data-theme='warm'] #music-view {
+  --mu-bg: #fdf4ed;
+  --mu-raised: #fcf2ea;
+  --mu-text: #000000;
+  --mu-muted: rgba(0, 0, 0, 0.62);
+  --mu-faint: rgba(0, 0, 0, 0.12);
+  --mu-accent: #8c3a2e;
+  --mu-left: #2f4a44;
+  --mu-right: #6b4a12;
+}
+
+/* The labels are Georgia in both themes (the id outranks the app-wide typeface rule). */
+#music-view .music-serif {
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-stretch: normal !important;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+#music-view .music-stage { flex: 1 1 auto; min-height: 0; display: flex; }
+
+/* ---- The compass: a row above, left | centre | right, a row below ------------------------ */
+#music-view .music-compass {
+  --mu-edge-row: clamp(92px, 14.5vh, 156px);
+  --mu-side: minmax(0, 1fr);
+  --mu-middle: clamp(180px, 17vw, 320px);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--mu-side) 1px var(--mu-middle) 1px var(--mu-side);
+  grid-template-rows: var(--mu-top-row, var(--mu-edge-row)) 1px minmax(0, 1fr) 1px var(--mu-edge-row);
+  gap: clamp(10px, 1.8vh, 22px) clamp(12px, 1.5vw, 28px);
+  padding: clamp(10px, 1.8vh, 24px) clamp(20px, 3vw, 60px) clamp(16px, 2.6vh, 32px);
+}
+/* Narrow sides around a wide centre: a playlist page and the player. */
+#music-view .music-compass--wide { --mu-side: clamp(150px, 15vw, 290px); --mu-middle: minmax(0, 1fr); }
+/* A passive heading above, so it takes less height than a choice would. */
+#music-view .music-compass--header { --mu-top-row: clamp(62px, 9vh, 108px); }
+
+#music-view .music-slot { min-width: 0; min-height: 0; display: flex; }
+#music-view .music-slot-top { grid-column: 1 / -1; grid-row: 1; justify-content: center; align-items: stretch; }
+#music-view .music-slot-left { grid-column: 1; grid-row: 3; }
+#music-view .music-slot-center { grid-column: 3; grid-row: 3; align-items: center; justify-content: center; }
+#music-view .music-slot-right { grid-column: 5; grid-row: 3; }
+#music-view .music-slot-message { grid-column: 1 / -1; grid-row: 3; align-items: center; justify-content: center; }
+#music-view .music-slot-bottom { grid-column: 1 / -1; grid-row: 5; justify-content: center; align-items: stretch; }
+#music-view .music-compass--wide .music-slot-center { align-items: stretch; justify-content: stretch; }
+
+#music-view .music-rule { background-color: var(--mu-faint); pointer-events: none; }
+#music-view .music-rule-h { height: 1px; align-self: center; margin: 0 clamp(40px, 9vw, 180px); }
+#music-view .music-rule-top { grid-column: 1 / -1; grid-row: 2; }
+#music-view .music-rule-bottom { grid-column: 1 / -1; grid-row: 4; }
+#music-view .music-rule-v { width: 1px; margin: clamp(14px, 4vh, 48px) 0; }
+#music-view .music-rule-left { grid-column: 2; grid-row: 3; }
+#music-view .music-rule-right { grid-column: 4; grid-row: 3; }
+
+/* A choice above or below: one width, centred. */
+#music-view .music-edge { width: clamp(300px, 30vw, 560px); height: 100%; display: flex; }
+
+/* ---- Choices (the app's GazeButtons, painted for Music) ---------------------------------- */
+#music-view .music-choice {
+  --mu-tone: var(--mu-accent);
+  --mu-edge: color-mix(in srgb, var(--mu-tone) 40%, transparent);
+}
+#music-view .music-choice--left { --mu-tone: var(--mu-left); }
+#music-view .music-choice--right { --mu-tone: var(--mu-right); }
+#music-view .music-choice--plain { --mu-tone: var(--mu-text); --mu-edge: var(--mu-faint); }
+#music-view .music-choice:hover { border-color: var(--mu-tone) !important; }
+
+#music-view .music-choice-body {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.2vh, 14px);
+  text-align: center;
+  color: var(--mu-tone);
+}
+#music-view .music-choice-label {
+  font-size: clamp(34px, 5.4vh, 64px);
+  line-height: 1.08;
+  color: var(--mu-tone);
+  overflow-wrap: anywhere;
+}
+#music-view .music-choice-sub {
+  font-size: clamp(14px, 1.8vh, 20px);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: var(--mu-muted);
+}
+#music-view .music-glyph { width: clamp(28px, 4.2vh, 48px); height: clamp(28px, 4.2vh, 48px); flex-shrink: 0; }
+
+/* Above and below: the sign beside the word, any detail underneath. */
+#music-view .music-choice--edge .music-choice-body { flex-direction: row; flex-wrap: wrap; gap: 2px clamp(12px, 1.2vw, 20px); }
+#music-view .music-choice--edge .music-choice-label { font-size: clamp(26px, 3.8vh, 44px); }
+#music-view .music-choice--edge .music-choice-sub { flex-basis: 100%; }
+#music-view .music-choice--edge .music-glyph { width: clamp(24px, 3.4vh, 40px); height: clamp(24px, 3.4vh, 40px); }
+
+/* The narrow sides of a playlist page and the player: a smaller word, still large. */
+#music-view .music-compass--wide .music-choice--side .music-choice-label { font-size: clamp(26px, 4.4vh, 50px); }
+
+/* A song: its title (two lines at most) and who sings it. */
+#music-view .music-choice--song .music-choice-label {
+  font-size: clamp(22px, 3.3vh, 38px);
+  line-height: 1.16;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- The passive centre ------------------------------------------------------------------ */
+#music-view .music-rest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 1.6vh, 18px);
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+#music-view .music-rest-ring {
+  width: clamp(44px, 6vh, 64px);
+  height: clamp(44px, 6vh, 64px);
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--mu-accent) 45%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#music-view .music-rest-dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--mu-accent); opacity: 0.8; }
+#music-view .music-rest-label {
+  margin: 0;
+  font-size: clamp(12px, 1.5vh, 16px);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mu-muted);
+}
+
+/* ---- Other: coming soon ------------------------------------------------------------------ */
+#music-view .music-message { display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 2.4vh, 28px); text-align: center; }
+#music-view .music-message-title { margin: 0; font-size: clamp(40px, 7vh, 84px); line-height: 1.05; color: var(--mu-accent); }
+
+/* ---- A playlist page ---------------------------------------------------------------------- */
+#music-view .music-playlist-head {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+#music-view .music-playlist-title { margin: 0; font-size: clamp(30px, 4.8vh, 54px); line-height: 1.05; color: var(--mu-text); }
+#music-view .music-playlist-meta {
+  font-size: clamp(12px, 1.5vh, 16px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mu-muted);
+}
+#music-view .music-songs {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 2.2vh, 26px) clamp(14px, 1.5vw, 26px);
+}
+#music-view .music-empty { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+#music-view .music-empty-title { margin: 0; font-size: clamp(28px, 4.4vh, 50px); line-height: 1.1; color: var(--mu-text); }
+#music-view .music-empty-note { margin: 0; font-size: clamp(15px, 2vh, 22px); color: var(--mu-muted); }
+
+/* ---- NOW PLAYING -------------------------------------------------------------------------- */
+#music-view .music-now {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.5vh, 18px);
+  padding: clamp(14px, 2.6vh, 34px) clamp(18px, 2.6vw, 48px);
+  background-color: var(--mu-raised);
+  border: 1px solid var(--mu-faint);
+  border-radius: 26px;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+#music-view .music-now-eyebrow {
+  font-size: clamp(12px, 1.6vh, 17px);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mu-accent);
+}
+#music-view .music-now-title {
+  margin: 0;
+  font-size: clamp(30px, 5vh, 60px);
+  line-height: 1.1;
+  color: var(--mu-text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+#music-view .music-now-artist { font-size: clamp(15px, 2.1vh, 24px); font-weight: 600; color: var(--mu-muted); }
+#music-view .music-now-progress {
+  width: min(100%, 720px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(10px, 1.2vw, 18px);
+  margin-top: clamp(2px, 0.8vh, 10px);
+}
+#music-view .music-now-time {
+  min-width: 3.2em;
+  font-size: clamp(15px, 2.1vh, 24px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mu-text);
+}
+#music-view .music-now-track { display: block; height: 6px; border-radius: 3px; overflow: hidden; background-color: var(--mu-faint); }
+#music-view .music-now-fill { display: block; height: 100%; background-color: var(--mu-accent); }
+#music-view .music-now-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px clamp(14px, 1.6vw, 26px);
+  font-size: clamp(12px, 1.6vh, 17px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mu-muted);
+}
+#music-view .music-now-status--failed { color: var(--mu-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  #music-view .music-choice { transition: none !important; }
+}

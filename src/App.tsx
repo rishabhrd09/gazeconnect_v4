@@ -56,6 +56,7 @@ const DesignHomeLandingScreen = React.lazy(() => import('./screens/DesignHomeLan
 const CustomizeScreen = React.lazy(() => import('./screens/CustomizeScreen'));
 const AdvancedMapScreen = React.lazy(() => import('./screens/AdvancedMapScreen'));
 const QuickWordsScreen = React.lazy(() => import('./screens/QuickWordsScreen'));
+const MusicScreen = React.lazy(() => import('./screens/MusicScreen'));
 
 // Pulled in quietly once the first screen is on the glass, most used first, so
 // moving between screens never waits for a download.
@@ -76,6 +77,7 @@ const SCREEN_LOADERS: Array<() => Promise<unknown>> = [
   () => import('./screens/FloorPlanSurveyScreen'),
   () => import('./screens/CompassMapScreen'),
   () => import('./screens/AdvancedMapScreen'),
+  () => import('./screens/MusicScreen'),
 ];
 
 const ScreenLoading: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
@@ -88,7 +90,7 @@ const ScreenLoading: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
 type Screen = 'home' | 'keyboard' | 'phrases' | 'feelings' | 'needs' |
   'people' | 'medical' | 'settings' | 'activities' | 'spatial' | 'web' |
   'floor-plan' | 'floor-plan-survey' | 'compass-map' | 'customize' | 'advanced-map' |
-  'quickwords';
+  'quickwords' | 'music';
 
 const KEYBOARD_TEXT_SESSION_KEY = 'gazeconnect_keyboard_text_session';
 
@@ -405,6 +407,7 @@ const InnerApp: React.FC = () => {
       case 'compass-map': return <CompassMapScreen {...common} />;
       case 'customize': return <CustomizeScreen {...common} />;
       case 'advanced-map': return <AdvancedMapScreen {...common} />;
+      case 'music': return <MusicScreen {...common} />;
       case 'quickwords': return <QuickWordsScreen {...common}
         injectMode={!!quickWordsReturnScreen}
         onWordInject={handleWordInject}

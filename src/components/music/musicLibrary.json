@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "note": "Written by scripts/import-music.cjs. Audio: public/music/<file> (local only, not in git). Titles from the music folder's library.json, else ID3 tags, else file names.",
+  "categories": [
+    {
+      "id": "bollywood",
+      "title": "Bollywood",
+      "songs": [
+        {
+          "id": "bollywood-01-mere-sapnon-ki-rani",
+          "title": "Mere Sapnon Ki Rani",
+          "artist": "Kishore Kumar",
+          "seconds": 301,
+          "file": "bollywood/01-mere-sapnon-ki-rani.mp3"
+        },
+        {
+          "id": "bollywood-02-roop-tera-mastana",
+          "title": "Roop Tera Mastana",
+          "artist": "Kishore Kumar",
+          "seconds": 225,
+          "file": "bollywood/02-roop-tera-mastana.mp3"
+        },
+        {
+          "id": "bollywood-03-yeh-shaam-mastani",
+          "title": "Yeh Shaam Mastani",
+          "artist": "Kishore Kumar",
+          "seconds": 277,
+          "file": "bollywood/03-yeh-shaam-mastani.mp3"
+        },
+        {
+          "id": "bollywood-04-zindagi-ek-safar-hai-suhana",
+          "title": "Zindagi Ek Safar Hai Suhana",
+          "artist": "Kishore Kumar",
+          "seconds": 260,
+          "file": "bollywood/04-zindagi-ek-safar-hai-suhana.mp3"
+        },
+        {
+          "id": "bollywood-05-chingari-koi-bhadke",
+          "title": "Chingari Koi Bhadke",
+          "artist": "Kishore Kumar",
+          "seconds": 335,
+          "file": "bollywood/05-chingari-koi-bhadke.mp3"
+        },
+        {
+          "id": "bollywood-06-kuch-to-log-kahenge",
+          "title": "Kuch To Log Kahenge",
+          "artist": "Kishore Kumar",
+          "seconds": 260,
+          "file": "bollywood/06-kuch-to-log-kahenge.mp3"
+        },
+        {
+          "id": "bollywood-07-ek-ajnabee-haseena-se",
+          "title": "Ek Ajnabee Haseena Se",
+          "artist": "Kishore Kumar",
+          "seconds": 266,
+          "file": "bollywood/07-ek-ajnabee-haseena-se.mp3"
+        },
+        {
+          "id": "bollywood-08-o-mere-dil-ke-chain",
+          "title": "O Mere Dil Ke Chain",
+          "artist": "Kishore Kumar",
+          "seconds": 273,
+          "file": "bollywood/08-o-mere-dil-ke-chain.mp3"
+        },
+        {
+          "id": "bollywood-09-aane-wala-pal-jane-wala-hai",
+          "title": "Aane Wala Pal Jane Wala Hai",
+          "artist": "Kishore Kumar",
+          "seconds": 279,
+          "file": "bollywood/09-aane-wala-pal-jane-wala-hai.mp3"
+        },
+        {
+          "id": "bollywood-10-kora-kagaz-tha-yeh-man-mera",
+          "title": "Kora Kagaz Tha Yeh Man Mera",
+          "artist": "Kishore Kumar, Lata Mangeshkar",
+          "seconds": 339,
+          "file": "bollywood/10-kora-kagaz-tha-yeh-man-mera.mp3"
+        },
+        {
+          "id": "bollywood-11-musafir-hoon-yaaron",
+          "title": "Musafir Hoon Yaaron",
+          "artist": "Kishore Kumar",
+          "seconds": 190,
+          "file": "bollywood/11-musafir-hoon-yaaron.mp3"
+        },
+        {
+          "id": "bollywood-12-yeh-jo-mohabbat-hai",
+          "title": "Yeh Jo Mohabbat Hai",
+          "artist": "Kishore Kumar",
+          "seconds": 248,
+          "file": "bollywood/12-yeh-jo-mohabbat-hai.mp3"
+        },
+        {
+          "id": "bollywood-13-phoolon-ke-rang-se",
+          "title": "Phoolon Ke Rang Se",
+          "artist": "Kishore Kumar",
+          "seconds": 307,
+          "file": "bollywood/13-phoolon-ke-rang-se.mp3"
+        },
+        {
+          "id": "bollywood-14-woh-sham-kuchh-ajeeb-thi",
+          "title": "Woh Sham Kuchh Ajeeb Thi",
+          "artist": "Kishore Kumar",
+          "seconds": 273,
+          "file": "bollywood/14-woh-sham-kuchh-ajeeb-thi.mp3"
+        },
+        {
+          "id": "bollywood-15-hamen-tumse-pyar-kitna",
+          "title": "Hamen Tumse Pyar Kitna",
+          "artist": "Kishore Kumar",
+          "seconds": 241,
+          "file": "bollywood/15-hamen-tumse-pyar-kitna.mp3"
+        },
+        {
+          "id": "bollywood-16-pyar-diwana-hota-hai",
+          "title": "Pyar Diwana Hota Hai",
+          "artist": "Kishore Kumar",
+          "seconds": 284,
+          "file": "bollywood/16-pyar-diwana-hota-hai.mp3"
+        }
+      ]
+    },
+    {
+      "id": "krishna",
+      "title": "Krishna",
+      "songs": [
+        {
+          "id": "krishna-01-mere-man-radhe-krishna",
+          "title": "Mere Man Mera Radhe Krishna",
+          "seconds": 164,
+          "file": "krishna/01-mere-man-radhe-krishna.mp3"
+        },
+        {
+          "id": "krishna-02-radha-krishna-naamawali",
+          "title": "Radha Krishna Naamawali",
+          "artist": "Mohit Lalwani, Akanksha",
+          "seconds": 517,
+          "file": "krishna/02-radha-krishna-naamawali.mp3"
+        },
+        {
+          "id": "krishna-03-tum-hi-tum-krishna",
+          "title": "Tum Hi Tum Krishna",
+          "seconds": 415,
+          "file": "krishna/03-tum-hi-tum-krishna.mp3"
+        }
+      ]
+    },
+    {
+      "id": "chalisa",
+      "title": "Chalisa",
+      "songs": [
+        {
+          "id": "chalisa-01-hanuman-chalisa",
+          "title": "Hanuman Chalisa",
+          "seconds": 517,
+          "file": "chalisa/01-hanuman-chalisa.mp3"
+        },
+        {
+          "id": "chalisa-02-hanuman-chalisa-tulsidas",
+          "title": "Shri Hanuman Chalisa",
+          "artist": "Goswami Tulsidas",
+          "seconds": 549,
+          "file": "chalisa/02-hanuman-chalisa-tulsidas.mp3"
+        },
+        {
+          "id": "chalisa-03-hanuman-chalisa-genz",
+          "title": "Hanuman Chalisa (GenZ)",
+          "artist": "Modern rendition",
+          "seconds": 281,
+          "file": "chalisa/03-hanuman-chalisa-genz.mp3"
+        }
+      ]
+    },
+    {
+      "id": "devotional",
+      "title": "Devotional",
+      "songs": [
+        {
+          "id": "devotional-02-gayatri-mantra",
+          "title": "Gayatri Mantra",
+          "artist": "Vedic",
+          "seconds": 290,
+          "file": "devotional/02-gayatri-mantra.mp3"
+        },
+        {
+          "id": "devotional-03-om-chanting-and-gayatri-mahima",
+          "title": "Om Chanting and Gayatri Mahima",
+          "artist": "Traditional",
+          "seconds": 237,
+          "file": "devotional/03-om-chanting-and-gayatri-mahima.mp3"
+        },
+        {
+          "id": "devotional-04-shiv-kailasho-ke-vasi",
+          "title": "Shiv Kailasho Ke Vasi",
+          "artist": "Traditional bhajan",
+          "seconds": 170,
+          "file": "devotional/04-shiv-kailasho-ke-vasi.mp3"
+        }
+      ]
+    }
+  ]
+}
