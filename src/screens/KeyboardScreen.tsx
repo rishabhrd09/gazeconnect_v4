@@ -1179,7 +1179,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                           : (isGazeEnabled ? 'rgba(122, 156, 181, 0.58)' : 'rgba(181, 168, 146, 0.7)');
                         return (
                           <div key={kc.key} style={{
-                            flex: kc.flex || 1, display: 'flex', alignItems: 'stretch', height: '100%',
+                            flex: kc.flex || 1, display: 'flex', alignItems: 'stretch', height: '100%', minWidth: 0,
                           }}>
                             {/* Left dead zone — non-interactive */}
                             <div style={{ width: deadZoneL, flexShrink: 0, pointerEvents: 'none' }} />
@@ -1202,6 +1202,8 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                               onClick={toggleGaze}
                               style={{
                                 flex: 1,
+                                // The circle fits the width the row gives it, so no other key moves (1366x768).
+                                minWidth: 0,
                                 height: '100%',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1212,10 +1214,11 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                                 padding: 0,
                               }}
                             >
-                              {/* Visual circle hub — fixed size, centered, no margin */}
+                              {/* Visual circle hub — full size where it fits, centered, no margin */}
                               <div className="keyboard-gaze-hub" style={{
                                 width: hubDiam,
-                                height: hubDiam,
+                                maxWidth: '100%',
+                                aspectRatio: '1 / 1',
                                 borderRadius: '50%',
                                 margin: 0,
                                 flexShrink: 0,
