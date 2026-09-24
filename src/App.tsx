@@ -30,6 +30,7 @@ import SarvamBloom from './components/SarvamBloom';
 import SvgDefs from './components/SvgDefs';
 import './warmmode.css';
 import './refinement.css';
+import './styles/gazespell-look.css';
 
 import HomeScreen from './screens/HomeScreen';
 import AlertModeScreen from './screens/AlertModeScreen';

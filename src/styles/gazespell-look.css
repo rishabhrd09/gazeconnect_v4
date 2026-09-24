@@ -1,0 +1,245 @@
+/* =====================================================================================
+   GAZESPELL LOOK (24 Sep 2026, maintainer's choice): the redesign as one removable layer.
+   Switch: src/config/look.ts sets <html data-look>; every rule here needs data-look='gazespell',
+   so 'classic' there brings the previous look back. Paint and type only: the size and position
+   of every gaze target stays in its component (checked by comparing target boxes with and
+   without this layer). Warm follows the GazeSpell tokens; Dark keeps GazeConnect's dark colours
+   and Manrope, in the same flat shapes (20 px corners, hairline borders, no shadows).
+   ===================================================================================== */
+
+/* ---- Tokens ------------------------------------------------------------------------ */
+:root[data-look='gazespell'][data-theme='warm'] {
+  --ui-page: #fdf4ed;
+  --ui-surface: #fcf2ea;
+  --ui-panel: #faf2eb;
+  --ui-inset: #f9f1ea;
+  --ui-hover: #f7eae0;
+  --ui-border: #f3e2d8;
+  --ui-ink: #000000;
+  --ui-muted: #5f5c59;
+  --ui-brand: #5c6c3e;
+  --ui-accent-ink: #5c6c3e;
+  --ui-care-ink: #2f0000;
+  --ui-care-border: #f3e2d8;
+  --ui-selected: #ece6d9;
+  --ui-on-action: #ffffff;
+  /* Roboto Condensed once it is bundled; Bahnschrift (Windows) is the condensed stand-in. */
+  --ui-font: 'Roboto Condensed', Bahnschrift, 'Arial Narrow', 'Segoe UI', sans-serif;
+  --gs-chip: #fdf6ef;
+  --gs-rose: #f8e7df;
+  --gs-rose-ink: #2f0000;
+  --gs-sage: #e6dfd2;
+  --gs-space: #057914;
+  --gs-looking: #3f5d78;
+  --gs-sos: #2f0000;
+  --gs-sos-ink: #f8e7df;
+  --gs-care: #5c6c3e;
+  --gs-care-ink: #ffffff;
+  --gs-exit: #000000;
+  --gs-exit-ink: #fdf4ed;
+  --gs-label: 800;
+  --gs-title: 900;
+}
+:root[data-look='gazespell']:not([data-theme='warm']) {
+  --ui-font: 'Manrope', 'Segoe UI', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
+  --gs-chip: #212823;
+  --gs-rose: #2b2321;
+  --gs-rose-ink: #e3a49b;
+  --gs-sage: #233129;
+  --gs-space: #a5d0b9;
+  --gs-looking: #2dd4bf;
+  --gs-sos: #5a2320;
+  --gs-sos-ink: #f8e7df;
+  --gs-care: #263e30;
+  --gs-care-ink: #f1f3ed;
+  --gs-exit: #f1f3ed;
+  --gs-exit-ink: #171c19;
+  --gs-label: 700;
+  --gs-title: 800;
+}
+
+/* ---- One typeface ------------------------------------------------------------------ */
+/* Warm is condensed (GazeSpell); Dark is Manrope. The wordmark keeps its Georgia (refinement.css).
+   The top bar's Home / Keyboard buttons keep their own font: their width follows their text, and
+   a new font would move them (and the gaze toggle beside them) by a few pixels. */
+:root[data-look='gazespell'][data-theme] body,
+:root[data-look='gazespell'][data-theme] body *:not(svg):not(svg *):not(.nav-btn):not(.nav-btn *):not(.app-wordmark):not(.app-wordmark *) {
+  font-family: var(--ui-font) !important;
+}
+:root[data-look='gazespell'][data-theme='warm'] body { font-stretch: 87.5%; }
+:root[data-look='gazespell'][data-theme] body .app-wordmark { font-stretch: 100% !important; }
+
+/* ---- Flat cards: 20 px corners, hairline borders, no shadows ------------------------- */
+:root[data-look='gazespell'] :is(.grid-card, .design-card, .phrase-card, .keyboard-key, .zone-group, .zone-suggestion, .zone-delete, .zone-space, .zone-speak,
+  .nav-pill, button.gaze-switch-card, .quickcall-btn:not(.home-care-card), .category-sidebar, .keyboard-text-area, .keyboard-prediction-bar,
+  [id^='assist-category-'], [id^='act-cat-'], [id^='hub-'], [id^='qws-'], [id^='alert-card-'], #alert-mode-home, [id^='person-'],
+  [id^='selected-person-display-'], #assist-back-categories-card, .medical-screen [id^='phrase-'], [id^='spatial-'], [id^='cat-']) {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+:root[data-look='gazespell'] :is(.grid-card, .design-card, .phrase-card, .keyboard-key, .zone-group, .zone-suggestion, .zone-delete, .zone-space, .zone-speak,
+  .nav-pill, button.gaze-switch-card, [id^='assist-category-'], [id^='act-cat-'], [id^='hub-'], [id^='qws-'], [id^='alert-card-'],
+  #alert-mode-home, [id^='person-'], [id^='selected-person-display-'], #assist-back-categories-card, .medical-screen [id^='phrase-'],
+  #spatial-home, #spatial-keyboard, #spatial-quick-phrases, #spatial-fullscreen, #spatial-gaze, .category-sidebar, .keyboard-text-area) {
+  border-radius: 20px !important;
+}
+/* Keyboard keys keep their 2 px border: the action row's flex sizes include it. */
+:root[data-look='gazespell'] :is(.grid-card, .design-card, .phrase-card, .zone-group, .zone-suggestion, [id^='assist-category-'], [id^='act-cat-'],
+  [id^='hub-'], [id^='person-']:not([aria-pressed='true']), .medical-screen [id^='phrase-'], #assist-back-categories-card) {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--ui-border) !important;
+}
+
+/* ---- Top bar ------------------------------------------------------------------------- */
+:root[data-look='gazespell'] .nav-btn svg { color: var(--ui-brand) !important; }
+:root[data-look='gazespell'] .nav-btn svg [stroke]:not([stroke='none']) { stroke: var(--ui-brand) !important; }
+:root[data-look='gazespell'] button.gaze-switch-card .gaze-switch-label { font-weight: var(--gs-label) !important; }
+
+/* ---- Home ---------------------------------------------------------------------------- */
+:root[data-look='gazespell'] .home-screen .grid-card-label { font-weight: var(--gs-label) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .home-screen .grid-card-label { font-size: clamp(26px, 3.9vh, 42px) !important; line-height: 1.05 !important; }
+:root[data-look='gazespell'] .home-screen .grid-card-label + span { font-weight: 800 !important; letter-spacing: 0.09em !important; }
+:root[data-look='gazespell'] .home-screen .home-dock-phrases { background: var(--ui-surface) !important; }
+:root[data-look='gazespell'] .home-screen .home-dock-phrases span { font-weight: var(--gs-label) !important; }
+:root[data-look='gazespell'] .home-screen .home-dock-phrases span:first-child { color: var(--ui-ink) !important; }
+:root[data-look='gazespell'] .home-screen .home-dock-phrases div + span { color: var(--ui-muted) !important; }
+/* Larger only when Quick Phrases is alone; beside Urgent Needs the pill is narrower. */
+:root[data-look='gazespell'][data-theme='warm'] .home-screen .home-dock-solo span:first-child { font-size: clamp(26px, 3.9vh, 42px) !important; }
+/* Urgent Needs launcher (when Home shows it): Warm uses GazeSpell's soft rose action. */
+:root[data-look='gazespell'][data-theme='warm'] .home-screen .home-dock-urgent { background: var(--gs-rose) !important; border-color: var(--ui-border) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .home-screen .home-dock-urgent span { color: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .home-screen .home-dock-urgent svg [stroke]:not([stroke='none']) { stroke: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'] .home-screen .home-dock-urgent span { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .home-screen .live-clock-time { font-weight: 800 !important; }
+:root[data-look='gazespell'] .home-screen .live-clock-date { font-weight: 800 !important; }
+:root[data-look='gazespell'] .live-clock-time { font-weight: 800 !important; }
+:root[data-look='gazespell'] .live-clock-date { font-weight: 800 !important; }
+
+/* ---- Keyboard ------------------------------------------------------------------------ */
+:root[data-look='gazespell'] .keyboard-screen .keyboard-key { font-weight: 900 !important; }
+:root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='letter'] { font-weight: 900 !important; }
+:root[data-look='gazespell'][data-theme='warm'] .keyboard-screen .keyboard-key[data-action='letter'] { font-size: clamp(38px, 6.1vh, 66px) !important; }
+:root[data-look='gazespell'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) { border-radius: 14px !important; }
+:root[data-look='gazespell'] .keyboard-screen .keyboard-word-slot { background: var(--gs-chip) !important; }
+:root[data-look='gazespell'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) :is(button, span) { font-weight: 750 !important; }
+:root[data-look='gazespell'] .keyboard-screen #nav-restore-btn {
+  font-weight: 900 !important; letter-spacing: 0.08em !important;
+  background: var(--ui-selected) !important; color: var(--ui-accent-ink) !important;
+}
+:root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='space'] { color: var(--gs-space) !important; letter-spacing: 0.12em !important; }
+:root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='backspace'],
+:root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='deleteWord'] {
+  background: var(--gs-rose) !important; color: var(--gs-rose-ink) !important;
+}
+
+/* ---- Message bar (Keyboard and Zone Board) ---------------------------------------------- */
+:root[data-look='gazespell'] .keyboard-message { background: var(--ui-inset) !important; }
+:root[data-look='gazespell'] .keyboard-message .message-display-action { font-weight: var(--gs-label) !important; }
+
+/* ---- Zone Board ---------------------------------------------------------------------- */
+/* GazeSpell's 84 px / +0.2em groups sit in wider cells; here six letters must fit a third of the
+   width on one line, so the size also follows the width. */
+:root[data-look='gazespell'] .zone-workspace .zone-group { font-weight: 900 !important; letter-spacing: 0.16em !important; }
+:root[data-look='gazespell'][data-theme='warm'] .zone-workspace .zone-group { font-size: clamp(40px, min(7vh, 3.9vw), 76px) !important; }
+:root[data-look='gazespell'] .zone-workspace .zone-suggestion { background: var(--gs-chip) !important; font-weight: 750 !important; }
+:root[data-look='gazespell'][data-theme='warm'] .zone-workspace .zone-suggestion { font-size: clamp(22px, 3.15vh, 34px) !important; }
+:root[data-look='gazespell'] .zone-workspace :is(.zone-delete, .zone-space, .zone-speak) { font-weight: 900 !important; }
+:root[data-look='gazespell'][data-theme='warm'] .zone-workspace :is(.zone-delete, .zone-space, .zone-speak) { font-size: clamp(30px, 5.2vh, 56px) !important; }
+:root[data-look='gazespell'][data-theme] .zone-workspace .zone-delete { background: var(--gs-rose) !important; color: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'][data-theme] .zone-workspace .zone-space { color: var(--gs-space) !important; }
+:root[data-look='gazespell'] .zone-workspace .zone-current-word { border-radius: 20px !important; background: var(--ui-panel) !important; }
+:root[data-look='gazespell'] .zone-workspace .zone-current-text { font-weight: 900 !important; }
+:root[data-look='gazespell'] .zone-workspace .zone-navigation button { font-weight: var(--gs-label) !important; }
+
+/* ---- Quick Phrases (three columns of care requests) ------------------------------------ */
+:root[data-look='gazespell'] .quickwords-screen [id^='qws-emergency-'] { background: var(--gs-rose) !important; border: 1px solid var(--ui-border) !important; }
+:root[data-look='gazespell'] .quickwords-screen [id^='qws-emergency-'] * { color: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'] .quickwords-screen [id^='qws-position-'] { background: var(--gs-sage) !important; border: 1px solid var(--ui-border) !important; }
+:root[data-look='gazespell'] .quickwords-screen [id^='qws-daily-'] { background: var(--gs-chip) !important; border: 1px solid var(--ui-border) !important; }
+:root[data-look='gazespell'] .quickwords-screen :is([id^='qws-position-'], [id^='qws-daily-']) * { color: var(--ui-ink) !important; }
+:root[data-look='gazespell'] .quickwords-screen [id^='qws-'] * { font-weight: var(--gs-label) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .quickwords-screen [id^='qws-'] span { font-size: clamp(22px, 3.5vh, 38px) !important; line-height: 1.12 !important; }
+/* Column headings: simple line icons in place of the pictures. */
+:root[data-look='gazespell'] .quickwords-screen [style*='mask-image'] { -webkit-mask-size: 70% !important; mask-size: 70% !important; }
+:root[data-look='gazespell'] .quickwords-screen [style*='medical-urgent'] { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h4.5L9 6l4 12 2-9 1.5 3H21'/%3E%3C/svg%3E") !important; mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h4.5L9 6l4 12 2-9 1.5 3H21'/%3E%3C/svg%3E") !important; background-color: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'] .quickwords-screen [style*='bed-position'] { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7v11 M3 14h18v4 M21 18v-4a3 3 0 0 0-3-3h-8v3 M5 9a2 2 0 1 0 4 0a2 2 0 0 0-4 0'/%3E%3C/svg%3E") !important; mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7v11 M3 14h18v4 M21 18v-4a3 3 0 0 0-3-3h-8v3 M5 9a2 2 0 1 0 4 0a2 2 0 0 0-4 0'/%3E%3C/svg%3E") !important; background-color: var(--ui-accent-ink) !important; }
+:root[data-look='gazespell'] .quickwords-screen [style*='daily-care'] { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M3 12h1 M20 12h1 M12 3v1 M12 20v1 M5.6 5.6l.7.7 M17.7 17.7l.7.7 M18.4 5.6l-.7.7 M6.3 17.7l-.7.7'/%3E%3C/svg%3E") !important; mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M3 12h1 M20 12h1 M12 3v1 M12 20v1 M5.6 5.6l.7.7 M17.7 17.7l.7.7 M18.4 5.6l-.7.7 M6.3 17.7l-.7.7'/%3E%3C/svg%3E") !important; background-color: var(--ui-ink) !important; }
+
+/* ---- Phrases ------------------------------------------------------------------------- */
+:root[data-look='gazespell'] .phrases-screen [id^='cat-'] { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .phrases-screen [id^='cat-'] { border-radius: 20px !important; }
+/* The chosen category (its inline fill is the only thing that marks it): the look's selected fill. */
+:root[data-look='gazespell'][data-theme='warm'] .phrases-screen [id^='cat-']:not([style*='background-color: transparent']) { background-color: var(--ui-selected) !important; }
+:root[data-look='gazespell'] .phrases-screen .phrase-card { font-weight: var(--gs-label) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .phrases-screen .phrase-card { font-size: clamp(22px, 3.5vh, 38px) !important; }
+:root[data-look='gazespell'] .phrases-screen :is(h1, h2) { font-weight: var(--gs-title) !important; }
+
+/* ---- Assistance ---------------------------------------------------------------------- */
+:root[data-look='gazespell'] .medical-screen :is(h1, h2) { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .medical-screen [id^='assist-category-'] div[style*='position: absolute'][style*='width: 2px'] { display: none !important; }
+:root[data-look='gazespell'] .medical-screen [id^='assist-category-'] * { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .medical-screen [id^='phrase-'] * { font-weight: var(--gs-label) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .medical-screen [id^='phrase-'] span { font-size: clamp(22px, 3.5vh, 38px) !important; }
+:root[data-look='gazespell'] .medical-screen #assist-back-categories-card { background: var(--gs-chip) !important; }
+/* The Assistance pictures stay the originals (src/assets/daily-assistance), the maintainer's choice. */
+
+/* ---- Urgent Needs (the emergency screen) ------------------------------------------------ */
+:root[data-look='gazespell'] [id^='alert-card-'] { background: var(--gs-care) !important; border: 1px solid transparent !important; }
+:root[data-look='gazespell'] [id^='alert-card-'] * { color: var(--gs-care-ink) !important; font-weight: 900 !important; }
+:root[data-look='gazespell'] #alert-card-0 { background: var(--gs-sos) !important; }
+:root[data-look='gazespell'] #alert-card-0 * { color: var(--gs-sos-ink) !important; }
+:root[data-look='gazespell'] #alert-mode-home { background: var(--gs-exit) !important; color: var(--gs-exit-ink) !important; }
+:root[data-look='gazespell'] #alert-mode-home * { color: var(--gs-exit-ink) !important; font-weight: 900 !important; }
+:root[data-look='gazespell'] #alert-mode-home svg [stroke]:not([stroke='none']) { stroke: var(--gs-exit-ink) !important; }
+:root[data-look='gazespell'] .alert-mode-title { color: var(--ui-ink) !important; font-weight: 900 !important; }
+:root[data-look='gazespell'] .alert-mode-hint { color: var(--ui-muted) !important; font-weight: 700 !important; }
+:root[data-look='gazespell'] .alert-mode-strip { background: var(--gs-rose) !important; border-bottom-color: var(--ui-border) !important; }
+:root[data-look='gazespell'] .alert-mode-strip span { color: var(--gs-rose-ink) !important; font-weight: 900 !important; }
+:root[data-look='gazespell'] .alert-mode-strip > div { background: var(--gs-rose-ink) !important; opacity: 1 !important; }
+:root[data-look='gazespell'] .alert-mode-footer { color: var(--ui-muted) !important; }
+/* The confirmation after a card: the same two colours as the cards. */
+:root[data-look='gazespell'] .alert-confirm-panel { background: var(--gs-care) !important; box-shadow: none !important; border-radius: 20px !important; }
+:root[data-look='gazespell'] .alert-confirm-panel * { color: var(--gs-care-ink) !important; }
+:root[data-look='gazespell'] .alert-confirm-panel.alert-confirm-sos { background: var(--gs-sos) !important; }
+:root[data-look='gazespell'] .alert-confirm-panel.alert-confirm-sos * { color: var(--gs-sos-ink) !important; }
+
+/* ---- People -------------------------------------------------------------------------- */
+:root[data-look='gazespell'] .people-screen [id^='person-'] * { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .people-screen [id^='person-'][style*='0.12'] { background: var(--ui-selected) !important; border: 2px solid var(--ui-accent-ink) !important; }
+:root[data-look='gazespell'] .people-screen [id^='selected-person-display-'] { background: var(--gs-chip) !important; border: 2px solid var(--ui-accent-ink) !important; }
+:root[data-look='gazespell'] .people-screen [id^='selected-person-display-'] * { font-weight: var(--gs-title) !important; }
+/* The name bar speaks the name: a speaker sign says so. */
+:root[data-look='gazespell'] .people-screen [id^='selected-person-display-'] > div {
+  display: flex !important; align-items: center !important; justify-content: center !important; gap: 20px !important;
+}
+:root[data-look='gazespell'] .people-screen [id^='selected-person-display-'] > div::before {
+  content: ''; display: block; flex-shrink: 0; width: 44px; height: 44px;
+  background-color: var(--ui-accent-ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 8a5 5 0 0 1 0 8 M17.7 5a9 9 0 0 1 0 14 M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5A.8.8 0 0 1 11 5v14a.8.8 0 0 1-1.5.5L6 15'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 8a5 5 0 0 1 0 8 M17.7 5a9 9 0 0 1 0 14 M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5A.8.8 0 0 1 11 5v14a.8.8 0 0 1-1.5.5L6 15'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* ---- Activities ---------------------------------------------------------------------- */
+:root[data-look='gazespell'] .activities-screen :is(h1, h2) { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .activities-screen [id^='act-cat-'] div[style*='position: absolute'][style*='width: 2px'] { display: none !important; }
+:root[data-look='gazespell'] .activities-screen [id^='act-cat-'] * { font-weight: var(--gs-title) !important; }
+/* Simple line icons at full strength: the colour sits on the <svg> itself or on its paths. */
+:root[data-look='gazespell'] .activities-screen [id^='act-cat-'] div:has(> svg) { opacity: 1 !important; filter: none !important; }
+:root[data-look='gazespell'] .activities-screen [id^='act-cat-'] svg { color: var(--ui-accent-ink) !important; }
+:root[data-look='gazespell'] .activities-screen [id^='act-cat-'] :is(svg[stroke], svg [stroke]):not([stroke='none']) { stroke: var(--ui-accent-ink) !important; }
+:root[data-look='gazespell'] .activities-screen [id^='act-cat-'] svg [fill]:not([fill='none']) { fill: var(--ui-accent-ink) !important; }
+:root[data-look='gazespell'] .activities-screen #act-cat-youtube :is(svg[stroke], svg [stroke]):not([stroke='none']) { stroke: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'] .activities-screen #act-cat-youtube svg [fill]:not([fill='none']) { fill: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'] .activities-screen #act-cat-web :is(svg[stroke], svg [stroke]):not([stroke='none']) { stroke: var(--gs-looking) !important; }
+
+/* ---- Web Browsing -------------------------------------------------------------------- */
+:root[data-look='gazespell'] .web-hub-screen [id^='hub-'] span { font-weight: var(--gs-label) !important; }
+:root[data-look='gazespell'] .web-hub-screen [id^='hub-'] svg [stroke]:not([stroke='none']) { stroke: var(--ui-ink) !important; }
+:root[data-look='gazespell'] .web-hub-screen #hub-youtube svg [stroke]:not([stroke='none']) { stroke: var(--gs-rose-ink) !important; }
+:root[data-look='gazespell'] .web-hub-screen #hub-social svg [stroke]:not([stroke='none']) { stroke: var(--ui-accent-ink) !important; }
+
+/* ---- Design Home --------------------------------------------------------------------- */
+:root[data-look='gazespell'] .design-home-screen h1 { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .design-home-screen .design-card > div > div:last-child > div:first-child { font-weight: var(--gs-title) !important; }
+:root[data-look='gazespell'] .design-home-screen .design-card > div > div:last-child > div:last-child { font-weight: 700 !important; }
+:root[data-look='gazespell'] .design-home-screen .design-card > div > div:first-child { color: var(--ui-accent-ink) !important; }
