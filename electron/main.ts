@@ -556,9 +556,10 @@ async function applyHighContrastIfNeeded(): Promise<void> {
 function sendBrowserNavState(force = false): void {
   if (!mainWindow || !activeBrowserView) return;
   try {
+    const history = activeBrowserView.webContents.navigationHistory;
     const nextState = {
-      canGoBack: activeBrowserView.webContents.canGoBack(),
-      canGoForward: activeBrowserView.webContents.canGoForward(),
+      canGoBack: history.canGoBack(),
+      canGoForward: history.canGoForward(),
       url: activeBrowserView.webContents.getURL() || '',
     };
 
@@ -1912,8 +1913,8 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('webview:back', () => {
     console.log('[Main] webview:back called');
-    if (activeBrowserView?.webContents.canGoBack()) {
-      activeBrowserView.webContents.goBack();
+    if (activeBrowserView?.webContents.navigationHistory.canGoBack()) {
+      activeBrowserView.webContents.navigationHistory.goBack();
       console.log('[Main] Executed goBack');
       setTimeout(() => sendBrowserNavState(true), 250);
     } else {
@@ -1923,8 +1924,8 @@ function setupIpcHandlers(): void {
   });
 
   ipcMain.handle('webview:forward', () => {
-    if (activeBrowserView?.webContents.canGoForward()) {
-      activeBrowserView.webContents.goForward();
+    if (activeBrowserView?.webContents.navigationHistory.canGoForward()) {
+      activeBrowserView.webContents.navigationHistory.goForward();
       setTimeout(() => sendBrowserNavState(true), 250);
     }
   });

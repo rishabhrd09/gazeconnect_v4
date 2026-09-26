@@ -8,7 +8,7 @@ GazeConnect is a communication aid, not a dependable emergency notification syst
 
 Target: **Windows 10 / 11, x64**. Hardware tracking has been used successfully on the maintainer's Windows 10 laptop. Each new release still needs validation on Windows with the tracker connected; a browser preview or macOS build cannot validate the drivers or installer.
 
-For development, install Git, Node.js x64 (Node 22 is the validation baseline), Python x64 (3.12 is the validation baseline; minimum 3.10), and the latest serviced .NET 8 SDK used by the current bridge. For hardware use, install Tobii Experience and calibrate the tracker there first.
+For development, install Git, Node.js x64 (22.12 or newer, which Electron 44 requires; Node 22 is the validation baseline), Python x64 (3.12 is the validation baseline; minimum 3.10), and the latest serviced .NET 8 SDK used by the current bridge. For hardware use, install Tobii Experience and calibrate the tracker there first.
 
 ```powershell
 git clone https://github.com/rishabhrd09/gazeconnect_v4.git

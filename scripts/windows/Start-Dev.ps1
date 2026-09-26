@@ -82,7 +82,9 @@ try {
     # console shows start-up, connection, speech and error messages without flooding.
     $logDir = Join-Path $ProjectRoot 'tools\reports'
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-    $logPath = Join-Path $logDir ('dev-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+    # Relative to the checkout (the current location), so no % or ! of its path reaches cmd.exe.
+    $logRelative = 'tools\reports\dev-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log'
+    $logPath = Join-Path $ProjectRoot $logRelative
     if ($Hot) { Write-Host 'Interface: development server (live reload, slower to start).' }
     else { Write-Host 'Interface: built (fast start). Use --hot for live reloading while editing it.' }
     Write-Host "Starting application. Logs: $logPath"
@@ -91,9 +93,9 @@ try {
     $launchExit = 0
     try {
         # The same two tasks as `npm run dev:electron`, with the chosen interface port handed to
-        # Vite. cmd merges stderr first: Windows PowerShell 5.1 would otherwise wrap each native
-        # stderr line in an error record. Tee keeps the same text in the log file.
-        $launch = 'node_modules\.bin\npm-run-all.cmd --parallel --race "dev -- --port ' + $vitePort + '" electron:dev 2>&1'
+        # Vite. cmd merges stderr (2>&1 below): Windows PowerShell 5.1 would otherwise wrap each
+        # native stderr line in an error record.
+        $launch = 'node_modules\.bin\npm-run-all.cmd --parallel --race "dev -- --port ' + $vitePort + '" electron:dev'
         if ($Fast) {
             # No development server: Electron opens the built interface, which is one
             # bundle instead of a hundred requests. Rebuilt only when sources changed.
@@ -110,12 +112,21 @@ try {
                 Invoke-Checked 'node.exe' @('node_modules\typescript\bin\tsc', '-p', 'tsconfig.electron.json')
             }
             $env:GAZECONNECT_UI = 'dist'
-            $launch = 'node_modules\.bin\electron.cmd . 2>&1'
+            $launch = 'node_modules\.bin\electron.cmd .'
         }
+        # The log is UTF-8 without a BOM, so grep and tail read it (Windows PowerShell 5.1's
+        # redirection and Tee-Object write UTF-16).
         if ($Quiet) {
-            & cmd.exe /d /c $launch *> $logPath
+            # cmd.exe stores the application's bytes unchanged. Out-Null makes PowerShell wait
+            # for it, so Ctrl+C still reaches the finally block below.
+            & cmd.exe /d /c ($launch + ' > "' + $logRelative + '" 2>&1') | Out-Null
         } else {
-            & cmd.exe /d /c $launch | Tee-Object -FilePath $logPath
+            # Each line to the console and to the log as it arrives.
+            $log = New-Object IO.StreamWriter($logPath, $false, (New-Object Text.UTF8Encoding($false)))
+            $log.AutoFlush = $true
+            try {
+                & cmd.exe /d /c ($launch + ' 2>&1') | ForEach-Object { $log.WriteLine($_); $_ }
+            } finally { $log.Dispose() }
         }
         $launchExit = $LASTEXITCODE
     } finally {
@@ -125,7 +136,8 @@ try {
         if ($closed -gt 0) { Write-Host "Closed $closed remaining GazeConnect process(es)." }
     }
     if ($launchExit -ne 0) {
-        if ($Quiet) { Get-Content -LiteralPath $logPath -Tail 40 }
+        # BOM-less, so the encoding is named: 5.1 would read the file as ANSI.
+        if ($Quiet) { Get-Content -LiteralPath $logPath -Tail 40 -Encoding UTF8 }
         throw "Development launch failed (exit code $launchExit); see $logPath"
     }
 } catch { Write-Error $_ -ErrorAction Continue; exit 1 }

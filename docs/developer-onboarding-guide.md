@@ -29,7 +29,7 @@ cd gazeconnect_v4
 ```
 
 `setup.bat` performs the following:
-1. Installs Node.js packages exactly as `package-lock.json` (`npm ci`), skipped when `node_modules` already matches it
+1. Installs Node.js packages exactly as `package-lock.json` (`npm ci --ignore-scripts`: no package install scripts run), skipped when `node_modules` already matches it, then downloads Electron's program and checks it against the locked checksums, so the first launch never downloads anything
 2. Creates the Python virtual environment (`python/.venv/`) from Python 3.12 x64, found through the `py` launcher rather than PATH order, and rebuilds one that is broken or made with an unsupported Python
 3. Installs Python dependencies from `requirements.txt` at the versions pinned in `python/constraints.txt`, then checks them (`pip check`, imports)
 4. Verifies the Tobii DLLs in `tobii-helper/TobiiGazeHelper/lib/` and builds the .NET TobiiGazeHelper project (skipped with `--simulate`)

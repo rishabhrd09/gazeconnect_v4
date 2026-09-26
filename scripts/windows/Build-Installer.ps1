@@ -36,6 +36,14 @@ try {
     # records the fresh install, so the next start-dev does not ask for setup.bat.
     Install-NodeDependencies
     Require-File (Join-Path $ProjectRoot 'node_modules\.bin\electron-builder.cmd')
+    # A build that was killed never reached its finally block; its work tree (hundreds of MB) is
+    # removed here. Only this script's own naming, and only when a day old, so a build running
+    # from another checkout at the same time keeps its tree.
+    foreach ($stale in @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'gazeconnect-build-*' -ErrorAction SilentlyContinue)) {
+        if ($stale.CreationTimeUtc -lt [DateTime]::UtcNow.AddDays(-1) -and -not ($stale.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            Remove-Item -LiteralPath $stale.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
     $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + ([guid]::NewGuid().ToString('N').Substring(0, 8))
     $work = Join-Path ([IO.Path]::GetTempPath()) ('gazeconnect-build-' + $runId)
     New-Item -ItemType Directory -Path $work | Out-Null

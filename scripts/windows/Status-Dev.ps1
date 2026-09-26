@@ -17,7 +17,7 @@ try {
         }
         Write-Host '  (A closed window only hides the app in the notification area; it keeps its ports.)'
     }
-    $setupProblems = @(@(Get-PythonEnvironmentProblem; Get-NodeModulesProblem) | Where-Object { $_ })
+    $setupProblems = @(@(Get-PythonEnvironmentProblem; Get-NodeModulesProblem; Get-ElectronProgramProblem) | Where-Object { $_ })
     if ($setupProblems.Count -eq 0) { Write-Host 'Setup: done (python\.venv and node_modules match the current requirements).' }
     else { Write-Host ('Setup: needed - ' + ($setupProblems -join '; ') + '.') }
     Write-Host ''

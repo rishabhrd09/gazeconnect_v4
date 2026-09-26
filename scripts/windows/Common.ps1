@@ -391,11 +391,39 @@ function Get-NodeModulesProblem {
     return $null
 }
 
+function Get-ElectronProgramProblem {
+    # Electron 42+ downloads its program the first time it runs, not during npm install. Setup
+    # downloads it instead, so a launch never fetches 100+ MB or fails offline. This mirrors the
+    # package's own isInstalled() in node_modules\electron\install.js.
+    $electron = Join-Path $ProjectRoot 'node_modules\electron'
+    $package = Join-Path $electron 'package.json'
+    if (-not (Test-Path -LiteralPath $package -PathType Leaf)) { return 'node_modules has no Electron' }
+    try {
+        $wanted = [string](Get-Content -LiteralPath $package -Raw | ConvertFrom-Json).version
+        $have = ([string](Get-Content -LiteralPath (Join-Path $electron 'dist\version') -Raw -ErrorAction Stop)).Trim() -replace '^v', ''
+        $program = ([string](Get-Content -LiteralPath (Join-Path $electron 'path.txt') -Raw -ErrorAction Stop)).Trim()
+    } catch {
+        return 'the Electron program has not been downloaded'
+    }
+    if ($have -ne $wanted -or -not $program -or -not (Test-Path -LiteralPath (Join-Path $electron ('dist\' + $program)) -PathType Leaf)) {
+        return "the Electron $wanted program has not been downloaded"
+    }
+    return $null
+}
+
+function Install-ElectronProgram {
+    # node_modules\electron\install.js checks the download against checksums.json from the locked
+    # package, and does nothing when the matching program is already there.
+    Invoke-Checked 'node.exe' @((Join-Path $ProjectRoot 'node_modules\electron\install.js'))
+    $problem = Get-ElectronProgramProblem
+    if ($problem) { throw "Downloading Electron did not complete: $problem." }
+}
+
 function Assert-DependenciesReady {
     # For launchers and checks: stop before anything starts when setup.bat has to run first.
     param([switch]$PythonOnly)
     $problems = @(Get-PythonEnvironmentProblem)
-    if (-not $PythonOnly) { $problems += @(Get-NodeModulesProblem) }
+    if (-not $PythonOnly) { $problems += @(Get-NodeModulesProblem; Get-ElectronProgramProblem) }
     $problems = @($problems | Where-Object { $_ })
     if ($problems.Count -gt 0) {
         throw ('Setup is needed: ' + ($problems -join '; ') + '. Run .\setup.bat (.\setup.bat --simulate without an eye tracker), then try again.')
@@ -403,9 +431,13 @@ function Assert-DependenciesReady {
 }
 
 function Install-NodeDependencies {
-    # Exactly package-lock.json: npm ci always starts from an empty node_modules.
+    # Exactly package-lock.json: npm ci always starts from an empty node_modules. No package's
+    # install script runs (supply-chain safety; none is needed on Windows: esbuild's binary comes
+    # as an optional dependency, electron-winstaller is only for Squirrel installers). The one
+    # download that needs code, Electron's own program, runs next from the locked package.
     Require-File $PackageLock
-    Invoke-Checked 'npm.cmd' @('ci')
+    Invoke-Checked 'npm.cmd' @('ci', '--ignore-scripts')
+    Install-ElectronProgram
     Write-SetupStamp $NodeStamp @{ packageLockSha256 = (Get-FileSha256 $PackageLock); node = [string](& node.exe --version) }
 }
 

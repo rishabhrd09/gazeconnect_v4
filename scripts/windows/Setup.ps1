@@ -28,6 +28,11 @@ try {
         Install-NodeDependencies
     } else {
         Write-Host '  Already match package-lock.json; npm ci skipped (--force reinstalls).'
+        $electronProblem = Get-ElectronProgramProblem
+        if ($electronProblem) {
+            Write-Host "  Downloading Electron: $electronProblem."
+            Install-ElectronProgram
+        }
     }
 
     Write-Host '[2/3] Python environment (python\.venv)'

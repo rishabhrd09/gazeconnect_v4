@@ -4,9 +4,9 @@
 Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND patients using Tobii Eye Tracker 5. Built for Papa — and for every ALS patient who deserves to communicate freely.
 
 ## Architecture
-- **Frontend**: Electron 28 + React 18 + TypeScript + Vite 5
+- **Frontend**: Electron 44 + React 18 + TypeScript + Vite 5 (Node.js 22.12+ for development)
 - **Backend**: Python 3.10+ (asyncio WebSocket server on port 8765)
-- **Eye Tracking**: .NET 6.0 TobiiGazeHelper (TCP port 5555)
+- **Eye Tracking**: .NET 8 x64 self-contained TobiiGazeHelper (TCP port 5555)
 - **TTS**: pyttsx3 (SAPI5) + browser SpeechSynthesis fallback
 
 ## Key Constraints
@@ -38,7 +38,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `python/data/smart_bigrams.json` — Legacy engine: pre-computed 1,339 word-pair frequencies (36KB)
 - `python/ml/` — Legacy engine: CIFG-LSTM neural model (1.9MB ONNX) + inference + fusion
 - `electron/` — Electron main process + preload
-- `tobii-helper/` — .NET 6.0 eye tracker bridge (C#)
+- `tobii-helper/` — .NET 8 eye tracker bridge (C#)
 
 ## Word Prediction System (v4, deterministic)
 - **Default engine**: `python/services/deterministic_prediction/`, a port of the GazeCompass deterministic predictor (pinned `de33a95`, stage-level parity with 0 mismatches). No network, LLM, neural model, randomness or clock: the same draft, learned state and slot lineage always give the same slots. Details: `docs/deterministic-prediction/README.md`
