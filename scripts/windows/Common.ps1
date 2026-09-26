@@ -2,7 +2,19 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$script:VenvPython = Join-Path $ProjectRoot 'python\.venv\Scripts\python.exe'
+$script:VenvDir = Join-Path $ProjectRoot 'python\.venv'
+$script:VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
+$script:PackageLock = Join-Path $ProjectRoot 'package-lock.json'
+$script:PythonRequirements = Join-Path $ProjectRoot 'requirements.txt'
+# Exact package versions validated with $PythonBaseline x64; see the file's header.
+$script:PythonConstraints = Join-Path $ProjectRoot 'python\constraints.txt'
+$script:PythonBaseline = '3.12'
+# Installed beside the requirements: the installer build needs it, the app does not.
+$script:PyInstallerSpec = 'pyinstaller>=6,<7'
+# Written by setup only after a complete, verified install, and read by the launchers instead of
+# starting an interpreter or npm. Each lives inside what it describes, so deleting one deletes both.
+$script:PythonStamp = Join-Path $VenvDir 'gazeconnect-setup.json'
+$script:NodeStamp = Join-Path $ProjectRoot 'node_modules\.gazeconnect-setup.json'
 $script:TobiiProject = Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\TobiiGazeHelper.csproj'
 $script:TobiiLib = Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\lib'
 $script:TobiiDlls = @('Tobii.Interaction.Net.dll', 'Tobii.Interaction.Model.dll',
@@ -216,4 +228,198 @@ function Format-DevPortRow([object]$Row) {
         '{0} (PID {1}, {2})' -f $_.Name, $_.ProcessId, $tag
     }) -join '; '
     return ('{0,-5} {1,-19} held by {2}' -f $Row.Port, $Row.Purpose, $who)
+}
+
+# ---- Dependencies: interpreter choice, python\.venv, node_modules ----
+
+function Get-PythonProbe {
+    # Describes one interpreter (check_python.py --probe), or $null when it cannot run: not
+    # installed, a Microsoft Store alias with nothing behind it, a venv whose base Python is gone.
+    param([string]$Command, [string[]]$Prefix = @())
+    $previous = $ErrorActionPreference
+    # A failing candidate's stderr is an answer here, not an error: under Stop, Windows
+    # PowerShell 5.1 would raise its first redirected line.
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& $Command @Prefix (Join-Path $PSScriptRoot 'check_python.py') '--probe' 2>$null)
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $json = @($output | Where-Object { "$_" -match '^\s*\{' }) | Select-Object -Last 1
+        if (-not $json) { return $null }
+        return ($json | ConvertFrom-Json)
+    } catch {
+        return $null
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
+function Find-BasePython {
+    # The interpreter python\.venv is made from. PATH order alone is not trusted: on the
+    # maintainer's machine an older Python 3.9 comes first there. Order: -Python or
+    # GAZECONNECT_PYTHON when given (then nothing else), the validated 3.12 through the py
+    # launcher, the other supported versions, then each python.exe on PATH.
+    param([string]$Requested)
+    # A virtual environment's interpreter (an activated venv on PATH, python\.venv itself) is
+    # replaced by the Python it was made from: a rebuild would otherwise delete what it runs.
+    function Resolve-Base($probe) {
+        if ($probe -and $probe.supported -and $probe.in_venv) { $probe = Get-PythonProbe ([string]$probe.base_executable) }
+        return $probe
+    }
+    if (-not $Requested) { $Requested = $env:GAZECONNECT_PYTHON }
+    if ($Requested) {
+        $probe = $null
+        if (Test-Path -LiteralPath $Requested -PathType Leaf) { $probe = Resolve-Base (Get-PythonProbe $Requested) }
+        if (-not $probe -or -not $probe.supported) { throw "The requested Python '$Requested' did not run as Python 3.10+ x64." }
+        return $probe
+    }
+    # A probe must never install anything (the py launcher can offer winget or the Store).
+    Remove-Item Env:PYLAUNCHER_ALLOW_INSTALL -ErrorAction SilentlyContinue
+    $rejected = @{}
+    if (Get-Command 'py.exe' -ErrorAction SilentlyContinue) {
+        foreach ($tag in @('-3.12-64', '-3.11-64', '-3.10-64', '-3.13-64', '-3-64')) {
+            $probe = Resolve-Base (Get-PythonProbe 'py.exe' @($tag))
+            if ($probe -and $probe.supported) { return $probe }
+            if ($probe) { $rejected[[string]$probe.executable] = $probe }
+        }
+    }
+    foreach ($command in @(Get-Command 'python.exe' -All -ErrorAction SilentlyContinue)) {
+        $probe = Resolve-Base (Get-PythonProbe $command.Path)
+        if ($probe -and $probe.supported) { return $probe }
+        if ($probe) { $rejected[[string]$probe.executable] = $probe }
+    }
+    $found = ''
+    if ($rejected.Count -gt 0) {
+        $found = ' Found only: ' + (($rejected.Values | ForEach-Object { "Python $($_.python) ($($_.bits)-bit) at $($_.executable)" }) -join '; ') + '.'
+    }
+    throw ("Python 3.10+ x64 was not found.$found Install Python $PythonBaseline x64 from python.org (keep its " +
+        "'py launcher' option), or pass -Python <path to python.exe>, then run setup.bat again.")
+}
+
+function Get-VenvProblem {
+    # Why python\.venv cannot be kept as it is (worded to follow "python\.venv"), or $null.
+    if (-not (Test-Path -LiteralPath $VenvDir)) { return 'does not exist yet' }
+    if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $VenvDir 'pyvenv.cfg') -PathType Leaf)) {
+        return 'is incomplete or was made on another operating system'
+    }
+    $probe = Get-PythonProbe $VenvPython
+    if (-not $probe) { return 'cannot start (the Python it was made from was probably uninstalled or moved)' }
+    if (-not $probe.supported) { return "was made with Python $($probe.python) ($($probe.bits)-bit); 3.10+ x64 is required" }
+    return $null
+}
+
+function Get-VenvHome {
+    # The base interpreter's folder recorded in pyvenv.cfg.
+    $cfg = Join-Path $VenvDir 'pyvenv.cfg'
+    if (-not (Test-Path -LiteralPath $cfg -PathType Leaf)) { return $null }
+    foreach ($line in (Get-Content -LiteralPath $cfg)) {
+        if ($line -match '^\s*home\s*=\s*(.+?)\s*$') { return $Matches[1] }
+    }
+    return $null
+}
+
+function Get-RequirementLines([string]$Path, [System.Collections.Generic.HashSet[string]]$Seen) {
+    # A pip file's requirement lines and those of the files it includes (-r/-c), without the
+    # comments and blank lines, so rewording a comment never asks for setup again.
+    $full = [IO.Path]::GetFullPath($Path)
+    if (-not $Seen.Add($full.ToLowerInvariant())) { return }
+    Require-File $full
+    $label = $full
+    if ($full.StartsWith($ProjectRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { $label = $full.Substring($ProjectRoot.Length + 1) }
+    '## ' + $label
+    foreach ($raw in (Get-Content -LiteralPath $full)) {
+        $line = ($raw -replace '(^|\s)#.*$', '').Trim()
+        if (-not $line) { continue }
+        $line
+        if ($line -match '^(-r|--requirement|-c|--constraint)\s*=?\s*(.+)$') {
+            Get-RequirementLines (Join-Path (Split-Path -Parent $full) $Matches[2]) $Seen
+        }
+    }
+}
+
+function Get-TextSha256([string]$Text) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $bytes = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text)) } finally { $sha.Dispose() }
+    return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+}
+
+function Get-PythonRequirementsFingerprint {
+    # What setup installs into python\.venv: requirements, validated constraints, PyInstaller range.
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+    $lines = @(Get-RequirementLines $PythonRequirements $seen) + @(Get-RequirementLines $PythonConstraints $seen) + @($PyInstallerSpec)
+    return (Get-TextSha256 ($lines -join "`n"))
+}
+
+function Write-SetupStamp([string]$Path, [hashtable]$Values) {
+    $Values['schema'] = 1
+    $Values['verifiedUtc'] = [DateTime]::UtcNow.ToString('o')
+    ConvertTo-Json -InputObject $Values | Set-Content -LiteralPath $Path -Encoding UTF8
+}
+
+function Get-SetupStampValue([string]$Path, [string]$Name) {
+    # One recorded value, or $null when the stamp or the value is missing or unreadable.
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    try { $stamp = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json } catch { return $null }
+    if (-not $stamp -or -not $stamp.PSObject.Properties[$Name]) { return $null }
+    return $stamp.$Name
+}
+
+function Get-FileSha256([string]$Path) {
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-PythonEnvironmentProblem {
+    # File reads only, no interpreter start: why python\.venv is not the environment setup.bat
+    # verified for the current requirements, or $null when it is.
+    if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) { return 'python\.venv does not exist' }
+    $recorded = Get-SetupStampValue $PythonStamp 'requirementsSha256'
+    if (-not $recorded) { return 'python\.venv was not verified by setup.bat, or its setup did not finish' }
+    if ($recorded -ne (Get-PythonRequirementsFingerprint)) { return 'the Python requirements changed since python\.venv was set up' }
+    $base = Get-VenvHome
+    if (-not $base -or -not (Test-Path -LiteralPath (Join-Path $base 'python.exe') -PathType Leaf)) {
+        return "the Python that python\.venv was made from is gone ($base)"
+    }
+    return $null
+}
+
+function Get-NodeModulesProblem {
+    # Why node_modules is not what setup installed from the current package-lock.json, or $null.
+    $recorded = Get-SetupStampValue $NodeStamp 'packageLockSha256'
+    if (-not $recorded) { return 'node_modules was not installed by setup.bat, or that install did not finish' }
+    if ($recorded -ne (Get-FileSha256 $PackageLock)) { return 'package-lock.json changed since node_modules was installed' }
+    if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'node_modules\.bin\electron.cmd') -PathType Leaf)) { return 'node_modules has no Electron' }
+    return $null
+}
+
+function Assert-DependenciesReady {
+    # For launchers and checks: stop before anything starts when setup.bat has to run first.
+    param([switch]$PythonOnly)
+    $problems = @(Get-PythonEnvironmentProblem)
+    if (-not $PythonOnly) { $problems += @(Get-NodeModulesProblem) }
+    $problems = @($problems | Where-Object { $_ })
+    if ($problems.Count -gt 0) {
+        throw ('Setup is needed: ' + ($problems -join '; ') + '. Run .\setup.bat (.\setup.bat --simulate without an eye tracker), then try again.')
+    }
+}
+
+function Install-NodeDependencies {
+    # Exactly package-lock.json: npm ci always starts from an empty node_modules.
+    Require-File $PackageLock
+    Invoke-Checked 'npm.cmd' @('ci')
+    Write-SetupStamp $NodeStamp @{ packageLockSha256 = (Get-FileSha256 $PackageLock); node = [string](& node.exe --version) }
+}
+
+function Get-DependencyUsers {
+    # Programs running from this checkout's python\.venv or node_modules (the app, its prediction
+    # worker, a test run). Setup would fail half-way replacing files they hold open.
+    $inside = @(($VenvDir.TrimEnd('\') + '\'), ((Join-Path $ProjectRoot 'node_modules') + '\'))
+    $users = @{}
+    foreach ($process in (Get-ProjectProcesses)) { $users[[int]$process.ProcessId] = $process }
+    foreach ($process in @(Get-CimInstance Win32_Process)) {
+        $exe = [string]$process.ExecutablePath
+        foreach ($folder in $inside) {
+            if ($exe.StartsWith($folder, [StringComparison]::OrdinalIgnoreCase)) { $users[[int]$process.ProcessId] = $process }
+        }
+    }
+    return @($users.Values)
 }

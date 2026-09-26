@@ -30,6 +30,10 @@ try {
     Require-Command 'npm.cmd'
     Require-File $VenvPython
     Require-File (Join-Path $ProjectRoot 'node_modules\.bin\electron.cmd')
+    # File reads only (no interpreter or npm start): python\.venv and node_modules are what the
+    # last completed setup.bat verified for the current requirements and package-lock.json.
+    # Checked before anything is closed, so a launch that cannot work never ends a running one.
+    Assert-DependenciesReady
     # 1. A previous GazeConnect (this checkout, or the installed app) is closed automatically: it
     #    needs the same tracker and ports, so the new launch could never work beside it.
     $fixedPorts = @(8765)

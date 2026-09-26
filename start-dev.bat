@@ -41,4 +41,7 @@ goto parse
 :run
 REM Process-scoped policy only; no elevation or permanent policy change.
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\Start-Dev.ps1" %DEV_ARGS%
-exit /b %ERRORLEVEL%
+set "LAUNCH_EXIT=%ERRORLEVEL%"
+REM Never end silently: a launcher that stopped early (closed, interrupted, crashed) says so.
+if not "%LAUNCH_EXIT%"=="0" echo start-dev ended with exit code %LAUNCH_EXIT%. The lines above say why; .\status-dev.bat shows what is still running.
+exit /b %LAUNCH_EXIT%

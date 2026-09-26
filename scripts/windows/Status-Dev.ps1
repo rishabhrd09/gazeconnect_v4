@@ -17,6 +17,9 @@ try {
         }
         Write-Host '  (A closed window only hides the app in the notification area; it keeps its ports.)'
     }
+    $setupProblems = @(@(Get-PythonEnvironmentProblem; Get-NodeModulesProblem) | Where-Object { $_ })
+    if ($setupProblems.Count -eq 0) { Write-Host 'Setup: done (python\.venv and node_modules match the current requirements).' }
+    else { Write-Host ('Setup: needed - ' + ($setupProblems -join '; ') + '.') }
     Write-Host ''
     Write-Host 'Ports'
     $rows = @(Get-DevPortState)
@@ -37,6 +40,7 @@ try {
         Write-Host 'GazeConnect is running. Close it with .\stop-dev.bat, Ctrl+C in its launch window, or right-click the app and choose Exit App.'
         exit 1
     }
-    Write-Host 'Ready to launch: .\start-dev.bat'
+    if ($setupProblems.Count -gt 0) { Write-Host 'Nothing is running and the ports are free. Run .\setup.bat, then .\start-dev.bat.' }
+    else { Write-Host 'Ready to launch: .\start-dev.bat' }
     exit 0
 } catch { Write-Error $_ -ErrorAction Continue; exit 3 }

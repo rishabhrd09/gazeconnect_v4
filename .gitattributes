@@ -4,3 +4,8 @@
 python/services/deterministic_prediction/assets/** -text
 python/services/deterministic_prediction/english_only_policy.v1.json -text
 docs/phrase-inventory.csv -text
+
+# cmd.exe mis-parses labels and goto in batch files with LF-only line endings, so
+# check them out with CRLF whatever core.autocrlf says (the launchers use labels).
+*.bat text eol=crlf
+*.cmd text eol=crlf

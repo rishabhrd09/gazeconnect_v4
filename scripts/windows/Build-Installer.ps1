@@ -6,6 +6,8 @@ try {
     Set-Location -LiteralPath $ProjectRoot
     Assert-BuildTools
     Require-File $VenvPython
+    # Never freeze a python\.venv that setup.bat did not verify against the pinned requirements.
+    Assert-DependenciesReady -PythonOnly
     Require-File (Join-Path $ProjectRoot 'package-lock.json')
     Require-File (Join-Path $ProjectRoot 'build\icon.ico')
     Invoke-Checked $VenvPython @('-m', 'pip', 'check')
@@ -30,8 +32,9 @@ try {
             if ($approval.vendorSha256.$name -ne $actual) { throw "Distribution approval does not cover current DLL: $name" }
         }
     }
-    # Never package an arbitrary/stale node_modules tree from a previous checkout.
-    Invoke-Checked 'npm.cmd' @('ci')
+    # Never package an arbitrary/stale node_modules tree from a previous checkout. Also
+    # records the fresh install, so the next start-dev does not ask for setup.bat.
+    Install-NodeDependencies
     Require-File (Join-Path $ProjectRoot 'node_modules\.bin\electron-builder.cmd')
     $runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + ([guid]::NewGuid().ToString('N').Substring(0, 8))
     $work = Join-Path ([IO.Path]::GetTempPath()) ('gazeconnect-build-' + $runId)

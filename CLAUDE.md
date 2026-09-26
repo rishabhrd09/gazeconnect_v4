@@ -20,6 +20,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - overflow:hidden is intentional — content must fit, not scroll
 
 ## Development Commands
+- `.\setup.bat` — Prepare the checkout (`--simulate` skips the helper build, `--force` reinstalls). Python comes from the `py` launcher (3.12 first), never PATH order; pinned versions live in `python/constraints.txt`. `start-dev.bat` stops with "Setup is needed" until setup has verified the current requirements (details in AGENTS.md)
 - `npm run dev` — Start Vite dev server (UI only, for rapid iteration)
 - `.\start-dev.bat` — Full app (Electron + Python + Tobii)
 - `.\start-dev.bat --simulate` — Without eye tracker (mouse-as-gaze mode)

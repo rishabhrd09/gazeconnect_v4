@@ -18,7 +18,7 @@ cd gazeconnect_v4
 .\start-dev.bat
 ```
 
-`setup.bat` prepares Node dependencies, the Python environment, and the Tobii helper. `copy-tobii-dlls.bat` refreshes helper libraries from a local Tobii installation when needed. See [bridge setup](tobii-helper/README.md).
+`setup.bat` prepares Node dependencies (exactly `package-lock.json`), the Python environment (`python\.venv`, with the validated versions pinned in `python/constraints.txt`), and the Tobii helper. It picks Python 3.12 x64 through the `py` launcher rather than whichever `python` comes first on PATH (`-Python <path to python.exe>` or `GAZECONNECT_PYTHON` chooses another), rebuilds a `python\.venv` that is broken or was made with an unsupported Python, and skips what is already verified, so running it again is quick; `--force` reinstalls everything. `start-dev.bat` checks in milliseconds that the last setup still matches the requirements and asks for `setup.bat` when it does not. `copy-tobii-dlls.bat` refreshes helper libraries from a local Tobii installation when needed. See [bridge setup](tobii-helper/README.md).
 
 `check-windows.bat` runs finite checks without starting gaze tracking. It checks dependencies, the prediction model, floor-plan renderer/solver, DLL inputs and required ports, and writes a report to `tools/reports/`. Close a running GazeConnect app before this check. Use `-Simulate` to omit hardware build checks. Do not copy a macOS `node_modules` or Python virtual environment to Windows; let setup create Windows dependencies.
 

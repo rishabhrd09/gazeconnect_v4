@@ -29,13 +29,12 @@ cd gazeconnect_v4
 ```
 
 `setup.bat` performs the following:
-1. Installs Node.js packages (`npm install`)
-2. Creates a Python virtual environment (`python/.venv/`)
-3. Installs Python dependencies from `python/requirements.txt`
-4. Verifies and copies Tobii DLLs into `tobii-helper/TobiiGazeHelper/lib/`
-5. Builds the .NET TobiiGazeHelper project
+1. Installs Node.js packages exactly as `package-lock.json` (`npm ci`), skipped when `node_modules` already matches it
+2. Creates the Python virtual environment (`python/.venv/`) from Python 3.12 x64, found through the `py` launcher rather than PATH order, and rebuilds one that is broken or made with an unsupported Python
+3. Installs Python dependencies from `requirements.txt` at the versions pinned in `python/constraints.txt`, then checks them (`pip check`, imports)
+4. Verifies the Tobii DLLs in `tobii-helper/TobiiGazeHelper/lib/` and builds the .NET TobiiGazeHelper project (skipped with `--simulate`)
 
-If any step fails, the script prints a clear error message. Fix the issue and re-run `setup.bat`.
+If any step fails, the script prints a clear error message. Fix the issue and re-run `setup.bat`; verified steps are skipped, and `--force` reinstalls everything. Close the app first: setup refuses to replace files the running app uses.
 
 ---
 
@@ -270,10 +269,14 @@ The protected-file diff should be empty unless the task explicitly targeted one 
 
 ## Troubleshooting
 
-### "Python not found" or "pip failed"
+### "Python 3.10+ x64 was not found" or "pip failed"
 
-- Ensure Python is in your PATH: `python --version`
+- Install Python 3.12 x64 from python.org with its "py launcher" option, or run `.\setup.bat -Python C:\path\to\python.exe`
 - Re-run `setup.bat`
+
+### "Setup is needed" when launching
+
+`start-dev.bat` found that `python\.venv` or `node_modules` no longer matches the requirements (usually after pulling changes). Run `.\setup.bat`, then launch again.
 
 ### "Node modules missing" or "Cannot find module"
 
@@ -284,10 +287,12 @@ The protected-file diff should be empty unless the task explicitly targeted one 
 
 ### "Port 8765 already in use"
 
-Another instance of the Python backend is running. Kill it:
+Another instance of the backend is running. See what holds the port, then close only this checkout's processes:
 ```powershell
-taskkill /f /im python.exe
+.\status-dev.bat
+.\stop-dev.bat
 ```
+Do not use `taskkill /im python.exe`: it ends every Python program on the computer. `.\stop-dev.bat --force` stops a program outside this checkout that holds 8765 or 5555, after naming it.
 Or check Task Manager for orphaned `python.exe` processes.
 
 ### "Port 5555 already in use"

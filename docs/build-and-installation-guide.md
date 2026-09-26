@@ -235,11 +235,11 @@ electron-builder requires an icon file at `build/icon.ico`.
 
 **Fix**: Run `python create_icon.py` to generate a placeholder icon.
 
-### "Python not found" or "pip failed"
+### "Python 3.10+ x64 was not found" or "pip failed"
 
-Python is not in your PATH.
+`setup.bat` looks for Python 3.12 x64 through the `py` launcher first, so an older `python` earlier on PATH is skipped rather than used. The message lists the interpreters it found and rejected.
 
-**Fix**: Ensure `python --version` works in your terminal. Re-run `setup.bat`.
+**Fix**: Install Python 3.12 x64 from python.org (keep the "py launcher" option), or run `.\setup.bat -Python C:\path\to\python.exe`. Re-run `setup.bat`; it rebuilds a `python\.venv` that was made with an unsupported Python.
 
 ### ". was unexpected at this time"
 

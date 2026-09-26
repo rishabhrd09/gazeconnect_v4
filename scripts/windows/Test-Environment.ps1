@@ -27,7 +27,8 @@ try {
             Require-Command 'npm.cmd'
             Require-File $VenvPython
             Require-File (Join-Path $ProjectRoot 'node_modules\.bin\electron.cmd')
-            Invoke-Checked 'node.exe' @((Join-Path $PSScriptRoot 'check_node.cjs'))
+            Assert-DependenciesReady
+            if ($Simulate) { Invoke-Checked 'node.exe' @((Join-Path $PSScriptRoot 'check_node.cjs')) } else { Assert-BuildTools }
             Invoke-Checked $VenvPython @((Join-Path $PSScriptRoot 'check_python.py'))
             Invoke-Checked $VenvPython @('-m', 'pip', 'check')
             # Uses the same imports/model/render/solver probes as frozen packages.
@@ -38,7 +39,6 @@ try {
                 Invoke-Checked $VenvPython @((Join-Path $PSScriptRoot 'floorplan_entry.py'), '--self-test')
             } finally { $env:PYTHONPATH = $previousPythonPath }
             if (-not $Simulate) {
-                Assert-BuildTools
                 Invoke-Checked $VenvPython @((Join-Path $ProjectRoot 'scripts\verify_windows_bundle.py'), 'source', '--root', $ProjectRoot)
                 Require-File (Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net8.0-windows\win-x64\TobiiGazeHelper.exe')
             }

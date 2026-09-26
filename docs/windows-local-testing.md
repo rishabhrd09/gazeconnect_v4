@@ -6,7 +6,7 @@ For a fresh Windows agent session, use [the complete handoff prompt](windows-han
 
 ## Source setup
 
-Use a fresh Windows checkout or source copy without `node_modules`, `python/.venv`, `dist*`, `python-dist`, `tobii-dist` or .NET `bin/obj` from the Mac. Install Git, Node 22 x64, Python 3.12 x64 and the latest serviced .NET 8 SDK. Ensure `node`, `npm`, `python` and `dotnet` resolve in a new terminal. Tobii Experience must recognize/calibrate the Eye Tracker 5.
+Use a fresh Windows checkout or source copy without `node_modules`, `python/.venv`, `dist*`, `python-dist`, `tobii-dist` or .NET `bin/obj` from the Mac. Install Git, Node 22 x64, Python 3.12 x64 and the latest serviced .NET 8 SDK. Ensure `node`, `npm` and `dotnet` resolve in a new terminal. Setup finds Python 3.12 through the `py` launcher, not PATH order (pass `-Python <path to python.exe>` to choose another 3.10+ x64). Tobii Experience must recognize/calibrate the Eye Tracker 5.
 
 From a normal, non-administrator terminal:
 
