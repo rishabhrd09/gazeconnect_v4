@@ -46,17 +46,37 @@ test('a repeated or reordered source stamp does not refresh freshness', () => {
 // `opts.others`: more targets beside the main one; `opts.gazeEnabled: false`:
 // gaze selection switched off (only always-active controls may be chosen).
 function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = null, opts = {}) {
-  let now = 10000, clicks = 0, rafId = 0;
-  const rafs = new Map(), effects = [], listeners = new Map(), interrupts = [], clickLog = [];
+  let now = 10000, clicks = 0, rafId = 0, timerId = 0;
+  const rafs = new Map(), timers = new Map(), effects = [], listeners = new Map(), interrupts = [], clickLog = [];
   const states = [], refs = [], drawn = [];
   const r0 = box || { left: 860, top: height / 2 - 100, width: 200, height: 200 };
   let gaze;
   class Element {
-    constructor(r = r0, id = 'test-button') { this.r=r; this.id=id; this.tagName='BUTTON'; this.className='gaze-button'; this.textContent='Test'; this.isConnected=true; this.disabled=false; this.parentElement=null; }
-    getAttribute(key) { return ({'data-gaze':'true', 'data-gaze-context':'navigation'})[key] ?? null; }
+    constructor(r = r0, id = 'test-button') {
+      this.r=r; this.id=id; this.tagName='BUTTON';
+      this.className=opts.screen==='keyboard'
+        ? `gaze-button ${opts.targetKind==='suggestion'?'keyboard-word-slot':'keyboard-key'}` : 'gaze-button';
+      this.textContent='Test'; this.isConnected=true; this.disabled=false; this.parentElement=null; this.attributes=new Map();
+    }
+    getAttribute(key) {
+      const keyboardContext = opts.targetKind==='suggestion'?'prediction'
+        : opts.targetKind==='special'?'deliberateAction':'keyboard';
+      const action = opts.targetKind==='modifier'?'shift'
+        : opts.targetKind==='special'?'deleteWord':'letter';
+      return this.attributes.get(key) ?? ({'data-gaze':'true',
+        'data-gaze-context':opts.screen==='keyboard'?keyboardContext:'navigation',
+        'data-action':opts.screen==='keyboard'?action:null})[key] ?? null;
+    }
+    setAttribute(key, value) { this.attributes.set(key, value); }
+    removeAttribute(key) { this.attributes.delete(key); }
     getBoundingClientRect() { const r=this.r; return {left:r.left, top:r.top, right:r.left+r.width, bottom:r.top+r.height, width:r.width, height:r.height}; }
     closest() { return null; }
-    matches() { return this.disabled; }
+    matches(selector) {
+      if (selector==='.keyboard-screen .keyboard-key') return opts.screen==='keyboard' && this.className.includes('keyboard-key');
+      if (selector==='.keyboard-screen .keyboard-word-slot') return opts.screen==='keyboard' && this.className.includes('keyboard-word-slot');
+      if (selector==='.keyboard-screen .keyboard-phrase-slot') return false;
+      return this.disabled;
+    }
     contains(node) { return node===this; }
     click() { clicks++; clickLog.push(this.id); }
   }
@@ -66,7 +86,7 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
   // Anything outside the buttons is plain page background, not a control.
   const background = {tagName:'DIV',className:'',id:'',parentElement:null,getAttribute:()=>null,closest:()=>null,matches:()=>false,contains:node=>node===background};
   const at = (x, y) => all.find(el => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }) || background;
-  const ws={isConnected:true,currentScreen:'home',setGazeOffset(){},registerTargets(){},subscribeGaze(cb){gaze=cb;return()=>{};}};
+  const ws={isConnected:true,currentScreen:opts.screen || 'home',setGazeOffset(){},registerTargets(){},subscribeGaze(cb){gaze=cb;return()=>{};}};
   // State setters and refs are recorded so a test can see what is drawn: the
   // ring's progress (first useState), the highlight (fifth), whether the bubble
   // is hidden for want of gaze (sixth) and its transform (first null ref).
@@ -98,7 +118,9 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
   const window={innerWidth:1920,innerHeight:height,addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:k=>listeners.delete(k)};
   const context={window,document:{body:{},elementsFromPoint:(x,y)=>[at(x,y)],elementFromPoint:(x,y)=>at(x,y)},HTMLElement:Element,
     getComputedStyle:()=>({zIndex:'0'}),Date:{now:()=>now},performance:{now:()=>now},
-    setInterval:()=>1,clearInterval(){},setTimeout:()=>1,clearTimeout(){},
+    setInterval:()=>1,clearInterval(){},
+    setTimeout:(fn,ms)=>{timers.set(++timerId,{fn,at:now+ms});return timerId;},
+    clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:fn=>{rafs.set(++rafId,fn);return rafId;},cancelAnimationFrame:id=>rafs.delete(id),
     console:{log(){},warn(){},error(){}},require:name=>{if(!(name in stubs))throw new Error(name);return stubs[name];}};
   const component=load('src/components/core/GazeCursor.tsx',context);
@@ -112,7 +134,7 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
     get cursor(){return drawn[drawn.length-1];},
     // `sample` overrides the frame: {intent_x} alone is a raw sample the
     // estimator did not follow; add {x} as well for gaze that really moved.
-    frame(ms=16, valid=true, sample={}){now+=ms;if(valid)gaze({...base,t_helper_ms:now,active_pipeline:'adaptive_cursor_v1',intent_x:.5,intent_y:.5,...sample});const pending=[...rafs.values()];rafs.clear();pending.forEach(fn=>fn());},
+    frame(ms=16, valid=true, sample={}){now+=ms;for(const [id,t] of [...timers])if(t.at<=now){timers.delete(id);t.fn();}if(valid)gaze({...base,t_helper_ms:now,active_pipeline:'adaptive_cursor_v1',intent_x:.5,intent_y:.5,...sample});const pending=[...rafs.values()];rafs.clear();pending.forEach(fn=>fn());},
     run(ms, valid=true, sample={}){for(let elapsed=0;elapsed<ms;elapsed+=16)this.frame(16,valid,sample);},
     lose(){listeners.get('gaze_lost')?.();},
     // A physical press or click, as the browser would deliver it (trusted unless told otherwise).
@@ -146,6 +168,97 @@ test('equal-sized keys keep their previous ownership', () => {
   assert.equal(pick(634, 755), 'c');            // Gap between C and V, nearer C.
   assert.equal(pick(636, 755), 'v');
   assert.equal(pick(1200, 640), null);
+});
+test('keyboard acquisition outline follows the key, clears on loss, then gives way to progress', () => {
+  const opts = {screen:'keyboard', others:[{left:1110,top:284,width:200,height:200}]};
+  const h = cursorHarness(768, {}, {keyboardCadence:false}, null, opts);
+  h.run(96);
+  assert.equal(h.target.getAttribute('data-keyboard-onset'), 'true');
+  assert.equal(h.ringProgress, 0, 'acquisition must not count as dwell');
+  h.lose();
+  assert.equal(h.target.getAttribute('data-keyboard-onset'), null, 'tracking loss hides acquisition');
+  h.run(32);
+  assert.equal(h.target.getAttribute('data-keyboard-onset'), 'true', 'fresh gaze restores acquisition');
+  h.run(96, true, {x:.63, y:.5, intent_x:.63, intent_y:.5});
+  assert.equal(h.target.getAttribute('data-keyboard-onset'), null, 'old key outline must clear');
+  assert.equal(h.others[0].getAttribute('data-keyboard-onset'), 'true', 'new key must own outline');
+  h.run(240, true, {x:.1, y:.1, intent_x:.1, intent_y:.1});
+  assert.equal(h.others[0].getAttribute('data-keyboard-onset'), null, 'outline must clear when gaze leaves keys');
+
+  const dwell = cursorHarness(768, {}, {keyboardCadence:false}, null, {screen:'keyboard'});
+  dwell.run(420);
+  assert.equal(dwell.target.getAttribute('data-keyboard-onset'), null, 'amber outline ends after onset');
+  assert.equal(dwell.highlight?.keyboardKey, true, 'the progress outline is keyboard scoped');
+  assert(dwell.ringProgress > 0, 'teal progress begins only after onset');
+  for (let i=0; i<250 && dwell.clicks===0; i++) dwell.frame();
+  assert.equal(dwell.clicks, 1);
+  assert.equal(dwell.target.getAttribute('data-keyboard-confirmed'), 'true', 'click shows a brief key-local confirmation');
+  dwell.pointerDown();
+  assert.equal(dwell.target.getAttribute('data-keyboard-confirmed'), null, 'physical press clears confirmation');
+
+  const timed = cursorHarness(768, {}, {keyboardCadence:false}, null, {screen:'keyboard'});
+  for (let i=0; i<300 && timed.clicks===0; i++) timed.frame();
+  assert.equal(timed.target.getAttribute('data-keyboard-confirmed'), 'true');
+  timed.run(240);
+  assert.equal(timed.target.getAttribute('data-keyboard-confirmed'), null, 'confirmation expires without input delay');
+});
+test('Familiar acquires for 350 ms then fills ordinary keys, Shift and suggestions at their own fixed pace', () => {
+  const cases = [
+    ['key', dwell.FAMILIAR_KEYBOARD_TIMING.key],
+    ['modifier', dwell.FAMILIAR_KEYBOARD_TIMING.modifier],
+    ['suggestion', dwell.FAMILIAR_KEYBOARD_TIMING.suggestion],
+  ];
+  for (const [targetKind, fillMs] of cases) {
+    // Familiar is explicit and must work even if legacy keyboardCadence is off.
+    const h = cursorHarness(768, {keyboardFeel:'familiar'}, {keyboardCadence:false}, null, {screen:'keyboard',targetKind});
+    const start = h.now;
+    h.run(336);
+    assert.equal(h.ringProgress, 0, `${targetKind} began fill before Familiar acquisition`);
+    h.run(48);
+    assert(h.ringProgress > 0, `${targetKind} did not begin fill after Familiar acquisition`);
+    while (h.clicks===0 && h.now < start+5000) h.frame();
+    assert.equal(h.clicks, 1, `${targetKind} did not select`);
+    const selectionMs = h.now-start;
+    assert(selectionMs >= 350+fillMs-32 && selectionMs <= 350+fillMs+64,
+      `${targetKind} selected in ${selectionMs} ms, expected about ${350+fillMs}`);
+  }
+});
+test('Familiar leaves Delete Word and non-keyboard navigation at Standard timing', () => {
+  for (const [screen,targetKind] of [['keyboard','special'],['home','key']]) {
+    const elapsed = feel => {
+      const h=cursorHarness(768,{keyboardFeel:feel},{keyboardCadence:true},null,{screen,targetKind});
+      const start=h.now;
+      while(h.clicks===0&&h.now<start+6000)h.frame();
+      assert.equal(h.clicks,1);
+      return h.now-start;
+    };
+    assert.equal(elapsed('familiar'),elapsed('standard'), `${screen}/${targetKind} timing changed`);
+  }
+});
+test('Familiar resumes a recent keyboard dwell but starts fresh after its 750 ms window', () => {
+  const on = {x:.5,y:.5,intent_x:.5,intent_y:.5};
+  const away = {x:.1,y:.1,intent_x:.1,intent_y:.1};
+  const recent = cursorHarness(768,{keyboardFeel:'familiar'},{keyboardCadence:true},null,{screen:'keyboard'});
+  recent.run(350+900,true,on);
+  assert(recent.ringProgress>0.4);
+  recent.run(400,true,away);
+  assert.equal(recent.clicks,0);
+  recent.run(80,true,on);
+  assert(recent.interrupts.includes('resumed'), 'recent keyboard dwell should resume without a new onset');
+  assert(recent.ringProgress>0.4);
+
+  const expired = cursorHarness(768,{keyboardFeel:'familiar'},{keyboardCadence:true},null,{screen:'keyboard'});
+  expired.run(350+900,true,on);
+  assert(expired.ringProgress>0.4);
+  expired.run(960,true,away); // Long enough after either target-loss or lock-break save.
+  assert.equal(expired.clicks,0);
+  const returnAt=expired.now;
+  expired.run(96,true,on);
+  assert.equal(expired.interrupts.includes('resumed'),false,'expired keyboard progress was resumed');
+  assert.equal(expired.ringProgress,0,'expired keyboard progress bypassed acquisition');
+  while(expired.clicks===0&&expired.now<returnAt+5000)expired.frame(16,true,on);
+  assert.equal(expired.clicks,1);
+  assert(expired.now-returnAt>=350+1750-32,'expired progress shortened the new selection');
 });
 // The target the eyes are on (utils/gazeFocus): decided on the gaze estimate
 // with hysteresis, so tracker noise at a border never moves the bubble.
@@ -248,6 +361,16 @@ test('progress is banked per target, the strongest kept, and only while it is fr
   for (let i = 0; i < 20; i++) b.save({ isConnected: true }, 0.5, 4000 + i);
   assert.equal(b.size, bank.BANK_MAX_ENTRIES, 'a scan across the screen filled the bank');
   b.clear(); assert.equal(b.size, 0);
+});
+test('Familiar keyboard bank entries expire at 750 ms without shortening Standard entries', () => {
+  const b = new bank.DwellProgressBank();
+  const familiar = {isConnected:true}, standard = {isConnected:true};
+  b.save(familiar, 0.6, 1000, dwell.FAMILIAR_KEYBOARD_TIMING.incompleteTtl);
+  b.save(standard, 0.6, 1000);
+  assert.equal(b.peek(familiar, 1749), 0.6);
+  assert.equal(b.peek(familiar, 1750), null);
+  assert.equal(b.peek(standard, 1750), 0.6);
+  assert.equal(b.peek(standard, 2000), null);
 });
 test('a filling ring holds its target through a wider zone and a longer look at a neighbour', () => {
   assert.equal(focus.commitmentRamp(undefined), 0);

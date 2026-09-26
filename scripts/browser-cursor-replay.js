@@ -592,8 +592,8 @@ scenario('S17 hide cancels pending dwell and all saved progress', (t) => {
   t.expect(out.clicks.length === 0, 'reappearance completed the old dwell');
 });
 
-scenario('S18 every duration of the three timing sets excludes onset', (t) => {
-  for (const dwellMs of [500, 900, 1000, 1250, 1300, 1500, 1600, 1700, 1900, 2000, 2400, 2500, 3000]) {
+scenario('S18 every duration of the four timing sets excludes onset', (t) => {
+  for (const dwellMs of [800, 1000, 1250, 1300, 1400, 1500, 1600, 1700, 1900, 2000, 2200, 2400, 2500, 2600, 3000, 3800]) {
     for (const onsetMs of [120, 320]) {
       const env = makeEnv({ host: 'example.com' });
       inject(env, { dwellMs, onsetMs });

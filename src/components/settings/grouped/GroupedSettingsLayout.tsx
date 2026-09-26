@@ -50,7 +50,7 @@ const GroupedSettingsLayout: React.FC<GroupedSettingsLayoutProps> = ({
     const defaults = DEFAULT_CUSTOMIZATION.settings;
     if (page === 'gaze') {
       updateSettings({
-        dwellTimingSet: defaults.dwellTimingSet, gazeOnNavigate: defaults.gazeOnNavigate,
+        dwellTimingSet: defaults.dwellTimingSet, keyboardFeel: defaults.keyboardFeel, gazeOnNavigate: defaults.gazeOnNavigate,
         showGazeCursor: defaults.showGazeCursor, gazeCursorSize: defaults.gazeCursorSize, filterPreset: defaults.filterPreset,
       });
     } else if (page === 'voice') {

@@ -6,26 +6,22 @@ import SliderSetting from '../shared/SliderSetting';
 import SelectSetting from '../shared/SelectSetting';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { DWELL_GROUPS, DWELL_TIMING_SETS, normalizeDwellTimingSet, type DwellTimingSet } from '../../../config/dwellTimeConfig';
+import { DWELL_TIMING_SETS, normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet } from '../../../config/dwellTimeConfig';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
 
-// Three complete timing sets of five groups; no per-screen tuning or hidden multipliers.
+// Four complete timing sets; the displayed advice avoids promising an exact
+// total selection time because gaze acquisition and onset precede the ring.
 const DwellTimeSection: React.FC = () => {
   const { timingSet } = useDwellTime();
+  const { settings } = useCustomization();
+  const familiar = normalizeKeyboardFeel(settings.keyboardFeel) === 'familiar';
   return (
-  <div className="settings-section dwell-guide">
-    <h3>Dwell Timings: {DWELL_TIMING_SETS[timingSet].label.replace(' (default)', '')}</h3>
-    <p>How long to look at something to select it. Five times, matched to each kind of action.</p>
-    <div className="dwell-guide-grid">
-      {Object.entries(DWELL_GROUPS).map(([key, group]) => (
-        <div key={key} className="dwell-guide-card">
-          <strong>{group.ms}<span> ms</span></strong>
-          <h4>{group.label}</h4>
-          <p>{group.description}</p>
-        </div>
-      ))}
+    <div className="settings-section dwell-guide">
+      <h3>{DWELL_TIMING_SETS[timingSet].label.replace(' (default)', '')}</h3>
+      <p>{DWELL_TIMING_SETS[timingSet].description}. {familiar
+        ? 'Familiar keyboard sets its own pace for keys and suggestions; this speed still controls other choices.'
+        : 'A short settling phase comes before the dwell ring fills, and a pause follows each selection.'}</p>
     </div>
-  </div>
   );
 };
 
@@ -126,12 +122,23 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
           />
           <SelectSetting
             label="Selection Speed"
-            description="How long to look at a key or button before it is selected. Quick suits a practised user. Choose Relaxed if selections happen too fast: it gives more time to settle, and to look away from a wrong choice."
+            description="Choose a comfortable pace for general choices. Standard keyboard follows this speed; Familiar keyboard has its own key and suggestion pace."
             value={normalizeDwellTimingSet(settings.dwellTimingSet)}
             options={(Object.keys(DWELL_TIMING_SETS) as DwellTimingSet[]).map(key => ({
               value: key, label: DWELL_TIMING_SETS[key].label,
             }))}
             onChange={v => updateSetting('dwellTimingSet', normalizeDwellTimingSet(v))}
+            isDarkMode={isDarkMode}
+          />
+          <SelectSetting
+            label="Keyboard Feel"
+            description="Standard follows Selection Speed. Familiar is inspired by the supplied eye-typing setup: a longer key settling phase and steady fill, with no change to gaze smoothing or other screens."
+            value={normalizeKeyboardFeel(settings.keyboardFeel)}
+            options={[
+              { value: 'standard', label: 'Standard' },
+              { value: 'familiar', label: 'Familiar keyboard' },
+            ]}
+            onChange={value => updateSetting('keyboardFeel', normalizeKeyboardFeel(value))}
             isDarkMode={isDarkMode}
           />
           <DwellTimeSection />
@@ -208,7 +215,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
             Eye-gaze communication and everyday activities for Windows.
           </p>
           <p style={{ color: colors.text.tertiary, fontSize: typography.fontSize.sm }}>
-            Choose a comfortable gaze response and use the five fixed selection times.
+            Choose a comfortable gaze response and selection speed.
           </p>
         </div>
       </section>

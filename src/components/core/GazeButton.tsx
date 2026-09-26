@@ -40,6 +40,9 @@ export interface GazeButtonProps {
   // Dwell timing
   dwellCategory?: DwellAction;
   context?: DwellContext;
+  /** Mouse-as-gaze preview only; the central GazeCursor owns live eye-gaze timing. */
+  mouseDwellOnsetMs?: number;
+  mouseDwellDurationMs?: number;
   priority?: number; // Target registration priority; never changes dwell time
 
   // State
@@ -207,6 +210,8 @@ const GazeButton: React.FC<GazeButtonProps> = ({
   isDarkMode = true,
   dwellCategory,
   context,
+  mouseDwellOnsetMs,
+  mouseDwellDurationMs,
   priority = 0,
   disabled = false,
   selected = false,
@@ -291,7 +296,8 @@ const GazeButton: React.FC<GazeButtonProps> = ({
   const effectiveDwell = dwellCategory ? dwellForAction(dwellCategory)
     : dwellForContext(context || (variant === 'emergency' ? 'emergency' : variant === 'quickfire' ? 'quickfire' : 'standard'));
 
-  const onsetDelay = dwellSettings.onsetDelay;
+  const onsetDelay = mouseDwellOnsetMs ?? dwellSettings.onsetDelay;
+  const mouseDwellDuration = mouseDwellDurationMs ?? effectiveDwell;
   // v16: Added 'quickWord' mapping — was unmapped, fell through to 'navigation' context
   const gazeContext = context
     || (dwellCategory === 'keyboardKey' ? 'keyboard'
@@ -397,7 +403,7 @@ const GazeButton: React.FC<GazeButtonProps> = ({
   // Update progress animation
   const updateProgress = useCallback(() => {
     const elapsed = Date.now() - startTimeRef.current - onsetDelay;
-    const dwellDuration = effectiveDwell;
+    const dwellDuration = mouseDwellDuration;
     const progress = Math.max(0, Math.min(1, elapsed / dwellDuration));
 
     setDwellProgress(progress);
@@ -406,7 +412,7 @@ const GazeButton: React.FC<GazeButtonProps> = ({
     if (progress < 1) {
       progressTimerRef.current = requestAnimationFrame(updateProgress);
     }
-  }, [effectiveDwell, onsetDelay, onDwellProgress]);
+  }, [mouseDwellDuration, onsetDelay, onDwellProgress]);
 
   // Handle hover enter
   const handleEnter = useCallback(() => {
@@ -439,7 +445,7 @@ const GazeButton: React.FC<GazeButtonProps> = ({
       }
 
       // Resume: adjust start time to match saved progress
-      const dwellDuration = effectiveDwell;
+      const dwellDuration = mouseDwellDuration;
       const elapsedEquiv = savedProgressRef.current * dwellDuration;
       startTimeRef.current = Date.now() - onsetDelay - elapsedEquiv;
 
@@ -494,8 +500,8 @@ const GazeButton: React.FC<GazeButtonProps> = ({
       setTimeout(() => {
         setIsActivated(false);
       }, 150);
-    }, onsetDelay + effectiveDwell);
-  }, [disabled, gazeEnabled, alwaysActive, isMouseOnlyMode, hasRealGaze, gazeEnabledTimestamp, lastNavigationTimestamp, onDwellStart, onDwellComplete, onClick, effectiveDwell, onsetDelay, updateProgress, id]);
+    }, onsetDelay + mouseDwellDuration);
+  }, [disabled, gazeEnabled, alwaysActive, isMouseOnlyMode, hasRealGaze, gazeEnabledTimestamp, lastNavigationTimestamp, onDwellStart, onDwellComplete, onClick, mouseDwellDuration, onsetDelay, updateProgress, id]);
 
   // Handle hover leave — slow decay instead of instant cancel
   const handleLeave = useCallback(() => {

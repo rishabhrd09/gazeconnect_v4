@@ -1,4 +1,4 @@
-// Regression coverage for the three fixed timing sets and legacy safeguard loading.
+// Regression coverage for the four fixed timing sets and legacy safeguard loading.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -15,26 +15,40 @@ function loadTs(relative) {
 const dwell = loadTs('src/config/dwellTimeConfig.ts');
 const filters = loadTs('src/config/gazeFilterConfig.ts');
 const SETS = {
-  quick: [500, 1000, 1250, 1500, 2000],       // The durations this app shipped with.
-  balanced: [900, 1300, 1600, 1900, 2500],
-  relaxed: [1300, 1700, 2000, 2400, 3000],
+  quick: [800, 1000, 1250, 1500, 2000],
+  balanced: [1400, 1300, 1600, 1900, 2500],
+  relaxed: [2200, 1700, 2000, 2400, 3000],
+  extra_time: [3000, 2200, 2600, 3000, 3800],
 };
 const union = [...new Set(Object.values(SETS).flat())].sort((a, b) => a - b);
 const eachSet = fn => { for (const name of Object.keys(SETS)) { dwell.setDwellTimingSet(name); fn(name, SETS[name]); } dwell.setDwellTimingSet('balanced'); };
 const storage = values => ({ getItem: key => values[key] ?? null });
 let passed = 0;
 function test(name, fn) { fn(); passed++; console.log(`PASS ${name}`); }
-test('there are exactly three timing sets, Balanced is the default, Quick is the previous timing', () => {
+test('there are exactly four timing sets and Balanced remains the default', () => {
   assert.deepEqual(Object.keys(dwell.DWELL_TIMING_SETS), Object.keys(SETS));
   assert.equal(dwell.DEFAULT_DWELL_TIMING_SET, 'balanced');
   assert.equal(dwell.getDwellTimingSet(), 'balanced');
   for (const [name, values] of Object.entries(SETS)) assert.deepEqual(Object.values(dwell.DWELL_TIMING_SETS[name].ms), values);
   assert.deepEqual(dwell.ALL_DWELL_DURATIONS_MS, union);
 });
-test('every set is slower group by group than the one before, and ordered within itself', () => {
-  const [quick, balanced, relaxed] = Object.values(SETS);
-  for (let i = 0; i < 5; i++) assert(quick[i] < balanced[i] && balanced[i] < relaxed[i]);
-  for (const values of Object.values(SETS)) assert.deepEqual([...values].sort((a, b) => a - b), values);
+test('Familiar is a keyboard-only feel with fixed acquisition and completion stages', () => {
+  assert.equal(dwell.DEFAULT_KEYBOARD_FEEL, 'standard');
+  assert.equal(dwell.normalizeKeyboardFeel('familiar'), 'familiar');
+  for (const value of [undefined, null, '', 'Familiar', 'custom', '__proto__']) {
+    assert.equal(dwell.normalizeKeyboardFeel(value), 'standard');
+  }
+  assert.deepEqual(dwell.FAMILIAR_KEYBOARD_TIMING, {
+    onset: 350, key: 1750, suggestion: 1750, modifier: 1500, incompleteTtl: 750,
+  });
+  // The keyboard feel must not add a fifth app-wide speed or browser duration.
+  assert.deepEqual(Object.keys(dwell.DWELL_TIMING_SETS), Object.keys(SETS));
+  assert.deepEqual(dwell.ALL_DWELL_DURATIONS_MS, union);
+});
+test('every set is slower group by group than the one before; typing can exceed words', () => {
+  const [quick, balanced, relaxed, extra] = Object.values(SETS);
+  for (let i = 0; i < 5; i++) assert(quick[i] < balanced[i] && balanced[i] < relaxed[i] && relaxed[i] < extra[i]);
+  for (const values of [balanced, relaxed, extra]) assert(values[0] > values[1]);
 });
 test('unknown, malformed or hostile set names select the default', () => {
   for (const name of [undefined, null, '', 'fast', '__proto__', 'constructor', 7, {}, 'QUICK']) {
@@ -42,12 +56,12 @@ test('unknown, malformed or hostile set names select the default', () => {
     assert.equal(dwell.setDwellTimingSet(name), 'balanced');
   }
 });
-test('every action resolves to one of exactly five durations in every set', () => eachSet((name, allowed) => {
+test('every action resolves to its configured group duration in every set', () => eachSet((name, allowed) => {
   const durations = Object.keys(dwell.DWELL_ACTION_GROUPS).map(dwell.dwellForAction);
-  assert.deepEqual([...new Set(durations)].sort((a, b) => a - b), allowed, name);
+  assert.deepEqual([...new Set(durations)].sort((a, b) => a - b), [...new Set(allowed)].sort((a, b) => a - b), name);
   assert.deepEqual(Object.values(dwell.DWELL_GROUPS).map(group => group.ms), allowed, name);
 }));
-test('typing, words, communication, navigation and deliberate actions stay distinct in every set', () => eachSet((name, [typing, words, communication, navigation, deliberate]) => {
+test('typing, words, communication, navigation and deliberate actions use their assigned group times', () => eachSet((name, [typing, words, communication, navigation, deliberate]) => {
   for (const context of ['keyboard', 'keyboardKey']) assert.equal(dwell.dwellForContext(context), typing, name);
   for (const context of ['prediction', 'predictionButton', 'spatialZone']) assert.equal(dwell.dwellForContext(context), words, name);
   for (const context of ['quickWord', 'medicalUrgent', 'phrases']) assert.equal(dwell.dwellForContext(context), communication, name);
@@ -60,14 +74,16 @@ test('unknown DOM contexts cannot access object prototype properties', () => eac
 test('legacy explicit overrides cannot create extra durations in any set', () => eachSet((name, allowed) => {
   for (let ms = 1; ms < 6000; ms += 37) assert(allowed.includes(dwell.fixedDwell(ms)), `${name} ${ms}`);
   for (const invalid of [NaN, Infinity, -20, 0]) assert.equal(dwell.fixedDwell(invalid, allowed[2]), allowed[2]);
-  assert.equal(dwell.fixedDwell(allowed[3] + 1), allowed[4]);     // Rounded up, never down.
-  assert.equal(dwell.fixedDwell(99999), allowed[4]);
+  const sorted = [...new Set(allowed)].sort((a, b) => a - b);
+  for (let ms = 1; ms <= sorted[sorted.length - 1]; ms += 37) {
+    assert.equal(dwell.fixedDwell(ms), sorted.find(duration => duration >= ms), `${name}: ${ms} must round up`);
+  }
+  assert.equal(dwell.fixedDwell(99999), sorted[sorted.length - 1]);
 }));
-test('native browser accepts exactly the durations the three sets can produce', () => {
+test('native browser accepts exactly the durations the four sets can produce', () => {
   for (const file of ['electron/main.ts', 'electron/browser/browserGazeController.ts']) {
     const source = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
     assert(source.includes('[' + union.join(', ') + '].includes('), file);
-    assert(!source.includes('[500, 1000, 1250, 1500, 2000].includes('), `${file} still has the old list`);
     assert(source.includes('dwellMs: 1900,'), `${file} default is not the Balanced navigation time`);
   }
 });

@@ -1,4 +1,4 @@
-/** Smoothing changes movement response, never the four selection durations. */
+/** Smoothing changes movement response, never the selection timing set. */
 export const GAZE_FILTER_MODES = [
   { value: 'balanced', label: 'Balanced (default)' },
   { value: 'responsive', label: 'Responsive' },

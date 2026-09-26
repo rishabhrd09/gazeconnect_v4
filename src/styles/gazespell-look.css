@@ -97,6 +97,22 @@
 :root[data-look='gazespell'] button.gaze-switch-card .gaze-switch-label { font-weight: var(--gs-label) !important; }
 
 /* ---- Home ---------------------------------------------------------------------------- */
+/* A quiet tonal lift using only the existing page, panel and card colours. These rules
+   change paint and glyph rendering; the approved Home geometry and gaze boxes stay put. */
+:root[data-look='gazespell'][data-theme] .home-screen {
+  background: radial-gradient(ellipse 82% 68% at 50% 0%, var(--ui-panel), var(--ui-page) 76%) !important;
+}
+:root[data-look='gazespell'][data-theme] .home-screen .grid-card {
+  background: linear-gradient(155deg, var(--ui-surface) 0%, var(--ui-panel) 100%) !important;
+}
+:root[data-look='gazespell'][data-theme] .home-screen .grid-card-label {
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+:root[data-look='gazespell'][data-theme] .home-screen .grid-card svg {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 :root[data-look='gazespell'] .home-screen .grid-card-label { font-weight: var(--gs-label) !important; }
 :root[data-look='gazespell'][data-theme='warm'] .home-screen .grid-card-label { font-size: clamp(26px, 3.9vh, 42px) !important; line-height: 1.05 !important; }
 :root[data-look='gazespell'] .home-screen .grid-card-label + span { font-weight: 800 !important; letter-spacing: 0.09em !important; }

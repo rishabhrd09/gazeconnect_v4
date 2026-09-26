@@ -24,6 +24,7 @@ interface Entry<T> {
   target: T;
   progress: number;
   at: number;
+  expiresAt: number;
 }
 
 export class DwellProgressBank<T extends { isConnected?: boolean }> {
@@ -34,16 +35,18 @@ export class DwellProgressBank<T extends { isConnected?: boolean }> {
   }
 
   /** Remember where this target had got to (never lower than what is already banked). */
-  save(target: T, progress: number, now: number): void {
+  save(target: T, progress: number, now: number, ttlMs: number = BANK_TTL_MS): void {
     if (!target || !(progress > 0) || progress >= 1) return;
     this.prune(now);
+    const expiresAt = now + ttlMs;
     const found = this.entries.find(e => e.target === target);
     if (found) {
       found.progress = Math.max(found.progress, progress);
       found.at = now;
+      found.expiresAt = expiresAt;
       return;
     }
-    this.entries.push({ target, progress, at: now });
+    this.entries.push({ target, progress, at: now, expiresAt });
     if (this.entries.length > BANK_MAX_ENTRIES) {
       this.entries.sort((a, b) => a.at - b.at);
       this.entries.splice(0, this.entries.length - BANK_MAX_ENTRIES);
@@ -75,7 +78,7 @@ export class DwellProgressBank<T extends { isConnected?: boolean }> {
 
   prune(now: number): void {
     this.entries = this.entries.filter(e => (
-      now - e.at < BANK_TTL_MS && (e.target.isConnected === undefined || e.target.isConnected)
+      now < e.expiresAt && (e.target.isConnected === undefined || e.target.isConnected)
     ));
   }
 }

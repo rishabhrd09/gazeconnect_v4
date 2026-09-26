@@ -830,7 +830,7 @@ export function buildBrowserCursorInjectionScript(): string {
       // intent guard and must never shorten the selected action duration.
       const selectionDurationMs = () => {
         const requested = Number((window.gcConfig || {}).dwellMs);
-        return [500, 900, 1000, 1250, 1300, 1500, 1600, 1700, 1900, 2000, 2400, 2500, 3000].includes(requested) ? requested : 1900;
+        return [800, 1000, 1250, 1300, 1400, 1500, 1600, 1700, 1900, 2000, 2200, 2400, 2500, 2600, 3000, 3800].includes(requested) ? requested : 1900;
       };
 
       // Saved progress expires in wall time, including tracking gaps.

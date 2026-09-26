@@ -31,7 +31,24 @@ import { recordDwellEvent, recordDwellInterrupt, recordFreeze, recordGazeLatency
 import { gazeFlags } from '../../utils/gazeFlags';
 import { GazeFreshness, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../../utils/gazeSafety';
 import { TrackerStatusNotice } from './TrackerStatusNotice';
-import { KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT, dwellForContext, fixedDwell, type KeyboardCadence } from '../../config/dwellTimeConfig';
+import {
+  FAMILIAR_KEYBOARD_TIMING, KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT,
+  dwellForContext, fixedDwell, normalizeKeyboardFeel, type KeyboardCadence,
+} from '../../config/dwellTimeConfig';
+
+type FamiliarKeyboardTarget = 'key' | 'modifier' | 'suggestion';
+/** Only the ordinary keyboard keys and its suggestion slots use Familiar timing. */
+function familiarKeyboardTarget(el: HTMLElement, onKeyboardScreen: boolean): FamiliarKeyboardTarget | null {
+  if (!onKeyboardScreen) return null;
+  if (el.matches('.keyboard-screen .keyboard-key')) {
+    if (el.getAttribute('data-gaze-context') !== 'keyboard') return null;
+    return el.getAttribute('data-action') === 'shift' ? 'modifier' : 'key';
+  }
+  if (el.getAttribute('data-gaze-context') === 'prediction'
+      && (el.matches('.keyboard-screen .keyboard-word-slot')
+        || el.matches('.keyboard-screen .keyboard-phrase-slot'))) return 'suggestion';
+  return null;
+}
 
 // Match native pointer hit testing: an opaque/noninteractive surface blocks targets
 // below it. The rendered gaze cursor is decorative and must never block its target.
@@ -187,6 +204,10 @@ export const GazeCursor: React.FC = () => {
   const gazeControl = useGazeControl();
   const { hasRealGaze, reportGazeReceived } = useRealGaze();
   const { settings } = useCustomization();
+  // Read a primitive in the frame loop. A settings change takes effect without
+  // closing over an old profile or allocating on each gaze sample.
+  const keyboardFeelRef = useRef(normalizeKeyboardFeel(settings.keyboardFeel));
+  keyboardFeelRef.current = normalizeKeyboardFeel(settings.keyboardFeel);
   const { settings: dwellSettings, currentStage } = useDwellTime();
   const dwellSettingsRef = useRef(dwellSettings);
   useEffect(() => { dwellSettingsRef.current = dwellSettings; }, [dwellSettings]);
@@ -236,7 +257,7 @@ export const GazeCursor: React.FC = () => {
   // Provides psychological stability: even if cursor moves slightly, the highlight stays
   // fixed on the correct element, matching Grid 3 / Tobii Communicator / TD Snap behavior.
   const [highlightRect, setHighlightRect] = useState<{
-    left: number; top: number; width: number; height: number;
+    left: number; top: number; width: number; height: number; keyboardKey: boolean;
   } | null>(null);
 
   // No usable gaze for GAZE_RECOVERY_MS, or none yet: the bubble is hidden.
@@ -308,6 +329,34 @@ export const GazeCursor: React.FC = () => {
   const screenProfileRef = useRef(computeScreenProfile());
   const isKeyboardScreenRef = useRef(false);
   const isCompassScreenRef = useRef(false);
+  // The keyboard alone shows a stationary acquisition outline during onset.
+  // Change the attribute only when the target changes, never on gaze samples.
+  const keyboardOnsetVisualRef = useRef<HTMLElement | null>(null);
+  const setKeyboardOnsetVisual = useCallback((target: HTMLElement | null) => {
+    if (keyboardOnsetVisualRef.current === target) return;
+    keyboardOnsetVisualRef.current?.removeAttribute('data-keyboard-onset');
+    keyboardOnsetVisualRef.current = null;
+    if (target && isKeyboardScreenRef.current && target.matches('.keyboard-screen .keyboard-key')) {
+      target.setAttribute('data-keyboard-onset', 'true');
+      keyboardOnsetVisualRef.current = target;
+    }
+  }, []);
+  const keyboardConfirmVisualRef = useRef<HTMLElement | null>(null);
+  const keyboardConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearKeyboardConfirmation = useCallback(() => {
+    if (keyboardConfirmTimerRef.current !== null) clearTimeout(keyboardConfirmTimerRef.current);
+    keyboardConfirmTimerRef.current = null;
+    keyboardConfirmVisualRef.current?.removeAttribute('data-keyboard-confirmed');
+    keyboardConfirmVisualRef.current = null;
+  }, []);
+  const confirmKeyboardSelection = useCallback((target: HTMLElement) => {
+    clearKeyboardConfirmation();
+    if (!isKeyboardScreenRef.current || !target.matches('.keyboard-screen .keyboard-key')) return;
+    target.setAttribute('data-keyboard-confirmed', 'true');
+    keyboardConfirmVisualRef.current = target;
+    // Confirmation is paint only. The click fires on its original frame.
+    keyboardConfirmTimerRef.current = setTimeout(clearKeyboardConfirmation, 220);
+  }, [clearKeyboardConfirmation]);
 
   // Toggle lockout: prevent double-fire by requiring look-away + cooldown
   const lastToggleTimeRef = useRef<number>(0);
@@ -446,9 +495,15 @@ export const GazeCursor: React.FC = () => {
   // v9: Track keyboard screen for context-aware dwell timing
   // v10: Also track compass/advanced-map screens for nav dwell boost
   useEffect(() => {
+    setKeyboardOnsetVisual(null);
+    clearKeyboardConfirmation();
     isKeyboardScreenRef.current = ws.currentScreen === 'keyboard';
     isCompassScreenRef.current = ws.currentScreen === 'compass-map' || ws.currentScreen === 'advanced-map';
-  }, [ws.currentScreen]);
+  }, [ws.currentScreen, setKeyboardOnsetVisual, clearKeyboardConfirmation]);
+  useEffect(() => () => {
+    setKeyboardOnsetVisual(null);
+    clearKeyboardConfirmation();
+  }, [setKeyboardOnsetVisual, clearKeyboardConfirmation]);
 
   // Find gaze toggle element
   const isGazeToggleElement = useCallback((el: HTMLElement | null): boolean => {
@@ -535,6 +590,10 @@ export const GazeCursor: React.FC = () => {
     isCompass: boolean,
     getAttr: (el: HTMLElement | null, attr: string) => string | null
   ): number => {
+    if (keyboardFeelRef.current === 'familiar') {
+      const familiarTarget = familiarKeyboardTarget(el, isKeyboard);
+      if (familiarTarget) return FAMILIAR_KEYBOARD_TIMING[familiarTarget];
+    }
     const explicitDwellRaw = getAttr(el, 'data-gaze-dwell-ms') || getAttr(el, 'data-gaze-dwell');
     const explicitDwell = explicitDwellRaw ? Number(explicitDwellRaw) : NaN;
 
@@ -555,6 +614,8 @@ export const GazeCursor: React.FC = () => {
   }, []);
 
   const resetSelection = useCallback(() => {
+    setKeyboardOnsetVisual(null);
+    clearKeyboardConfirmation();
     dwellTargetRef.current = null;
     dwellStartTimeRef.current = 0;
     onsetTargetRef.current = null;
@@ -571,7 +632,7 @@ export const GazeCursor: React.FC = () => {
     setIsLocked(false);
     setTargetName('');
     setHighlightRect(null);
-  }, []);
+  }, [setKeyboardOnsetVisual, clearKeyboardConfirmation]);
 
   // === v18: THE TARGET UNDER A POINT OF THE GAZE ESTIMATE ================
   // Before any hysteresis. Moved here from the dwell loop, rules unchanged:
@@ -806,6 +867,8 @@ export const GazeCursor: React.FC = () => {
 
     // Mouse-Only Mode: no dwell detection at all
     if (isMouseMode) {
+      setKeyboardOnsetVisual(null);
+      clearKeyboardConfirmation();
       if (dwellTargetRef.current) {
         dwellTargetRef.current = null;
         dwellStartTimeRef.current = 0;
@@ -929,6 +992,7 @@ export const GazeCursor: React.FC = () => {
     // - (Gaze is enabled OR element is always-active) AND
     // - (Not in navigation cooldown OR element is always-active)
     if (!clickable || (!enabled && !isAlwaysActive) || (inClickCooldown && !isToggle) || (inNavCooldown && !isAlwaysActive)) {
+      setKeyboardOnsetVisual(null);
       // === INCOMPLETE FIXATION TTL ===
       // Save progress when gaze leaves so it can be resumed if user looks back
       let didCaptureSave = false;
@@ -939,13 +1003,16 @@ export const GazeCursor: React.FC = () => {
         const effectiveDwell = _getEffectiveDwell(dwellTargetRef.current, contextKey, s, isToggle, isKeyboardScreenRef.current, isCompassScreenRef.current, getTargetAttr);
         const currentProgress = Math.min(1, elapsed / effectiveDwell);
         if (currentProgress >= FIXATION_TTL_MIN_PROGRESS && currentProgress < 1) {
+          const familiarTtl = keyboardFeelRef.current === 'familiar'
+            && familiarKeyboardTarget(dwellTargetRef.current, isKeyboardScreenRef.current);
+          const ttlMs = familiarTtl ? FAMILIAR_KEYBOARD_TIMING.incompleteTtl : FIXATION_TTL_MS;
           savedDwellRef.current = {
             element: dwellTargetRef.current,
             progress: currentProgress,
             timestamp: now,
           };
-          savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
-          progressBankRef.current.save(dwellTargetRef.current, currentProgress, now);
+          savedDwellExpiryRef.current = now + ttlMs;
+          progressBankRef.current.save(dwellTargetRef.current, currentProgress, now, ttlMs);
           didCaptureSave = true;
           // Telemetry: dwell progress suspended mid-fixation (measurement only)
           try {
@@ -999,8 +1066,10 @@ export const GazeCursor: React.FC = () => {
 
     // === ONSET DELAY PHASE (OptiKey-inspired two-phase fixation) ===
     // Phase 1: Cursor must remain on SAME element for ONSET_DELAY_MS.
-    // No visual feedback during onset — prevents "drive-by" activations.
+    // The keyboard shows only an acquisition outline, never dwell progress,
+    // until this phase completes.
     if (clickable !== onsetTargetRef.current) {
+      setKeyboardOnsetVisual(null);
       // New target — start onset phase. A target that has only just taken
       // the focus is credited the samples that confirmed it
       // (ONSET_CREDIT_WINDOW_MS): the onset is as long as it always was.
@@ -1051,6 +1120,7 @@ export const GazeCursor: React.FC = () => {
         }
         savedDwellRef.current = null;
         dwellProgressRef.current = 0;
+        setKeyboardOnsetVisual(clickable);
         // Reset dwell state during onset
         if (dwellTargetRef.current !== clickable) {
           dwellTargetRef.current = null;
@@ -1066,6 +1136,12 @@ export const GazeCursor: React.FC = () => {
 
     // Check if onset is still in progress
     if (!onsetCompletedRef.current) {
+      // A brief gaze-loss event hides acquisition. Restore it on the first
+      // usable frame if the same key is still being acquired.
+      if (isKeyboardScreenRef.current && keyboardOnsetVisualRef.current !== clickable
+          && clickable.matches('.keyboard-screen .keyboard-key')) {
+        setKeyboardOnsetVisual(clickable);
+      }
       // B1-FE extension (flag toggleCalmFrontend): with gaze ON, the toggle
       // uses the STANDARD onset — the 100ms fast path let a glance that
       // merely passed near the toggle become the dwell candidate almost
@@ -1085,13 +1161,18 @@ export const GazeCursor: React.FC = () => {
           onsetDuration = kbOnsetCadence.onset;
         }
       }
+      if (keyboardFeelRef.current === 'familiar'
+          && familiarKeyboardTarget(clickable, isKeyboardScreenRef.current)) {
+        onsetDuration = FAMILIAR_KEYBOARD_TIMING.onset;
+      }
       const onsetElapsed = now - onsetStartTimeRef.current;
       if (onsetElapsed < onsetDuration) {
-        // Still in onset phase — no visual feedback, no dwell timer
+        // Still in onset phase — acquisition only, no dwell timer.
         frameRef.current = requestAnimationFrame(dwellFrame);
         return;
       }
       // Onset completed — transition to dwell phase
+      setKeyboardOnsetVisual(null);
       onsetCompletedRef.current = true;
       if (dwellTargetRef.current !== clickable) {
         dwellTargetRef.current = clickable;
@@ -1124,7 +1205,8 @@ export const GazeCursor: React.FC = () => {
         // The bubble is already at this target's centre (drawBubble); the
         // highlight marks the start of the selection.
         const rect = clickable.getBoundingClientRect();
-        setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+        setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+          keyboardKey: isKeyboardScreenRef.current && clickable.matches('.keyboard-screen .keyboard-key') });
       }
     }
 
@@ -1137,7 +1219,8 @@ export const GazeCursor: React.FC = () => {
       const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
       setTargetName(name);
       const rect = clickable.getBoundingClientRect();
-      setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+      setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+        keyboardKey: isKeyboardScreenRef.current && clickable.matches('.keyboard-screen .keyboard-key') });
     }
 
     // Progress — only counts AFTER onset completes
@@ -1226,7 +1309,9 @@ export const GazeCursor: React.FC = () => {
       progressBankRef.current.clear();
       dwellProgressRef.current = 0;
       lastGazeActivationRef.current = { element: dwellTargetRef.current, at: now };
+      confirmKeyboardSelection(dwellTargetRef.current);
       dwellTargetRef.current.click();
+      setKeyboardOnsetVisual(null);
       dwellTargetRef.current = null;
       dwellStartTimeRef.current = 0;
       onsetTargetRef.current = null;
@@ -1241,7 +1326,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble, takeBankedProgress]);
+  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble, takeBankedProgress, setKeyboardOnsetVisual, clearKeyboardConfirmation, confirmKeyboardSelection]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {
@@ -1472,9 +1557,12 @@ export const GazeCursor: React.FC = () => {
           brokenProgress = Math.min(1, (now - dwellStartTimeRef.current) / effDwell);
           if (gazeFlags.lockBreakProgressRetention
             && brokenProgress >= FIXATION_TTL_MIN_PROGRESS && brokenProgress < 1) {
+            const familiarTtl = keyboardFeelRef.current === 'familiar'
+              && familiarKeyboardTarget(brokenTarget, isKeyboardScreenRef.current);
+            const ttlMs = familiarTtl ? FAMILIAR_KEYBOARD_TIMING.incompleteTtl : FIXATION_TTL_MS;
             savedDwellRef.current = { element: brokenTarget, progress: brokenProgress, timestamp: now };
-            savedDwellExpiryRef.current = now + FIXATION_TTL_MS;
-            progressBankRef.current.save(brokenTarget, brokenProgress, now);
+            savedDwellExpiryRef.current = now + ttlMs;
+            progressBankRef.current.save(brokenTarget, brokenProgress, now, ttlMs);
             lockBreakSaved = true;
           }
           // Telemetry: lock-break interruption (measurement only, always on)
@@ -1667,10 +1755,14 @@ export const GazeCursor: React.FC = () => {
   // When backend detects blink or tracking loss, we freeze dwell progress
   // instead of resetting it. This prevents blinks from losing typing progress.
   useEffect(() => {
-    const handleGazeLost = () => { freshnessRef.current.lose(); };
+    const handleGazeLost = () => {
+      freshnessRef.current.lose();
+      setKeyboardOnsetVisual(null);
+      clearKeyboardConfirmation();
+    };
     window.addEventListener('gaze_lost', handleGazeLost);
     return () => window.removeEventListener('gaze_lost', handleGazeLost);
-  }, []);
+  }, [setKeyboardOnsetVisual, clearKeyboardConfirmation]);
 
   // Mouse, touch and pen stay available beside gaze (see DUPLICATE_INPUT_MS).
   // Gaze presses are programmatic, so isTrusted tells the two apart. Capture
@@ -1736,7 +1828,7 @@ export const GazeCursor: React.FC = () => {
       {/* v16: Visual Selection Highlight — rectangular border around the element being dwelled on.
           Provides psychological stability: the highlight stays fixed on the correct element
           even if the cursor has micro-drift, matching Grid 3 / Tobii Communicator behavior. */}
-      {highlightRect && dwellProgress > 0 && (
+      {highlightRect && (dwellProgress > 0 || highlightRect.keyboardKey) && (
         <div
           data-cursor="true"
           style={{
@@ -1746,12 +1838,13 @@ export const GazeCursor: React.FC = () => {
             width: highlightRect.width + 6,
             height: highlightRect.height + 6,
             borderRadius: 8,
-            border: `3px solid ${isLocked ? CURSOR_COLOR_LOCKED : CURSOR_COLOR_NORMAL}`,
+            border: `3px solid ${highlightRect.keyboardKey ? CURSOR_COLOR_LOCKED : isLocked ? CURSOR_COLOR_LOCKED : CURSOR_COLOR_NORMAL}`,
             backgroundColor: 'transparent',
             pointerEvents: 'none',
             zIndex: 2147483646, // Just below cursor
-            boxShadow: `0 0 ${8 + dwellProgress * 12}px ${isLocked ? CURSOR_COLOR_LOCKED : CURSOR_COLOR_NORMAL}40`,
-            opacity: Math.min(1, dwellProgress * 3), // Fade in quickly
+            boxShadow: highlightRect.keyboardKey ? 'none'
+              : `0 0 ${8 + dwellProgress * 12}px ${isLocked ? CURSOR_COLOR_LOCKED : CURSOR_COLOR_NORMAL}40`,
+            opacity: highlightRect.keyboardKey ? 1 : Math.min(1, dwellProgress * 3),
             transition: 'border-color 150ms ease, box-shadow 150ms ease',
           }}
         />

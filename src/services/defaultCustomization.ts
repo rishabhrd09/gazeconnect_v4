@@ -598,6 +598,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     dwellTime: 900,
     filterPreset: 'balanced',
     dwellTimingSet: 'balanced',
+    keyboardFeel: 'standard',
     gazeOnNavigate: 'smart-pause',
     ttsRate: 150,  // words per minute (the Voice stepper: 80-250); 150 is the normal pace
     ttsVolume: 0.25,

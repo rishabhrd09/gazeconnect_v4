@@ -1,17 +1,13 @@
 /** Selection durations shared by every gaze surface.
  *
- * Five action groups, and three complete timing sets that fix all five at
+ * Five action groups, and four complete timing sets that fix all five at
  * once. There are no per-button sliders, multipliers or repeat acceleration:
  * a person chooses one named set. Onset, cooldown and tracking stability are
  * separate internal safeguards.
  *
- * The sets follow published eye-typing practice. Novices typically use
- * 500-1000 ms; in Majaranta, Ahola and Spakov (CHI 2009) the mean was 876 ms
- * in the first session and about 500 ms after an hour of practice. OptiKey
- * defaults to 1250 ms after a 250 ms lock-on.
- *   quick     the timings this app shipped with: for a practised user;
- *   balanced  the default: a first-time user's pace;
- *   relaxed   more time to settle on a target and to look away from a wrong one.
+ * The keyboard dwell is deliberately longer than the original timings after
+ * patient feedback. Typing need not be the shortest group: each group is set
+ * for the choice it represents, and every mode is slower than the one before.
  */
 const GROUP_INFO = {
   typing: { label: 'Typing', description: 'Individual letters and keyboard keys' },
@@ -24,24 +20,50 @@ export type DwellGroup = keyof typeof GROUP_INFO;
 
 export const DWELL_TIMING_SETS = {
   quick: {
-    label: 'Quick', description: 'For a practised user',
-    ms: { typing: 500, words: 1000, communication: 1250, navigation: 1500, deliberate: 2000 },
+    label: 'Quick', description: 'For a practised user who prefers shorter selections',
+    ms: { typing: 800, words: 1000, communication: 1250, navigation: 1500, deliberate: 2000 },
   },
   balanced: {
-    label: 'Balanced (default)', description: 'A comfortable pace for most people',
-    ms: { typing: 900, words: 1300, communication: 1600, navigation: 1900, deliberate: 2500 },
+    label: 'Balanced (default)', description: 'A comfortable pace for most people, with calmer typing',
+    ms: { typing: 1400, words: 1300, communication: 1600, navigation: 1900, deliberate: 2500 },
   },
   relaxed: {
-    label: 'Relaxed', description: 'More time to settle, and to look away from a wrong choice',
-    ms: { typing: 1300, words: 1700, communication: 2000, navigation: 2400, deliberate: 3000 },
+    label: 'Relaxed', description: 'More time to find a key and look away from a wrong choice',
+    ms: { typing: 2200, words: 1700, communication: 2000, navigation: 2400, deliberate: 3000 },
+  },
+  extra_time: {
+    label: 'Extra Time', description: 'The slowest pace, with generous time to settle on each key',
+    ms: { typing: 3000, words: 2200, communication: 2600, navigation: 3000, deliberate: 3800 },
   },
 } as const satisfies Record<string, { label: string; description: string; ms: Record<DwellGroup, number> }>;
 export type DwellTimingSet = keyof typeof DWELL_TIMING_SETS;
 export const DEFAULT_DWELL_TIMING_SET: DwellTimingSet = 'balanced';
+/** An optional keyboard-only feel. The four app-wide speed sets remain intact. */
+export type KeyboardFeel = 'standard' | 'familiar';
+export const DEFAULT_KEYBOARD_FEEL: KeyboardFeel = 'standard';
+/** Initial OptiKey-inspired targets, not a claim of equal end-to-end latency. */
+export const FAMILIAR_KEYBOARD_TIMING = {
+  onset: 350,
+  key: 1750,
+  suggestion: 1750,
+  modifier: 1500,
+  incompleteTtl: 750,
+} as const;
+export function normalizeKeyboardFeel(value: unknown): KeyboardFeel {
+  return value === 'familiar' ? 'familiar' : DEFAULT_KEYBOARD_FEEL;
+}
 /** Every duration any set can produce: the only values another process may accept. */
 export const ALL_DWELL_DURATIONS_MS: number[] = [...new Set(
   Object.values(DWELL_TIMING_SETS).flatMap(set => Object.values(set.ms)),
 )].sort((a, b) => a - b);
+// The cursor resolves legacy element overrides on every animation frame.
+// Prepare each set once so that path never allocates or sorts durations.
+const ALLOWED_DURATIONS_BY_SET = Object.fromEntries(
+  (Object.keys(DWELL_TIMING_SETS) as DwellTimingSet[]).map(set => [
+    set,
+    [...new Set(Object.values(DWELL_TIMING_SETS[set].ms))].sort((a, b) => a - b),
+  ]),
+) as Record<DwellTimingSet, number[]>;
 
 export function normalizeDwellTimingSet(value: unknown): DwellTimingSet {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(DWELL_TIMING_SETS, value)
@@ -49,6 +71,7 @@ export function normalizeDwellTimingSet(value: unknown): DwellTimingSet {
 }
 
 let activeTimingSet: DwellTimingSet = DEFAULT_DWELL_TIMING_SET;
+let activeAllowedDurations = ALLOWED_DURATIONS_BY_SET[DEFAULT_DWELL_TIMING_SET];
 /** The five durations of the active timing set. `ms` follows setDwellTimingSet. */
 export const DWELL_GROUPS = Object.fromEntries((Object.keys(GROUP_INFO) as DwellGroup[]).map(group => [
   group, { ms: DWELL_TIMING_SETS[DEFAULT_DWELL_TIMING_SET].ms[group] as number, ...GROUP_INFO[group] },
@@ -58,6 +81,7 @@ export function getDwellTimingSet(): DwellTimingSet { return activeTimingSet; }
 /** Select a timing set for every surface at once. Unknown names select the default. */
 export function setDwellTimingSet(value: unknown): DwellTimingSet {
   activeTimingSet = normalizeDwellTimingSet(value);
+  activeAllowedDurations = ALLOWED_DURATIONS_BY_SET[activeTimingSet];
   for (const group of Object.keys(GROUP_INFO) as DwellGroup[]) {
     DWELL_GROUPS[group].ms = DWELL_TIMING_SETS[activeTimingSet].ms[group];
   }
@@ -98,7 +122,8 @@ export function dwellForContext(context: string): number {
 /** Old element overrides cannot introduce an extra duration. Round upward. */
 export function fixedDwell(ms: number, fallback: number = DWELL_GROUPS.navigation.ms): number {
   if (!Number.isFinite(ms) || ms <= 0) return fallback;
-  return Object.values(DWELL_GROUPS).find(group => group.ms >= ms)?.ms ?? DWELL_GROUPS.deliberate.ms;
+  return activeAllowedDurations.find(duration => duration >= ms)
+    ?? activeAllowedDurations[activeAllowedDurations.length - 1];
 }
 /** Per-action durations of one timing set. */
 export function dwellTimesFor(set: DwellTimingSet): Record<DwellAction, number> {

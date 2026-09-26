@@ -7,10 +7,12 @@ import { useCustomization } from '../../../contexts/CustomizationContext';
 import { useTheme, type Theme } from '../../../contexts/ThemeContext';
 import type { AppSettings } from '../../../types/customization';
 import {
-  DEFAULT_DWELL_TIMING_SET, DWELL_GROUPS, DWELL_TIMING_SETS, normalizeDwellTimingSet,
-  type DwellGroup, type DwellTimingSet,
+  DEFAULT_DWELL_TIMING_SET, DWELL_TIMING_SETS, FAMILIAR_KEYBOARD_TIMING, KEYBOARD_CADENCE_BY_STAGE,
+  normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet, type KeyboardFeel,
 } from '../../../config/dwellTimeConfig';
 import { GAZE_FILTER_MODES, normalizeFilterPreset } from '../../../config/gazeFilterConfig';
+import { useDwellTime } from '../../../contexts/DwellTimeContext';
+import { gazeFlags } from '../../../utils/gazeFlags';
 import { POST_NAVIGATION_COOLDOWN_MS } from '../../core/GazeControlToggle';
 import { ICON } from './settingsPages';
 
@@ -125,6 +127,10 @@ const SPEED_OPTIONS: Option<DwellTimingSet>[] = (Object.keys(DWELL_TIMING_SETS) 
   sub: DWELL_TIMING_SETS[key].description,
   tag: key === DEFAULT_DWELL_TIMING_SET ? 'Default' : undefined,
 }));
+const KEYBOARD_FEEL_OPTIONS: Option<KeyboardFeel>[] = [
+  { value: 'standard', label: 'Standard', sub: 'Keys and suggestions follow Selection speed.' },
+  { value: 'familiar', label: 'Familiar keyboard', sub: 'A longer settling phase and steady fill, inspired by the supplied eye-typing setup.' },
+];
 
 const SCREEN_CHANGE_OPTIONS: Option<AppSettings['gazeOnNavigate']>[] = [
   {
@@ -141,9 +147,9 @@ const CURSOR_SIZES: Option<string>[] = [
 
 const SMOOTHING_OPTIONS: Option<string>[] = GAZE_FILTER_MODES.map(mode => ({ value: mode.value, label: mode.label.replace(' (default)', '') }));
 
-/** A tile that fills while the mouse rests on it, at the chosen Typing time. */
-const TryTile: React.FC<{ ms: number }> = ({ ms }) => {
-  const [state, setState] = useState<'idle' | 'looking' | 'selected'>('idle');
+/** Preview the active keyboard onset followed by its chosen Typing dwell. */
+const TryTile: React.FC<{ ms: number; onsetMs: number }> = ({ ms, onsetMs }) => {
+  const [state, setState] = useState<'idle' | 'settling' | 'looking' | 'selected'>('idle');
   const [progress, setProgress] = useState(0);
   const frame = useRef<number | null>(null);
   const stop = () => { if (frame.current !== null) cancelAnimationFrame(frame.current); frame.current = null; };
@@ -151,10 +157,16 @@ const TryTile: React.FC<{ ms: number }> = ({ ms }) => {
   const enter = () => {
     stop();
     const start = performance.now();
-    setState('looking');
+    setState('settling');
     setProgress(0);
     const tick = (now: number) => {
-      const done = Math.min(1, (now - start) / ms);
+      const elapsed = now - start;
+      if (elapsed < onsetMs) {
+        frame.current = requestAnimationFrame(tick);
+        return;
+      }
+      setState('looking');
+      const done = Math.min(1, (elapsed - onsetMs) / ms);
       setProgress(done);
       if (done >= 1) { setState('selected'); frame.current = null; return; }
       frame.current = requestAnimationFrame(tick);
@@ -164,7 +176,7 @@ const TryTile: React.FC<{ ms: number }> = ({ ms }) => {
   const leave = () => { stop(); setState('idle'); setProgress(0); };
   return (
     <div className={`gss-try gss-try-${state}`} onMouseEnter={enter} onMouseLeave={leave}>
-      <span className="gss-try-label">{state === 'selected' ? 'Selected' : state === 'looking' ? 'Looking…' : 'Look here'}</span>
+      <span className="gss-try-label">{state === 'selected' ? 'Selected' : state === 'looking' ? 'Looking…' : state === 'settling' ? 'Settling…' : 'Look here'}</span>
       <span className="gss-try-track"><span className="gss-try-fill" style={{ width: `${Math.round(progress * 100)}%` }} /></span>
     </div>
   );
@@ -172,42 +184,34 @@ const TryTile: React.FC<{ ms: number }> = ({ ms }) => {
 
 export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   const { settings, save } = useInstantSetting(onSaved);
-  const [showTimes, setShowTimes] = useState(false);
+  const { currentStage } = useDwellTime();
   const [moreOpen, setMoreOpen] = useState(false);
   const timingSet = normalizeDwellTimingSet(settings.dwellTimingSet);
-  const times = (Object.keys(DWELL_GROUPS) as DwellGroup[]).map(group => ({
-    group, ms: DWELL_TIMING_SETS[timingSet].ms[group], label: DWELL_GROUPS[group].label, description: DWELL_GROUPS[group].description,
-  }));
+  const keyboardFeel = normalizeKeyboardFeel(settings.keyboardFeel);
+  // GazeCursor uses the stage-specific onset with keyboardCadence, or its
+  // standard 250 ms onset if the rollback flag is off.
+  const keyboardOnsetMs = keyboardFeel === 'familiar' ? FAMILIAR_KEYBOARD_TIMING.onset
+    : gazeFlags.keyboardCadence ? KEYBOARD_CADENCE_BY_STAGE[currentStage].onset : 250;
+  const keyboardFillMs = keyboardFeel === 'familiar' ? FAMILIAR_KEYBOARD_TIMING.key : DWELL_TIMING_SETS[timingSet].ms.typing;
   const cursorOn = settings.showGazeCursor !== false;
 
   return (
     <div className="gss-columns">
       <div className="gss-column">
-        <Card title="Selection speed" note="How long to look at a key or button before it is chosen.">
+        <Card title="Selection speed" note="Choose a pace for general choices. Standard keyboard follows this speed.">
           <RadioCards label="Selection speed" options={SPEED_OPTIONS} value={timingSet}
             onChange={value => save('dwellTimingSet', value)} />
-          <button type="button" className="gss-link" aria-expanded={showTimes} onClick={() => setShowTimes(open => !open)}>
-            <LineIcon d={showTimes ? ICON.chevronUp : ICON.chevronDown} />
-            <span>{showTimes ? 'Hide the five times' : 'Show the five times'}</span>
-          </button>
-          {showTimes && (
-            <div className="gss-times">
-              {times.map(time => (
-                <div key={time.group} className="gss-time">
-                  <span className="gss-time-ms">{time.ms}<span> ms</span></span>
-                  <span className="gss-time-label">{time.label}</span>
-                  <span className="gss-time-desc">{time.description}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </Card>
         <Card title="Try this speed"
-          note={<>Rest the pointer on the tile as if it were a look. The bar fills at the Typing time: {DWELL_TIMING_SETS[timingSet].ms.typing} ms.</>}>
-          <TryTile ms={DWELL_TIMING_SETS[timingSet].ms.typing} />
+          note="Rest the pointer here as if it were a look. This previews the selected keyboard feel's settling and fill; tracking conditions can change the full selection time.">
+          <TryTile ms={keyboardFillMs} onsetMs={keyboardOnsetMs} />
         </Card>
       </div>
       <div className="gss-column">
+        <Card title="Keyboard feel" note="Familiar is based on the supplied eye-typing setup. It changes only keys and suggestions; gaze smoothing and other screens keep their settings.">
+          <RadioCards label="Keyboard feel" options={KEYBOARD_FEEL_OPTIONS} value={keyboardFeel}
+            onChange={value => save('keyboardFeel', value)} />
+        </Card>
         <Card title="When a new screen opens" note="What gaze does right after a page changes.">
           <RadioCards label="When a new screen opens" options={SCREEN_CHANGE_OPTIONS} value={settings.gazeOnNavigate || 'smart-pause'}
             onChange={value => save('gazeOnNavigate', value)} />

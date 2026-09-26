@@ -51,4 +51,31 @@ test('a damaged saved rate falls back to the normal pace', () => {
   assert.equal(normalizeSpeechRateWpm(Number.NaN), 150);
 });
 
+test('new and older profiles keep the Standard keyboard feel', () => {
+  assert.equal(DEFAULT_CUSTOMIZATION.settings.keyboardFeel, 'standard');
+  const service = new CustomizationService();
+  service.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'relaxed' } }));
+  assert.equal(service.getData().settings.keyboardFeel, 'standard');
+  assert.equal(service.getData().settings.dwellTimingSet, 'relaxed');
+});
+
+test('Familiar keyboard feel persists through export and import without changing speed', () => {
+  const service = new CustomizationService();
+  service.updateSetting('dwellTimingSet', 'extra_time');
+  service.updateSetting('keyboardFeel', 'familiar');
+  const restored = new CustomizationService();
+  restored.importJSON(service.exportJSON());
+  assert.equal(restored.getData().settings.keyboardFeel, 'familiar');
+  assert.equal(restored.getData().settings.dwellTimingSet, 'extra_time');
+});
+
+test('invalid saved keyboard feel falls back to Standard', () => {
+  const service = new CustomizationService();
+  service.importJSON(JSON.stringify({ settings: { keyboardFeel: 'unknown' } }));
+  assert.equal(service.getData().settings.keyboardFeel, 'standard');
+  service.updateSetting('keyboardFeel', 'familiar');
+  service.resetToDefaults();
+  assert.equal(service.getData().settings.keyboardFeel, 'standard');
+});
+
 console.log(`${passed} settings checks passed.`);

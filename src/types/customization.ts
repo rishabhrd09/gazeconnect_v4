@@ -188,7 +188,8 @@ export interface AppSettings {
   showHindi: boolean; // Legacy storage field; normalized to false for this English-only release.
   dwellTime: number;
   filterPreset: string;
-  dwellTimingSet: 'quick' | 'balanced' | 'relaxed'; // One complete set of the five selection durations
+  dwellTimingSet: 'quick' | 'balanced' | 'relaxed' | 'extra_time'; // One complete set of the five selection durations
+  keyboardFeel: 'standard' | 'familiar'; // Optional keyboard-only timing and Dark key appearance
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';
   ttsRate: number;                 // words per minute, 80-250 (older saves: a multiplier, converted on load)
   ttsVolume: number;

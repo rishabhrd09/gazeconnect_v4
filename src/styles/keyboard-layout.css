@@ -1,6 +1,44 @@
 /* The keyboard's two right controls own their width; neither may spill into
    Quick Words. Keep these rules scoped to the keyboard navigation variant. */
 .keyboard-screen .keyboard-key { transform: none !important; }
+/* Amber means the key is being acquired; teal progress begins only after onset.
+   An inset outline changes no key box or gaze hit area. */
+:root[data-theme] .keyboard-screen .keyboard-key[data-keyboard-onset='true'] {
+  outline: 3px solid #FFC247 !important;
+  outline-offset: -4px !important;
+}
+:root[data-theme='warm'] .keyboard-screen .keyboard-key[data-keyboard-onset='true'] {
+  outline-color: var(--ui-accent) !important;
+}
+:root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-keyboard-onset='true'] {
+  outline-color: #EC9068 !important;
+}
+/* Brief local acknowledgement after a completed dwell; it never delays the click. */
+:root[data-theme] .keyboard-screen .keyboard-key[data-keyboard-confirmed='true'] {
+  outline: 4px solid var(--ui-accent) !important;
+  outline-offset: -5px !important;
+}
+:root[data-theme] .keyboard-screen .keyboard-key[data-action='letter'][data-keyboard-confirmed='true'] {
+  background: var(--ui-selected) !important;
+}
+/* Optional Familiar keyboard paint. The user's full-screen reference is matte
+   charcoal with fine dividers and lighter lowercase lettering. The #root hook
+   beats the shared card-corner rule without affecting another screen. */
+:root[data-theme='dark'] #root .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key {
+  border-radius: 10px !important;
+}
+:root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-action='letter'] {
+  font-weight: 600 !important;
+}
+:root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-action='letter']:not([data-keyboard-confirmed='true']) {
+  background: #1B1F21 !important;
+  border-color: #697477 !important;
+  color: #F3F5F2 !important;
+}
+:root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-action='letter']:not([data-keyboard-confirmed='true']):hover {
+  background: #262C2E !important;
+  border-color: var(--ui-accent) !important;
+}
 .keyboard-screen .keyboard-gaze-hub {
   background: var(--ui-panel) !important;
   border-color: var(--ui-accent-ink) !important;

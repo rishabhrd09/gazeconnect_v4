@@ -1,4 +1,4 @@
-import { DWELL_GROUPS } from '../config/dwellTimeConfig';
+import { DWELL_GROUPS, FAMILIAR_KEYBOARD_TIMING, normalizeKeyboardFeel } from '../config/dwellTimeConfig';
 /**
  * GazeConnect Pro - Professional Keyboard v5.0
  * =============================================
@@ -294,7 +294,8 @@ const KeyBtn: React.FC<{
   config: KeyConfig; onPress: (k: string, a?: string) => void;
   isShift: boolean; isDarkMode: boolean; dwellMs: number;
   gazeEnabled: boolean; lastEnabledTs: number; hasRealGaze: boolean;
-}> = ({ config, onPress, isShift, isDarkMode, dwellMs, gazeEnabled, lastEnabledTs, hasRealGaze }) => {
+  familiarFeel: boolean;
+}> = ({ config, onPress, isShift, isDarkMode, dwellMs, gazeEnabled, lastEnabledTs, hasRealGaze, familiarFeel }) => {
   const [hovered, setHovered] = useState(false);
   const [progress, setProgress] = useState(0);
   const [flash, setFlash] = useState(false);
@@ -307,6 +308,14 @@ const KeyBtn: React.FC<{
   const colors = isDarkMode ? darkColors : lightColors;
   const keyboardTheme = getKeyboardTheme(isDarkMode);
   const keyboardAccent = getKeyboardAccent(isDarkMode);
+  // Familiar changes only keyboard typing and Shift. Keep the existing longer
+  // deliberate/communication/navigation timings for the other action keys.
+  const familiarTypingKey = familiarFeel && config.action !== 'deleteWord'
+    && config.action !== 'speak' && config.action !== 'quickWords';
+  const fillMs = familiarTypingKey
+    ? (config.action === 'shift' ? FAMILIAR_KEYBOARD_TIMING.modifier : FAMILIAR_KEYBOARD_TIMING.key)
+    : dwellMs;
+  const onsetMs = familiarTypingKey ? FAMILIAR_KEYBOARD_TIMING.onset : 0;
 
   const clearAll = useCallback(() => {
     if (timerRef.current) { cancelAnimationFrame(timerRef.current); timerRef.current = null; }
@@ -314,8 +323,8 @@ const KeyBtn: React.FC<{
   }, []);
 
   const tick = useCallback(() => {
-    const elapsed = Date.now() - startRef.current;
-    const p = Math.min(1, elapsed / dwellMs);
+    const elapsed = Date.now() - startRef.current - onsetMs;
+    const p = Math.max(0, Math.min(1, elapsed / fillMs));
     setProgress(p);
 
     if (p >= 1 && !firedRef.current) {
@@ -333,7 +342,7 @@ const KeyBtn: React.FC<{
     if (p < 1) {
       timerRef.current = requestAnimationFrame(tick);
     }
-  }, [dwellMs, onPress, config.key, config.action]);
+  }, [fillMs, onsetMs, onPress, config.key, config.action]);
 
   const handleEnter = () => {
     if (hasRealGaze) { setHovered(true); return; }
@@ -400,8 +409,13 @@ const KeyBtn: React.FC<{
   const visibleBorder = isSpecialAction ? 'transparent' : border;
 
   let display = config.display || config.key;
-  // Uppercase by default for faster brain processing; shift toggles to lowercase
-  if (!isAction && display.length === 1) display = isShift ? display.toLowerCase() : display.toUpperCase();
+  // Familiar keeps the photographed lowercase QWERTY labels; the typed output
+  // and key positions do not change. Standard keeps the existing display.
+  if (!isAction && display.length === 1) {
+    display = familiarFeel
+      ? (isShift ? display.toUpperCase() : display.toLowerCase())
+      : (isShift ? display.toLowerCase() : display.toUpperCase());
+  }
 
   const btnW = btnRef.current?.offsetWidth || 60;
   const btnH = btnRef.current?.offsetHeight || 52;
@@ -430,10 +444,19 @@ const KeyBtn: React.FC<{
       className="gaze-button keyboard-key"
       data-gaze="true"
       data-gaze-context={isDeleteWord ? "deliberateAction" : isSpeak ? "quickWord" : isQuickWords ? "navigation" : "keyboard"}
-      data-gaze-dwell-ms={dwellMs}
+      data-gaze-dwell-ms={fillMs}
       data-action={config.action || 'letter'}
+      data-keyboard-onset={familiarTypingKey && hovered && !hasRealGaze && progress === 0 && !firedRef.current ? 'true' : undefined}
       onMouseEnter={handleEnter} onMouseLeave={handleLeave}
-      onClick={() => onPress(config.key, config.action)}
+      onClick={() => {
+        // A physical click remains immediate and must cancel any preview dwell.
+        if (familiarTypingKey) {
+          clearAll();
+          firedRef.current = true;
+          setHovered(false); setProgress(0); setCompleted(false);
+        }
+        onPress(config.key, config.action);
+      }}
       style={{
         position: 'relative', flex: config.flex || 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -442,7 +465,7 @@ const KeyBtn: React.FC<{
         outline: 'none',
         color: textColor,
         fontSize: isAction ? 'clamp(19px, 1.9vw, 26px)' : 'clamp(32px, 3.25vw, 48px)',
-        fontWeight: isAction ? 760 : 720,
+        fontWeight: isAction ? 760 : familiarFeel ? 600 : 720,
         letterSpacing: isAction ? '0' : '0.5px',
         cursor: 'pointer',
         transform: flash ? 'scale(0.95)' : hovered ? 'scale(1.02)' : 'scale(1)',
@@ -456,8 +479,8 @@ const KeyBtn: React.FC<{
           progress={progress}
           size={circleSize}
           color={dwellColor}
-          showShrink={true}
-          completed={completed}
+          showShrink={!familiarFeel}
+          completed={completed && !familiarFeel}
         />
       )}
       <span style={{
@@ -492,8 +515,9 @@ const WordSlotButton: React.FC<{
   isDarkMode: boolean;
   gazeEnabled: boolean;
   gazeEnabledTimestamp: number;
+  familiarFeel: boolean;
   onSelect: (index: number, word: string) => void;
-}> = React.memo(({ index, word, selectable, best, isDarkMode, gazeEnabled, gazeEnabledTimestamp, onSelect }) => {
+}> = React.memo(({ index, word, selectable, best, isDarkMode, gazeEnabled, gazeEnabledTimestamp, familiarFeel, onSelect }) => {
   const keyboardTheme = getKeyboardTheme(isDarkMode);
   const { predictionBestBg, predictionText, predictionBestText } = getKeyboardHierarchyColors(isDarkMode);
   if (!word) {
@@ -509,6 +533,8 @@ const WordSlotButton: React.FC<{
       className={`keyboard-word-slot${best ? ' keyboard-word-slot-best' : ''}${selectable ? '' : ' keyboard-word-slot-stale'}`}
       ariaLabel={`Insert ${word}`}
       dwellCategory="predictionButton"
+      mouseDwellOnsetMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.onset : undefined}
+      mouseDwellDurationMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.suggestion : undefined}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       disabled={!selectable}
@@ -546,8 +572,9 @@ const PhraseSuggestionButton: React.FC<{
   isDarkMode: boolean;
   gazeEnabled: boolean;
   gazeEnabledTimestamp: number;
+  familiarFeel: boolean;
   onSelect: (suggestion: SentenceSuggestion) => void;
-}> = React.memo(({ suggestion, selectable, isDarkMode, gazeEnabled, gazeEnabledTimestamp, onSelect }) => {
+}> = React.memo(({ suggestion, selectable, isDarkMode, gazeEnabled, gazeEnabledTimestamp, familiarFeel, onSelect }) => {
   const { sentenceSuggestionBg, sentenceSuggestionText } = getKeyboardHierarchyColors(isDarkMode);
   if (!suggestion) {
     return <div className="keyboard-phrase-slot keyboard-phrase-slot-empty" aria-hidden="true" style={{ backgroundColor: sentenceSuggestionBg }} />;
@@ -558,6 +585,8 @@ const PhraseSuggestionButton: React.FC<{
       className="keyboard-phrase-slot"
       ariaLabel={`Insert phrase ${suggestion.text}`}
       dwellCategory="predictionButton"
+      mouseDwellOnsetMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.onset : undefined}
+      mouseDwellDurationMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.suggestion : undefined}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       disabled={!selectable}
@@ -617,7 +646,8 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
   const { hasRealGaze } = useRealGaze();
   const { isLight, isWarm } = useTheme();
-  const { data: { quickWords } } = useCustomization();
+  const { data: { quickWords, settings } } = useCustomization();
+  const familiarFeel = normalizeKeyboardFeel(settings.keyboardFeel) === 'familiar';
 
   // Track Focus Lock state from Electron
   const [isFocusLocked, setIsFocusLocked] = useState(false);
@@ -964,7 +994,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   );
 
   return (
-    <div className={`keyboard-screen${navHidden ? ' keyboard-nav-hidden' : ' keyboard-nav-visible'}${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
+    <div data-keyboard-feel={familiarFeel ? 'familiar' : 'standard'} className={`keyboard-screen${navHidden ? ' keyboard-nav-hidden' : ' keyboard-nav-visible'}${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
       display: 'flex', flexDirection: 'column',
       height: '100%',
       backgroundColor: keyboardTheme.shellBg,
@@ -1030,11 +1060,13 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
             <WordSlotButton key={`${index}:${word ?? ''}`} index={index} word={word}
               selectable={slotsSelectable} best={index === 0} isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+              familiarFeel={familiarFeel}
               onSelect={handleWordSlot} />
           ))}
           <PhraseSuggestionButton key={`phrase:${phraseSuggestion?.mode ?? ''}:${phraseSuggestion?.text ?? ''}`}
             suggestion={phraseSuggestion} selectable={slotsSelectable} isDarkMode={isDarkMode}
             gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+            familiarFeel={familiarFeel}
             onSelect={handleSentenceSelect} />
         </div>
       )}
@@ -1300,7 +1332,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                               : kc.action === 'quickWords' ? DWELL_GROUPS.navigation.ms : DWELL_GROUPS.typing.ms}
                           gazeEnabled={isGazeEnabled}
                           lastEnabledTs={lastEnabledTimestamp}
-                          hasRealGaze={hasRealGaze} />
+                          hasRealGaze={hasRealGaze} familiarFeel={familiarFeel} />
                       );
                     })}
                   </div>
@@ -1317,6 +1349,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                 <WordSlotButton key={`${index}:${word ?? ''}`} index={index} word={word}
                   selectable={slotsSelectable} best={false} isDarkMode={isDarkMode}
                   gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+                  familiarFeel={familiarFeel}
                   onSelect={handleWordSlot} />
               );
             })}
