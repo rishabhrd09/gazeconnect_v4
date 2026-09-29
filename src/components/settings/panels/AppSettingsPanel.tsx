@@ -7,6 +7,7 @@ import SelectSetting from '../shared/SelectSetting';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { DWELL_TIMING_SETS, normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet } from '../../../config/dwellTimeConfig';
+import { GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors } from '../../../config/gazeColors';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
 
 // Four complete timing sets; the displayed advice avoids promising an exact
@@ -159,6 +160,16 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
               { value: 'large', label: 'Large' },
             ]}
             onChange={v => updateSetting('gazeCursorSize', v)}
+            isDarkMode={isDarkMode}
+          />
+          <SelectSetting
+            label="Gaze Colours"
+            description="Colours of the gaze ring, the dwell fill and the highlight round the key or card. Each choice has its own colours for Dark and Warm. High contrast is the clearest; Soft blue has the least glare and suits colour-blind eyes."
+            value={normalizeGazeColors(settings.gazeColors)}
+            options={(Object.keys(GAZE_COLOR_PALETTES) as GazeColors[]).map(key => ({
+              value: key, label: GAZE_COLOR_PALETTES[key].label,
+            }))}
+            onChange={v => updateSetting('gazeColors', normalizeGazeColors(v))}
             isDarkMode={isDarkMode}
           />
           <GazeFilterTuningSection isDarkMode={isDarkMode} />

@@ -114,13 +114,15 @@ const getKeyboardAccent = (isDarkMode: boolean) => (
 // in eye-tracking scans (Schlosser 2015: visual hierarchy reduces fixation errors 24%).
 const getKeyboardHierarchyColors = (isDarkMode: boolean) => ({
   predictionBestBg: isDarkMode ? '#242C26' : '#EEF0E4',                    // deeper amber accent (best prediction stands out)
-  predictionText: isDarkMode ? '#A5D0B9' : '#285C4D',    // warm dark-brown ~7.5:1
-  predictionBestText: isDarkMode ? '#CBE5D7' : '#1F4A3E',                  // primary text (AAA on best-bg)
+  // Suggestions read in the keyboard ink (27 Sep 2026): white on Dark as in OptiKey, full ink on
+  // Warm. The best one still stands out by its background (predictionBestBg).
+  predictionText: isDarkMode ? '#FFFFFF' : 'var(--ui-ink)',
+  predictionBestText: isDarkMode ? '#FFFFFF' : 'var(--ui-ink)',
   secondarySuggestionBg: isDarkMode ? '#1A201C' : '#F4EFE7',
   secondarySuggestionText: isDarkMode ? '#A5D0B9' : '#285C4D',
   // Sentence row — subtle sky-blue tint signals "alternate suggestion" zone
   sentenceSuggestionBg: isDarkMode ? '#222B27' : '#EDEFE6',
-  sentenceSuggestionText: isDarkMode ? '#DCE6DD' : '#26342D',
+  sentenceSuggestionText: isDarkMode ? '#FFFFFF' : 'var(--ui-ink)',
   // Show-nav suggestion — soft sage signals "navigation/positive"
   showNavSuggestionBg: isDarkMode ? '#22302A' : '#E4EAD9',
   showNavSuggestionText: isDarkMode ? '#BBC6BE' : '#285C4D',
@@ -446,7 +448,6 @@ const KeyBtn: React.FC<{
       data-gaze-context={isDeleteWord ? "deliberateAction" : isSpeak ? "quickWord" : isQuickWords ? "navigation" : "keyboard"}
       data-gaze-dwell-ms={fillMs}
       data-action={config.action || 'letter'}
-      data-keyboard-onset={familiarTypingKey && hovered && !hasRealGaze && progress === 0 && !firedRef.current ? 'true' : undefined}
       onMouseEnter={handleEnter} onMouseLeave={handleLeave}
       onClick={() => {
         // A physical click remains immediate and must cancel any preview dwell.
@@ -464,8 +465,10 @@ const KeyBtn: React.FC<{
         border: `2px solid ${visibleBorder}`, borderRadius: '10px',
         outline: 'none',
         color: textColor,
-        fontSize: isAction ? 'clamp(19px, 1.9vw, 26px)' : 'clamp(32px, 3.25vw, 48px)',
-        fontWeight: isAction ? 760 : familiarFeel ? 600 : 720,
+        // Letters fill the key as OptiKey's do (27 Sep 2026): the smaller of a height and a width
+        // share, so a capital is about a third of the key on 16:9 and 16:10 screens alike.
+        fontSize: isAction ? 'clamp(20px, min(3vh, 1.7vw), 32px)' : 'clamp(34px, min(7.2vh, 4.1vw), 84px)',
+        fontWeight: isAction ? 780 : familiarFeel ? 600 : 800,
         letterSpacing: isAction ? '0' : '0.5px',
         cursor: 'pointer',
         transform: flash ? 'scale(0.95)' : hovered ? 'scale(1.02)' : 'scale(1)',
@@ -544,7 +547,7 @@ const WordSlotButton: React.FC<{
         border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
         backgroundColor: best ? predictionBestBg : keyboardTheme.predictionBg,
         color: best ? predictionBestText : predictionText,
-        fontWeight: best ? 780 : 700,
+        fontWeight: 800,
         fontFamily: UI_FONT,
         lineHeight: 1.1,
         whiteSpace: 'nowrap',
@@ -555,9 +558,10 @@ const WordSlotButton: React.FC<{
       } as React.CSSProperties}
     >
       {/* Long words shrink to fit the slot instead of being clipped; short words
-          keep the large keyboard size. 100cqw is the slot's content width. */}
+          keep the large keyboard size. 100cqw is the slot's content width; 0.64 em
+          is a generous average letter width at weight 800. */}
       <span className="keyboard-word-slot-label" style={{
-        fontSize: `min(clamp(34px, 3.6vw, 52px), calc(100cqw / ${(letters * 0.62).toFixed(2)}))`,
+        fontSize: `min(clamp(36px, min(5.6vh, 3.2vw), 62px), calc(100cqw / ${(letters * 0.64).toFixed(2)}))`,
       }}>
         {word}
       </span>
@@ -595,7 +599,7 @@ const PhraseSuggestionButton: React.FC<{
         width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(10px, 1vw, 18px)',
         border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
         backgroundColor: sentenceSuggestionBg, color: sentenceSuggestionText,
-        fontSize: 'clamp(20px, 2vw, 30px)', fontWeight: 720, fontFamily: UI_FONT, lineHeight: 1.12,
+        fontSize: 'clamp(22px, min(3.3vh, 1.9vw), 36px)', fontWeight: 800, fontFamily: UI_FONT, lineHeight: 1.3,
         textAlign: 'center', overflow: 'hidden', cursor: selectable ? 'pointer' : 'default',
       }}
     >

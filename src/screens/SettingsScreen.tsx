@@ -117,7 +117,7 @@ function validateBackupJSON(data: any): { valid: boolean; error?: string } {
   }
   const knownKeys = [
     'people', 'phraseCategories', 'medicalSections', 'quickWords',
-    'homeQuickActions', 'homeEmergencyCards', 'homeWordBar', 'activityCategories', 'aacCategories',
+    'homeQuickActions', 'homeEmergencyCards', 'activityCategories', 'aacCategories',
     'feelings', 'basicNeeds', 'alertModeCards', 'settings', 'version',
   ];
   const hasKnownKey = knownKeys.some(k => k in data);

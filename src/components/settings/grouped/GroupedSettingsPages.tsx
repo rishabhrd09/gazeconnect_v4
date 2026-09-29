@@ -11,6 +11,9 @@ import {
   normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet, type KeyboardFeel,
 } from '../../../config/dwellTimeConfig';
 import { GAZE_FILTER_MODES, normalizeFilterPreset } from '../../../config/gazeFilterConfig';
+import {
+  DEFAULT_GAZE_COLORS, GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors, type GazePalette,
+} from '../../../config/gazeColors';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
 import { gazeFlags } from '../../../utils/gazeFlags';
 import { POST_NAVIGATION_COOLDOWN_MS } from '../../core/GazeControlToggle';
@@ -78,6 +81,52 @@ function Segmented<T extends string>({ label, options, value, onChange }: {
     </div>
   );
 }
+
+/** A key on the page as the cursor sees it: the square round it and the ring 60 % filled. */
+const GazeColourPreview: React.FC<{ palette: GazePalette }> = ({ palette }) => {
+  const ring = Math.max(3, 44 * palette.ringShare);
+  const square = Math.max(2, palette.squarePx * 0.6);
+  const r = 17, circumference = 2 * Math.PI * r;
+  const edge = palette.edge === 'light' ? 'rgba(255, 255, 255, 0.88)' : 'rgba(0, 0, 0, 0.35)';
+  return (
+    <svg className="gss-colour-preview" viewBox="0 0 120 72" aria-hidden="true">
+      <rect width="120" height="72" rx="10" fill="var(--ui-page)" />
+      <rect x="26" y="10" width="68" height="52" rx="8" fill="var(--ui-surface)" stroke="var(--ui-border)" />
+      <rect x={26 - square / 2} y={10 - square / 2} width={68 + square} height={52 + square} rx={8 + square / 2}
+        fill="none" stroke={palette.square} strokeWidth={square} />
+      <circle cx="60" cy="36" r={r + ring / 2 + 0.5} fill="none" stroke={edge} strokeWidth="1" />
+      <circle cx="60" cy="36" r={r - ring / 2 - 0.5} fill="none" stroke={edge} strokeWidth="1" />
+      <circle cx="60" cy="36" r={r} fill="none" stroke={palette.ring} strokeWidth={ring} />
+      <circle cx="60" cy="36" r={r} fill="none" stroke={palette.fill} strokeWidth={ring} strokeLinecap="round"
+        strokeDasharray={`${circumference * 0.6} ${circumference}`} transform="rotate(-90 60 36)" />
+    </svg>
+  );
+};
+
+/** Radio cards for the gaze colours, each showing its palette for the current theme. */
+const GazeColourCards: React.FC<{ value: GazeColors; warm: boolean; onChange: (value: GazeColors) => void }> = ({
+  value, warm, onChange,
+}) => (
+  <div role="radiogroup" aria-label="Gaze colours" className="gss-options">
+    {(Object.keys(GAZE_COLOR_PALETTES) as GazeColors[]).map(key => {
+      const option = GAZE_COLOR_PALETTES[key];
+      const checked = key === value;
+      return (
+        <button key={key} type="button" role="radio" aria-checked={checked} className="gss-option"
+          onClick={() => { if (!checked) onChange(key); }}>
+          <GazeColourPreview palette={warm ? option.warm : option.dark} />
+          <span className="gss-option-text">
+            <span className="gss-option-label">{option.label}</span>
+            <span className="gss-option-sub">{option.description}</span>
+          </span>
+          {key === DEFAULT_GAZE_COLORS && <span className="gss-tag">Default</span>}
+          {key === 'high_contrast' && <span className="gss-tag">Clearest</span>}
+          {checked && <LineIcon d={ICON.check} className="gss-option-check" />}
+        </button>
+      );
+    })}
+  </div>
+);
 
 const Switch: React.FC<{ label: string; on: boolean; onChange: (on: boolean) => void }> = ({ label, on, onChange }) => (
   <button type="button" role="switch" aria-checked={on} aria-label={label} className="gss-switch" onClick={() => onChange(!on)}>
@@ -194,6 +243,7 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     : gazeFlags.keyboardCadence ? KEYBOARD_CADENCE_BY_STAGE[currentStage].onset : 250;
   const keyboardFillMs = keyboardFeel === 'familiar' ? FAMILIAR_KEYBOARD_TIMING.key : DWELL_TIMING_SETS[timingSet].ms.typing;
   const cursorOn = settings.showGazeCursor !== false;
+  const { isWarm, isLight } = useTheme();
 
   return (
     <div className="gss-columns">
@@ -205,6 +255,11 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         <Card title="Try this speed"
           note="Rest the pointer here as if it were a look. This previews the selected keyboard feel's settling and fill; tracking conditions can change the full selection time.">
           <TryTile ms={keyboardFillMs} onsetMs={keyboardOnsetMs} />
+        </Card>
+        <Card title="Gaze colours"
+          note="The ring that follows the eyes, the fill that shows a selection coming, and the square round the key or card. Each choice has its own colours for Dark and Warm; the pictures show this theme.">
+          <GazeColourCards value={normalizeGazeColors(settings.gazeColors)} warm={isWarm || isLight}
+            onChange={value => save('gazeColors', value)} />
         </Card>
       </div>
       <div className="gss-column">

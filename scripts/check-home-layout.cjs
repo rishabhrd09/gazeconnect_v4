@@ -1,5 +1,7 @@
-// Home layout settings: the retired four-card mode, the word bar's shape and its first-run
-// seeding, as the real CustomizationService loads them from a saved settings file.
+// Home layout settings, as the real CustomizationService loads, keeps and resets them: the left
+// panel is Quick Phrases only unless the Urgent Needs card is chosen (maintainer's decision,
+// 28 Sep 2026; files from before data version 6 switch once), and the word bar that could run
+// along the bottom of Home is gone, from the screen, Settings and the saved data.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -16,7 +18,8 @@ global.window = {};
 
 const root = path.resolve(__dirname, '..');
 const { DEFAULT_CUSTOMIZATION } = require(path.join(root, 'src/services/defaultCustomization.ts'));
-const { CustomizationService, normalizeHomeWordBar } = require(path.join(root, 'src/services/CustomizationService.ts'));
+const { CustomizationService } = require(path.join(root, 'src/services/CustomizationService.ts'));
+const { HOME_LAYOUT_VERSION } = require(path.join(root, 'src/services/careContentPresets.ts'));
 
 // What an earlier version wrote to disk: the service reads it through importJSON,
 // the same merge the start-up load uses.
@@ -25,90 +28,86 @@ function loadSaved(saved) {
   service.importJSON(JSON.stringify(saved));
   return service;
 }
-const oldFile = (extra = {}) => ({
-  version: DEFAULT_CUSTOMIZATION.version,
-  settings: { ...DEFAULT_CUSTOMIZATION.settings, homeEmergencyLaunchMode: 'cards' },
-  homeEmergencyCards: DEFAULT_CUSTOMIZATION.homeEmergencyCards,
-  ...extra,
-});
+const withMode = (version, mode) => ({ version, settings: { ...DEFAULT_CUSTOMIZATION.settings, homeEmergencyLaunchMode: mode } });
+// What the app writes to disk next, read back as the next start-up would.
+const restart = (service) => loadSaved(JSON.parse(service.exportJSON()));
 
 let passed = 0;
 function test(name, fn) { fn(); passed++; console.log(`PASS ${name}`); }
 
-test('new installs start with Quick Phrases only and the word bar off', () => {
+test('new installs show Quick Phrases only, at data version 6, with no word bar', () => {
+  assert.equal(HOME_LAYOUT_VERSION, 6);
   assert.equal(DEFAULT_CUSTOMIZATION.settings.homeEmergencyLaunchMode, 'quick');
-  const bar = DEFAULT_CUSTOMIZATION.homeWordBar;
-  assert.equal(bar.enabled, false);
-  assert.equal(bar.layout, '3+2');
-  assert.equal(bar.words.length, 4);
-  assert.equal(bar.phrases.length, 2);
+  assert.equal('homeWordBar' in DEFAULT_CUSTOMIZATION, false);
+  const data = new CustomizationService().getData();
+  assert.equal(data.settings.homeEmergencyLaunchMode, 'quick');
+  assert.ok(data.version >= HOME_LAYOUT_VERSION);
+  assert.equal('homeWordBar' in data, false);
 });
 
-test('a saved four-card layout comes back as the Urgent Needs card, never as nothing', () => {
-  const data = loadSaved(oldFile()).getData();
-  assert.equal(data.settings.homeEmergencyLaunchMode, 'alert');
+test("the maintainer's saved Home (Urgent Needs and the word bar) loads as Quick Phrases only", () => {
+  // The shape of the maintainer's settings.json on 28 Sep 2026.
+  const saved = {
+    ...withMode(5, 'alert'),
+    homeWordBar: { enabled: true, layout: '3+2', words: ['Yes', 'No', 'Help', 'Water'], phrases: ['TT Suction', 'Ambu bag'] },
+    homeEmergencyCards: DEFAULT_CUSTOMIZATION.homeEmergencyCards,
+  };
+  const service = loadSaved(saved);
+  const data = service.getData();
+  assert.equal(data.settings.homeEmergencyLaunchMode, 'quick');
+  assert.equal(data.version, HOME_LAYOUT_VERSION);
+  assert.equal('homeWordBar' in data, false, 'the word bar is dropped from the data');
+  assert.doesNotMatch(service.exportJSON(), /homeWordBar/, 'and from what is saved and backed up');
+  assert.deepEqual(data.homeEmergencyCards, DEFAULT_CUSTOMIZATION.homeEmergencyCards, 'the emergency cards are kept (the word predictor reads them)');
 });
 
-test('a file saved before the left-panel choice existed keeps the Urgent Needs card', () => {
-  const settings = { ...DEFAULT_CUSTOMIZATION.settings };
-  delete settings.homeEmergencyLaunchMode;
-  assert.equal(loadSaved(oldFile({ settings })).getData().settings.homeEmergencyLaunchMode, 'alert');
-  assert.equal(loadSaved(oldFile({ settings: undefined })).getData().settings.homeEmergencyLaunchMode, 'alert');
+test('every file from before version 6 loads once as Quick Phrases only', () => {
+  for (const version of [undefined, 1, 4, 5]) {
+    for (const mode of ['alert', 'cards', 'quick', undefined]) {
+      const file = withMode(version, mode);
+      if (version === undefined) delete file.version;
+      if (mode === undefined) delete file.settings.homeEmergencyLaunchMode;
+      assert.equal(loadSaved(file).getData().settings.homeEmergencyLaunchMode, 'quick', `version ${version}, ${mode}`);
+    }
+  }
+  assert.equal(loadSaved({ version: 5 }).getData().settings.homeEmergencyLaunchMode, 'quick', 'no settings at all');
 });
 
-test('a saved Urgent Needs or Quick-Phrases-only choice is kept as it was', () => {
-  for (const mode of ['alert', 'quick']) {
-    const data = loadSaved(oldFile({ settings: { ...DEFAULT_CUSTOMIZATION.settings, homeEmergencyLaunchMode: mode } })).getData();
-    assert.equal(data.settings.homeEmergencyLaunchMode, mode);
+test('from version 6 a chosen Urgent Needs card is kept, and anything else is Quick Phrases only', () => {
+  assert.equal(loadSaved(withMode(6, 'alert')).getData().settings.homeEmergencyLaunchMode, 'alert');
+  for (const mode of ['quick', 'cards', 'banana', 42, null, undefined]) {
+    const file = withMode(6, mode);
+    if (mode === undefined) delete file.settings.homeEmergencyLaunchMode;
+    assert.equal(loadSaved(file).getData().settings.homeEmergencyLaunchMode, 'quick', String(mode));
   }
 });
 
-test("on first load the word bar's phrases are the caregiver's own enabled emergency cards", () => {
-  const cards = [
-    { en: '  Call the nurse ', hi: '', enabled: true, priority: 'high' },
-    { en: 'Not this one', hi: '', enabled: false, priority: 'high' },
-    { en: 'Turn me over', hi: '', enabled: true, priority: 'medium' },
-    { en: 'A third one', hi: '', enabled: true, priority: 'high' },
-  ];
-  const bar = loadSaved(oldFile({ homeEmergencyCards: cards })).getData().homeWordBar;
-  assert.deepEqual(bar.phrases, ['Call the nurse', 'Turn me over']);
-  assert.deepEqual(bar.words, DEFAULT_CUSTOMIZATION.homeWordBar.words);
-  assert.equal(bar.enabled, false, 'switched on by nobody');
+test('choosing Urgent Needs survives a restart, on a new install and after the one-time switch', () => {
+  const fresh = new CustomizationService();
+  fresh.updateSetting('homeEmergencyLaunchMode', 'alert');
+  assert.equal(restart(fresh).getData().settings.homeEmergencyLaunchMode, 'alert', 'new install');
+  const migrated = loadSaved(withMode(5, 'alert'));
+  assert.equal(migrated.getData().settings.homeEmergencyLaunchMode, 'quick');
+  migrated.updateSetting('homeEmergencyLaunchMode', 'alert');
+  const again = restart(migrated);
+  assert.equal(again.getData().settings.homeEmergencyLaunchMode, 'alert', 'after the switch');
+  assert.equal(restart(again).getData().settings.homeEmergencyLaunchMode, 'alert', 'and on every start after');
 });
 
-test('with no usable emergency cards the word bar falls back to the default phrases', () => {
-  for (const homeEmergencyCards of [[], [{ en: '   ', hi: '', enabled: true, priority: 'high' }], undefined]) {
-    const bar = loadSaved(oldFile({ homeEmergencyCards })).getData().homeWordBar;
-    assert.deepEqual(bar.phrases, DEFAULT_CUSTOMIZATION.homeWordBar.phrases);
-  }
+test('Reset gives Quick Phrases only at version 6, and a later choice is kept', () => {
+  const service = loadSaved(withMode(6, 'alert'));
+  service.resetToDefaults();
+  assert.equal(service.getData().settings.homeEmergencyLaunchMode, 'quick');
+  assert.ok(service.getData().version >= HOME_LAYOUT_VERSION);
+  service.updateSetting('homeEmergencyLaunchMode', 'alert');
+  assert.equal(restart(service).getData().settings.homeEmergencyLaunchMode, 'alert');
 });
 
-test('a saved word bar keeps its choices, and is always four words and two phrases', () => {
-  const saved = { enabled: true, layout: '4+2', words: ['Yes', 'Tea'], phrases: ['Please sit me up', 'I am cold', 'extra'] };
-  const bar = loadSaved(oldFile({ homeWordBar: saved })).getData().homeWordBar;
-  assert.equal(bar.enabled, true);
-  assert.equal(bar.layout, '4+2');
-  assert.deepEqual(bar.words, ['Yes', 'Tea', '', '']);
-  assert.deepEqual(bar.phrases, ['Please sit me up', 'I am cold']);
-});
-
-test('a damaged saved word bar cannot switch itself on or take an unknown layout', () => {
-  const bar = normalizeHomeWordBar(
-    { enabled: 'yes', layout: '5+5', words: ['Ok', 7, null, { a: 1 }, 'five'], phrases: 'nope' },
-    undefined, DEFAULT_CUSTOMIZATION.homeWordBar);
-  assert.equal(bar.enabled, false);
-  assert.equal(bar.layout, '3+2');
-  assert.deepEqual(bar.words, ['Ok', '', '', '']);
-  assert.deepEqual(bar.phrases, ['', '']);
-});
-
-test('the word bar survives a backup and restore unchanged', () => {
-  const service = new CustomizationService();
-  service.updateHomeWordBar({ enabled: true, layout: '4+2', words: ['Yes', 'No', 'Help', 'Water'], phrases: ['TT Suction', 'Pain'] });
-  const exported = service.exportJSON();
-  assert.match(exported, /"homeWordBar"/);
-  const restored = loadSaved(JSON.parse(exported)).getData().homeWordBar;
-  assert.deepEqual(restored, service.getData().homeWordBar);
+test('the older content migrations still run first for an old file', () => {
+  const data = loadSaved(withMode(4, 'alert')).getData();
+  const daily = data.medicalSections.find((section) => section.id === 'daily');
+  assert.ok(daily && daily.items.some((item) => item.en === 'I want food'), 'food content (version 5) added');
+  assert.equal(data.version, HOME_LAYOUT_VERSION);
 });
 
 console.log(`${passed} home layout checks passed.`);

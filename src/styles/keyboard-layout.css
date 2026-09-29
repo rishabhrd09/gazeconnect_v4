@@ -1,21 +1,23 @@
 /* The keyboard's two right controls own their width; neither may spill into
    Quick Words. Keep these rules scoped to the keyboard navigation variant. */
 .keyboard-screen .keyboard-key { transform: none !important; }
-/* Amber means the key is being acquired; teal progress begins only after onset.
-   An inset outline changes no key box or gaze hit area. */
-:root[data-theme] .keyboard-screen .keyboard-key[data-keyboard-onset='true'] {
-  outline: 3px solid #FFC247 !important;
-  outline-offset: -4px !important;
+/* Keyboard type (27 Sep 2026, maintainer request): white labels, after OptiKey. OptiKey's standard
+   Android Dark theme draws key labels pure white on flat black keys and scales each label to fill
+   the middle of the key (capitals about 40 % of its height): the look Papa's eyes know. Letters,
+   word suggestions, the phrase and the typed message use --kb-ink, white on Dark and the theme's
+   full ink on Warm; sizes are in KeyboardScreen.tsx. Flat paint only: no shadow, glow or gradient. */
+:root { --kb-ink: var(--ui-ink); }
+:root:not([data-theme='warm']) { --kb-ink: #ffffff; }
+:root[data-theme] .keyboard-screen .keyboard-key[data-action='letter'] { color: var(--kb-ink) !important; }
+:root:not([data-theme='warm']) .keyboard-screen .keyboard-key:is([data-action='shift'], [data-action='quickWords']) {
+  color: var(--kb-ink) !important;
 }
-:root[data-theme='warm'] .keyboard-screen .keyboard-key[data-keyboard-onset='true'] {
-  outline-color: var(--ui-accent) !important;
-}
-:root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-keyboard-onset='true'] {
-  outline-color: #EC9068 !important;
-}
-/* Brief local acknowledgement after a completed dwell; it never delays the click. */
+/* No acquisition outline during onset (27 Sep 2026): it lit a key before its ring
+   started, so each key was acknowledged twice. The square and ring now begin together. */
+/* Brief local acknowledgement after a completed dwell; it never delays the click. Its colour
+   follows the chosen gaze colours (--gaze-confirm, set by GazeCursor); Standard keeps the accent. */
 :root[data-theme] .keyboard-screen .keyboard-key[data-keyboard-confirmed='true'] {
-  outline: 4px solid var(--ui-accent) !important;
+  outline: 4px solid var(--gaze-confirm, var(--ui-accent)) !important;
   outline-offset: -5px !important;
 }
 :root[data-theme] .keyboard-screen .keyboard-key[data-action='letter'][data-keyboard-confirmed='true'] {
@@ -33,7 +35,7 @@
 :root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-action='letter']:not([data-keyboard-confirmed='true']) {
   background: #1B1F21 !important;
   border-color: #697477 !important;
-  color: #F3F5F2 !important;
+  color: var(--kb-ink) !important;
 }
 :root[data-theme='dark'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-action='letter']:not([data-keyboard-confirmed='true']):hover {
   background: #262C2E !important;
@@ -125,7 +127,9 @@
   border-radius: 10px;
   opacity: 0.55;
 }
-.keyboard-screen .keyboard-word-slot-label { display: block; max-width: 100%; overflow: hidden; }
+/* Clip sideways only: a line box of 1.1 cut the tails of g, p and y (27 Sep 2026). 1.35 holds
+   the whole glyph and still sits well inside the slot. */
+.keyboard-screen .keyboard-word-slot-label { display: block; max-width: 100%; overflow-x: clip; overflow-y: visible; line-height: 1.35; }
 /* Slots wait for the response to the latest keystroke before they can be
    selected; the delay keeps that brief wait from flickering. */
 .keyboard-screen .keyboard-word-slot-stale { opacity: 0.55 !important; transition: opacity 120ms linear 300ms; }

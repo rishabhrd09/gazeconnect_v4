@@ -4,20 +4,26 @@ export const BROWSER_CURSOR_CSS = `
      like Tobii Experience's "Preview my gaze". Dwell progress fills the ring in
      teal (below); a selection flashes it teal. The old teal-filled disc with
      yellow/green states hid what it sat on. */
+  /* v17.27 (28 Sep 2026) — the ring is moved by the compositor: the script sets
+     its translate property (the ring's centre) on the ring's own layer. It used
+     to set left/top, which made the whole page lay out and repaint on every
+     gaze frame: about a quarter of YouTube's main thread with the ring over a
+     playing video, measured on the rig. Same ring, same place, same glide. */
   #gazeconnect-cursor {
-    position: fixed; width: 84px; height: 84px; border-radius: 50%;
+    position: fixed; left: 0; top: 0; width: 84px; height: 84px; border-radius: 50%;
+    margin: -42px 0 0 -42px;
     box-sizing: border-box;
     border: 6px solid rgba(255,255,255,0.82); background: transparent;
     pointer-events: none; z-index: 2147483647;
-    transform: translate(-50%, -50%);
-    transition: border-color 120ms, transform 120ms;
+    will-change: translate;
+    transition: border-color 120ms, scale 120ms;
     box-shadow: 0 0 0 1.5px rgba(0,0,0,0.32), 0 2px 12px rgba(0,0,0,0.45),
       inset 0 0 0 1.5px rgba(0,0,0,0.30), inset 0 0 8px rgba(0,0,0,0.22);
     display: none;
   }
   #gazeconnect-cursor.clicking {
     border-color: rgba(45,212,191,0.95);
-    transform: translate(-50%, -50%) scale(0.94);
+    scale: 0.94;
   }
   /* v17.19 — dwell progress arc (gcConfig.progressArcEnabled). The app
      cursor has always shown dwell progress; the in-page ring was binary
@@ -164,7 +170,10 @@ export function buildBrowserCursorInjectionScript(): string {
         // Pushed into the frames ring (rMs / nCand) so DOM scan cost is
         // measurable on-rig via __gcTelemetry.perf().
         lastResolveMs: -1,
-        lastCandN: -1
+        lastCandN: -1,
+        // v17.27 — where the ring's centre was last drawn (drawCursorAt).
+        drawnX: NaN,
+        drawnY: NaN
       };
 
       window.gcConfig = Object.assign({
@@ -289,6 +298,15 @@ export function buildBrowserCursorInjectionScript(): string {
         (document.body || document.documentElement).appendChild(cursor);
       }
 
+      // v17.27 — every placement of the ring goes through here: the translate
+      // property is animated on the compositor (see BROWSER_CURSOR_CSS), so a
+      // move costs the page no layout or repaint.
+      const drawCursorAt = (x, y) => {
+        state.drawnX = x;
+        state.drawnY = y;
+        cursor.style.translate = x + 'px ' + y + 'px';
+      };
+
       // v17.19 — YouTube-machinery host gate (transparent perf change).
       // The skip-ad scan, Bayesian card posterior and nearest-card snap
       // can only ever match YouTube DOM, yet their document-wide
@@ -315,6 +333,8 @@ export function buildBrowserCursorInjectionScript(): string {
       // 300ms after it renders; skip buttons persist for seconds.
       let skipBtnCacheEl = null;
       let skipBtnScanAt = 0;
+      // v17.27 — when the last document-wide sweep ran (findYoutubeSkipButton).
+      let skipBtnDocScanAt = -Infinity;
 
       // v17.23 — probe-snap incumbent memory (probeSnapHysteresisPx).
       let probeIncumbentEl = null;
@@ -917,9 +937,16 @@ export function buildBrowserCursorInjectionScript(): string {
         return true;
       };
 
-      const findYoutubeSkipButton = () => {
-        const player = document.querySelector('#movie_player') || document;
-        const roots = [player, document];
+      // v17.27 (28 Sep 2026) — YouTube draws its ad controls inside the player,
+      // so the regular sweep covers the player only; 'wide' also sweeps the
+      // whole document, as every sweep used to. The document-wide passes cost
+      // about 22 ms on a 14,000-element watch page, every 300 ms while the gaze
+      // was on YouTube; the player alone costs about 1 ms. Without a player
+      // only the wide sweep runs.
+      const findYoutubeSkipButton = (wide) => {
+        const player = document.querySelector('#movie_player');
+        if (!player && !wide) return null;
+        const roots = player ? (wide ? [player, document] : [player]) : [document];
         const seen = new Set();
         const candidates = [];
         for (const root of roots) {
@@ -934,7 +961,7 @@ export function buildBrowserCursorInjectionScript(): string {
           } catch (_) {}
         }
         try {
-          document.querySelectorAll('button[aria-label*="Skip" i], [role="button"][aria-label*="Skip" i], [title*="Skip" i]')
+          (wide ? document : player).querySelectorAll('button[aria-label*="Skip" i], [role="button"][aria-label*="Skip" i], [title*="Skip" i]')
             .forEach((el) => {
               if (!skipAdTextPattern.test(labelOf(el))) return;
               const norm = normalizeSkipCandidate(el);
@@ -969,7 +996,10 @@ export function buildBrowserCursorInjectionScript(): string {
         const nowMs = performance.now();
         if (nowMs - skipBtnScanAt < 300) return null;
         skipBtnScanAt = nowMs;
-        skipBtnCacheEl = findYoutubeSkipButton();
+        // The whole document at most every 2 s (the first sweep always).
+        const wide = nowMs - skipBtnDocScanAt >= 2000;
+        if (wide) skipBtnDocScanAt = nowMs;
+        skipBtnCacheEl = findYoutubeSkipButton(wide);
         return skipBtnCacheEl;
       };
 
@@ -1593,16 +1623,15 @@ export function buildBrowserCursorInjectionScript(): string {
         if (wasHidden && smoothMs > 0) {
           cursor.style.transition = 'none';
           cursor.style.display = 'block';
-          cursor.style.left = x + 'px';
-          cursor.style.top = y + 'px';
+          drawCursorAt(x, y);
           void cursor.offsetWidth; // commit the jump before re-enabling
           state.lastSmoothMs = -1;
         }
         if (smoothMs !== state.lastSmoothMs) {
           state.lastSmoothMs = smoothMs;
           cursor.style.transition =
-            'border-color 120ms, background-color 120ms, transform 120ms' +
-            (smoothMs > 0 ? (', left ' + smoothMs + 'ms linear, top ' + smoothMs + 'ms linear') : '');
+            'border-color 120ms, background-color 120ms, scale 120ms' +
+            (smoothMs > 0 ? (', translate ' + smoothMs + 'ms linear') : '');
         }
 
         // v17.22 — the per-frame cursor position write now happens AFTER
@@ -1663,8 +1692,7 @@ export function buildBrowserCursorInjectionScript(): string {
               state.onsetEmitted = false;
               state.dwellingExpiryAt = 0;
               cursor.style.display = 'block';
-              cursor.style.left = x + 'px';
-              cursor.style.top = y + 'px';
+              drawCursorAt(x, y);
               cursor.classList.remove('dwelling');
               cursor.classList.remove('clicking');
               if ((now - state.lastSuppressedEmitTs) >= 1000) {
@@ -1686,8 +1714,7 @@ export function buildBrowserCursorInjectionScript(): string {
             pointInsideRect(x, y, state.targetRect, targetRegionSlackPx);
           const rx = heldOnSelected ? (state.targetRect.left + state.targetRect.right) / 2 : x;
           const ry = heldOnSelected ? (state.targetRect.top + state.targetRect.bottom) / 2 : y;
-          cursor.style.left = rx + 'px';
-          cursor.style.top = ry + 'px';
+          drawCursorAt(rx, ry);
           cursor.classList.remove('dwelling');
           state.dwellingExpiryAt = 0;
           return null;
@@ -1718,11 +1745,10 @@ export function buildBrowserCursorInjectionScript(): string {
         // move one glide. Where the click lands is unchanged (clickReq).
         const placeRing = (tracked) => {
           if (tracked && state.targetRect) {
-            cursor.style.left = ((state.targetRect.left + state.targetRect.right) / 2) + 'px';
-            cursor.style.top = ((state.targetRect.top + state.targetRect.bottom) / 2) + 'px';
+            drawCursorAt((state.targetRect.left + state.targetRect.right) / 2,
+              (state.targetRect.top + state.targetRect.bottom) / 2);
           } else if (!clickReq) {
-            cursor.style.left = x + 'px';
-            cursor.style.top = y + 'px';
+            drawCursorAt(x, y);
           }
         };
         cursor.style.display = 'block';
@@ -2251,12 +2277,8 @@ export function buildBrowserCursorInjectionScript(): string {
           }
           let cursorX = Math.round(x);
           let cursorY = Math.round(y);
-          if (cursor && cursor.style) {
-            const lx = parseFloat(cursor.style.left);
-            const ly = parseFloat(cursor.style.top);
-            if (Number.isFinite(lx)) cursorX = Math.round(lx);
-            if (Number.isFinite(ly)) cursorY = Math.round(ly);
-          }
+          if (Number.isFinite(state.drawnX)) cursorX = Math.round(state.drawnX);
+          if (Number.isFinite(state.drawnY)) cursorY = Math.round(state.drawnY);
           const winMargin = Math.round(
             (((state.bayesianWinnerP || 0) - (state.bayesianSecondP || 0)) * 1000)
           ) / 1000;

@@ -10,6 +10,10 @@ import type {
 export const CARE_CONTENT_ARCHITECTURE_VERSION = 4;
 
 export const FOOD_CONTENT_VERSION = 5;
+// Not content: from this version the Home screen shows Quick Phrases alone unless the Urgent
+// Needs card was chosen in Settings > Home Layout (maintainer's decision, 28 Sep 2026). An
+// older file loads with Quick Phrases alone once (CustomizationService.applyHomeLayoutVersion).
+export const HOME_LAYOUT_VERSION = 6;
 export const FOOD_PHRASES: Phrase[] = [
   { en: 'I want food', hi: 'मुझे खाना चाहिए' },
   { en: 'I am hungry', hi: 'मुझे भूख लगी है' },

@@ -17,6 +17,7 @@ function load(file, context = {}) {
 }
 const safety = load('src/utils/gazeSafety.ts');
 const dwell = load('src/config/dwellTimeConfig.ts');
+const gazeColors = load('src/config/gazeColors.ts');
 // Real geometry, not stubs: target choice and the gaze focus decide WHICH
 // control a dwell belongs to, so they are part of selection safety.
 const hitZones = load('src/utils/hitZoneExpansion.ts', { Math, HTMLElement: class {}, document: { querySelectorAll: () => [] } });
@@ -112,6 +113,7 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
     '../../utils/gazeTelemetry':new Proxy({}, {get:(_,name)=>name==='recordDwellInterrupt'?(event=>interrupts.push(event.kind)):()=>{}}),
     '../../utils/gazeFlags':{gazeFlags:{keyboardCadence:true,dwellPauseOnGap:false,lockBreakProgressRetention:true,lockBreakConfirm:true,...flags}},
     '../../config/dwellTimeConfig':dwell,
+    '../../config/gazeColors':gazeColors,
     '../../utils/gazeSafety':safety,
     './TrackerStatusNotice':{TrackerStatusNotice:()=>null},
   };
@@ -169,27 +171,31 @@ test('equal-sized keys keep their previous ownership', () => {
   assert.equal(pick(636, 755), 'v');
   assert.equal(pick(1200, 640), null);
 });
-test('keyboard acquisition outline follows the key, clears on loss, then gives way to progress', () => {
+test('a key shows nothing while it is acquired, then its square and ring begin together', () => {
+  // 26 Sep 2026 lit the key with an outline during onset, before its ring: each key
+  // was acknowledged twice, which felt overwhelming on the rig (27 Sep 2026). Keys now
+  // behave as cards do and as OptiKey's lock-on does: nothing during onset.
   const opts = {screen:'keyboard', others:[{left:1110,top:284,width:200,height:200}]};
   const h = cursorHarness(768, {}, {keyboardCadence:false}, null, opts);
   h.run(96);
-  assert.equal(h.target.getAttribute('data-keyboard-onset'), 'true');
+  assert.equal(h.target.getAttribute('data-keyboard-onset'), null, 'no acquisition paint during onset');
   assert.equal(h.ringProgress, 0, 'acquisition must not count as dwell');
-  h.lose();
-  assert.equal(h.target.getAttribute('data-keyboard-onset'), null, 'tracking loss hides acquisition');
-  h.run(32);
-  assert.equal(h.target.getAttribute('data-keyboard-onset'), 'true', 'fresh gaze restores acquisition');
+  assert.equal(h.highlight, null, 'no square before the ring');
   h.run(96, true, {x:.63, y:.5, intent_x:.63, intent_y:.5});
-  assert.equal(h.target.getAttribute('data-keyboard-onset'), null, 'old key outline must clear');
-  assert.equal(h.others[0].getAttribute('data-keyboard-onset'), 'true', 'new key must own outline');
-  h.run(240, true, {x:.1, y:.1, intent_x:.1, intent_y:.1});
-  assert.equal(h.others[0].getAttribute('data-keyboard-onset'), null, 'outline must clear when gaze leaves keys');
+  assert.equal(h.others[0].getAttribute('data-keyboard-onset'), null, 'the next key gets no acquisition paint either');
+  assert.equal(h.highlight, null, 'moving between keys shows no square ahead of a ring');
 
   const dwell = cursorHarness(768, {}, {keyboardCadence:false}, null, {screen:'keyboard'});
-  dwell.run(420);
-  assert.equal(dwell.target.getAttribute('data-keyboard-onset'), null, 'amber outline ends after onset');
-  assert.equal(dwell.highlight?.keyboardKey, true, 'the progress outline is keyboard scoped');
-  assert(dwell.ringProgress > 0, 'teal progress begins only after onset');
+  for (let i=0; i<200 && dwell.ringProgress===0; i++) dwell.frame();
+  assert(dwell.ringProgress > 0, 'the ring begins after onset');
+  assert(dwell.highlight, 'the square is there on the frame the ring begins');
+  // The square is drawn only with ring progress, so the two can never appear apart.
+  const cursorSource = fs.readFileSync(path.join(root, 'src/components/core/GazeCursor.tsx'), 'utf8');
+  assert(cursorSource.includes('{highlightRect && dwellProgress > 0 && ('), 'square must be drawn only with ring progress');
+  for (const file of ['src/components/core/GazeCursor.tsx', 'src/screens/KeyboardScreen.tsx', 'src/styles/keyboard-layout.css']) {
+    assert(!/data-keyboard-onset/.test(fs.readFileSync(path.join(root, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')),
+      `${file} must not paint an acquisition stage`);
+  }
   for (let i=0; i<250 && dwell.clicks===0; i++) dwell.frame();
   assert.equal(dwell.clicks, 1);
   assert.equal(dwell.target.getAttribute('data-keyboard-confirmed'), 'true', 'click shows a brief key-local confirmation');

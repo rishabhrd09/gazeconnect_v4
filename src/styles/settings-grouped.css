@@ -135,6 +135,8 @@
 .gss-option[aria-checked='true'] .gss-option-label { color: var(--ui-accent-ink); }
 .gss-option-sub { font-size: clamp(13px, 1.65vh, 18px); font-weight: 700; line-height: 1.3; color: var(--ui-muted); }
 .gss-layout .gss-option-check { width: 28px; height: 28px; color: var(--ui-accent-ink); }
+/* Gaze colours: a picture of each palette on this theme's own page and key colours. */
+.gss-colour-preview { flex: 0 0 auto; width: clamp(96px, 7.5vw, 124px); height: auto; margin: 4px 0; }
 .gss-segmented { display: flex; flex-wrap: wrap; gap: 10px; }
 .gss-segment {
   min-height: clamp(44px, 5.2vh, 56px); padding: 0 clamp(14px, 1.2vw, 22px);

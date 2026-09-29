@@ -135,15 +135,17 @@
 /* ---- Keyboard ------------------------------------------------------------------------ */
 :root[data-look='gazespell'] .keyboard-screen .keyboard-key { font-weight: 900 !important; }
 :root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='letter'] { font-weight: 900 !important; }
-:root[data-look='gazespell'][data-theme='warm'] .keyboard-screen .keyboard-key[data-action='letter'] { font-size: clamp(38px, 6.1vh, 66px) !important; }
+:root[data-look='gazespell'][data-theme='warm'] .keyboard-screen .keyboard-key[data-action='letter'] { font-size: clamp(34px, min(7.2vh, 4.1vw), 84px) !important; }
 :root[data-look='gazespell'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) { border-radius: 14px !important; }
 :root[data-look='gazespell'] .keyboard-screen .keyboard-word-slot { background: var(--gs-chip) !important; }
-:root[data-look='gazespell'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) :is(button, span) { font-weight: 750 !important; }
+:root[data-look='gazespell'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) :is(button, span) { font-weight: 800 !important; }
 :root[data-look='gazespell'] .keyboard-screen #nav-restore-btn {
   font-weight: 900 !important; letter-spacing: 0.08em !important;
   background: var(--ui-selected) !important; color: var(--ui-accent-ink) !important;
 }
 :root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='space'] { color: var(--gs-space) !important; letter-spacing: 0.12em !important; }
+/* Dark SPACE is white like every other key label (keyboard-layout.css: --kb-ink). */
+:root[data-look='gazespell']:not([data-theme='warm']) .keyboard-screen .keyboard-key[data-action='space'] { color: var(--kb-ink) !important; }
 :root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='backspace'],
 :root[data-look='gazespell'] .keyboard-screen .keyboard-key[data-action='deleteWord'] {
   background: var(--gs-rose) !important; color: var(--gs-rose-ink) !important;

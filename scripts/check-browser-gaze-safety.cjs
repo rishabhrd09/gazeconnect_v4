@@ -136,4 +136,64 @@ h.advance(100);
 expect(h.events.some((e) => e.type === 'mouseDown') && h.events.some((e) => e.type === 'mouseUp'),
   'explicit manual/toolbar click remains usable without gaze eligibility');
 
-console.log(`Browser request/native-click safety: ${assertions} checks passed; 10,000 busy frames dropped.`);
+// Page requests are spaced out (28 Sep 2026): the Eye Tracker 5's ~66 frames a second, each a
+// hit test on the page, saturated YouTube's main thread. Runs the real per-frame handler and the
+// real interval from main.ts against a fake clock and a page that answers at once.
+async function checkRequestSpacing() {
+  const walk = (node, fn) => { fn(node); ts.forEachChild(node, (child) => walk(child, fn)); };
+  let handler = null;
+  walk(source, (node) => {
+    if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'handleWebviewGazeFrame') handler = node;
+  });
+  const interval = source.statements.find((s) => ts.isVariableStatement(s) &&
+    s.declarationList.declarations.some((d) => d.name.getText(source) === 'BROWSER_GAZE_MIN_INTERVAL_MS'));
+  assert.ok(handler && interval, 'gaze frame handler and request interval exist');
+  const run = async (frameMs, durationMs) => {
+    let now = 50000;
+    const requests = [];
+    const answers = [];
+    const g = new BrowserGazeGate();
+    const view = {
+      webContents: {
+        isDestroyed: () => false,
+        getZoomFactor: () => 1.35,
+        executeJavaScript: () => { requests.push(now); return new Promise((resolve) => answers.push(resolve)); },
+        sendInputEvent: () => {},
+      },
+      getBounds: () => ({ x: 0, y: 0, width: 1600, height: 850 }),
+    };
+    const context = vm.createContext({
+      activeBrowserView: view, activeBrowserViewSessionId: 1, gazeGateFor: () => g, BrowserGazeGate,
+      invalidateBrowserGaze: () => {}, flushBrowserGazeReset: () => {}, resetEdgeScrollState: () => {},
+      sendEdgeScrollState: () => {}, sendTrustedBrowserClick: () => {}, buildGazeUpdateAndPollScript: () => 'poll',
+      browserDiagnostics: { recordIpcTick: () => {}, info: () => {} },
+      browserGazeConfig: { edgeScrollEnabled: false, edgeDeadZonePct: 0.02, edgeZonePct: 0.2, zoomCompensationEnabled: true,
+        edgeScrollPauseDuringDwell: true, edgeHoldMs: 650, edgeMaxBurstMs: 6000, edgeThrottleMs: 130, edgeMinDeltaPx: 16, edgeMaxDeltaPx: 36 },
+      lastBrowserGazeFrameAt: 0, lastBrowserDwellState: 'idle', lastBrowserGazePollAt: 0, lastEdgeScrollAt: 0,
+      edgeScrollCandidate: 'none', edgeScrollEnteredAt: 0, edgeScrollActiveDirection: 'none', edgeScrollStartedAt: 0,
+      Date: { now: () => now }, Promise,
+    });
+    vm.runInContext(compile(interval.getText(source)), context);
+    vm.runInContext(compile(`var handleWebviewGazeFrame = ${handler.initializer.getText(source)};`), context);
+    for (let t = 0; t < durationMs; t += frameMs) {
+      now = 50000 + t;
+      context.handleWebviewGazeFrame(800, 425, { emittedAtWallMs: now });
+      await new Promise(setImmediate);
+      while (answers.length) answers.shift()(JSON.stringify({ c: null, s: 'idle' }));
+      await new Promise(setImmediate);
+    }
+    return requests;
+  };
+  const fast = await run(15, 3000);
+  const gaps = fast.slice(1).map((t, i) => t - fast[i]);
+  expect(fast.length >= 95 && fast.length <= 105, `Eye Tracker 5 frames every 15 ms reach the page about 33 times a second (got ${fast.length} in 3 s)`);
+  expect(gaps.every((gap) => gap >= 25), `page requests are at least 25 ms apart (smallest gap ${Math.min(...gaps)} ms)`);
+  const slow = await run(33, 3000);
+  expect(slow.length === Math.ceil(3000 / 33), `frames 33 ms apart are all sent (got ${slow.length} of ${Math.ceil(3000 / 33)})`);
+  return fast.length;
+}
+
+checkRequestSpacing().then((perThreeSeconds) => {
+  console.log(`Browser request/native-click safety: ${assertions} checks passed; 10,000 busy frames dropped; ` +
+    `${perThreeSeconds} page requests in 3 s of 66 Hz gaze.`);
+}).catch((err) => { console.error(err); process.exit(1); });

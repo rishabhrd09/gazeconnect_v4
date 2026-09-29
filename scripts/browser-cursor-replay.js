@@ -457,6 +457,14 @@ function scenario(name, fn) {
 
 function centerOfRect(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 
+// Where the ring's centre is drawn. The script sets its translate property, which the
+// compositor animates (v17.27, 28 Sep 2026); left/top would lay the page out on every frame.
+function drawnAt(cursor) {
+  const [x, y] = String(cursor.style.translate || '').split(' ').map(parseFloat);
+  return { x, y };
+}
+const positionedByLayout = (cursor) => cursor.style.left !== undefined || cursor.style.top !== undefined;
+
 // Collect clicks over a trace. step() returns per-frame envelope.
 function runTrace(env, samples, dtMs = 30) {
   const clicks = [];
@@ -963,7 +971,7 @@ scenario('S21 the ring sits at the centre of the card being selected and clicks 
   const c = centerOfRect(anchor.rect);
   const gaze = { x: c.x - 190, y: c.y - 110 };
   const cursor = env.doc.getElementById('gazeconnect-cursor');
-  const drawn = () => ({ x: parseFloat(cursor.style.left), y: parseFloat(cursor.style.top) });
+  const drawn = () => drawnAt(cursor);
   const rng = mulberry32(21);
   const clicks = [];
   let worst = 0, atLanding = 0, onCentre = 0;
@@ -981,6 +989,7 @@ scenario('S21 the ring sits at the centre of the card being selected and clicks 
     if (Math.hypot(p.x - gaze.x, p.y - gaze.y) < 30) atLanding++;
   }
   t.expect(!!cursor, 'no cursor element');
+  t.expect(!positionedByLayout(cursor), 'ring positioned with left/top: the page lays out on every gaze frame');
   t.expect(worst < 1, `ring left the card's centre by ${worst.toFixed(0)} px (the gaze is 220 px away)`);
   t.expect(atLanding === 0, `ring was drawn at the gaze landing point on ${atLanding} frames`);
   t.expect(onCentre > 50, `ring on the centre for only ${onCentre} frames`);
@@ -1003,7 +1012,7 @@ scenario('S22 moving to another card: the ring goes centre to centre, B is click
   const ca = centerOfRect(A.rect), cb = centerOfRect(B.rect);
   const gA = { x: ca.x - 150, y: ca.y - 90 }, gB = { x: cb.x + 150, y: cb.y + 90 };
   const cursor = env.doc.getElementById('gazeconnect-cursor');
-  const drawn = () => ({ x: parseFloat(cursor.style.left), y: parseFloat(cursor.style.top) });
+  const drawn = () => drawnAt(cursor);
   const rng = mulberry32(22);
   const clicks = [];
   for (let i = 0; i < 25; i++) {                        // Part of a dwell on A.
@@ -1024,6 +1033,7 @@ scenario('S22 moving to another card: the ring goes centre to centre, B is click
   t.expect(others.length === 0, `ring rested ${others.length} frames somewhere other than a centre`);
   const last = seen[seen.length - 1];
   t.expect(Math.hypot(last.x - cb.x, last.y - cb.y) < 1, `ring not on B's centre at the end`);
+  t.expect(!positionedByLayout(cursor), 'ring positioned with left/top: the page lays out on every gaze frame');
   t.expect(clicks.length === 1 && clicks[0].href && clicks[0].href.includes('bbb'),
     `expected one click on B, got ${JSON.stringify(clicks.map(c => c.href || c.key))}`);
 });

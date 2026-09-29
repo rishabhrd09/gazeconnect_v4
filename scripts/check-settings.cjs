@@ -78,4 +78,24 @@ test('invalid saved keyboard feel falls back to Standard', () => {
   assert.equal(service.getData().settings.keyboardFeel, 'standard');
 });
 
+test('gaze colours: Standard for new and older profiles, a choice persists, bad values fall back', () => {
+  assert.equal(DEFAULT_CUSTOMIZATION.settings.gazeColors, 'standard');
+  const older = new CustomizationService();
+  older.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'relaxed' } }));
+  assert.equal(older.getData().settings.gazeColors, 'standard');
+  for (const choice of ['high_contrast', 'soft']) {
+    const service = new CustomizationService();
+    service.updateSetting('gazeColors', choice);
+    const restored = new CustomizationService();
+    restored.importJSON(service.exportJSON());
+    assert.equal(restored.getData().settings.gazeColors, choice);
+  }
+  const bad = new CustomizationService();
+  bad.importJSON(JSON.stringify({ settings: { gazeColors: 'purple' } }));
+  assert.equal(bad.getData().settings.gazeColors, 'standard');
+  bad.updateSetting('gazeColors', 'soft');
+  bad.resetToDefaults();
+  assert.equal(bad.getData().settings.gazeColors, 'standard');
+});
+
 console.log(`${passed} settings checks passed.`);

@@ -24,6 +24,7 @@ import { collectSnapTargets, computeSnap, type SnapTarget } from '../../utils/ga
 import { computeEdgeExpansion, isPointInExpandedRect } from '../../utils/edgeHitZone';
 import { computeScreenProfile } from '../../utils/screenProfile';
 import { useTheme } from '../../contexts/ThemeContext';
+import { gazePalette, gazeRingEdge } from '../../config/gazeColors';
 import { collectKeyboardKeys, distanceToRect, findBestKeyboardKey, isCloserTarget, type KeyRect } from '../../utils/hitZoneExpansion';
 import { BubbleMotion, FreeAnchor, GazeFocus, rectCentre, type Point } from '../../utils/gazeFocus';
 import { DwellProgressBank } from '../../utils/dwellProgressBank';
@@ -91,8 +92,8 @@ function bubbleSize(setting: string): number {
   const s = CURSOR_SIZES[setting] || CURSOR_SIZES.medium;
   return Math.round(Math.min(s.max, Math.max(s.min, window.innerWidth * s.share)));
 }
-// Ring width as a share of the diameter (7 px at 108 px).
-const BUBBLE_RING_SHARE = 0.065;
+// The ring's width is a share of the diameter set by the gaze colour palette
+// (config/gazeColors: Standard 0.065, 7 px at 108 px).
 // A non-keyboard target is acquired from at most this far outside its box
 // (keyboard keys: KEYBOARD_SNAP_MARGIN). Small controls are limited sooner by
 // their centre-based range; this bounds the large cards.
@@ -257,7 +258,7 @@ export const GazeCursor: React.FC = () => {
   // Provides psychological stability: even if cursor moves slightly, the highlight stays
   // fixed on the correct element, matching Grid 3 / Tobii Communicator / TD Snap behavior.
   const [highlightRect, setHighlightRect] = useState<{
-    left: number; top: number; width: number; height: number; keyboardKey: boolean;
+    left: number; top: number; width: number; height: number;
   } | null>(null);
 
   // No usable gaze for GAZE_RECOVERY_MS, or none yet: the bubble is hidden.
@@ -329,18 +330,8 @@ export const GazeCursor: React.FC = () => {
   const screenProfileRef = useRef(computeScreenProfile());
   const isKeyboardScreenRef = useRef(false);
   const isCompassScreenRef = useRef(false);
-  // The keyboard alone shows a stationary acquisition outline during onset.
-  // Change the attribute only when the target changes, never on gaze samples.
-  const keyboardOnsetVisualRef = useRef<HTMLElement | null>(null);
-  const setKeyboardOnsetVisual = useCallback((target: HTMLElement | null) => {
-    if (keyboardOnsetVisualRef.current === target) return;
-    keyboardOnsetVisualRef.current?.removeAttribute('data-keyboard-onset');
-    keyboardOnsetVisualRef.current = null;
-    if (target && isKeyboardScreenRef.current && target.matches('.keyboard-screen .keyboard-key')) {
-      target.setAttribute('data-keyboard-onset', 'true');
-      keyboardOnsetVisualRef.current = target;
-    }
-  }, []);
+  // No acquisition paint during onset (27 Sep 2026): an outline that lit the key before its
+  // ring made every key light up twice. The square and the ring now start together.
   const keyboardConfirmVisualRef = useRef<HTMLElement | null>(null);
   const keyboardConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearKeyboardConfirmation = useCallback(() => {
@@ -495,15 +486,13 @@ export const GazeCursor: React.FC = () => {
   // v9: Track keyboard screen for context-aware dwell timing
   // v10: Also track compass/advanced-map screens for nav dwell boost
   useEffect(() => {
-    setKeyboardOnsetVisual(null);
     clearKeyboardConfirmation();
     isKeyboardScreenRef.current = ws.currentScreen === 'keyboard';
     isCompassScreenRef.current = ws.currentScreen === 'compass-map' || ws.currentScreen === 'advanced-map';
-  }, [ws.currentScreen, setKeyboardOnsetVisual, clearKeyboardConfirmation]);
+  }, [ws.currentScreen, clearKeyboardConfirmation]);
   useEffect(() => () => {
-    setKeyboardOnsetVisual(null);
     clearKeyboardConfirmation();
-  }, [setKeyboardOnsetVisual, clearKeyboardConfirmation]);
+  }, [clearKeyboardConfirmation]);
 
   // Find gaze toggle element
   const isGazeToggleElement = useCallback((el: HTMLElement | null): boolean => {
@@ -614,7 +603,6 @@ export const GazeCursor: React.FC = () => {
   }, []);
 
   const resetSelection = useCallback(() => {
-    setKeyboardOnsetVisual(null);
     clearKeyboardConfirmation();
     dwellTargetRef.current = null;
     dwellStartTimeRef.current = 0;
@@ -632,7 +620,7 @@ export const GazeCursor: React.FC = () => {
     setIsLocked(false);
     setTargetName('');
     setHighlightRect(null);
-  }, [setKeyboardOnsetVisual, clearKeyboardConfirmation]);
+  }, [clearKeyboardConfirmation]);
 
   // === v18: THE TARGET UNDER A POINT OF THE GAZE ESTIMATE ================
   // Before any hysteresis. Moved here from the dwell loop, rules unchanged:
@@ -867,7 +855,6 @@ export const GazeCursor: React.FC = () => {
 
     // Mouse-Only Mode: no dwell detection at all
     if (isMouseMode) {
-      setKeyboardOnsetVisual(null);
       clearKeyboardConfirmation();
       if (dwellTargetRef.current) {
         dwellTargetRef.current = null;
@@ -992,7 +979,6 @@ export const GazeCursor: React.FC = () => {
     // - (Gaze is enabled OR element is always-active) AND
     // - (Not in navigation cooldown OR element is always-active)
     if (!clickable || (!enabled && !isAlwaysActive) || (inClickCooldown && !isToggle) || (inNavCooldown && !isAlwaysActive)) {
-      setKeyboardOnsetVisual(null);
       // === INCOMPLETE FIXATION TTL ===
       // Save progress when gaze leaves so it can be resumed if user looks back
       let didCaptureSave = false;
@@ -1066,10 +1052,9 @@ export const GazeCursor: React.FC = () => {
 
     // === ONSET DELAY PHASE (OptiKey-inspired two-phase fixation) ===
     // Phase 1: Cursor must remain on SAME element for ONSET_DELAY_MS.
-    // The keyboard shows only an acquisition outline, never dwell progress,
-    // until this phase completes.
+    // No visual feedback during onset (OptiKey's lock-on): the square highlight
+    // and the ring start together when it completes, on keys and cards alike.
     if (clickable !== onsetTargetRef.current) {
-      setKeyboardOnsetVisual(null);
       // New target — start onset phase. A target that has only just taken
       // the focus is credited the samples that confirmed it
       // (ONSET_CREDIT_WINDOW_MS): the onset is as long as it always was.
@@ -1120,7 +1105,6 @@ export const GazeCursor: React.FC = () => {
         }
         savedDwellRef.current = null;
         dwellProgressRef.current = 0;
-        setKeyboardOnsetVisual(clickable);
         // Reset dwell state during onset
         if (dwellTargetRef.current !== clickable) {
           dwellTargetRef.current = null;
@@ -1136,12 +1120,6 @@ export const GazeCursor: React.FC = () => {
 
     // Check if onset is still in progress
     if (!onsetCompletedRef.current) {
-      // A brief gaze-loss event hides acquisition. Restore it on the first
-      // usable frame if the same key is still being acquired.
-      if (isKeyboardScreenRef.current && keyboardOnsetVisualRef.current !== clickable
-          && clickable.matches('.keyboard-screen .keyboard-key')) {
-        setKeyboardOnsetVisual(clickable);
-      }
       // B1-FE extension (flag toggleCalmFrontend): with gaze ON, the toggle
       // uses the STANDARD onset — the 100ms fast path let a glance that
       // merely passed near the toggle become the dwell candidate almost
@@ -1167,12 +1145,11 @@ export const GazeCursor: React.FC = () => {
       }
       const onsetElapsed = now - onsetStartTimeRef.current;
       if (onsetElapsed < onsetDuration) {
-        // Still in onset phase — acquisition only, no dwell timer.
+        // Still in onset phase — no visual feedback, no dwell timer.
         frameRef.current = requestAnimationFrame(dwellFrame);
         return;
       }
       // Onset completed — transition to dwell phase
-      setKeyboardOnsetVisual(null);
       onsetCompletedRef.current = true;
       if (dwellTargetRef.current !== clickable) {
         dwellTargetRef.current = clickable;
@@ -1205,8 +1182,7 @@ export const GazeCursor: React.FC = () => {
         // The bubble is already at this target's centre (drawBubble); the
         // highlight marks the start of the selection.
         const rect = clickable.getBoundingClientRect();
-        setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height,
-          keyboardKey: isKeyboardScreenRef.current && clickable.matches('.keyboard-screen .keyboard-key') });
+        setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
       }
     }
 
@@ -1219,8 +1195,7 @@ export const GazeCursor: React.FC = () => {
       const name = clickable.textContent?.slice(0, 15)?.trim() || clickable.tagName;
       setTargetName(name);
       const rect = clickable.getBoundingClientRect();
-      setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height,
-        keyboardKey: isKeyboardScreenRef.current && clickable.matches('.keyboard-screen .keyboard-key') });
+      setHighlightRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     }
 
     // Progress — only counts AFTER onset completes
@@ -1311,7 +1286,6 @@ export const GazeCursor: React.FC = () => {
       lastGazeActivationRef.current = { element: dwellTargetRef.current, at: now };
       confirmKeyboardSelection(dwellTargetRef.current);
       dwellTargetRef.current.click();
-      setKeyboardOnsetVisual(null);
       dwellTargetRef.current = null;
       dwellStartTimeRef.current = 0;
       onsetTargetRef.current = null;
@@ -1326,7 +1300,7 @@ export const GazeCursor: React.FC = () => {
     }
 
     frameRef.current = requestAnimationFrame(dwellFrame);
-  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble, takeBankedProgress, setKeyboardOnsetVisual, clearKeyboardConfirmation, confirmKeyboardSelection]);
+  }, [enabled, isMouseMode, isGazeToggleElement, isAlwaysActiveElement, getTargetAttr, _getEffectiveDwell, getKeyboardCadence, resetSelection, drawBubble, takeBankedProgress, clearKeyboardConfirmation, confirmKeyboardSelection]);
 
   // Core gaze handler with coordinate transformation
   const handleGaze = useCallback((data: any) => {
@@ -1757,12 +1731,11 @@ export const GazeCursor: React.FC = () => {
   useEffect(() => {
     const handleGazeLost = () => {
       freshnessRef.current.lose();
-      setKeyboardOnsetVisual(null);
       clearKeyboardConfirmation();
     };
     window.addEventListener('gaze_lost', handleGazeLost);
     return () => window.removeEventListener('gaze_lost', handleGazeLost);
-  }, [setKeyboardOnsetVisual, clearKeyboardConfirmation]);
+  }, [clearKeyboardConfirmation]);
 
   // Mouse, touch and pen stay available beside gaze (see DUPLICATE_INPUT_MS).
   // Gaze presses are programmatic, so isTrusted tells the two apart. Capture
@@ -1801,6 +1774,16 @@ export const GazeCursor: React.FC = () => {
     };
   }, [ws.subscribeGaze, handleGaze, dwellFrame]);
 
+  // The chosen gaze colours (Settings -> Eye Gaze -> Gaze colours) for this theme. A typed
+  // key's brief confirmation takes the palette's colour through --gaze-confirm.
+  const palette = gazePalette(settings.gazeColors, isWarm || isLight);
+  useEffect(() => {
+    const root = typeof document !== 'undefined' ? document.documentElement : null;
+    if (!root?.style) return;
+    if (palette.confirm) root.style.setProperty('--gaze-confirm', palette.confirm);
+    else root.style.removeProperty('--gaze-confirm');
+  }, [palette.confirm]);
+
   // Mouse-Only Mode: hide cursor and dwell UI entirely
   if (isMouseMode) {
     return null;
@@ -1814,11 +1797,13 @@ export const GazeCursor: React.FC = () => {
   // especially with longer dwell times (800-1000ms vs old 500ms before ring appears)
   const CURSOR_COLOR_IDLE = '#8899AA'; // Muted steel blue — visible on dark bg without being distracting
   const cursorColor = isLocked ? CURSOR_COLOR_LOCKED : (enabled || dwellProgress > 0 ? CURSOR_COLOR_NORMAL : CURSOR_COLOR_IDLE);
-  // The bubble's ring. Dark: amber (24 Sep 2026), because a light ring was lost among the Dark
-  // keyboard's near-white letters; amber stands apart from them and from the teal dwell fill.
-  // Warm keeps the light ring, whose soft dark edge reads on its pale keys.
-  const BUBBLE_RING_COLOR = isWarm || isLight ? 'rgba(255, 255, 255, 0.82)' : '#FFC247';
-  const ringPx = Math.max(5, Math.round(CURSOR_SIZE * BUBBLE_RING_SHARE));
+  // The bubble's ring, its fill and the square come from the palette (config/gazeColors).
+  // Standard keeps the earlier look: amber in Dark (24 Sep 2026: a light ring was lost among
+  // the Dark keyboard's near-white letters), the light ring with a soft dark edge in Warm.
+  const BUBBLE_RING_COLOR = palette.ring;
+  const ringPx = Math.max(5, Math.round(CURSOR_SIZE * palette.ringShare));
+  const squarePx = palette.squarePx;
+  const squareColor = isLocked ? palette.squareLocked : palette.square;
   const arcR = (CURSOR_SIZE - ringPx) / 2;
   const arcLen = 2 * Math.PI * arcR;
   const bubbleVisible = !gazeAbsent && (showRoamingCursor || dwellProgress > 0);
@@ -1828,23 +1813,24 @@ export const GazeCursor: React.FC = () => {
       {/* v16: Visual Selection Highlight — rectangular border around the element being dwelled on.
           Provides psychological stability: the highlight stays fixed on the correct element
           even if the cursor has micro-drift, matching Grid 3 / Tobii Communicator behavior. */}
-      {highlightRect && (dwellProgress > 0 || highlightRect.keyboardKey) && (
+      {/* One acknowledgement per target, as on cards: the square appears with
+          the ring's first progress and fades in with it (27 Sep 2026). */}
+      {highlightRect && dwellProgress > 0 && (
         <div
           data-cursor="true"
           style={{
             position: 'fixed',
-            left: highlightRect.left - 3,
-            top: highlightRect.top - 3,
-            width: highlightRect.width + 6,
-            height: highlightRect.height + 6,
+            left: highlightRect.left - squarePx,
+            top: highlightRect.top - squarePx,
+            width: highlightRect.width + squarePx * 2,
+            height: highlightRect.height + squarePx * 2,
             borderRadius: 8,
-            border: `3px solid ${highlightRect.keyboardKey ? CURSOR_COLOR_LOCKED : isLocked ? CURSOR_COLOR_LOCKED : CURSOR_COLOR_NORMAL}`,
+            border: `${squarePx}px solid ${squareColor}`,
             backgroundColor: 'transparent',
             pointerEvents: 'none',
             zIndex: 2147483646, // Just below cursor
-            boxShadow: highlightRect.keyboardKey ? 'none'
-              : `0 0 ${8 + dwellProgress * 12}px ${isLocked ? CURSOR_COLOR_LOCKED : CURSOR_COLOR_NORMAL}40`,
-            opacity: highlightRect.keyboardKey ? 1 : Math.min(1, dwellProgress * 3),
+            boxShadow: `0 0 ${8 + dwellProgress * 12}px ${squareColor}40`,
+            opacity: Math.min(1, dwellProgress * 3), // Fade in quickly
             transition: 'border-color 150ms ease, box-shadow 150ms ease',
           }}
         />
@@ -1885,8 +1871,7 @@ export const GazeCursor: React.FC = () => {
             boxSizing: 'border-box',
             border: `${ringPx}px solid ${BUBBLE_RING_COLOR}`,
             background: 'transparent',
-            boxShadow: '0 0 0 1.5px rgba(0, 0, 0, 0.32), 0 2px 12px rgba(0, 0, 0, 0.45), '
-              + 'inset 0 0 0 1.5px rgba(0, 0, 0, 0.30), inset 0 0 8px rgba(0, 0, 0, 0.22)',
+            boxShadow: gazeRingEdge(palette.edge),
           }}
         />
         {dwellProgress > 0 && (
@@ -1901,7 +1886,7 @@ export const GazeCursor: React.FC = () => {
               cy={CURSOR_SIZE / 2}
               r={arcR}
               fill="none"
-              stroke={CURSOR_COLOR_LOCKED}
+              stroke={palette.fill}
               strokeWidth={ringPx}
               strokeLinecap="round"
               strokeDasharray={arcLen}

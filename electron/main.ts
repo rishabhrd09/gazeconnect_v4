@@ -93,6 +93,15 @@ let activeBrowserViewSessionId = 0;
 let browserViewRequestSeq = 0;
 const browserGazeGates = new WeakMap<BrowserView, BrowserGazeGate>();
 let lastBrowserGazeFrameAt = 0;
+// The page's dwell loop is built for about 33 gaze frames a second (browserGazeController.ts);
+// the Eye Tracker 5 delivers about 66. Every page request hit-tests the page (4-8 ms on a
+// 14,000-element YouTube watch page) and moves the ring, so at 66 a second our requests alone
+// used a third or more of YouTube's main thread: the page fell behind, requests queued past the
+// 150 ms freshness limit and were discarded, and browsing felt hung after a few videos
+// (28 Sep 2026). Requests start at least this far apart; a skipped frame is superseded by the
+// next one about 15 ms later, and dwell is timed by the clock, not by counting frames.
+const BROWSER_GAZE_MIN_INTERVAL_MS = 25;
+let lastBrowserGazePollAt = 0;
 let lastNavState: { canGoBack: boolean; canGoForward: boolean; url: string } | null = null;
 // v17.16 — last playback state sent to React, for change-detection so we
 // only emit webview:playbackState on transitions, not every poll.
@@ -1697,7 +1706,18 @@ function setupIpcHandlers(): void {
       const injectBrowserPageHelpers = async () => {
         if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
         applyAacBrowsingMode();
+        // YouTube changes video without loading a new document, so this runs on every video and
+        // each insert used to add one more copy of the cursor sheet (28 Sep 2026). The new copy is
+        // inserted before the previous one is removed, so the ring is never unstyled; a key from a
+        // document that has since been replaced removes nothing.
+        const previousCursorCssKey: string | undefined = (view as any)._cursorCssKey;
         view.webContents.insertCSS(BROWSER_CURSOR_CSS)
+          .then((key) => {
+            (view as any)._cursorCssKey = key;
+            if (previousCursorCssKey && previousCursorCssKey !== key && !view.webContents.isDestroyed()) {
+              view.webContents.removeInsertedCSS(previousCursorCssKey).catch(() => { });
+            }
+          })
           .catch((e) => browserDiagnostics.warn('cursor-css', `[Main] Cursor CSS injection failed: ${e?.message || e}`));
         // Seed window.gcConfig with the latest live values BEFORE the
         // cursor IIFE runs — the IIFE merges existing window.gcConfig
@@ -2476,8 +2496,11 @@ function setupIpcHandlers(): void {
       if (!cursorEnabled) return;
       gate.enable();
       flushBrowserGazeReset(view);
-      const request = gate.begin(emittedAt, Date.now());
+      const pollNow = Date.now();
+      if (pollNow >= lastBrowserGazePollAt && pollNow - lastBrowserGazePollAt < BROWSER_GAZE_MIN_INTERVAL_MS) return;
+      const request = gate.begin(emittedAt, pollNow);
       if (!request) return;
+      lastBrowserGazePollAt = pollNow;
       // v17.21 — convert view DIPs → page CSS px before hit-testing. The
       // page runs at zoomFactor (1.35 default), so CSS coords = view/zoom.
       // Without this, the injected script treated view px as CSS px:

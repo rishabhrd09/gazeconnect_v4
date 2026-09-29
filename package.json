@@ -26,6 +26,7 @@
     "check:settings": "node scripts/check-settings.cjs",
     "check:look": "node scripts/check-look.cjs",
     "check:gaze-safety": "node scripts/check-gaze-safety.cjs",
+    "check:gaze-colours": "node scripts/check-gaze-colours.cjs",
     "check:browser-gaze-safety": "node scripts/check-browser-gaze-safety.cjs",
     "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs"
   },

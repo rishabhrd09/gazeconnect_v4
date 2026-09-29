@@ -13,11 +13,12 @@ import type {
   CustomizationData, Person, PhraseCategory,
   MedicalSection, HomeQuickActions, HomeEmergencyCard,
   ActivityCategory, AACCategory, Phrase, AppSettings, QuickWordsConfig,
-  AlertModeCard, QuickWord, HomeWordBarConfig,
+  AlertModeCard, QuickWord,
 } from '../types/customization';
 import { MAX_ACTIVE_PEOPLE } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
 import { normalizeKeyboardFeel } from '../config/dwellTimeConfig';
+import { normalizeGazeColors } from '../config/gazeColors';
 import {
   CARE_ACTIVITY_CATEGORIES,
   CARE_CONTENT_ARCHITECTURE_VERSION,
@@ -27,6 +28,7 @@ import {
   FOOD_CONTENT_VERSION,
   FOOD_PHRASES,
   FOOD_QUICK_WORD,
+  HOME_LAYOUT_VERSION,
 } from './careContentPresets';
 
 const DEBOUNCE_MS = 500;
@@ -39,6 +41,7 @@ const DEBOUNCE_MS = 500;
 const englishOnlySettings = (settings: AppSettings): AppSettings => ({
   ...settings, showHindi: false, ttsLanguage: 'english', gazeOffsetX: 0, gazeOffsetY: 0,
   keyboardFeel: normalizeKeyboardFeel(settings.keyboardFeel),
+  gazeColors: normalizeGazeColors(settings.gazeColors),
 });
 const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
 
@@ -57,40 +60,6 @@ export function normalizeSpeechRateWpm(value: unknown, fallback = 150): number {
   // Anything else (0, negative, or the 11/21/31 the stepper made from a multiplier) is not a
   // rate anyone chose: the normal pace.
   return Math.max(SPEECH_RATE_MIN_WPM, Math.min(SPEECH_RATE_MAX_WPM, Math.round(wpm)));
-}
-
-export const HOME_WORD_BAR_WORDS = 4;
-export const HOME_WORD_BAR_PHRASES = 2;
-
-/** Always the same shape: exactly four words and two phrases ('' = empty slot). */
-export function normalizeHomeWordBar(
-  saved: Partial<HomeWordBarConfig> | undefined,
-  savedCards: HomeEmergencyCard[] | undefined,
-  defaults: HomeWordBarConfig,
-): HomeWordBarConfig {
-  const fit = (values: unknown, size: number): string[] => {
-    const list = Array.isArray(values) ? values.map(v => (typeof v === 'string' ? v.trim() : '')) : [];
-    return Array.from({ length: size }, (_, i) => list[i] ?? '');
-  };
-  if (!saved || typeof saved !== 'object') {
-    // First load with the word bar: offer the caregiver's own emergency cards as its phrases.
-    const fromCards = (savedCards ?? [])
-      .filter(card => card && card.enabled && typeof card.en === 'string' && card.en.trim())
-      .map(card => card.en.trim())
-      .slice(0, HOME_WORD_BAR_PHRASES);
-    return {
-      enabled: false,
-      layout: defaults.layout,
-      words: fit(defaults.words, HOME_WORD_BAR_WORDS),
-      phrases: fit(fromCards.length > 0 ? fromCards : defaults.phrases, HOME_WORD_BAR_PHRASES),
-    };
-  }
-  return {
-    enabled: saved.enabled === true,
-    layout: saved.layout === '4+2' ? '4+2' : '3+2',
-    words: fit(saved.words ?? defaults.words, HOME_WORD_BAR_WORDS),
-    phrases: fit(saved.phrases ?? defaults.phrases, HOME_WORD_BAR_PHRASES),
-  };
 }
 
 const isPersonActive = (person: Person) => person.isActive !== false;
@@ -250,6 +219,7 @@ export class CustomizationService {
     this.data = { ...this.data, people: normalizePeople(this.data.people) };
     this.data = this.applyFoodContent(this.data);
     this.data = { ...this.data, settings: englishOnlySettings(this.data.settings) };
+    this.data = this.applyHomeLayoutVersion(this.data);
   }
 
   // ============================================
@@ -298,17 +268,20 @@ export class CustomizationService {
       );
 
     const savedSettings: Partial<AppSettings> = { ...(saved.settings || {}) };
-    // The four-card left panel was retired (24 Sep 2026). Whoever had it -- chosen, or
-    // by default in a file saved before this choice existed -- gets the Urgent Needs
-    // card, so a one-look path to help is never lost. Quick Phrases only, the default,
-    // is for new installs and resets.
-    const savedLeftPanel = savedSettings.homeEmergencyLaunchMode;
-    if (savedLeftPanel === 'cards' || savedLeftPanel === undefined) savedSettings.homeEmergencyLaunchMode = 'alert';
+    // Home shows the Urgent Needs card only when it was chosen in Settings > Home Layout
+    // (maintainer's decision, 28 Sep 2026). Anything else -- the four emergency cards
+    // retired on 24 Sep 2026, no choice at all, a damaged value -- is Quick Phrases only.
+    if (savedSettings.homeEmergencyLaunchMode !== 'alert') savedSettings.homeEmergencyLaunchMode = 'quick';
     if ('ttsRate' in savedSettings) savedSettings.ttsRate = normalizeSpeechRateWpm(savedSettings.ttsRate, defaults.settings.ttsRate);
+
+    // The word bar along the bottom of Home was removed (maintainer's decision, 28 Sep
+    // 2026): Quick Phrases and Assistance already offer those words. A saved one is dropped.
+    const savedData: Partial<CustomizationData> = { ...saved };
+    delete (savedData as { homeWordBar?: unknown }).homeWordBar;
 
     const merged: CustomizationData = {
       ...defaults,
-      ...saved,
+      ...savedData,
       // Deep merge settings to preserve new settings keys
       settings: englishOnlySettings({ ...defaults.settings, ...savedSettings }),
       // Deep merge quickWords to preserve coreWords and other new fields
@@ -319,7 +292,6 @@ export class CustomizationService {
       medicalSections: saved.medicalSections ?? defaults.medicalSections,
       homeQuickActions: saved.homeQuickActions ?? defaults.homeQuickActions,
       homeEmergencyCards: saved.homeEmergencyCards ?? defaults.homeEmergencyCards,
-      homeWordBar: normalizeHomeWordBar(saved.homeWordBar, saved.homeEmergencyCards, defaults.homeWordBar),
       activityCategories: saved.activityCategories ?? defaults.activityCategories,
       aacCategories: saved.aacCategories ?? defaults.aacCategories,
       feelings: saved.feelings ?? defaults.feelings,
@@ -328,9 +300,24 @@ export class CustomizationService {
       version: saved.version ?? defaults.version,
     };
 
-    return this.applyFoodContent(this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
+    return this.applyHomeLayoutVersion(this.applyFoodContent(this.applyPhraseCategoryUpdates(this.applyQuickWordPhraseUpdates(this.applyMedicalLabelUpdates(
       this.applyCareContentArchitecture(merged, (saved.version ?? 1) < CARE_CONTENT_ARCHITECTURE_VERSION)
-    ))));
+    )))));
+  }
+
+  // Home shows Quick Phrases alone unless the Urgent Needs card was chosen in Settings >
+  // Home Layout (maintainer's decision, 28 Sep 2026). A file from before version 6 had the
+  // card put back by the 24 Sep 2026 migration, so it loads with Quick Phrases alone once;
+  // the card can be added back in Home Layout, and that choice is kept from then on. Every
+  // new, loaded, imported or reset data set passes through here last, so it is saved as
+  // version 6 or later and a later choice is never undone.
+  private applyHomeLayoutVersion(data: CustomizationData): CustomizationData {
+    if ((data.version ?? 1) >= HOME_LAYOUT_VERSION) return data;
+    return {
+      ...data,
+      settings: { ...data.settings, homeEmergencyLaunchMode: 'quick' },
+      version: HOME_LAYOUT_VERSION,
+    };
   }
 
   // Add the food vocabulary once without replacing saved phrases or disabled words.
@@ -748,16 +735,6 @@ export class CustomizationService {
     this.notify();
   }
 
-  // --- Home word bar ---
-  updateHomeWordBar(config: HomeWordBarConfig): void {
-    this.data = {
-      ...this.data,
-      homeWordBar: normalizeHomeWordBar(config, undefined, DEFAULT_CUSTOMIZATION.homeWordBar),
-    };
-    this.scheduleSave();
-    this.notify();
-  }
-
   // --- Alert Mode Cards ---
   updateAlertModeCards(cards: AlertModeCard[]): void {
     this.data = { ...this.data, alertModeCards: cards };
@@ -801,6 +778,7 @@ export class CustomizationService {
     this.data = this.applyFoodContent(this.applyCareContentArchitecture(structuredClone(DEFAULT_CUSTOMIZATION), true));
     this.data = { ...this.data, people: normalizePeople(this.data.people) };
     this.data = { ...this.data, settings: englishOnlySettings(this.data.settings) };
+    this.data = this.applyHomeLayoutVersion(this.data);
     this.scheduleSave();
     this.notify();
   }

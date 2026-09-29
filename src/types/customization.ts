@@ -190,6 +190,7 @@ export interface AppSettings {
   filterPreset: string;
   dwellTimingSet: 'quick' | 'balanced' | 'relaxed' | 'extra_time'; // One complete set of the five selection durations
   keyboardFeel: 'standard' | 'familiar'; // Optional keyboard-only timing and Dark key appearance
+  gazeColors: 'standard' | 'high_contrast' | 'soft'; // Cursor ring, dwell fill and highlight palette (config/gazeColors)
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';
   ttsRate: number;                 // words per minute, 80-250 (older saves: a multiplier, converted on load)
   ttsVolume: number;
@@ -203,23 +204,12 @@ export interface AppSettings {
   gazeOffsetX: number;             // Legacy storage field; normalized to 0 (see CustomizationService).
   gazeOffsetY: number;             // Legacy storage field; normalized to 0.
   gazeDebugOverlay: boolean;       // Show gaze debug overlay (default false)
-  // Home left panel: 'quick' = Quick Phrases only (the default for new installs and
-  // resets, 24 Sep 2026), 'alert' = the Urgent Needs card above Quick Phrases. 'cards'
-  // (four emergency cards) was retired on 24 Sep 2026; it, or a saved file without this
-  // value, is read as 'alert', so nobody loses the one-look path to help.
+  // Home left panel: 'quick' = Quick Phrases only (the default), 'alert' = the Urgent
+  // Needs card above Quick Phrases, only when chosen in Settings > Home Layout
+  // (maintainer's decision, 28 Sep 2026). Anything else, including the four emergency
+  // cards retired on 24 Sep 2026 ('cards'), is read as 'quick'; a file saved before
+  // data version 6 loads as 'quick' once (CustomizationService).
   homeEmergencyLaunchMode?: 'cards' | 'alert' | 'quick';
-}
-
-// ============================================
-// HOME WORD BAR (optional row along the bottom of Home)
-// ============================================
-
-/** Words and phrases that stay on the Home screen; one look speaks them. */
-export interface HomeWordBarConfig {
-  enabled: boolean;          // Off by default
-  layout: '3+2' | '4+2';     // How many words, then two phrases
-  words: string[];           // Always 4 entries, in order; '' = empty
-  phrases: string[];         // Always 2 entries, in order; '' = empty
 }
 
 // ============================================
@@ -244,7 +234,6 @@ export interface CustomizationData {
   quickWords: QuickWordsConfig;
   homeQuickActions: HomeQuickActions;
   homeEmergencyCards: HomeEmergencyCard[];
-  homeWordBar: HomeWordBarConfig;
   activityCategories: ActivityCategory[];
   aacCategories: AACCategory[];
   feelings: Phrase[];
