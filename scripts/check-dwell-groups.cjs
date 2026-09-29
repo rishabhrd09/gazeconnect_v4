@@ -15,10 +15,10 @@ function loadTs(relative) {
 const dwell = loadTs('src/config/dwellTimeConfig.ts');
 const filters = loadTs('src/config/gazeFilterConfig.ts');
 const SETS = {
-  quick: [800, 1000, 1250, 1500, 2000],
+  quick: [800, 750, 900, 1100, 1450],
   balanced: [1400, 1300, 1600, 1900, 2500],
-  relaxed: [2200, 1700, 2000, 2400, 3000],
-  extra_time: [3000, 2200, 2600, 3000, 3800],
+  relaxed: [2400, 2250, 2750, 3250, 4000],
+  extra_time: [2800, 2600, 3200, 3800, 4000],
 };
 const union = [...new Set(Object.values(SETS).flat())].sort((a, b) => a - b);
 const eachSet = fn => { for (const name of Object.keys(SETS)) { dwell.setDwellTimingSet(name); fn(name, SETS[name]); } dwell.setDwellTimingSet('balanced'); };
@@ -45,10 +45,21 @@ test('Familiar is a keyboard-only feel with fixed acquisition and completion sta
   assert.deepEqual(Object.keys(dwell.DWELL_TIMING_SETS), Object.keys(SETS));
   assert.deepEqual(dwell.ALL_DWELL_DURATIONS_MS, union);
 });
-test('every set is slower group by group than the one before; typing can exceed words', () => {
-  const [quick, balanced, relaxed, extra] = Object.values(SETS);
-  for (let i = 0; i < 5; i++) assert(quick[i] < balanced[i] && balanced[i] < relaxed[i] && relaxed[i] < extra[i]);
-  for (const values of [balanced, relaxed, extra]) assert(values[0] > values[1]);
+test('every set is slower group by group than the one before, or both are at the 4 s ceiling', () => {
+  const sets = Object.values(SETS);
+  for (let s = 1; s < sets.length; s++) for (let i = 0; i < 5; i++) {
+    assert(sets[s][i] > sets[s - 1][i] || (sets[s][i] === 4000 && sets[s - 1][i] === 4000), `set ${s} group ${i}`);
+  }
+});
+test('every set is Balanced scaled by its typing time, to 50 ms and at most 4 s', () => {
+  const balanced = SETS.balanced;
+  for (const [name, values] of Object.entries(SETS)) {
+    const pace = values[0] / balanced[0];
+    assert.deepEqual(values, balanced.map(ms => Math.min(4000, Math.round(ms * pace / 50) * 50)), name);
+  }
+  // 29 Sep 2026: a word suggestion took 1.25 of a key's time in Quick and 0.73 in Extra Time.
+  // It now takes the key time itself in every set, for muscle memory.
+  for (const [name, [typing]] of Object.entries(SETS)) assert.equal(dwell.dwellTimesFor(name).predictionButton, typing, name);
 });
 test('unknown, malformed or hostile set names select the default', () => {
   for (const name of [undefined, null, '', 'fast', '__proto__', 'constructor', 7, {}, 'QUICK']) {
@@ -61,9 +72,9 @@ test('every action resolves to its configured group duration in every set', () =
   assert.deepEqual([...new Set(durations)].sort((a, b) => a - b), [...new Set(allowed)].sort((a, b) => a - b), name);
   assert.deepEqual(Object.values(dwell.DWELL_GROUPS).map(group => group.ms), allowed, name);
 }));
-test('typing, words, communication, navigation and deliberate actions use their assigned group times', () => eachSet((name, [typing, words, communication, navigation, deliberate]) => {
-  for (const context of ['keyboard', 'keyboardKey']) assert.equal(dwell.dwellForContext(context), typing, name);
-  for (const context of ['prediction', 'predictionButton', 'spatialZone']) assert.equal(dwell.dwellForContext(context), words, name);
+test('typing, alphabet groups, communication, navigation and deliberate actions use their assigned group times', () => eachSet((name, [typing, words, communication, navigation, deliberate]) => {
+  for (const context of ['keyboard', 'keyboardKey', 'prediction', 'predictionButton']) assert.equal(dwell.dwellForContext(context), typing, name);
+  for (const context of ['spatial', 'spatialZone']) assert.equal(dwell.dwellForContext(context), words, name);
   for (const context of ['quickWord', 'medicalUrgent', 'phrases']) assert.equal(dwell.dwellForContext(context), communication, name);
   for (const context of ['surveyOption', 'compass-map', 'settings', 'navigation']) assert.equal(dwell.dwellForContext(context), navigation, name);
   for (const context of ['gazeToggle', 'deliberateAction', 'emergency']) assert.equal(dwell.dwellForContext(context), deliberate, name);
@@ -86,6 +97,8 @@ test('native browser accepts exactly the durations the four sets can produce', (
     assert(source.includes('[' + union.join(', ') + '].includes('), file);
     assert(source.includes('dwellMs: 1900,'), `${file} default is not the Balanced navigation time`);
   }
+  const replay = fs.readFileSync(path.resolve(__dirname, 'browser-cursor-replay.js'), 'utf8');
+  assert(replay.includes('for (const dwellMs of [' + union.join(', ') + '])'), 'browser-cursor-replay.js S18 must replay every duration');
 });
 test('the active set reaches the per-action table that components read', () => eachSet((name, allowed) => {
   const result = dwell.loadDwellPreferences(storage({}));

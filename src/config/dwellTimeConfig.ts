@@ -5,13 +5,21 @@
  * a person chooses one named set. Onset, cooldown and tracking stability are
  * separate internal safeguards.
  *
- * The keyboard dwell is deliberately longer than the original timings after
- * patient feedback. Typing need not be the shortest group: each group is set
- * for the choice it represents, and every mode is slower than the one before.
+ * Balanced is the standard, and every set keeps its proportions (maintainer
+ * request, 29 Sep 2026: word suggestions had fallen to 0.73 of a key's time in
+ * Extra Time, yet took 1.25 of it in Quick). Each set is Balanced scaled by its
+ * typing time, to the nearest 50 ms, and no selection takes longer than 4 s.
+ * The typing times follow patient feedback: raised on 26 Sep 2026, then on
+ * 29 Sep Relaxed went from 2.2 to 2.4 s (it felt quick) and Extra Time from
+ * 3.0 to 2.8 s (it felt long). Deliberate actions reach the 4 s ceiling in both
+ * (4286 and 5000 would be proportional), so there Extra Time equals Relaxed;
+ * everything else is slower than in the mode before. Word suggestions on the
+ * keyboard take the key time itself (maintainer request, 29 Sep 2026, for
+ * muscle memory). check:dwell-groups recomputes the four sets from Balanced.
  */
 const GROUP_INFO = {
-  typing: { label: 'Typing', description: 'Individual letters and keyboard keys' },
-  words: { label: 'Words & suggestions', description: 'Word suggestions and alphabet groups' },
+  typing: { label: 'Typing', description: 'Letters, keyboard keys and word suggestions' },
+  words: { label: 'Alphabet groups', description: 'Letter groups on the Zone Board' },
   communication: { label: 'Communication', description: 'Phrases, care requests and quick replies' },
   navigation: { label: 'Navigation & choices', description: 'Pages, survey answers, map cells and browsing' },
   deliberate: { label: 'Deliberate actions', description: 'Gaze on/off, clearing text and confirmations' },
@@ -21,7 +29,7 @@ export type DwellGroup = keyof typeof GROUP_INFO;
 export const DWELL_TIMING_SETS = {
   quick: {
     label: 'Quick', description: 'For a practised user who prefers shorter selections',
-    ms: { typing: 800, words: 1000, communication: 1250, navigation: 1500, deliberate: 2000 },
+    ms: { typing: 800, words: 750, communication: 900, navigation: 1100, deliberate: 1450 },
   },
   balanced: {
     label: 'Balanced (default)', description: 'A comfortable pace for most people, with calmer typing',
@@ -29,11 +37,11 @@ export const DWELL_TIMING_SETS = {
   },
   relaxed: {
     label: 'Relaxed', description: 'More time to find a key and look away from a wrong choice',
-    ms: { typing: 2200, words: 1700, communication: 2000, navigation: 2400, deliberate: 3000 },
+    ms: { typing: 2400, words: 2250, communication: 2750, navigation: 3250, deliberate: 4000 },
   },
   extra_time: {
     label: 'Extra Time', description: 'The slowest pace, with generous time to settle on each key',
-    ms: { typing: 3000, words: 2200, communication: 2600, navigation: 3000, deliberate: 3800 },
+    ms: { typing: 2800, words: 2600, communication: 3200, navigation: 3800, deliberate: 4000 },
   },
 } as const satisfies Record<string, { label: string; description: string; ms: Record<DwellGroup, number> }>;
 export type DwellTimingSet = keyof typeof DWELL_TIMING_SETS;
@@ -92,7 +100,7 @@ export const DWELL_ACTION_GROUPS = {
   standardButton: 'navigation', navigationButton: 'navigation',
   emergencyButton: 'deliberate', quickWord: 'communication', gazeToggle: 'deliberate',
   backSkipButton: 'navigation', homeScreenTile: 'navigation', keyboardKey: 'typing',
-  predictionButton: 'words', phraseButton: 'communication', surveyOption: 'navigation', compassMapAction: 'navigation',
+  predictionButton: 'typing', phraseButton: 'communication', surveyOption: 'navigation', compassMapAction: 'navigation',
   quickfire: 'communication', spatialZone: 'words', settingsButton: 'navigation',
   medicalUrgent: 'communication', deliberateAction: 'deliberate',
 } as const satisfies Record<string, DwellGroup>;

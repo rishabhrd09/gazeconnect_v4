@@ -2216,7 +2216,7 @@ function setupIpcHandlers(): void {
     */
   ipcMain.handle('webview:setGazeConfig', async (_event: any, config: Partial<BrowserGazeConfig>) => {
     browserGazeConfig = {
-      dwellMs: typeof config?.dwellMs === 'number' && [800, 1000, 1250, 1300, 1400, 1500, 1600, 1700, 1900, 2000, 2200, 2400, 2500, 2600, 3000, 3800].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
+      dwellMs: typeof config?.dwellMs === 'number' && [750, 800, 900, 1100, 1300, 1400, 1450, 1600, 1900, 2250, 2400, 2500, 2600, 2750, 2800, 3200, 3250, 3800, 4000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
       onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
       stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),

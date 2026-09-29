@@ -306,9 +306,11 @@ function makeEnv({ viewW = 1585, viewH = 891, zoom = 1.0, host = 'www.youtube.co
 }
 
 function inject(env, seedConfig) {
-  // Existing gap/retention scenarios use an explicit allowed 2000ms hold.
+  // Existing gap/retention scenarios use an explicit allowed 1900ms hold: Balanced
+  // navigation, which is also the browser's own default, so retuning the slower
+  // sets does not move them (their 2000ms left the sets on 29 Sep 2026).
   // S18 covers every duration; S19 below covers the unconfigured default.
-  seedConfig = { dwellMs: 2000, ...seedConfig };
+  seedConfig = { dwellMs: 1900, ...seedConfig };
   if (seedConfig) {
     vm.runInContext(`window.gcConfig = ${JSON.stringify(seedConfig)};`, env.ctx);
   }
@@ -493,10 +495,10 @@ scenario('S1 grid fixation commits once at card center', (t) => {
     t.expect(Math.abs(k.x - c.x) <= 2 && Math.abs(k.y - c.y) <= 2,
       `click at (${k.x},${k.y}) not at center (${c.x},${c.y})`);
     t.expect(/^youtube_/.test(k.kind), `unexpected kind ${k.kind}`);
-    // Configured dwell is 2000ms AFTER the 280ms intent onset.
-    // At 30ms cadence: commit near frame 2280/30 = 76.
-    t.expect(k.frameIndex >= 76 && k.frameIndex <= 80,
-      `commit at frame ${k.frameIndex}, expected ~76-80`);
+    // Configured dwell is 1900ms AFTER the 280ms intent onset.
+    // At 30ms cadence: commit near frame 2180/30 ≈ 73.
+    t.expect(k.frameIndex >= 72 && k.frameIndex <= 76,
+      `commit at frame ${k.frameIndex}, expected ~72-76`);
   }
 });
 
@@ -514,7 +516,7 @@ scenario('S2 blink gap pauses dwell even with legacy flag disabled', (t) => {
   const res = frame(env, c.x, c.y, 400);
   t.expect(res.c === null, 'jump-committed on first frame after 400ms gap');
   // Continue fixating: commit should need the REMAINING on-frame time
-  // (2000 + 280 - 1590 ≈ 690ms ≈ 23 frames), not fire early. If the gap
+  // (1900 + 280 - 1590 ≈ 590ms ≈ 20 frames), not fire early. If the gap
   // leaked into the dwell, the commit would land within the first frames.
   out = runTrace(env, Array(40).fill([c.x, c.y]));
   t.expect(out.clicks.length === 1, `expected 1 click after gap, got ${out.clicks.length}`);
@@ -601,7 +603,7 @@ scenario('S17 hide cancels pending dwell and all saved progress', (t) => {
 });
 
 scenario('S18 every duration of the four timing sets excludes onset', (t) => {
-  for (const dwellMs of [800, 1000, 1250, 1300, 1400, 1500, 1600, 1700, 1900, 2000, 2200, 2400, 2500, 2600, 3000, 3800]) {
+  for (const dwellMs of [750, 800, 900, 1100, 1300, 1400, 1450, 1600, 1900, 2250, 2400, 2500, 2600, 2750, 2800, 3200, 3250, 3800, 4000]) {
     for (const onsetMs of [120, 320]) {
       const env = makeEnv({ host: 'example.com' });
       inject(env, { dwellMs, onsetMs });
@@ -620,7 +622,8 @@ scenario('S18 every duration of the four timing sets excludes onset', (t) => {
 });
 
 scenario('S19 default and unknown browser durations use the Balanced 1900ms navigation', (t) => {
-  for (const dwellMs of [undefined, 1800, 2800, 450]) {
+  // 2000 was a duration until 29 Sep 2026; like any value outside the sets it now falls back.
+  for (const dwellMs of [undefined, 1800, 2000, 450]) {
     const env = makeEnv({ zoom: 1.0 });
     inject(env, { dwellMs });
     const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'default' });
@@ -641,13 +644,13 @@ scenario('S3 dwell progress resumes on same target only', (t) => {
   const b = addGridCard(env, { left: 700, top: 150, width: 300, height: 200, vid: 'other' });
   const ca = centerOfRect(a.anchor.rect);
   const cb = centerOfRect(b.anchor.rect);
-  // 1710ms of fixation: most of the configured 2000ms dwell.
+  // 1710ms of fixation: most of the configured 1900ms dwell.
   let out = runTrace(env, Array(57).fill([ca.x, ca.y]));
   t.expect(out.clicks.length === 0, 'committed before excursion');
   // Excursion to empty space far from both cards (~10 frames = 300ms < 1000 TTL)
   runTrace(env, Array(10).fill([560, 700]));
   // Return to the SAME card: resume should commit much sooner than a
-  // fresh onset+dwell (which would need ~76 frames).
+  // fresh onset+dwell (which would need ~73 frames).
   out = runTrace(env, Array(30).fill([ca.x, ca.y]));
   const resumed = events2(env).filter((e) => e.kind === 'dwellResumed');
   t.expect(resumed.length === 1, `expected 1 dwellResumed, got ${resumed.length}`);

@@ -241,6 +241,26 @@ test('Familiar leaves Delete Word and non-keyboard navigation at Standard timing
     assert.equal(elapsed('familiar'),elapsed('standard'), `${screen}/${targetKind} timing changed`);
   }
 });
+test('in every speed a word suggestion takes exactly a key\'s time, measured end to end', () => {
+  // 29 Sep 2026: a suggestion completed in 0.75 of a key's time in Extra Time, but 1.21 in Quick.
+  // The maintainer asked for the key time itself, for muscle memory.
+  const selectionMs = targetKind => {
+    const h=cursorHarness(768,{},{keyboardCadence:true},null,{screen:'keyboard',targetKind});
+    const start=h.now;
+    while(h.clicks===0&&h.now<start+8000)h.frame();
+    assert.equal(h.clicks,1,targetKind);
+    return h.now-start;
+  };
+  try {
+    for (const set of Object.keys(dwell.DWELL_TIMING_SETS)) {
+      dwell.setDwellTimingSet(set);
+      const key=selectionMs('key'), word=selectionMs('suggestion');
+      assert.equal(word, key, `${set}: key ${key} ms, suggestion ${word} ms`);
+      const expected=dwell.KEYBOARD_CADENCE_BY_STAGE.mid_als.onset+dwell.DWELL_TIMING_SETS[set].ms.typing;
+      assert(key>=expected-32 && key<=expected+64, `${set}: key ${key} ms, expected onset plus the typing time, about ${expected} ms`);
+    }
+  } finally { dwell.setDwellTimingSet('balanced'); }
+});
 test('Familiar resumes a recent keyboard dwell but starts fresh after its 750 ms window', () => {
   const on = {x:.5,y:.5,intent_x:.5,intent_y:.5};
   const away = {x:.1,y:.1,intent_x:.1,intent_y:.1};
