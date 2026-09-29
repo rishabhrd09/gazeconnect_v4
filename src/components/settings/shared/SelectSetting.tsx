@@ -1,6 +1,6 @@
 import React from 'react';
-import { darkColors, lightColors, warmColors, layout, typography, spacing } from '../../../utils/design';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { lightColors, warmColors, layout, typography, spacing } from '../../../utils/design';
+import { useTheme, useDarkPalette } from '../../../contexts/ThemeContext';
 import GazeButton from '../../core/GazeButton';
 
 interface SelectSettingProps {
@@ -21,7 +21,8 @@ const SelectSetting: React.FC<SelectSettingProps> = ({
   isDarkMode,
 }) => {
   const { isWarm } = useTheme();
-  const colors = isWarm ? warmColors : isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isWarm ? warmColors : isDarkMode ? darkPalette : lightColors;
 
   return (
     <div className="settings-choice-section" style={{

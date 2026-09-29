@@ -9,7 +9,9 @@
 
 import React, { useState, useCallback } from 'react';
 import { useReportUnsavedChanges } from '../shared/unsavedChanges';
-import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
+import { lightColors, typography, spacing } from '../../../utils/design';
+import { useDarkPalette, useTheme } from '../../../contexts/ThemeContext';
+import { MIDNIGHT_NAVY } from '../../../config/midnightNavy';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { DEFAULT_CUSTOMIZATION } from '../../../services/defaultCustomization';
 import type { AlertModeCard } from '../../../types/customization';
@@ -28,7 +30,24 @@ const padCards = (list: AlertModeCard[]): AlertModeCard[] => {
 };
 
 const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
-    const colors = isDarkMode ? darkColors : lightColors;
+    const darkPalette = useDarkPalette();
+    const colors = isDarkMode ? darkPalette : lightColors;
+    // This panel's own reds and blues; Midnight Navy draws them from its palette instead.
+    const sos = useTheme().isMidnightNavy
+        ? {
+            ink: MIDNIGHT_NAVY.stateDanger, text: MIDNIGHT_NAVY.stateDanger, note: 'rgba(208,140,130,0.08)', noteEdge: 'rgba(208,140,130,0.28)',
+            card: 'rgba(208,140,130,0.12)', cardEdge: 'rgba(208,140,130,0.45)', tag: 'rgba(208,140,130,0.06)',
+            onBg: MIDNIGHT_NAVY.cardLive, onEdge: MIDNIGHT_NAVY.accent, onInk: MIDNIGHT_NAVY.accent,
+            switchOn: MIDNIGHT_NAVY.accent, knobOn: MIDNIGHT_NAVY.bgEdge, knobOff: MIDNIGHT_NAVY.textSecondary,
+            save: MIDNIGHT_NAVY.action, saved: '#1A2E43', saveInk: MIDNIGHT_NAVY.actionInk, savedInk: MIDNIGHT_NAVY.stateOk,
+        }
+        : {
+            ink: '#EF4444', text: '#FCA5A5', note: 'rgba(239,68,68,0.08)', noteEdge: 'rgba(239,68,68,0.25)',
+            card: 'rgba(127,29,29,0.25)', cardEdge: 'rgba(239,68,68,0.45)', tag: 'rgba(239,68,68,0.2)',
+            onBg: 'rgba(56,130,184,0.25)', onEdge: 'rgba(56,130,184,0.6)', onInk: '#7DD3FC',
+            switchOn: '#3882B8', knobOn: '#fff', knobOff: '#fff',
+            save: '#3882B8', saved: '#497775', saveInk: '#fff', savedInk: '#fff',
+        };
     const { data, updateAlertModeCards } = useCustomization();
 
     const savedCards = data.alertModeCards ?? DEFAULT_CUSTOMIZATION.alertModeCards;
@@ -78,29 +97,29 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
             {/* Info banner */}
             <div style={{
                 padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                background: sos.note, border: `1px solid ${sos.noteEdge}`,
                 fontSize: 13, color: colors.text.secondary, lineHeight: 1.5,
             }}>
-                <strong style={{ color: '#EF4444' }}>Urgent Needs</strong> opens from its card on the Home screen, or from the right-click menu.
+                <strong style={{ color: sos.ink }}>Urgent Needs</strong> opens from its card on the Home screen, or from the right-click menu.
                 It fills the screen with the SOS card and your chosen cards, and can be locked from the right-click menu.
             </div>
 
             {/* SOS card: fixed, read-only */}
             <div style={{
                 padding: '14px 18px', borderRadius: 12,
-                background: 'rgba(127,29,29,0.25)', border: '2px solid rgba(239,68,68,0.45)',
+                background: sos.card, border: `2px solid ${sos.cardEdge}`,
                 display: 'flex', alignItems: 'center', gap: 14,
             }}>
-                <span style={{ fontSize: 18, fontWeight: 800, color: '#FCA5A5' }}>SOS</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: sos.text }}>SOS</span>
                 <div>
-                    <div style={{ fontWeight: 700, color: '#FCA5A5', fontSize: 15 }}>Card 1 - SOS EMERGENCY</div>
+                    <div style={{ fontWeight: 700, color: sos.text, fontSize: 15 }}>Card 1 - SOS EMERGENCY</div>
                     <div style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 2 }}>
                         Always present, cannot be removed or renamed. Speaks: "Emergency - please come immediately"
                     </div>
                 </div>
                 <span style={{
                     marginLeft: 'auto', padding: '3px 10px', borderRadius: 6,
-                    background: 'rgba(239,68,68,0.2)', color: '#EF4444', fontSize: 12, fontWeight: 700,
+                    background: sos.tag, color: sos.ink, fontSize: 12, fontWeight: 700,
                 }}>
                     FIXED
                 </span>
@@ -118,11 +137,11 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                         {/* Card number badge */}
                         <div style={{
                             width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                            background: card.enabled ? 'rgba(56,130,184,0.25)' : colors.background.tertiary,
-                            border: `1.5px solid ${card.enabled ? 'rgba(56,130,184,0.6)' : colors.border.main}`,
+                            background: card.enabled ? sos.onBg : colors.background.tertiary,
+                            border: `1.5px solid ${card.enabled ? sos.onEdge : colors.border.main}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 700,
-                            color: card.enabled ? '#7DD3FC' : colors.text.tertiary,
+                            color: card.enabled ? sos.onInk : colors.text.tertiary,
                         }}>
                             {idx + 2}
                         </div>
@@ -151,12 +170,12 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                                 width: 44, height: 24, borderRadius: 12, border: 'none',
                                 cursor: 'pointer', position: 'relative', transition: 'background 150ms',
                                 flexShrink: 0,
-                                background: card.enabled ? '#3882B8' : colors.border.main,
+                                background: card.enabled ? sos.switchOn : colors.border.main,
                             }}
                         >
                             <span style={{
                                 position: 'absolute', top: 3, left: 3,
-                                width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                                width: 18, height: 18, borderRadius: '50%', background: card.enabled ? sos.knobOn : sos.knobOff,
                                 transition: 'transform 150ms',
                                 transform: card.enabled ? 'translateX(20px)' : 'translateX(0)',
                             }} />
@@ -175,8 +194,8 @@ const AlertModePanel: React.FC<AlertModePanelProps> = ({ isDarkMode }) => {
                     onClick={handleSave}
                     style={{
                         padding: '10px 28px', borderRadius: 8, border: 'none',
-                        background: saved ? '#497775' : '#3882B8',
-                        color: '#fff', fontWeight: 700, fontSize: 14,
+                        background: saved ? sos.saved : sos.save,
+                        color: saved ? sos.savedInk : sos.saveInk, fontWeight: 700, fontSize: 14,
                         cursor: 'pointer', transition: 'background 200ms', fontFamily: 'inherit',
                     }}
                 >

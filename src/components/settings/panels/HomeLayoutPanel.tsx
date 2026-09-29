@@ -12,6 +12,7 @@
 import React, { useState, useCallback } from 'react';
 import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
+import { useDarkPalette } from '../../../contexts/ThemeContext';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { DEFAULT_CUSTOMIZATION } from '../../../services/defaultCustomization';
@@ -74,7 +75,8 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
     const t = setTimeout(onDone, 2500);
     return () => clearTimeout(t);
   }, [onDone]);
-  const bg = type === 'success' ? darkColors.success.main : darkColors.emergency.main;
+  const darkPalette = useDarkPalette();
+  const bg = type === 'success' ? darkPalette.success.main : darkPalette.emergency.main;
   return <div className="hl-toast" style={{ background: bg }}>{msg}</div>;
 };
 
@@ -92,7 +94,8 @@ const readLeftPanelMode = (value: unknown): LeftPanelMode => (value === 'alert' 
 // ============================================
 
 const HomeLayoutPanel: React.FC<HomeLayoutPanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const { data, updateSetting } = useCustomization();
 
   const savedMode = readLeftPanelMode(data.settings?.homeEmergencyLaunchMode);

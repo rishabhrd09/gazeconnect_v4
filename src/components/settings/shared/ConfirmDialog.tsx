@@ -1,5 +1,6 @@
 import React from 'react';
-import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
+import { lightColors, layout, typography, spacing } from '../../../utils/design';
+import { useDarkPalette } from '../../../contexts/ThemeContext';
 import GazeButton from '../../core/GazeButton';
 
 interface ConfirmDialogProps {
@@ -23,7 +24,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isDarkMode,
   variant = 'emergency',
 }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
 
   return (
     <div style={{
@@ -35,7 +37,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       justifyContent: 'center',
       zIndex: 1000,
     }}>
-      <div style={{
+      <div className="confirm-dialog-panel" data-variant={variant} style={{
         backgroundColor: colors.background.elevated,
         borderRadius: layout.borderRadius.xl,
         border: `1px solid ${colors.border.main}`,

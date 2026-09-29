@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
+import { lightColors, layout, typography, spacing } from '../../../utils/design';
+import { useDarkPalette } from '../../../contexts/ThemeContext';
 import GazeButton from '../../core/GazeButton';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
@@ -15,7 +16,8 @@ const AddPersonForm: React.FC<{
   isDarkMode: boolean;
   onAdd: (person: Person) => void;
 }> = ({ isDarkMode, onAdd }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const [name, setName] = useState('');
   const [nameHi, setNameHi] = useState('');
   const role = 'Other';
@@ -96,7 +98,8 @@ const PersonRow: React.FC<{
   onToggleActive: () => void;
   onRemove: () => void;
 }> = ({ person, isActive, activeCount, isDarkMode, onToggleActive, onRemove }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const canShow = isActive || activeCount < MAX_ACTIVE_PEOPLE;
   const canHide = !isActive || activeCount > 1;
   const toggleDisabled = isActive ? !canHide : !canShow;
@@ -169,7 +172,8 @@ const PersonRow: React.FC<{
 };
 
 const PeoplePanel: React.FC<PeoplePanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const { people, addPerson, removePerson, resetPeople, updatePeople } = useCustomization();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);

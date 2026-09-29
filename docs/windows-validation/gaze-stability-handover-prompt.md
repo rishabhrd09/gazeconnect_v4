@@ -75,7 +75,7 @@ session's full report).
 ### Non-negotiable constraints
 
 - Preserve existing screen names, phrases, board content, spatial layout and navigation.
-- Warm and Dark themes only. English-only UI; no Hindi, no language toggles.
+- Dark, Warm and the optional Midnight Navy themes only. English-only UI; no Hindi, no language toggles.
 - No global emergency buttons. Keep existing care phrases and the separate Alert Mode board.
 - Primary gaze targets stay at least **80 CSS pixels**. Main screens must fit the
   viewport without scrolling. Preserve the tested 1920×1080 layout and 1366×768.

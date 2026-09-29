@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
+import { lightColors, layout, typography, spacing } from '../../../utils/design';
+import { useDarkPalette } from '../../../contexts/ThemeContext';
 import GazeButton from '../../core/GazeButton';
 
 interface EditableListProps {
@@ -17,7 +18,8 @@ const EditableList: React.FC<EditableListProps> = ({
   placeholder = 'New item...',
   maxItems = 20,
 }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const [newItem, setNewItem] = useState('');
 
   const handleAdd = () => {

@@ -14,6 +14,7 @@ import { GAZE_FILTER_MODES, normalizeFilterPreset } from '../../../config/gazeFi
 import {
   DEFAULT_GAZE_COLORS, GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors, type GazePalette,
 } from '../../../config/gazeColors';
+import { MIDNIGHT_NAVY, MIDNIGHT_NAVY_PAGE_GRADIENT } from '../../../config/midnightNavy';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
 import { gazeFlags } from '../../../utils/gazeFlags';
 import { POST_NAVIGATION_COOLDOWN_MS } from '../../core/GazeControlToggle';
@@ -335,26 +336,32 @@ export const VoicePage: React.FC<{ onSaved: () => void; onSpeak: (text: string) 
 // DISPLAY
 // ============================================
 
+// Each theme's own page, card, accent and type colours (Midnight Navy's page swatch is its gradient).
 const THEME_OPTIONS: Array<{ value: Theme; label: string; sub: string; swatches: string[] }> = [
   { value: 'warm', label: 'Warm', sub: 'Warm off-white surfaces, true black type, olive accents.', swatches: ['#fdf4ed', '#fcf2ea', '#5c6c3e', '#000000'] },
   { value: 'dark', label: 'Dark', sub: 'Deep green-grey surfaces, soft light type.', swatches: ['#171c19', '#212823', '#a5d0b9', '#f1f3ed'] },
+  {
+    value: 'midnight-navy', label: 'Midnight Navy', sub: 'Matte deep navy, pale text, and quiet blue accents.',
+    swatches: [MIDNIGHT_NAVY_PAGE_GRADIENT, MIDNIGHT_NAVY.card, MIDNIGHT_NAVY.accent, MIDNIGHT_NAVY.textPrimary],
+  },
 ];
 
 export const DisplayPage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   const { theme, setTheme } = useTheme();
   return (
-    <Card title="Theme" note="Only these two themes exist. Every screen follows this choice.">
+    <Card title="Theme" note="Three themes. Every screen follows this choice.">
       <div role="radiogroup" aria-label="Theme" className="gss-themes">
         {THEME_OPTIONS.map(option => {
           const checked = option.value === theme;
           return (
             <button key={option.value} type="button" role="radio" aria-checked={checked} className="gss-option gss-theme"
+              aria-label={option.label} aria-describedby={`theme-option-${option.value}-sub`}
               onClick={() => { if (!checked) { setTheme(option.value); onSaved(); } }}>
               <span className="gss-swatches" aria-hidden="true">
                 {option.swatches.map(colour => <span key={colour} style={{ background: colour }} />)}
               </span>
               <span className="gss-option-label">{option.label}</span>
-              <span className="gss-option-sub">{option.sub}</span>
+              <span className="gss-option-sub" id={`theme-option-${option.value}-sub`}>{option.sub}</span>
               {checked && <LineIcon d={ICON.check} className="gss-option-check" />}
             </button>
           );

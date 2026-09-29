@@ -1,11 +1,11 @@
 import React from 'react';
 import { GAZE_FILTER_MODES, normalizeFilterPreset } from '../../../config/gazeFilterConfig';
-import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
+import { lightColors, typography, spacing } from '../../../utils/design';
 import ToggleSetting from '../shared/ToggleSetting';
 import SliderSetting from '../shared/SliderSetting';
 import SelectSetting from '../shared/SelectSetting';
 import { useCustomization } from '../../../contexts/CustomizationContext';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme, type Theme, useDarkPalette } from '../../../contexts/ThemeContext';
 import { DWELL_TIMING_SETS, normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet } from '../../../config/dwellTimeConfig';
 import { GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors } from '../../../config/gazeColors';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
@@ -42,8 +42,15 @@ interface AppSettingsPanelProps {
   isDarkMode: boolean;
 }
 
+const APPEARANCES: Array<{ value: Theme; label: string; description: string }> = [
+  { value: 'warm', label: 'Warm', description: 'Warm off-white surfaces, true black type, olive accents.' },
+  { value: 'dark', label: 'Dark', description: 'Deep green-grey surfaces, soft light type.' },
+  { value: 'midnight-navy', label: 'Midnight Navy', description: 'Matte deep navy, pale text, and quiet blue accents.' },
+];
+
 const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const { settings, updateSetting } = useCustomization();
   const { theme, setTheme } = useTheme();
 
@@ -84,18 +91,16 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
                 Theme
               </div>
               <div style={{ fontSize: '12px', color: colors.text.secondary, marginTop: '2px' }}>
-                {theme === 'warm'
-                  ? 'Warm mode'
-                  : 'Dark mode'}
+                {`${APPEARANCES.find(appearance => appearance.value === theme)?.label ?? 'Dark'} mode`}
               </div>
             </div>
 
             <div className="theme-toggle-pill" role="group" aria-label="Theme">
-              {(['warm', 'dark'] as const).map(appearance => (
-                <button key={appearance} aria-pressed={theme === appearance}
-                  onClick={() => setTheme(appearance)}>
-                  <span className={`theme-swatch theme-swatch-${appearance}`} aria-hidden="true" />
-                  {appearance === 'warm' ? 'Warm' : 'Dark'}
+              {APPEARANCES.map(appearance => (
+                <button key={appearance.value} aria-pressed={theme === appearance.value}
+                  title={appearance.description} onClick={() => setTheme(appearance.value)}>
+                  <span className={`theme-swatch theme-swatch-${appearance.value}`} aria-hidden="true" />
+                  {appearance.label}
                 </button>
               ))}
             </div>

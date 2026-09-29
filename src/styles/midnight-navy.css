@@ -1,0 +1,503 @@
+/* =====================================================================================
+   MIDNIGHT NAVY (28 Sep 2026, maintainer request): an optional third display mode after the
+   bedside palette of Iris Desk Buddy. Matte deep navy, pale words, quiet blue accents; no glass,
+   blur, glow, glossy gradient, large shadow or animated background.
+
+   Paint and type only, like the GazeSpell look: every selector here starts with
+   :root[data-theme='midnight-navy'] (npm run check:look), so Dark and Warm cannot change, and no
+   rule sets the size, padding, margin, border width or position of anything, so every gaze
+   target keeps its box. The saved choice is applied before the first paint (index.html), and
+   the base tokens below need nothing else, so the first frame is already navy.
+
+   Deliberate exceptions to "all navy": the live gaze feedback keeps its tested colours (the
+   amber bubble, the teal dwell fill and focus teal, --ui-accent); success, warning and error
+   keep the semantic --state-* colours; the wordmark and Music labels keep their Georgia.
+
+   Specificity: tokens and the page background use :root[data-theme='midnight-navy'] alone.
+   Rules that must outrank the GazeSpell look or a screen's own stylesheet (screens load theirs
+   later, so a tie would go to them) add [data-look], which main.tsx always sets.
+   ===================================================================================== */
+
+/* ---- Iris's palette (exact values) and GazeConnect's roles ------------------------------ */
+:root[data-theme='midnight-navy'] {
+  color-scheme: dark;
+
+  /* Background */
+  --iris-bg: #00102E;
+  --iris-bg-edge: #000918;
+  --iris-bg-outer: #000B24;
+  --iris-bg-inner: #00102E;
+  --iris-bg-centre: #001538;
+  --iris-nav-bg: #000918;
+  --iris-draft-bg: #08162D;
+
+  /* Surfaces */
+  --iris-card: #0A1A36;
+  --iris-card-edge: #223A61;
+  --iris-card-live: #17305A;
+  --iris-inset: #17305A;
+
+  /* Words and icons */
+  --iris-text-primary: #F3F5F8;
+  --iris-text-secondary: #96AAD2;
+  --iris-text-muted: #8D9DB8;
+  --iris-text-bright: #FFFFFF;
+  --iris-icon: #DCE7F5;
+
+  /* Rules, actions, and passive progress */
+  --iris-ring: #162A4B;
+  --iris-divider: #415270;
+  --iris-outline: #415270;
+  --iris-accent: #C2D3EE;
+  --iris-action: #17305A;
+  --iris-action-ink: #F3F5F8;
+  --iris-progress-track: #203756;
+  --iris-progress-fill: #C2D3EE;
+
+  /* Semantic states */
+  --state-ok: #8FBFA0;
+  --state-warn: #C9A96A;
+  --state-danger: #D08C82;
+  --state-info: #C2D3EE;
+  --state-note: #8FA6D0;
+
+  /* Iris's optional decorative scene colours: kept for reference only. GazeConnect draws no scene. */
+  --scene-eye: #E8EDF3;
+  --scene-cyan: #3D5F8F;
+  --scene-teal: #4E77AA;
+  --scene-violet: #42558B;
+  --scene-amber: #7E7396;
+  --scene-pink: #6C6796;
+  --scene-red: #8A5F72;
+
+  /* Iris's one restrained radial gradient, and its shapes. */
+  --iris-page-gradient: radial-gradient(ellipse 52% 48% at 50% 53%, var(--iris-bg-centre) 0%, var(--iris-bg-inner) 38%, var(--iris-bg-outer) 66%, var(--iris-bg-edge) 100%);
+  --iris-radius-card: 18px;
+  --iris-radius-control: 11px;
+  /* Tinted surfaces for the semantic roles (a state colour laid thinly over the card). */
+  --iris-danger-surface: color-mix(in srgb, var(--state-danger) 13%, var(--iris-card));
+  --iris-danger-deep: color-mix(in srgb, var(--state-danger) 34%, var(--iris-bg-edge));
+  --iris-warn-surface: color-mix(in srgb, var(--state-warn) 13%, var(--iris-card));
+  --iris-ok-surface: color-mix(in srgb, var(--state-ok) 12%, var(--iris-card));
+
+  /* GazeConnect's semantic roles (refinement.css) in Iris colours. */
+  --ui-page: var(--iris-bg);
+  --ui-surface: var(--iris-card);
+  --ui-panel: var(--iris-bg-outer);
+  --ui-inset: var(--iris-draft-bg);
+  --ui-hover: var(--iris-card-live);
+  --ui-border: var(--iris-card-edge);
+  --ui-ink: var(--iris-text-primary);
+  --ui-muted: var(--iris-text-secondary);
+  /* The brand role paints the wordmark and the Home and top-bar icons: Iris's icon colour. */
+  --ui-brand: var(--iris-icon);
+  --ui-accent-ink: var(--iris-accent);
+  --ui-care-ink: var(--state-danger);
+  --ui-care-border: color-mix(in srgb, var(--state-danger) 32%, var(--iris-card-edge));
+  --ui-selected: var(--iris-card-live);
+  --ui-on-action: var(--iris-action-ink);
+  --ui-font: 'Manrope', 'Segoe UI', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
+
+  /* Intentional functional exception: preserve tested live gaze feedback. */
+  --ui-accent: #2DD4BF;
+
+  /* Warm-mode aliases some older screens read; harmless here, but never Warm's cream. */
+  --wm-root: var(--ui-page); --wm-surface: var(--ui-surface); --wm-text: var(--ui-ink);
+
+  /* Type roles. Iris sizes its patient type from a 1024x600 reference, s = min(vw/1024, vh/600):
+     main prompt 46 px (450, -0.025em), choice title 32 (550, -0.015em, line 1.15), large letter
+     44 (500), written draft 34, lead 24, body 20 (400), small label 15, tiny status 13 (spaced
+     capitals). GazeConnect's patient sizes are already clamp()s tuned to their boxes and denser
+     screens (the letters, draft and word slots match 44s, 34s and 32s within a few px), so they
+     are kept and Navy takes Iris's weights, tracking and leading; a size change there could move
+     a gaze target. Settings (mouse only) takes Iris's caregiver scale itself. */
+  --iris-w-prompt: 450;
+  --iris-w-choice: 550;
+  --iris-w-letter: 500;
+  --iris-w-body: 400;
+  --iris-w-status: 600;
+  --iris-track-prompt: -0.025em;
+  --iris-track-choice: -0.015em;
+  --iris-track-status: 0.08em;
+  --iris-set-heading: clamp(22px, min(2.54vw, 4.33vh), 28px);
+  --iris-set-section: clamp(17px, min(1.86vw, 3.17vh), 20px);
+  --iris-set-body: clamp(15px, min(1.66vw, 2.83vh), 18px);
+  --iris-set-support: clamp(13.5px, min(1.42vw, 2.42vh), 15.5px);
+}
+
+/* Tokens that the GazeSpell look and the keyboard also define: these rules tie or beat theirs
+   and come later. */
+:root[data-look][data-theme='midnight-navy'] {
+  --ui-font: 'Manrope', 'Segoe UI', 'Nirmala UI', 'Noto Sans Devanagari', sans-serif;
+  --kb-ink: var(--iris-text-primary);
+  --gs-chip: var(--iris-card);
+  --gs-rose: var(--iris-danger-surface);
+  --gs-rose-ink: var(--state-danger);
+  --gs-sage: var(--iris-card);
+  --gs-space: var(--iris-text-primary);
+  /* The practice tile previews a dwell: it keeps the live teal. */
+  --gs-looking: #2DD4BF;
+  --gs-sos: var(--iris-danger-deep);
+  --gs-sos-ink: var(--iris-text-primary);
+  --gs-care: var(--iris-action);
+  --gs-care-ink: var(--iris-action-ink);
+  --gs-exit: var(--iris-text-primary);
+  --gs-exit-ink: var(--iris-bg-edge);
+  --gs-label: var(--iris-w-choice);
+  --gs-title: 600;
+}
+
+/* ---- Page, top bar, status -------------------------------------------------------------- */
+/* The page wears Iris's gradient. The gaze cursor's layers (data-cursor) stay see-through, as
+   in refinement.css: never an opaque layer over the bubble or the dwell highlight. */
+:root[data-theme='midnight-navy'] body,
+:root[data-theme='midnight-navy'] #root > div:not([data-cursor]),
+:root[data-theme='midnight-navy'] [class*='-screen'] {
+  background: var(--iris-bg-edge) var(--iris-page-gradient) !important;
+  color: var(--ui-ink);
+}
+:root[data-look][data-theme='midnight-navy'] .home-screen { background: var(--iris-bg-edge) var(--iris-page-gradient) !important; }
+/* The moment a screen is still loading shows the page, not Dark's inline colour. */
+:root[data-theme='midnight-navy'] .screen-loading-fallback { background: transparent !important; }
+/* Small fixed chrome that sits directly on #root: solid navbar navy, not a gradient of its own. */
+:root[data-theme='midnight-navy'] #root > div.gaze-status-indicator {
+  background: var(--iris-nav-bg) !important;
+  border-color: var(--iris-outline) !important;
+}
+:root[data-theme='midnight-navy'] .nav-bar-container {
+  background: var(--iris-nav-bg) !important;
+  border-bottom-color: var(--iris-divider) !important;
+  box-shadow: none !important;
+}
+:root[data-theme='midnight-navy'] .nav-pill {
+  background: var(--iris-card) !important;
+  border-color: var(--iris-card-edge) !important;
+}
+:root[data-theme='midnight-navy'] .nav-pill .nav-btn {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--iris-text-secondary) !important;
+  box-shadow: none !important;
+}
+:root[data-theme='midnight-navy'] .nav-pill .nav-btn-back { background: color-mix(in srgb, var(--iris-accent) 6%, transparent) !important; }
+:root[data-theme='midnight-navy'] .nav-pill .nav-btn:not(:disabled):hover { background: var(--iris-card-live) !important; color: var(--iris-text-primary) !important; }
+:root[data-theme='midnight-navy'] .nav-pill .nav-btn-active {
+  background: var(--iris-card-live) !important;
+  border-color: var(--iris-accent) !important;
+  color: var(--iris-text-bright) !important;
+}
+:root[data-look][data-theme='midnight-navy'] .nav-btn svg { color: var(--iris-icon) !important; }
+:root[data-look][data-theme='midnight-navy'] .nav-btn svg [stroke]:not([stroke='none']) { stroke: var(--iris-icon) !important; }
+:root[data-theme='midnight-navy'] .app-wordmark { color: var(--ui-brand) !important; }
+
+/* Gaze toggles (the Zone Board's card face): off = panel, on = the selected navy lift. */
+:root[data-theme='midnight-navy'] button.gaze-switch-card { background: var(--iris-card) !important; border-color: var(--iris-card-edge) !important; color: var(--iris-text-primary) !important; }
+:root[data-theme='midnight-navy'] button.gaze-switch-card[aria-pressed='true'] { background: var(--iris-card-live) !important; border-color: var(--iris-accent) !important; color: var(--iris-text-bright) !important; }
+:root[data-theme='midnight-navy'] button.gaze-switch-card .gaze-switch-face svg { color: var(--iris-icon); }
+:root[data-look][data-theme='midnight-navy'] button.gaze-switch-card .gaze-switch-label { font-weight: var(--iris-w-choice) !important; }
+
+/* Status: the chip in the corner and the backend connection. Semantic colours, tiny type.
+   The chip's words keep their meaning: on and a healthy rate in the ok colour, a low rate in
+   the warning colour, a live tracker in the info colour, the rest quiet. */
+:root[data-theme='midnight-navy'] .gaze-status-indicator,
+:root[data-theme='midnight-navy'] .gaze-status-indicator span { color: var(--iris-text-muted) !important; }
+:root[data-theme='midnight-navy'] .gaze-status-indicator span[style*='rgb(0, 255, 0)'] { color: var(--state-ok) !important; }
+:root[data-theme='midnight-navy'] .gaze-status-indicator span[style*='rgb(255, 136, 0)'] { color: var(--state-warn) !important; }
+:root[data-theme='midnight-navy'] .gaze-status-indicator span[style*='rgb(0, 255, 255)'] { color: var(--state-info) !important; }
+:root[data-theme='midnight-navy'] .connection-indicator {
+  background: var(--iris-nav-bg) !important;
+  border-color: color-mix(in srgb, var(--state-ok) 55%, transparent) !important;
+  color: var(--state-ok) !important;
+  font-weight: var(--iris-w-status) !important;
+  letter-spacing: 0.03em;
+}
+:root[data-theme='midnight-navy'] .connection-indicator[data-connected='false'] {
+  border-color: color-mix(in srgb, var(--state-warn) 55%, transparent) !important;
+  color: var(--state-warn) !important;
+}
+:root[data-theme='midnight-navy'] .connection-indicator > span { background: var(--state-ok) !important; }
+:root[data-theme='midnight-navy'] .mouse-only-banner { background: var(--iris-warn-surface) !important; border-color: color-mix(in srgb, var(--state-warn) 55%, transparent) !important; color: var(--state-warn) !important; }
+
+/* The clock: quiet metadata above a calm time. */
+:root[data-look][data-theme='midnight-navy'] .live-clock-date { color: var(--iris-text-muted) !important; font-weight: var(--iris-w-status) !important; letter-spacing: var(--iris-track-status) !important; }
+:root[data-look][data-theme='midnight-navy'] .live-clock-time { color: var(--iris-text-primary) !important; font-weight: 500 !important; }
+:root[data-look][data-theme='midnight-navy'] .live-clock-period { color: var(--iris-text-muted) !important; font-weight: var(--iris-w-status) !important; }
+
+/* ---- Shared surfaces --------------------------------------------------------------------- */
+/* Cards: flat navy, 1 px edge, 18 px corners. Hover lifts the surface only: no move, no scale,
+   no glow. The chosen card keeps the live navy with a pale edge and its title brightens.
+   The GazeSpell look's card rules reach ID specificity (an #id inside their :is()), so the
+   rules that must beat them go through #root. */
+:root[data-look][data-theme='midnight-navy'] :is(.grid-card, .design-card, .phrase-card, [id^='assist-category-'], [id^='act-cat-'], [id^='hub-'],
+  [id^='qws-'], [id^='person-'], [id^='selected-person-display-'], #assist-back-categories-card, .medical-screen [id^='phrase-'], .zone-group, .zone-suggestion) {
+  border-radius: var(--iris-radius-card) !important;
+}
+:root[data-look][data-theme='midnight-navy'] #root :is(.grid-card, .design-card, .phrase-card, .keyboard-key, .quickcall-btn, [id^='assist-category-'], [id^='act-cat-'],
+  [id^='hub-'], [id^='qws-'], [id^='person-'], .medical-screen [id^='phrase-'], .zone-group, .zone-suggestion, .music-choice, .keyboard-word-slot, .keyboard-phrase-slot):not(:disabled):hover {
+  background: var(--iris-card-live) !important;
+  border-color: var(--iris-outline) !important;
+}
+:root[data-look][data-theme='midnight-navy'] #root :is(.grid-card, .design-card, .phrase-card, [id^='cat-'], [id^='act-cat-'], [id^='person-'], .survey-choice-grid > button,
+  .settings-choice-section button, .web-hub-screen [id^='yc-'], .web-hub-screen [id^='content-'], .browse-category-choice, .browse-reader-choices button)[aria-pressed='true'] {
+  background: var(--iris-card-live) !important;
+  border-color: var(--iris-accent) !important;
+  color: var(--iris-text-bright) !important;
+}
+:root[data-theme='midnight-navy'] ::-webkit-scrollbar-thumb { background: var(--iris-outline); border-radius: 6px; }
+:root[data-theme='midnight-navy'] ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Home ------------------------------------------------------------------------------- */
+/* Same eight tiles, same boxes: a flat card instead of the Dark diagonal wash. */
+:root[data-look][data-theme='midnight-navy'] .home-screen .grid-card { background: var(--iris-card) !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .grid-card-label {
+  color: var(--iris-text-primary) !important;
+  font-weight: var(--iris-w-choice) !important;
+  letter-spacing: var(--iris-track-choice) !important;
+  line-height: 1.15 !important;
+}
+:root[data-look][data-theme='midnight-navy'] .home-screen .grid-card-label + span {
+  color: var(--iris-text-secondary) !important;
+  font-weight: var(--iris-w-status) !important;
+}
+:root[data-theme='midnight-navy'] .home-screen .grid-card svg [stroke]:not([stroke='none']) { stroke: var(--iris-icon) !important; }
+:root[data-theme='midnight-navy'] .home-screen .grid-card svg [fill]:not([fill='none']) { fill: var(--iris-icon) !important; }
+/* The thin rules between the three columns (their inline wash is Dark's warm grey). */
+:root[data-theme='midnight-navy'] .home-screen [style*='rgba(213, 216, 188'] {
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--iris-divider) 70%, transparent) 50%, transparent 100%) !important;
+}
+/* Quick Phrases (and Urgent Needs when Home shows it): cards like the tiles. */
+:root[data-look][data-theme='midnight-navy'] .home-screen .quickcall-btn:not(.home-care-card) { background: var(--iris-card) !important; border-color: var(--iris-card-edge) !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .quickcall-btn:not(.home-care-card):hover { background: var(--iris-card-live) !important; border-color: var(--iris-outline) !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .home-dock-phrases span:first-child { font-weight: var(--iris-w-choice) !important; letter-spacing: var(--iris-track-choice) !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .home-dock-phrases div + span { color: var(--iris-text-secondary) !important; }
+/* Urgent Needs stays the most prominent card: a danger-tinted surface, the danger colour and a
+   firmer weight than Iris's choices. (.quickcall-btn outranks the plain-card rule above.) */
+:root[data-look][data-theme='midnight-navy'] .home-screen .quickcall-btn.home-dock-urgent { background: var(--iris-danger-surface) !important; border-color: var(--ui-care-border) !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .home-dock-urgent span { color: var(--state-danger) !important; font-weight: 700 !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .home-dock-urgent svg { color: var(--state-danger) !important; }
+:root[data-look][data-theme='midnight-navy'] .home-screen .home-dock-urgent svg [stroke]:not([stroke='none']) { stroke: var(--state-danger) !important; }
+/* The hairline between Urgent Needs and Quick Phrases (its inline colour is Dark's ink at 10 %). */
+:root[data-theme='midnight-navy'] .home-screen div[style*='height: 1px'][style*='rgba(241, 243, 237, 0.1)'] { background: var(--iris-divider) !important; }
+
+/* ---- Phrases, Assistance, People, Activities, Browsing ---------------------------------------------- */
+/* Choice cards whose surface is inline Dark paint. */
+:root[data-look][data-theme='midnight-navy'] :is(.activities-screen [id^='act-cat-'], .people-screen [id^='person-'], .medical-screen [id^='assist-category-']) {
+  background: var(--iris-card) !important;
+  border-color: var(--iris-card-edge) !important;
+}
+/* The chosen category or person is marked only by its inline fill (as the Warm rules in gazespell-look.css). */
+:root[data-look][data-theme='midnight-navy'] #root :is(.phrases-screen [id^='cat-']:not([style*='background-color: transparent']), .people-screen [id^='person-'][style*='rgba(127, 163, 155, 0.16)']) {
+  background: var(--iris-card-live) !important;
+  border-color: var(--iris-accent) !important;
+}
+:root[data-look][data-theme='midnight-navy'] :is(.phrases-screen [id^='cat-']:not([style*='background-color: transparent']), .people-screen [id^='person-'][style*='rgba(127, 163, 155, 0.16)']) :not(svg, svg *) { color: var(--iris-text-bright) !important; }
+:root[data-look][data-theme='midnight-navy'] .phrases-screen [id^='cat-'] :not(svg, svg *) { color: var(--iris-text-primary); }
+:root[data-look][data-theme='midnight-navy'] :is(.phrases-screen [id^='cat-'], .people-screen [id^='person-'], .medical-screen [id^='assist-category-'], .activities-screen [id^='act-cat-']) :not(svg, svg *) {
+  font-weight: var(--iris-w-choice) !important;
+  letter-spacing: var(--iris-track-choice) !important;
+}
+:root[data-look][data-theme='midnight-navy'] .phrases-screen .phrase-card { font-weight: var(--iris-w-choice) !important; letter-spacing: var(--iris-track-choice) !important; }
+/* Screen headings take Iris's main-prompt treatment (their size stays: they sit above the cards). */
+:root[data-look][data-theme='midnight-navy'] :is(.phrases-screen, .medical-screen, .activities-screen, .people-screen, .web-hub-screen, .design-home-screen, .quickwords-screen) :is(h1, h2) {
+  color: var(--iris-text-primary) !important;
+  font-weight: var(--iris-w-prompt) !important;
+  letter-spacing: var(--iris-track-prompt) !important;
+}
+/* Line icons in one quiet colour, instead of a hue per app (the Assistance pictures stay the originals). */
+:root[data-look][data-theme='midnight-navy'] :is(.phrases-screen, .medical-screen, .activities-screen, .people-screen, .web-hub-screen, .quickwords-screen) svg:not(.gaze-bubble-progress) {
+  color: var(--iris-icon) !important;
+}
+:root[data-look][data-theme='midnight-navy'] :is(.phrases-screen, .medical-screen, .activities-screen, .people-screen, .web-hub-screen, .quickwords-screen) :is(svg[stroke], svg [stroke]):not([stroke='none']):not(.gaze-bubble-progress *) {
+  stroke: var(--iris-icon) !important;
+}
+:root[data-look][data-theme='midnight-navy'] :is(.activities-screen, .web-hub-screen) :is(svg[fill], svg [fill]):not([fill='none']) { fill: var(--iris-icon) !important; }
+/* Quick Phrases: the urgent column keeps the danger colour; the other two are plain cards. */
+:root[data-look][data-theme='midnight-navy'] .quickwords-screen [style*='medical-urgent'] { background-color: var(--state-danger) !important; }
+:root[data-look][data-theme='midnight-navy'] .quickwords-screen :is([style*='bed-position'], [style*='daily-care']) { background-color: var(--iris-icon) !important; }
+:root[data-look][data-theme='midnight-navy'] .quickwords-screen [id^='qws-'] * { font-weight: var(--iris-w-choice) !important; }
+
+/* ---- Keyboard ------------------------------------------------------------------------------ */
+/* Flat navy keys with pale glyphs; the key and slot boxes, the 2 px key borders and every
+   size stay as they are (the action row's flex sizes include the border). */
+:root[data-look][data-theme='midnight-navy'] #root .keyboard-screen .keyboard-key { border-radius: var(--iris-radius-control) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-key { font-weight: 600 !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-key[data-action='letter'] { color: var(--kb-ink) !important; font-weight: var(--iris-w-letter) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-key[data-action='letter'][data-keyboard-confirmed='true'] { color: var(--iris-text-bright) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-key[data-action='space'] { color: var(--kb-ink) !important; }
+/* Familiar feel: the same flat navy, with the finer edge of its charcoal reference. */
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen[data-keyboard-feel='familiar'] .keyboard-key[data-action='letter']:not([data-keyboard-confirmed='true']) { border-color: var(--iris-outline) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) {
+  background: var(--iris-card) !important;
+  border-radius: var(--iris-radius-control) !important;
+}
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) :is(button, span) {
+  color: var(--iris-text-primary) !important;
+  font-weight: var(--iris-w-choice) !important;
+  letter-spacing: var(--iris-track-choice) !important;
+}
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen :is(.keyboard-word-slot-empty, .keyboard-phrase-slot-empty) { background: var(--iris-bg-outer) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen #nav-restore-btn {
+  background: var(--iris-action) !important;
+  color: var(--iris-accent) !important;
+  font-weight: 600 !important;
+}
+/* The panel behind the letter keys. */
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-letter-panel { background-color: var(--iris-bg-outer) !important; }
+/* The gaze hub beside SPACE: the same circle, dot, label and two thin lines, flat navy. Its
+   button says whether gaze is on (aria-label 'Pause gaze'), so the dot and lines can too. */
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-gaze-hub { background: var(--iris-bg-outer) !important; border-color: var(--iris-accent) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-gaze-hub > div:first-child { border-color: color-mix(in srgb, var(--iris-accent) 22%, transparent) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-gaze-hub > div:nth-child(2) { background-color: var(--iris-text-muted) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-inline-gaze[aria-label='Pause gaze'] .keyboard-gaze-hub > div:nth-child(2) { background-color: var(--iris-accent) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .keyboard-gaze-label { color: var(--iris-text-primary) !important; font-weight: var(--iris-w-status) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen :is(div:has(+ .keyboard-inline-gaze), .keyboard-inline-gaze + div) { background-color: var(--iris-divider) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen :is(div:has(+ .keyboard-inline-gaze[aria-label='Pause gaze']), .keyboard-inline-gaze[aria-label='Pause gaze'] + div) {
+  background-color: color-mix(in srgb, var(--iris-accent) 60%, transparent) !important;
+}
+/* The keyboard's own top-bar controls outside the pill (Full screen). */
+:root[data-look][data-theme='midnight-navy'] .keyboard-screen .nav-control-cell > .nav-btn {
+  background: var(--iris-card) !important;
+  border-color: var(--iris-card-edge) !important;
+  color: var(--iris-text-primary) !important;
+}
+/* The written draft: Iris's recessed field, primary ink. */
+:root[data-look][data-theme='midnight-navy'] .keyboard-message { background: var(--iris-draft-bg) !important; border-color: var(--iris-card-edge) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-message-text { color: var(--iris-text-primary) !important; font-weight: 500 !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-message .message-display-action { background: var(--iris-card) !important; color: var(--iris-text-secondary) !important; border-left-color: var(--iris-card-edge) !important; font-weight: var(--iris-w-choice) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-message .message-display-speak { background: var(--iris-action) !important; color: var(--iris-accent) !important; }
+:root[data-look][data-theme='midnight-navy'] .keyboard-message .message-display-action:hover { background: var(--iris-card-live) !important; }
+
+/* ---- Zone Board (the spatial keyboard) ---------------------------------------------------------- */
+:root[data-look][data-theme='midnight-navy'] .zone-workspace .zone-group { font-weight: var(--iris-w-letter) !important; }
+:root[data-look][data-theme='midnight-navy'] .zone-workspace .zone-suggestion { color: var(--iris-text-primary) !important; font-weight: var(--iris-w-choice) !important; }
+:root[data-look][data-theme='midnight-navy'] .zone-workspace :is(.zone-delete, .zone-space, .zone-speak) { font-weight: 600 !important; }
+:root[data-look][data-theme='midnight-navy'] .zone-workspace .zone-current-word { background: var(--iris-draft-bg) !important; }
+:root[data-look][data-theme='midnight-navy'] .zone-workspace .zone-current-text { font-weight: 500 !important; }
+
+/* ---- Music ----------------------------------------------------------------------------------- */
+/* Music's own tokens (music.css). Left and right are not told apart by colour. The page wears
+   the same gradient as every screen. */
+:root[data-theme='midnight-navy'] #music-view {
+  background-image: var(--iris-page-gradient);
+  --mu-bg: var(--iris-bg);
+  --mu-raised: var(--iris-card);
+  --mu-text: var(--iris-text-primary);
+  --mu-muted: var(--iris-text-secondary);
+  --mu-faint: var(--iris-divider);
+  --mu-accent: var(--iris-accent);
+  --mu-left: var(--iris-text-primary);
+  --mu-right: var(--iris-text-primary);
+}
+:root[data-theme='midnight-navy'] #music-view .music-choice { --mu-edge: var(--iris-card-edge); }
+:root[data-theme='midnight-navy'] #music-view .music-choice:not(:disabled):hover { border-color: var(--iris-outline) !important; }
+:root[data-theme='midnight-navy'] #music-view .music-rule { background-color: color-mix(in srgb, var(--iris-divider) 70%, transparent); }
+/* Song progress is ordinary interface progress: Iris's 6 px track and pale fill. */
+:root[data-theme='midnight-navy'] #music-view .music-now-track { background-color: var(--iris-progress-track); }
+:root[data-theme='midnight-navy'] #music-view .music-now-fill { background-color: var(--iris-progress-fill); }
+:root[data-theme='midnight-navy'] #music-view .music-now-status--failed { color: var(--state-danger); }
+
+/* ---- Older GazeButtons ------------------------------------------------------------------------ */
+/* GazeButton (src/components/core) paints Dark's variant colours inline and is left untouched
+   (it also runs the mouse dwell). Navy repaints each variant, recognised by its inline
+   background: default, quickfire, primary or selected, success, warning, emergency. Colours only. */
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgb(29, 36, 31)'] {
+  background-color: var(--iris-card) !important; border-color: var(--iris-card-edge) !important; color: var(--iris-text-primary) !important;
+}
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgb(38, 46, 40)'] {
+  background-color: var(--iris-card) !important; border-color: var(--iris-card-edge) !important; color: var(--iris-text-primary) !important;
+}
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgba(165, 208, 185, 0.14)'] {
+  background-color: var(--iris-card-live) !important; border-color: var(--iris-accent) !important; color: var(--iris-text-bright) !important;
+}
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgba(52, 211, 153, 0.14)'] {
+  background-color: var(--iris-ok-surface) !important; border-color: color-mix(in srgb, var(--state-ok) 55%, transparent) !important; color: var(--state-ok) !important;
+}
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgba(245, 158, 11, 0.14)'] {
+  background-color: var(--iris-warn-surface) !important; border-color: color-mix(in srgb, var(--state-warn) 55%, transparent) !important; color: var(--state-warn) !important;
+}
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgb(46, 26, 26)'] {
+  background-color: var(--iris-danger-surface) !important; border-color: color-mix(in srgb, var(--state-danger) 55%, transparent) !important; color: var(--state-danger) !important;
+}
+:root[data-theme='midnight-navy'] .gaze-button:is([style*='background-color: rgb(29, 36, 31)'], [style*='background-color: rgb(38, 46, 40)']) > div { color: var(--iris-text-primary) !important; }
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgba(165, 208, 185, 0.14)'] > div { color: var(--iris-text-bright) !important; }
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgba(52, 211, 153, 0.14)'] > div { color: var(--state-ok) !important; }
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgba(245, 158, 11, 0.14)'] > div { color: var(--state-warn) !important; }
+:root[data-theme='midnight-navy'] .gaze-button[style*='background-color: rgb(46, 26, 26)'] > div { color: var(--state-danger) !important; }
+
+/* ---- Card labels painted in Dark's warm off-white ----------------------------------------------- */
+:root[data-look][data-theme='midnight-navy'] :is(.phrase-card, .activities-screen [id^='act-cat-'], .medical-screen [id^='assist-category-'], .medical-screen [id^='phrase-'],
+  .people-screen [id^='person-'], .phrases-screen [id^='cat-']) span {
+  color: var(--iris-text-primary) !important;
+}
+:root[data-look][data-theme='midnight-navy'] .quickwords-screen h3 { color: var(--iris-text-primary) !important; }
+:root[data-look][data-theme='midnight-navy'] .people-screen [id^='selected-person-display-'] { background: var(--iris-card) !important; border-color: var(--iris-accent) !important; }
+:root[data-look][data-theme='midnight-navy'] .people-screen [id^='selected-person-display-'],
+:root[data-look][data-theme='midnight-navy'] .people-screen [id^='selected-person-display-'] * { color: var(--iris-text-primary) !important; }
+
+/* ---- Dialogs and overlays -------------------------------------------------------------------- */
+/* The confirm dialog (Settings): Navy's card from useDarkPalette(), matte, with a warning or
+   danger action in its semantic colour. */
+:root[data-theme='midnight-navy'] .confirm-dialog-panel { border-radius: var(--iris-radius-card) !important; box-shadow: none !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel > div:first-child { font-weight: 600 !important; letter-spacing: -0.01em; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel :is(#confirm-cancel, #confirm-ok) { border-radius: var(--iris-radius-control) !important; box-shadow: none !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel #confirm-cancel { background: var(--iris-bg-outer) !important; border-color: var(--iris-outline) !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel #confirm-cancel * { color: var(--iris-text-primary) !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel[data-variant='warning'] #confirm-ok { background: var(--iris-warn-surface) !important; border-color: var(--state-warn) !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel[data-variant='warning'] #confirm-ok * { color: var(--state-warn) !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel[data-variant='emergency'] #confirm-ok { background: var(--iris-danger-surface) !important; border-color: var(--state-danger) !important; }
+:root[data-theme='midnight-navy'] .confirm-dialog-panel[data-variant='emergency'] #confirm-ok * { color: var(--state-danger) !important; }
+
+/* Settings messages (export, import, reset): a navy card with the message in its state colour. */
+:root[data-theme='midnight-navy'] .settings-toast { background-color: var(--iris-card) !important; color: var(--state-info) !important; box-shadow: inset 0 0 0 1px var(--iris-outline) !important; }
+:root[data-theme='midnight-navy'] .settings-toast[data-type='success'] { color: var(--state-ok) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--state-ok) 55%, transparent) !important; }
+:root[data-theme='midnight-navy'] .settings-toast[data-type='error'] { color: var(--state-danger) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--state-danger) 55%, transparent) !important; }
+/* The Settings pages' own "Saved" and error notes: their inline background is Navy's ok or danger
+   colour (useDarkPalette), which white type cannot sit on; the same navy card instead. */
+:root[data-theme='midnight-navy'] :is(.hl-toast, .ap-toast, .mp-toast, .pp-toast, .qwp-toast) {
+  background: var(--iris-card) !important; color: var(--iris-text-primary) !important; box-shadow: inset 0 0 0 1px var(--iris-outline) !important;
+}
+:root[data-theme='midnight-navy'] :is(.hl-toast, .ap-toast, .mp-toast, .pp-toast, .qwp-toast)[style*='rgb(143, 191, 160)'] {
+  color: var(--state-ok) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--state-ok) 55%, transparent) !important;
+}
+:root[data-theme='midnight-navy'] :is(.hl-toast, .ap-toast, .mp-toast, .pp-toast, .qwp-toast)[style*='rgb(208, 140, 130)'] {
+  color: var(--state-danger) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--state-danger) 55%, transparent) !important;
+}
+
+/* The Settings pages' filled buttons (their own scoped styles fill with the accent or success
+   colour): Iris's action instead, a navy fill with pale ink; success keeps its state colour. */
+:root[data-theme='midnight-navy'] .settings-panel :is([class*='-btn-primary'], .hl-active-badge) {
+  background: var(--iris-action) !important; border-color: var(--iris-accent) !important; color: var(--iris-action-ink) !important;
+}
+:root[data-theme='midnight-navy'] .settings-panel [class*='-btn-success'] {
+  background: var(--iris-ok-surface) !important; border-color: color-mix(in srgb, var(--state-ok) 55%, transparent) !important; color: var(--state-ok) !important;
+}
+
+/* ---- Settings (grouped): Iris's caregiver scale ----------------------------------------------- */
+:root[data-look][data-theme='midnight-navy'] .gss-layout {
+  --gss-sel: var(--iris-card-live);
+  --gss-edge: var(--iris-outline);
+  --gss-track: var(--iris-progress-track);
+}
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-page-titles h1 { font-size: var(--iris-set-heading); font-weight: 600; letter-spacing: -0.01em; }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-page-titles p { font-size: var(--iris-set-support); font-weight: var(--iris-w-body); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout :is(.gss-card h2, .gss-more-title) { font-size: var(--iris-set-section); font-weight: 600; }
+:root[data-look][data-theme='midnight-navy'] .gss-layout :is(.gss-card-titles p, .gss-note, .gss-more-body p, .gss-more-sub, .gss-option-sub, .gss-time-desc, .gss-about-value) {
+  font-size: var(--iris-set-support); font-weight: var(--iris-w-body);
+}
+:root[data-look][data-theme='midnight-navy'] .gss-layout :is(.gss-option-label, .gss-row-label, .gss-about-key, .gss-nav-item, .gss-button, .gss-segment, .gss-switch, .gss-link) {
+  font-size: var(--iris-set-body); font-weight: 500;
+}
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-nav-item[aria-current='page'] { color: var(--iris-text-bright); font-weight: 600; }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-group-title { color: var(--iris-text-muted); font-weight: var(--iris-w-status); letter-spacing: var(--iris-track-status); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-sidebar-note { color: var(--iris-text-muted); font-weight: var(--iris-w-body); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout :is(.gss-option, .gss-segment)[aria-checked='true'] { border-color: var(--iris-accent); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout :is(.gss-option[aria-checked='true'] .gss-option-label, .gss-segment[aria-checked='true']) { color: var(--iris-text-bright); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-saved { color: var(--state-ok); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-dirty-dot { background: var(--state-warn); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout :is(.gss-button-primary, .gss-button-primary:hover) {
+  background: var(--iris-action); border-color: var(--iris-accent); color: var(--iris-action-ink);
+}
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-switch[aria-checked='true'] .gss-switch-knob { background: var(--iris-bg-edge); }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-big-value > span:first-child { font-weight: 500; }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-time-ms { font-weight: 600; }
+:root[data-look][data-theme='midnight-navy'] .gss-layout .gss-try-label { font-weight: var(--iris-w-choice); }

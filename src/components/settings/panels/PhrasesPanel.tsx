@@ -8,6 +8,7 @@
 import React, { useState, useCallback } from 'react';
 import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, layout, typography, spacing } from '../../../utils/design';
+import { useDarkPalette } from '../../../contexts/ThemeContext';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import type { PhraseCategory, Phrase } from '../../../types/customization';
@@ -152,7 +153,8 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
     return () => clearTimeout(t);
   }, [onDone]);
 
-  const bg = type === 'success' ? darkColors.success.main : darkColors.emergency.main;
+  const darkPalette = useDarkPalette();
+  const bg = type === 'success' ? darkPalette.success.main : darkPalette.emergency.main;
   return <div className="pp-toast" style={{ background: bg }}>{msg}</div>;
 };
 
@@ -161,7 +163,8 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
 // ============================================
 
 const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const { phraseCategories, updatePhraseCategory, addPhraseCategory, removePhraseCategory } = useCustomization();
 
   // Local editable copy for batch save

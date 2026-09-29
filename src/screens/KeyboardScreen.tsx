@@ -1077,7 +1077,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
 
       {/* ===== Full-screen Keyboard (Hidden if expanded) ===== */}
       {!isExpanded && (
-        <div style={{
+        <div className="keyboard-letter-panel" style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           gap: 'clamp(1px, 0.18vh, 2px)',
           padding: 'clamp(1px, 0.18vh, 3px) 6px',

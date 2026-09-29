@@ -8,6 +8,8 @@
 import React, { useState, useCallback } from 'react';
 import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
+import { useDarkPalette, useTheme } from '../../../contexts/ThemeContext';
+import { MIDNIGHT_NAVY } from '../../../config/midnightNavy';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import type { ActivityCategory, ActivityItem } from '../../../types/customization';
 
@@ -22,6 +24,10 @@ const SECTION_META: Record<string, { icon: string; color: string; description: s
   tv: { icon: 'TV', color: '#C69A45', description: 'TV channels and controls' },
   youtube: { icon: 'YT', color: '#B49362', description: 'YouTube content to play' },
   alexa: { icon: 'A', color: '#8FAE72', description: 'Alexa voice commands' },
+};
+// Midnight Navy draws the same three badges in its own state colours.
+const NAVY_SECTION_COLORS: Record<string, string> = {
+  tv: MIDNIGHT_NAVY.stateWarn, youtube: MIDNIGHT_NAVY.stateDanger, alexa: MIDNIGHT_NAVY.stateOk,
 };
 
 // ============================================
@@ -88,7 +94,8 @@ const Chevron: React.FC<{ open: boolean; color: string }> = ({ open, color }) =>
 
 const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => void }> = ({ msg, type, onDone }) => {
   React.useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, [onDone]);
-  const bg = type === 'success' ? darkColors.success.main : darkColors.emergency.main;
+  const darkPalette = useDarkPalette();
+  const bg = type === 'success' ? darkPalette.success.main : darkPalette.emergency.main;
   return <div className="ap-toast" style={{ background: bg }}>{msg}</div>;
 };
 
@@ -284,7 +291,9 @@ const AlexaItemEditor: React.FC<{
 // ============================================
 
 const ActivitiesPanel: React.FC<ActivitiesPanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
+  const { isMidnightNavy } = useTheme();
   const { activityCategories, updateActivityCategory } = useCustomization();
 
   // Local editable copy
@@ -411,7 +420,8 @@ const ActivitiesPanel: React.FC<ActivitiesPanelProps> = ({ isDarkMode }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {editCats.map(cat => {
           const isExpanded = expandedId === cat.id;
-          const meta = SECTION_META[cat.id] || SECTION_META.tv;
+          const baseMeta = SECTION_META[cat.id] || SECTION_META.tv;
+          const meta = isMidnightNavy ? { ...baseMeta, color: NAVY_SECTION_COLORS[cat.id] ?? NAVY_SECTION_COLORS.tv } : baseMeta;
 
           return (
             <div key={cat.id} className={`ap-section${isExpanded ? ' expanded' : ''}`}>

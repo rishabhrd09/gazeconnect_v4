@@ -99,7 +99,7 @@ Use the project's Python environment for tests. Neural training tests need addit
 
 Keep normal gaze logs off. Redirect runtime logs to a file; use `GAZE_DEBUG=1` only for focused diagnosis. Do not record or commit personal communication or gaze logs.
 
-Contributions should preserve phrase text, board names, dwell defaults, and the tested 1920×1080 layout. Primary gaze targets should be at least 80 CSS pixels and remain stationary during hover/selection. Check 1366×768 and 1920×1080, both themes, tracking loss and reconnect. Keep the interface English-only; Hindi support is deferred to a separate task. No scrolling or drag-and-drop is intended for primary communication flows. Known pre-existing clipping and small-target cases are listed in the review plan.
+Contributions should preserve phrase text, board names, dwell defaults, and the tested 1920×1080 layout. Primary gaze targets should be at least 80 CSS pixels and remain stationary during hover/selection. Check 1366×768 and 1920×1080, all three themes (Dark, Warm, Midnight Navy), tracking loss and reconnect. Keep the interface English-only; Hindi support is deferred to a separate task. No scrolling or drag-and-drop is intended for primary communication flows. Known pre-existing clipping and small-target cases are listed in the review plan.
 
 ## Technical references
 

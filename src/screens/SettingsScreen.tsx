@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { darkColors, lightColors, warmColors, warmScreenTokens, typography, spacing, screenThemes } from '../utils/design';
+import { lightColors, warmColors, warmScreenTokens, typography, spacing, screenThemes } from '../utils/design';
 import GazeButton from '../components/core/GazeButton';
 import {
   FamilyIcon, MessageIcon, MedicalCrossIcon,
@@ -17,7 +17,8 @@ import {
 import { useCustomization } from '../contexts/CustomizationContext';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import ConfirmDialog from '../components/settings/shared/ConfirmDialog';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme, useDarkPalette } from '../contexts/ThemeContext';
+import { MIDNIGHT_NAVY } from '../config/midnightNavy';
 
 import PeoplePanel from '../components/settings/panels/PeoplePanel';
 import PhrasesPanel from '../components/settings/panels/PhrasesPanel';
@@ -68,6 +69,11 @@ const SECTIONS: SidebarSection[] = [
 // Theme from design.ts
 const THEME_DARK = screenThemes.settings;
 const THEME_WARM = warmScreenTokens.settings;
+// The classic sidebar in Midnight Navy (the fields this screen reads from the two above).
+const THEME_MIDNIGHT_NAVY = {
+  sidebarBg: MIDNIGHT_NAVY.bgOuter, selectedBg: MIDNIGHT_NAVY.cardLive,
+  selectedColor: MIDNIGHT_NAVY.accent, separatorColor: MIDNIGHT_NAVY.divider,
+};
 
 // ============================================
 // TOAST COMPONENT
@@ -85,7 +91,7 @@ const Toast: React.FC<{ toast: ToastState; isDarkMode: boolean; onClose: () => v
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div style={{
+    <div className="settings-toast" data-type={toast.type} style={{
       position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
       padding: '12px 28px', borderRadius: '10px', zIndex: 9000,
       backgroundColor: bgMap[toast.type], color: '#fff',
@@ -137,9 +143,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   isDarkMode = true,
 }) => {
   const { exportJSON, importJSON, resetToDefaults } = useCustomization();
-  const { isLight, isWarm } = useTheme();
-  const colors = isWarm ? warmColors : isDarkMode ? darkColors : lightColors;
-  const THEME = isWarm ? THEME_WARM : THEME_DARK;
+  const { isLight, isWarm, isMidnightNavy } = useTheme();
+  const darkPalette = useDarkPalette();
+  const colors = isWarm ? warmColors : isDarkMode ? darkPalette : lightColors;
+  const THEME = isWarm ? THEME_WARM : isMidnightNavy ? THEME_MIDNIGHT_NAVY : THEME_DARK;
 
   const [selectedSection, setSelectedSection] = useState<SectionId>(isGazeSpellLook ? 'gaze' : 'appsettings');
   const [showResetConfirm, setShowResetConfirm] = useState(false);

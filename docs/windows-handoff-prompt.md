@@ -31,7 +31,7 @@ These include historical stages. The requirements below and the current code sup
 
 ## Product requirements to preserve
 
-1. Warm and Dark only. English-only UI: no Hindi, dual-language labels or language toggle. Hindi is a separate future task. Preserve stored personal content.
+1. Dark (default), Warm and the optional Midnight Navy only; add no other theme. English-only UI: no Hindi, dual-language labels or language toggle. Hindi is a separate future task. Preserve stored personal content.
 2. Keep existing screen/board names, phrases, room names, question order, navigation destinations and learned spatial arrangements. Changes to geometry should address a demonstrated usability defect. No broad redesign during Windows validation.
 3. Calm, matte, professional surfaces; readable typography and contrast; no glossy treatments or moving/scaling gaze targets. Keep large stationary targets, at least 80 CSS pixels, and preferably larger for primary choices. Main communication screens must fit without scrolling or drag-and-drop. Settings remains a scrollable, mouse-operated caregiver page.
 4. No global emergency controls. Existing care phrases and the separate Alert Mode communication board remain; do not advertise it as a reliable alert mechanism. Home shows the clock in the former navbar emergency area.

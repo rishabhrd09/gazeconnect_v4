@@ -31,6 +31,7 @@ import SvgDefs from './components/SvgDefs';
 import './warmmode.css';
 import './refinement.css';
 import './styles/gazespell-look.css';
+import './styles/midnight-navy.css';
 
 import HomeScreen from './screens/HomeScreen';
 import AlertModeScreen from './screens/AlertModeScreen';
@@ -81,7 +82,7 @@ const SCREEN_LOADERS: Array<() => Promise<unknown>> = [
 ];
 
 const ScreenLoading: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
-  <div style={{
+  <div className="screen-loading-fallback" style={{
     width: '100%', height: '100%',
     background: isDarkMode ? darkColors.background.primary : lightColors.background.primary,
   }} />
@@ -508,7 +509,7 @@ const InnerApp: React.FC = () => {
       </div>
 
       {/* Connection indicator */}
-      <div className="connection-indicator" style={connectionIndicatorStyle}>
+      <div className="connection-indicator" data-connected={ws.isConnected} style={connectionIndicatorStyle}>
         {isHomeWarmLight && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5A8C64', flexShrink: 0 }} />}
         {ws.isConnected ? 'Connected' : 'Connecting...'}
       </div>

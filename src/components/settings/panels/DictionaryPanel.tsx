@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWS } from '../../../hooks/useWebSocket';
-import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
+import { lightColors, typography, spacing } from '../../../utils/design';
+import { useDarkPalette, useTheme } from '../../../contexts/ThemeContext';
+import { MIDNIGHT_NAVY } from '../../../config/midnightNavy';
 import GazeButton from '../../core/GazeButton';
 import {
     DEFAULT_PREDICTION_TELEMETRY,
@@ -27,7 +29,9 @@ const Chevron: React.FC<{ open: boolean; color?: string }> = ({ open, color = 'c
 
 const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
     const ws = useWS();
-    const c = isDarkMode ? darkColors : lightColors;
+    const darkPalette = useDarkPalette();
+    const c = isDarkMode ? darkPalette : lightColors;
+    const { isMidnightNavy } = useTheme();
     const [activeTab, setActiveTab] = useState<Tab>('words');
     const [status, setStatus] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -121,7 +125,8 @@ const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
     const accent = isDarkMode ? 'rgba(148, 180, 200, 0.85)' : 'rgba(71, 85, 105, 0.9)';
     const subtleBg = isDarkMode ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.015)';
     const subtleBorder = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
-    const mutedText = isDarkMode ? 'rgba(148, 163, 184, 0.8)' : 'rgba(100, 116, 139, 0.9)';
+    // Midnight Navy: its supporting-text colour (the translucent slate is under 4.5:1 on navy).
+    const mutedText = isMidnightNavy ? MIDNIGHT_NAVY.textSecondary : isDarkMode ? 'rgba(148, 163, 184, 0.8)' : 'rgba(100, 116, 139, 0.9)';
 
     const card: React.CSSProperties = {
         backgroundColor: subtleBg, borderRadius: '10px',
@@ -269,9 +274,16 @@ const DictionaryPanel: React.FC<DictionaryPanelProps> = ({ isDarkMode }) => {
             {status && (
                 <div style={{
                     padding: '7px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
-                    backgroundColor: status.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-                    color: status.type === 'success' ? (isDarkMode ? '#6EE7B7' : '#059669') : (isDarkMode ? '#FCA5A5' : '#DC2626'),
-                    border: `1px solid ${status.type === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}`,
+                    // Midnight Navy shows the message in its own state colours.
+                    backgroundColor: isMidnightNavy
+                        ? (status.type === 'success' ? 'rgba(143,191,160,0.1)' : 'rgba(208,140,130,0.1)')
+                        : status.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                    color: isMidnightNavy
+                        ? (status.type === 'success' ? MIDNIGHT_NAVY.stateOk : MIDNIGHT_NAVY.stateDanger)
+                        : status.type === 'success' ? (isDarkMode ? '#6EE7B7' : '#059669') : (isDarkMode ? '#FCA5A5' : '#DC2626'),
+                    border: `1px solid ${isMidnightNavy
+                        ? (status.type === 'success' ? 'rgba(143,191,160,0.3)' : 'rgba(208,140,130,0.3)')
+                        : status.type === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}`,
                 }}>{status.msg}</div>
             )}
 

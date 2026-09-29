@@ -33,6 +33,9 @@ const THEMES = {
           surface: token('src/styles/gazespell-look.css', ":root[data-look='gazespell'][data-theme='warm']", 'ui-surface') },
   'warm (classic look)': { page: token('src/refinement.css', ":root[data-theme='warm']", 'ui-page'),
           surface: token('src/refinement.css', ":root[data-theme='warm']", 'ui-surface') },
+  // Midnight Navy is a dark theme: the cursor takes each palette's Dark set there (GazeCursor.tsx).
+  'midnight-navy': { page: token('src/styles/midnight-navy.css', ":root[data-theme='midnight-navy'] {", 'iris-bg'),
+          surface: token('src/styles/midnight-navy.css', ":root[data-theme='midnight-navy'] {", 'iris-card') },
 };
 
 const rgb = (c) => {
@@ -84,6 +87,13 @@ test('Standard stays exactly the colours used before the choice existed', () => 
   assert.equal(gazePalette(undefined, true), s.warm);
 });
 
+test('Midnight Navy keeps the tested live feedback: the cursor is given the Dark set there', () => {
+  const cursor = read('src/components/core/GazeCursor.tsx');
+  assert.match(cursor, /const palette = gazePalette\(settings\.gazeColors, isWarm \|\| isLight\);/);
+  assert.equal(gazePalette('standard', false), GAZE_COLOR_PALETTES.standard.dark);
+  assert.deepEqual([GAZE_COLOR_PALETTES.standard.dark.ring, GAZE_COLOR_PALETTES.standard.dark.fill], ['#FFC247', '#2DD4BF']);
+});
+
 const rows = [];
 for (const key of Object.keys(GAZE_COLOR_PALETTES)) {
   for (const theme of Object.keys(THEMES)) {
@@ -110,6 +120,7 @@ for (const key of Object.keys(GAZE_COLOR_PALETTES)) {
 
 const f = (n) => n.toFixed(1).padStart(5);
 console.log('palette        theme                ring:page ring:key square:page square:key fill:ring fill:key | ring~fill dE normal/protan/deutan/tritan');
+// (midnight-navy: the Dark set on Navy's page #00102E and card #0A1A36.)
 for (const { key, theme, m } of rows) {
   console.log(`${key.padEnd(14)} ${theme.padEnd(20)} ${f(m.ringPage)}    ${f(m.ringKey)}    ${f(m.squarePage)}      ${f(m.squareKey)}    ${f(m.fillRing)}   ${f(m.fillKey)}  | ${Object.values(m.apart).map((d) => d.toFixed(0).padStart(4)).join(' ')}`);
 }

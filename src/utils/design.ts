@@ -4,6 +4,7 @@
  * Color philosophy: Subtle, professional, low-fatigue.
  * Inspired by Claude AI aesthetics, Tobii blue accents, Apple accessibility.
  */
+import { MIDNIGHT_NAVY } from '../config/midnightNavy';
 
 export const darkColors = {
   background: {
@@ -108,6 +109,110 @@ export const darkColors = {
     sage: '#34D399',
     rose: '#D4544C',
     teal: '#2DD4BF',
+  },
+};
+
+// =====================================================================
+// MIDNIGHT NAVY (28 Sep 2026) — Dark's colour object in Iris Desk Buddy's
+// palette (src/config/midnightNavy.ts), for the older components that paint
+// from a colour object while settings.isDarkMode is true. Same shape as
+// darkColors; useDarkPalette() in ThemeContext hands it out only while the
+// Midnight Navy theme is on, so Dark keeps darkColors exactly. Success,
+// warning and error use Iris's semantic state colours; the gaze teal is kept.
+// =====================================================================
+export const midnightNavyColors: typeof darkColors = {
+  background: {
+    primary: MIDNIGHT_NAVY.bg,
+    secondary: MIDNIGHT_NAVY.bgOuter,
+    tertiary: MIDNIGHT_NAVY.cardLive,
+    elevated: MIDNIGHT_NAVY.card,
+    overlay: 'rgba(0, 9, 24, 0.78)',
+  },
+  text: {
+    primary: MIDNIGHT_NAVY.textPrimary,
+    secondary: MIDNIGHT_NAVY.textSecondary,
+    tertiary: MIDNIGHT_NAVY.textMuted,
+    inverse: MIDNIGHT_NAVY.bgEdge,
+  },
+  border: {
+    main: MIDNIGHT_NAVY.cardEdge,
+    light: MIDNIGHT_NAVY.ring,
+    focus: MIDNIGHT_NAVY.accent,
+  },
+  accent: {
+    main: MIDNIGHT_NAVY.accent,
+    hover: MIDNIGHT_NAVY.icon,
+    subtle: 'rgba(194, 211, 238, 0.14)',
+  },
+  success: {
+    main: MIDNIGHT_NAVY.stateOk,
+    hover: MIDNIGHT_NAVY.stateOk,
+    subtle: 'rgba(143, 191, 160, 0.14)',
+  },
+  warning: {
+    main: MIDNIGHT_NAVY.stateWarn,
+    hover: MIDNIGHT_NAVY.stateWarn,
+    subtle: 'rgba(201, 169, 106, 0.14)',
+  },
+  emergency: {
+    main: MIDNIGHT_NAVY.stateDanger,
+    hover: MIDNIGHT_NAVY.stateDanger,
+    subtle: '#242940', // the danger colour laid thinly over the card (midnight-navy.css --iris-danger-surface)
+  },
+  navigation: {
+    pillBackground: MIDNIGHT_NAVY.card,
+    pillBorder: MIDNIGHT_NAVY.cardEdge,
+    pillShadow: 'none',
+    containerDivider: MIDNIGHT_NAVY.divider,
+    idleBackground: 'transparent',
+    idleText: MIDNIGHT_NAVY.textSecondary,
+    hoverBackground: MIDNIGHT_NAVY.cardLive,
+    activeBackground: MIDNIGHT_NAVY.cardLive,
+    activeBorder: MIDNIGHT_NAVY.accent,
+    activeShadow: 'none',
+    activeText: MIDNIGHT_NAVY.textBright,
+    backBackground: 'rgba(194, 211, 238, 0.06)',
+    backHoverBackground: MIDNIGHT_NAVY.cardLive,
+    backBorder: 'transparent',
+    backShadow: 'none',
+    gazeBackgroundOn: MIDNIGHT_NAVY.cardLive,
+    gazeBackgroundOff: MIDNIGHT_NAVY.bgOuter,
+    gazeBorderOn: MIDNIGHT_NAVY.accent,
+    gazeBorderOff: MIDNIGHT_NAVY.outline,
+    gazeGlow: 'none',
+    gazeTextOn: MIDNIGHT_NAVY.textBright,
+    gazeTextOff: MIDNIGHT_NAVY.textPrimary,
+    auxiliaryBackground: 'rgba(194, 211, 238, 0.05)',
+    auxiliaryBorder: MIDNIGHT_NAVY.cardEdge,
+  },
+  // Categories are told apart by their words and pictures, not by bright hues.
+  category: {
+    people: MIDNIGHT_NAVY.stateNote,
+    medical: MIDNIGHT_NAVY.stateDanger,
+    needs: MIDNIGHT_NAVY.stateOk,
+    feelings: MIDNIGHT_NAVY.stateNote,
+    actions: MIDNIGHT_NAVY.stateInfo,
+    activities: MIDNIGHT_NAVY.stateWarn,
+    responses: MIDNIGHT_NAVY.stateOk,
+    courtesy: MIDNIGHT_NAVY.textMuted,
+  },
+  quickfire: {
+    yes: MIDNIGHT_NAVY.stateOk,
+    no: MIDNIGHT_NAVY.stateDanger,
+    wait: MIDNIGHT_NAVY.stateWarn,
+    help: MIDNIGHT_NAVY.stateDanger,
+    more: MIDNIGHT_NAVY.stateInfo,
+    done: MIDNIGHT_NAVY.stateOk,
+    thanks: MIDNIGHT_NAVY.stateNote,
+    sorry: MIDNIGHT_NAVY.textMuted,
+  },
+  // Live gaze feedback keeps its tested teal.
+  gaze: darkColors.gaze,
+  accentText: {
+    gold: MIDNIGHT_NAVY.stateWarn,
+    sage: MIDNIGHT_NAVY.stateOk,
+    rose: MIDNIGHT_NAVY.stateDanger,
+    teal: MIDNIGHT_NAVY.accent,
   },
 };
 
@@ -909,7 +1014,9 @@ export const sharedCardTokens = {
   sidebarSelectedBg: '#263E30',
 } as const;
 
-export type Theme = 'dark' | 'warm';
+export type Theme = 'dark' | 'warm' | 'midnight-navy';
+// Midnight Navy is a dark appearance: inline colours are Dark's, and its own paint is CSS
+// (src/styles/midnight-navy.css, scoped to data-theme='midnight-navy').
 export const getColors = (theme: Theme) =>
   theme === 'warm' ? warmColors
     : darkColors;
@@ -919,7 +1026,7 @@ export const createTheme = (theme: Theme) => ({
 });
 
 export default {
-  darkColors, lightColors, mixColors, warmColors, warmScreenTokens,
+  darkColors, midnightNavyColors, lightColors, mixColors, warmColors, warmScreenTokens,
   typography, spacing, buttonSizes, layout,
   screenLayouts, animations, accessibility, splitScreenLayouts, screenThemes, getColors, createTheme,
 };

@@ -12,6 +12,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, typography, spacing } from '../../../utils/design';
+import { useDarkPalette, useTheme } from '../../../contexts/ThemeContext';
+import { MIDNIGHT_NAVY } from '../../../config/midnightNavy';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { CARE_QUICK_WORDS } from '../../../services/careContentPresets';
@@ -27,6 +29,12 @@ const CATEGORY_COLORS: Record<string, { accent: string; bg: string }> = {
   emergency: { accent: '#B91C1C', bg: 'rgba(185, 28, 28, 0.1)' },
   position: { accent: '#B45309', bg: 'rgba(180, 83, 9, 0.1)' },
   daily: { accent: '#2C7A7B', bg: 'rgba(44, 122, 123, 0.1)' },
+};
+// Midnight Navy: the same three columns in its semantic state colours.
+const NAVY_CATEGORY_COLORS: Record<string, { accent: string; bg: string }> = {
+  emergency: { accent: MIDNIGHT_NAVY.stateDanger, bg: 'rgba(208, 140, 130, 0.1)' },
+  position: { accent: MIDNIGHT_NAVY.stateWarn, bg: 'rgba(201, 169, 106, 0.1)' },
+  daily: { accent: MIDNIGHT_NAVY.stateOk, bg: 'rgba(143, 191, 160, 0.1)' },
 };
 
 // ============================================
@@ -121,7 +129,8 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
     const t = setTimeout(onDone, 2500);
     return () => clearTimeout(t);
   }, [onDone]);
-  const bg = type === 'success' ? darkColors.success.main : darkColors.emergency.main;
+  const darkPalette = useDarkPalette();
+  const bg = type === 'success' ? darkPalette.success.main : darkPalette.emergency.main;
   return <div className="qwp-toast" style={{ background: bg }}>{msg}</div>;
 };
 
@@ -130,7 +139,9 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
 // ============================================
 
 const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
+  const categoryColors = useTheme().isMidnightNavy ? NAVY_CATEGORY_COLORS : CATEGORY_COLORS;
   const { data, updateQuickWords } = useCustomization();
 
   const originalCategories = data.quickWords?.categories ?? [];
@@ -326,7 +337,7 @@ const QuickWordsPanel: React.FC<QuickWordsPanelProps> = ({ isDarkMode }) => {
 
       {/* Category sections */}
       {editCategories.map(cat => {
-        const catStyle = CATEGORY_COLORS[cat.id] ?? { accent: '#6BB8C9', bg: 'rgba(107, 184, 201, 0.1)' };
+        const catStyle = categoryColors[cat.id] ?? { accent: '#6BB8C9', bg: 'rgba(107, 184, 201, 0.1)' };
         const isExpanded = expandedCatId === cat.id;
         const enabledCount = cat.words.filter(w => w.enabled).length;
         const form = newWordText[cat.id] ?? { en: '', hi: '' };

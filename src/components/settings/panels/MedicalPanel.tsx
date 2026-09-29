@@ -8,6 +8,8 @@
 import React, { useState, useCallback } from 'react';
 import { useReportUnsavedChanges } from '../shared/unsavedChanges';
 import { darkColors, lightColors, layout, typography, spacing, screenThemes } from '../../../utils/design';
+import { useDarkPalette, useTheme } from '../../../contexts/ThemeContext';
+import { MIDNIGHT_NAVY } from '../../../config/midnightNavy';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import type { MedicalSection, MedicalItem } from '../../../types/customization';
@@ -183,7 +185,8 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
     const t = setTimeout(onDone, 2500);
     return () => clearTimeout(t);
   }, [onDone]);
-  const bg = type === 'success' ? darkColors.success.main : darkColors.emergency.main;
+  const darkPalette = useDarkPalette();
+  const bg = type === 'success' ? darkPalette.success.main : darkPalette.emergency.main;
   return <div className="mp-toast" style={{ background: bg }}>{msg}</div>;
 };
 
@@ -192,7 +195,8 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onDone: () => vo
 // ============================================
 
 const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
-  const colors = isDarkMode ? darkColors : lightColors;
+  const darkPalette = useDarkPalette();
+  const colors = isDarkMode ? darkPalette : lightColors;
   const { medicalSections, updateMedicalSection, removeMedicalSection } = useCustomization();
 
   // Local editable copy for batch save
@@ -365,7 +369,8 @@ const MedicalPanel: React.FC<MedicalPanelProps> = ({ isDarkMode }) => {
     setToast({ msg: 'All changes saved', type: 'success' });
   }, [editSections, medicalSections, removeMedicalSection, updateMedicalSection]);
 
-  const urgentColor = screenThemes.medical.urgent;
+  // Midnight Navy: its danger colour (the Dark terracotta is under 4.5:1 on navy).
+  const urgentColor = useTheme().isMidnightNavy ? MIDNIGHT_NAVY.stateDanger : screenThemes.medical.urgent;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
