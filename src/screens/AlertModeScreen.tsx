@@ -19,6 +19,18 @@ interface AlertModeScreenProps {
 
 const UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, sans-serif";
 
+// HOME is pinned to the left edge, outside the card grid. The cards and their heading stay
+// centred while that leaves HOME plus one card gap clear (about 1755 px wide and up, so
+// 1920x1080 is unchanged). On narrower screens the centred grid ran under HOME (54.6 px at
+// 1366x768), so there they move right just far enough, keeping their size; the grid only
+// narrows if its right edge would come closer to the screen edge than HOME is on the left.
+const HOME_LEFT = 'clamp(28px, 3vw, 62px)';
+const HOME_WIDTH = 'clamp(156px, 12vw, 214px)';
+const CARD_GAP = 'clamp(18px, 2.8vw, 34px)';
+const CARDS_MIN_LEFT = `(${HOME_LEFT} + ${HOME_WIDTH} + ${CARD_GAP})`;
+const GRID_MAX_WIDTH = `min(1160px, 100vw - ${CARDS_MIN_LEFT} - ${HOME_LEFT})`;
+const BOARD_SHIFT = `max(0px, ${CARDS_MIN_LEFT} - (100vw - min(78vw, ${GRID_MAX_WIDTH})) / 2)`;
+
 const CARD_TONES: Array<{
   accent: string;
   label: string;
@@ -206,10 +218,10 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           dwellCategory="homeScreenTile"
           style={{
             position: 'absolute',
-            left: 'clamp(28px, 3vw, 62px)',
+            left: HOME_LEFT,
             top: '50%',
             transform: 'translateY(-50%)',
-            width: 'clamp(156px, 12vw, 214px)',
+            width: HOME_WIDTH,
             height: 'clamp(156px, 19vh, 214px)',
             borderRadius: 28,
             background: isAlertModeLocked ? '#10120F' : '#171A18',
@@ -259,7 +271,7 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           )}
         </GazeButton>
 
-        <div style={{ marginBottom: 'clamp(18px, 2.6vh, 34px)', textAlign: 'center' }}>
+        <div style={{ marginBottom: 'clamp(18px, 2.6vh, 34px)', textAlign: 'center', position: 'relative', left: BOARD_SHIFT }}>
           <div className="alert-mode-title" style={{
             fontSize: 'clamp(22px, 3.1vh, 38px)',
             fontWeight: 700,
@@ -282,11 +294,13 @@ const AlertModeScreen: React.FC<AlertModeScreenProps> = ({ onSpeak, onHome }) =>
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           gridTemplateRows: 'repeat(2, 1fr)',
-          gap: 'clamp(18px, 2.8vw, 34px)',
+          gap: CARD_GAP,
           width: '78vw',
           height: '62vh',
           minHeight: 360,
-          maxWidth: 1160,
+          maxWidth: GRID_MAX_WIDTH,
+          position: 'relative',
+          left: BOARD_SHIFT,
         }}>
           {cards.map((card, idx) => {
             if (!card.label) return <div key={`empty-${idx}`} />;
