@@ -9,7 +9,7 @@ def self_test():
     import aiohttp
     import comtypes
     import pyautogui
-    import pyttsx3.drivers.sapi5
+    from services.local_voice import self_test as voice_self_test
     import websockets
     from ml.inference import NeuralPredictor
     from prediction_guardrails import is_blocked_prediction_word
@@ -21,7 +21,7 @@ def self_test():
     if not model.load():
         raise RuntimeError("Bundled neural model failed to load")
     print(json.dumps({"self_test": "passed", "neural_model": "loaded", "assets": "present",
-                      "deterministic_prediction": deterministic_self_test()}))
+                      "deterministic_prediction": deterministic_self_test(), "local_voice": voice_self_test()}))
 
 
 def deterministic_self_test():

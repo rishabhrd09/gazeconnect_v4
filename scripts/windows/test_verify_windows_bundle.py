@@ -24,6 +24,18 @@ def prediction_assets(root):
     (root / bundle.ENGLISH_ONLY_POLICY).write_text(json.dumps({"withheldRomanizedHindi": ["khana"]}))
 
 
+def voice_assets(root):
+    directory = root / 'assets/kokoro'
+    directory.mkdir(parents=True)
+    files = {}
+    for name in ('model_quantized.onnx', 'af_heart.npz'):
+        body = b'test voice asset'
+        (directory / name).write_bytes(body)
+        files[name] = {'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()}
+    (directory / 'manifest.json').write_text(json.dumps({'voice':'af_heart', 'files': files}))
+    (directory / 'LICENSE').write_text('test license')
+
+
 def pe(path, machine=0x8664):
     path.parent.mkdir(parents=True, exist_ok=True)
     data = bytearray(88)
@@ -58,6 +70,7 @@ class BundleValidationTests(unittest.TestCase):
             asset.parent.mkdir(parents=True, exist_ok=True)
             asset.write_text("{}" if asset.suffix == ".json" else "model")
         prediction_assets(self.root / "python-dist/backend/_internal")
+        voice_assets(self.root / "python-dist/backend/_internal")
 
     def test_valid_managed_anycpu_and_native_x64(self):
         self.assertEqual(len(bundle.verify_dlls(self.helper)), 6)
@@ -110,6 +123,19 @@ class BundleValidationTests(unittest.TestCase):
         (self.root / "python-dist/backend/_internal" / bundle.ENGLISH_ONLY_POLICY).unlink()
         with self.assertRaisesRegex(ValueError, "Missing"):
             bundle.verify_stage(self.root)
+
+    def test_missing_or_corrupt_voice_rejected(self):
+        self.stage()
+        voice = self.root / 'python-dist/backend/_internal/assets/kokoro/af_heart.npz'
+        voice.write_bytes(b'corrupt')
+        with self.assertRaisesRegex(ValueError, 'Voice asset hash mismatch'):
+            bundle.verify_stage(self.root)
+        voice.unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing'):
+            bundle.verify_stage(self.root)
+
+    def test_repository_voice_assets_verify(self):
+        bundle.verify_voice_assets(Path(__file__).parents[2] / 'python')
 
     def test_repository_prediction_assets_verify(self):
         bundle.verify_prediction_assets(Path(__file__).parents[2] / "python")

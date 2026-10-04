@@ -7,7 +7,7 @@ on:
   pull_request:
   push:
     branches:
-      - codex/aac-visual-exploration
+      - ui/aac-visual-exploration
       - feature/aac-comfort-timing-keyboard-home
 
 permissions:
@@ -63,6 +63,7 @@ jobs:
           Invoke-Checked 'node.exe' @('scripts/check-word-prediction-slots.cjs')
           Invoke-Checked 'node.exe' @('scripts/check-dev-startup.cjs')
           Invoke-Checked 'node.exe' @('scripts/check-floorplan-transport.cjs')
+          Invoke-Checked 'node.exe' @('scripts/check-tts-routing.js')
       - name: Check Windows Python dependencies and finite runtime probes
         run: |
           & .\scripts\windows\Setup.ps1 -Simulate
@@ -84,3 +85,14 @@ jobs:
           $env:PYTHONPATH = (Join-Path $ProjectRoot 'tools') + ';' + (Join-Path $ProjectRoot 'python')
           Invoke-Checked $VenvPython @('-m', 'unittest', 'python.tests.test_compass_presentation', 'python.tests.test_compass_room_views', 'python.tests.test_gazeplan_candidates', 'python.tests.test_floorplan_candidate_api_contract')
           Invoke-Checked $VenvPython @('scripts/windows/floorplan_entry.py', '--self-test')
+      - name: Frozen offline voice (same bundle inputs as installer, no speaker needed)
+        run: |
+          . .\scripts\windows\Common.ps1
+          $voiceWork = Join-Path $env:RUNNER_TEMP 'gaze-voice-smoke'
+          $voiceArgs = @('-m', 'PyInstaller', '--onedir', '--noconfirm', '--clean', '--name', 'VoiceSmoke',
+            '--distpath', (Join-Path $voiceWork 'dist'), '--workpath', (Join-Path $voiceWork 'build'),
+            '--specpath', $voiceWork, '--paths', (Join-Path $ProjectRoot 'python'), '--collect-all', 'onnxruntime')
+          $voiceArgs += Get-KokoroBundleArguments
+          $voiceArgs += @('scripts/windows/voice_entry.py')
+          Invoke-Checked $VenvPython $voiceArgs
+          Invoke-Checked (Join-Path $voiceWork 'dist\VoiceSmoke\VoiceSmoke.exe') @()

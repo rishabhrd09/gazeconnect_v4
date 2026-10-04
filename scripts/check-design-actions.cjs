@@ -7,11 +7,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     const errors = [];
     p.on('pageerror', e => errors.push(e.message));
     await p.routeWebSocket('ws://127.0.0.1:8765', ws => {
-        ws.send(JSON.stringify({type:'connected',tts_available:false,gaze_enabled:false,current_screen:'home'}));
+        ws.onMessage(async raw => { const m = JSON.parse(raw); if (m.type === 'speak') await p.evaluate(t => qa.speech.push(t), m.text); });
+        ws.send(JSON.stringify({type:'connected',tts_available:true,tts_voice:"af_heart",tts_state:"ready",gaze_enabled:false,current_screen:'home'}));
     });
     await p.addInitScript(() => {
         window.qa = { calls: [], speech: [] };
-        speechSynthesis.speak = u => window.qa.speech.push(u.text);
+        speechSynthesis.speak = () => { throw new Error('System voice must not be used'); };
         const record = (name, result) => (...args) => { window.qa.calls.push({ name, args }); return Promise.resolve(result); };
         window.electronAPI = { on: () => () => { }, off: () => { }, updateAppContext: () => { }, settings: { load: async () => JSON.parse(sessionStorage.getItem('data') || 'null'), save: async (d) => { sessionStorage.setItem('data', JSON.stringify(d)); return { success: true }; } }, webview: { open: record('open', { success: true }), close: record('close', true), setBounds: record('bounds', true), setGazeConfig: record('gaze', true), executeJs: record('script', { success: true }), youtubeCommand: record('youtube', { ok: true, status: 'done' }), setScrollMode: record('scrollMode', true), updateGaze: record('updateGaze', true) } };
     });
@@ -31,7 +32,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await p.click('#pp');
     await p.getByRole('button', { name: 'Rishabh', exact: true }).first().click();
     await p.click('[id=selected-person-display-Rishabh]');
-    assert((await p.evaluate(() => qa.speech)).some(x => x.includes('Rishabh')));
+    await p.waitForFunction(() => qa.speech.some(x => x.includes('Rishabh')));
     await p.getByRole('button', { name: 'Home', exact: true }).click();
     await p.click('#med');
     await p.locator('[id^=assist-category-] img').first().waitFor();

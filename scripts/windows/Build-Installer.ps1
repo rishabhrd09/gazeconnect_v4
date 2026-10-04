@@ -64,7 +64,7 @@ try {
         '--add-data', ((Join-Path $ProjectRoot 'python\ml\trained_models\gazeconnect_lm_quantized.onnx') + ';ml/trained_models'),
         '--add-data', ((Join-Path $ProjectRoot 'python\ml\trained_models\vocabulary.json') + ';ml/trained_models'),
         '--collect-all', 'onnxruntime', '--hidden-import', 'ml.inference', '--hidden-import', 'ml.fusion',
-        '--hidden-import', 'websockets.legacy.server', '--hidden-import', 'pyttsx3.drivers.sapi5',
+        '--hidden-import', 'websockets.legacy.server') + (Get-KokoroBundleArguments) + @(
         (Join-Path $PSScriptRoot 'backend_entry.py'))
     Invoke-Checked $VenvPython $backendArgs
     $floorplanArgs = $common + @('--name', 'GazeConnectFloorplan',

@@ -56,7 +56,6 @@ pypiwin32==223
 PyRect==0.2.0
 PyScreeze==1.0.1
 python-dateutil==2.9.0.post0
-pyttsx3==2.99
 pytweening==1.2.0
 pywin32==312
 pywin32-ctypes==0.2.3
@@ -70,3 +69,14 @@ tzdata==2026.4
 websockets==17.1
 Werkzeug==3.1.8
 yarl==1.25.1
+
+# Local Kokoro voice (5 Oct 2026); same ONNX CPU runtime as prediction.
+cffi==2.1.1
+cloudpickle==3.1.2
+dlinfo==2.0.0
+espeakng-loader==0.2.4
+joblib==1.6.0
+kokoro-onnx==0.6.1
+phonemizer==3.4.0
+pycparser==3.0
+sounddevice==0.5.3

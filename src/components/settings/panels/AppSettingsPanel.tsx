@@ -191,7 +191,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
 
           <SliderSetting
-            label="Speech Rate"
+            label="Speech Rate · Kokoro af_heart"
             description="How fast the voice speaks"
             value={settings.ttsRate}
             min={80}

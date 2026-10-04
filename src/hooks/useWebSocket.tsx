@@ -113,11 +113,10 @@ export interface WebSocketContextValue {
   isGazeEnabled: boolean;
   tobiiConnected: boolean;
   trackerStatus: TrackerStatus | null;
-  // v17.18: backend TTS health from the 'connected' handshake. When false,
-  // speech must keep using browser speechSynthesis even though the socket is
-  // up — otherwise a healthy connection with a dead pyttsx3 leaves the
-  // patient silently mute (emergency included).
   ttsAvailable: boolean;
+  ttsVoice: string | null;
+  ttsState: string;
+  ttsError: string;
   currentScreen: string;
 
   // Connection/State Methods
@@ -259,9 +258,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const [currentScreen, setCurrentScreen] = useState('home');
   const [tobiiConnected, setTobiiConnected] = useState(false);
   const [trackerStatus, setTrackerStatus] = useState<TrackerStatus | null>(null);
-  // Default true: an older backend that doesn't send tts_available must not
-  // demote speech to the browser fallback.
-  const [ttsAvailable, setTtsAvailable] = useState(true);
+  const [ttsAvailable, setTtsAvailable] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState<string | null>(null);
+  const [ttsState, setTtsState] = useState('disconnected');
+  const [ttsError, setTtsError] = useState('');
 
   // Data state
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -483,8 +483,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           setTobiiConnected(data.tobii_connected || false);
           setTrackerStatus(data.tracker_status && typeof data.tracker_status.stream_state === 'string'
             ? data.tracker_status : null);
-          // Absent field (older backend) => assume available.
-          setTtsAvailable(data.tts_available !== false);
+          setTtsAvailable(data.tts_available === true && data.tts_voice === 'af_heart');
+          setTtsVoice(data.tts_voice || null);
+          setTtsState(data.tts_state || 'unavailable');
+          setTtsError(data.tts_error || '');
+          break;
+
+        case 'tts_status':
+          setTtsAvailable(data.tts_available === true && data.tts_voice === 'af_heart');
+          setTtsVoice(data.tts_voice || null);
+          setTtsState(data.tts_state || 'unavailable');
+          setTtsError(data.tts_error || '');
           break;
 
         case 'tracker_status':
@@ -650,6 +659,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       wsRef.current.onclose = () => {
         console.log('WebSocket disconnected');
         setIsConnected(false);
+        setTtsAvailable(false);
+        setTtsVoice(null);
+        setTtsState('disconnected');
         setTobiiConnected(false);
         setTrackerStatus(null);
         freshnessRef.current.lose();
@@ -737,7 +749,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     currentScreen,
     tobiiConnected,
     trackerStatus,
-    ttsAvailable,
+    ttsAvailable, ttsVoice, ttsState, ttsError,
     setGazeEnabled: (enabled) => send('set_gaze_enabled', { enabled }),
     setScreen: (screen) => send('set_screen', { screen }),
     setScreenSize: (width, height) => { void sendScreenMetrics(width, height); },
@@ -759,13 +771,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     addSentenceTemplate: (sentence) => send('add_sentence_template', { sentence }),
     getSentenceHistory: () => send('get_sentence_history'),
     speak: (text) => send('speak', { text }),
-    // STOP must silence every voice path: backend pyttsx3 AND any in-flight
-    // browser speechSynthesis utterance (e.g. one started while the backend
-    // was briefly down — previously it played to completion, unstoppable).
-    stopSpeaking: () => {
-      try { window.speechSynthesis?.cancel(); } catch { /* no-op */ }
-      send('stop_speaking');
-    },
+    stopSpeaking: () => send('stop_speaking'),
     setTTSRate: (rate) => send('set_tts_rate', { rate }),
     setTTSVolume: (volume) => send('set_tts_volume', { volume }),
     getFatigue: () => send('get_fatigue'),

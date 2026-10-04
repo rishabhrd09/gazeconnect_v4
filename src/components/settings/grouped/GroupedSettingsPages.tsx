@@ -308,12 +308,13 @@ export const VoicePage: React.FC<{ onSaved: () => void; onSpeak: (text: string) 
   const { settings, save } = useInstantSetting(onSaved);
   const rate = Math.max(80, Math.min(250, Math.round(settings.ttsRate || 150)));
   const volume = Math.max(0, Math.min(100, Math.round((settings.ttsVolume ?? 1) * 100)));
-  const rateNote = rate === 150 ? '150 is the normal pace.' : rate < 150 ? 'Slower than the normal 150.' : 'Faster than the normal 150.';
+  const rateNote = rate === 150 ? '150 is the normal pace; actual words per minute vary with the message.' : rate < 150 ? 'Slower than the normal 150.' : 'Faster than the normal 150.';
   const volumeNote = volume === 0 ? 'Muted: nothing is spoken, not even urgent messages.' : '0 mutes every spoken message, urgent ones too.';
 
   return (
     <div className="gss-columns">
       <Card title="Speech rate">
+        <p className="gss-note">Kokoro · af_heart · Local voice</p>
         <div className="gss-big-value"><span>{rate}</span><span className="gss-big-unit">words per minute</span></div>
         <p className="gss-note">{rateNote}</p>
         <RangeStepper label="Speech rate" value={rate} min={80} max={250} step={10} lessLabel="Slower" moreLabel="Faster"

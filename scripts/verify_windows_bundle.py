@@ -74,12 +74,29 @@ def verify_prediction_assets(root: Path) -> None:
         raise ValueError(f"Empty English-only policy: {root / ENGLISH_ONLY_POLICY}")
 
 
+def verify_voice_assets(root: Path) -> None:
+    directory = root / 'assets/kokoro'
+    manifest = json.loads(require_file(directory / 'manifest.json').read_text(encoding='utf-8'))
+    if manifest.get('voice') != 'af_heart' or set(manifest.get('files', {})) != {'model_quantized.onnx', 'af_heart.npz'}:
+        raise ValueError('Invalid bundled Kokoro voice manifest')
+    require_file(directory / 'LICENSE')
+    for name, info in manifest['files'].items():
+        path = require_file(directory / name)
+        digest = hashlib.sha256()
+        with path.open('rb') as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b''):
+                digest.update(block)
+        if path.stat().st_size != info['bytes'] or digest.hexdigest() != info['sha256']:
+            raise ValueError(f'Voice asset hash mismatch: {name}')
+
+
 def verify_assets(root: Path) -> None:
     for asset in ASSETS:
         path = require_file(root / asset)
         if path.suffix == ".json":
             json.loads(path.read_text(encoding="utf-8"))
     verify_prediction_assets(root)
+    verify_voice_assets(root)
 
 
 def verify_stage(root: Path, packaged: bool = False) -> dict[str, str]:

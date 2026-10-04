@@ -1,0 +1,23 @@
+Kokoro weights and af_heart voice: Apache-2.0
+https://huggingface.co/hexgrad/Kokoro-82M
+ONNX export: https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX
+
+kokoro-onnx 0.6.1: MIT
+https://github.com/thewh1teagle/kokoro-onnx
+ONNX Runtime: MIT
+https://github.com/microsoft/onnxruntime
+sounddevice 0.5.3 and PortAudio: MIT-style licenses
+https://github.com/spatialaudio/python-sounddevice
+https://github.com/PortAudio/portaudio
+
+Pronunciation only (these do not provide an alternate spoken voice):
+phonemizer 3.4.0: GPL-3.0-or-later
+https://github.com/bootphon/phonemizer
+espeakng-loader 0.2.4: MIT; bundled eSpeak NG: GPL-3.0-or-later
+https://github.com/thewh1teagle/espeakng-loader
+https://github.com/espeak-ng/espeak-ng
+
+The model's Apache license does not replace these component licenses.
+Redistribution must include applicable notices and corresponding source for
+GPL components. The existing installer distribution review remains applicable;
+this change is not a legal approval of a proprietary distribution.

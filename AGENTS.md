@@ -7,7 +7,7 @@ AAC (Augmentative & Alternative Communication) app for ALS/MND patients using To
 - **Frontend**: Electron 44 + React 18 + TypeScript + Vite 5 (Node.js 22.12+ for development, Electron 44's floor)
 - **Backend**: Python 3.10+ (asyncio WebSocket server on port 8765)
 - **Eye Tracking**: .NET 8 x64 self-contained TobiiGazeHelper (TCP port 5555)
-- **TTS**: pyttsx3 (SAPI5) + browser SpeechSynthesis fallback
+- **TTS**: offline Kokoro-82M v1.0 ONNX CPU, af_heart only (spawned Python worker; no system/browser voice fallback)
 
 ## Key Constraints
 - ALL UI must work with eye-gaze (dwell-based selection, NO drag/drop)
@@ -101,3 +101,5 @@ AAC (Augmentative & Alternative Communication) app for ALS/MND patients using To
 
 
 - **Compass rendering removal (4 Oct 2026, maintainer request).** The optional on-demand rendering feature is removed: no Render images page, background render workers, scene builder, quality API, installer engine dependency or render-engine bundle. Keep the 2D Compass geometry and Cairo preview/export pipeline; prioritize exact grid boundaries, readable architectural details and bounded local memory. Do not restore the removed feature without a new request.
+
+- **One local voice (5 Oct 2026, maintainer request).** All app speech, including keyboard, Compass, care phrases, news and Settings tests, uses Kokoro v1.0 ONNX int8 with `af_heart`. `python/assets/kokoro` contains the model, single voice, hashes and licenses; no runtime download, API key, PyTorch or GPU. `python/services/local_voice.py` owns one spawned CPU worker with one inference thread, bounded chunks and latest-request replacement. Stop/mute invalidates current synthesis and interrupts playback; no speech work runs on the gaze event loop. Preserve rate/volume controls (150 maps to native speed 1, not exact measured WPM). The frontend requires `tts_voice=af_heart` and reports errors rather than silently changing voices. `backend_entry.py --self-test` synthesizes offline without a speaker; installer collection includes model, phonemizer/eSpeak data and PortAudio. Rerun `setup.bat` after pulling these dependency changes. Native Windows speaker playback and Tobii testing remain required.

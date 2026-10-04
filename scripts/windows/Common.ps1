@@ -455,3 +455,11 @@ function Get-DependencyUsers {
     }
     return @($users.Values)
 }
+
+# Shared by the installer and the finite frozen-voice CI smoke test.
+function Get-KokoroBundleArguments {
+    @('--add-data', ((Join-Path $ProjectRoot 'python\assets\kokoro') + ';assets/kokoro'),
+      '--hidden-import', 'services.local_voice', '--collect-all', 'kokoro_onnx',
+      '--collect-all', 'phonemizer', '--collect-all', 'espeakng_loader',
+      '--collect-all', 'sounddevice', '--collect-all', '_sounddevice_data')
+}

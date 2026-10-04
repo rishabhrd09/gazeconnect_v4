@@ -111,3 +111,9 @@ Contributions should preserve phrase text, board names, dwell defaults, and the 
 ## License
 
 Application code is distributed under the [MIT License](LICENSE). Third-party components retain their own licenses. The bundled Manrope font includes its [SIL Open Font License](src/assets/fonts/Manrope-LICENSE.txt). Verify Tobii runtime redistribution permissions before publishing a binary package. Reference-project study does not grant permission to copy differently licensed source.
+
+### Local speech voice
+
+All app speech uses **Kokoro-82M v1.0 ONNX / af_heart** offline. The CPU-quantized model and single voice are tracked in `python/assets/kokoro` (about 93 MB combined); no first-run model download or API key is needed. After pulling this change, run `setup.bat`, then `check-windows.bat`, then `start-dev.bat`. The installer includes the voice and pronunciation/audio libraries. Settings > Voice keeps rate and volume; 150 maps to the model's natural speed, so actual WPM depends on the words. If speech cannot start or play, the app reports the failure instead of substituting another narrator.
+
+Inference is isolated from gaze in a separate process, limited to one CPU thread and short chunks. Stop, mute or a new phrase cancels old speech. Music and video soundtracks are unchanged. See `docs/local-voice.md` for sources, licensing and validation limits.

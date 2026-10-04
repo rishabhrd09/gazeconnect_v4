@@ -46,7 +46,7 @@ def main():
         if int(PyInstaller.__version__.split('.')[0]) != 6:
             raise RuntimeError('PyInstaller 6.x is required; rerun setup.bat.')
     if args.imports:
-        for name in ('websockets', 'pyttsx3', 'comtypes', 'pyautogui', 'aiohttp', 'flask',
+        for name in ('websockets', 'kokoro_onnx', 'sounddevice', 'espeakng_loader', 'comtypes', 'pyautogui', 'aiohttp', 'flask',
                      'flask_cors', 'cairo', 'ezdxf', 'PIL', 'numpy', 'svgwrite', 'shapely',
                      'networkx', 'squarify', 'onnxruntime', 'ortools.sat.python.cp_model'):
             importlib.import_module(name)

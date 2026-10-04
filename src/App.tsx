@@ -11,7 +11,7 @@
 import { normalizeFilterPreset } from './config/gazeFilterConfig';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { darkColors, lightColors } from './utils/design';
-import { browserRateFromWpm, chooseSpeechRoute, splitSpeechSegments } from './utils/ttsRouting';
+import { chooseSpeechRoute } from './utils/ttsRouting';
 import { WebSocketProvider, useWS } from './hooks/useWebSocket';
 import { GazeControlProvider, useGazeControl } from './components/core/GazeControlToggle';
 import { RealGazeProvider } from './contexts/RealGazeContext';
@@ -131,26 +131,6 @@ const BreakReminder: React.FC<{ onDismiss: () => void; isDarkMode: boolean }> = 
   );
 };
 
-function speakText(text: string, rate = 1.0, volume = 1.0, language = 'english'): void {
-  if (volume <= 0) return;
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  // Settings store rate as WPM; the utterance wants a 0.1-10 multiplier.
-  // (Previously raw WPM was assigned to u.rate, pinning the fallback voice
-  // at maximum speed once the slider was ever touched.)
-  const utterRate = browserRateFromWpm(rate);
-  // v17.18: mixed EN+HI text (the bilingual emergency phrase) is split into
-  // script runs so each half gets a voice that can actually speak it.
-  // speechSynthesis queues utterances, so the runs play in order.
-  for (const seg of splitSpeechSegments(text)) {
-    const u = new SpeechSynthesisUtterance(seg.text);
-    u.rate = utterRate;
-    u.volume = volume;
-    u.lang = language === 'hindi' ? 'hi-IN' : seg.lang;
-    window.speechSynthesis.speak(u);
-  }
-}
-
 const InnerApp: React.FC = () => {
   const ws = useWS();
   const { isGazeEnabled, disableGaze, signalNavigation, isMouseMode } = useGazeControl();
@@ -199,7 +179,6 @@ const InnerApp: React.FC = () => {
   // Destructure settings for convenience
   const { isDarkMode, ttsRate, ttsVolume } = settings;
   const showHindi = false;
-  const ttsLanguage = 'english';
 
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -287,49 +266,43 @@ const InnerApp: React.FC = () => {
     // 'always-active': do nothing — gaze stays fully active, no freeze
   }, [disableGaze, signalNavigation, ws, isFocusMode, currentScreen, settings]);
 
-  const handleSpeak = useCallback((text: string) => {
-    // v17.18: exactly ONE voice per utterance (fixes double-speak) routed so
-    // that Hindi and emergency speech can never be silenced:
-    //   - volume 0  -> mute everything, stop in-flight speech
-    //   - Hindi/Devanagari text -> browser speechSynthesis (the only path
-    //     that can select a hi-IN voice; backend SAPI5 renders Devanagari
-    //     as silence — empirically verified in the 2026-06-11 review)
-    //   - English -> backend pyttsx3 when connected AND its TTS engine
-    //     reports healthy (tts_available handshake); browser fallback
-    //     otherwise, so a dead backend voice never means a mute patient.
-    const route = chooseSpeechRoute({
-      text,
-      ttsLanguage,
-      volume: ttsVolume ?? 1,
-      backendConnected: !!(ws.isConnected && ws.speak),
-      backendTtsAvailable: ws.ttsAvailable !== false,
-    });
-    if (route === 'mute') {
-      try { window.speechSynthesis?.cancel(); } catch { /* no-op */ }
-      if (ws.isConnected && ws.stopSpeaking) ws.stopSpeaking();
-      return;
-    }
-    if (route === 'backend') {
-      // Kill any in-flight browser utterance (e.g. one started while the
-      // backend was briefly down) so a reconnect can't overlap two voices.
-      try { window.speechSynthesis?.cancel(); } catch { /* no-op */ }
-      ws.speak(text);
-      return;
-    }
-    speakText(text, ttsRate, ttsVolume ?? 1, ttsLanguage || 'english');
-  }, [ttsRate, ttsVolume, ttsLanguage, ws]);
+  const [speechNotice, setSpeechNotice] = useState('');
+  const speechRequested = useRef(false);
+  useEffect(() => {
+    if (!speechRequested.current) return;
+    if (ws.ttsState === 'error') setSpeechNotice(ws.ttsError || 'Speech is unavailable. Select Speak to try again.');
+    if (ws.ttsState === 'speaking' || ws.ttsState === 'ready') setSpeechNotice('');
+    if (ws.ttsState === 'disconnected') setSpeechNotice('Speech is unavailable while the local backend reconnects.');
+  }, [ws.ttsState, ws.ttsError]);
+  useEffect(() => {
+    if (!speechNotice) return;
+    const timer = window.setTimeout(() => setSpeechNotice(''), 10000);
+    return () => window.clearTimeout(timer);
+  }, [speechNotice]);
 
-  // v17.18: the backend voice must honor the Voice Settings panel — these
-  // were never wired, so the backend always spoke at its init defaults
-  // (rate=150 WPM, volume=1.0) no matter what the sliders said. ttsRate is
-  // WPM (80-250), which is exactly what pyttsx3 setProperty('rate') takes.
-  // NOTE: volume 0 also mutes the backend voice (incl. emergency speech) —
-  // deliberate, matching the panel's "0 = muted" promise.
+  const handleSpeak = useCallback((text: string) => {
+    const route = chooseSpeechRoute({ text, volume: ttsVolume ?? 1,
+      backendConnected: ws.isConnected, backendVoice: ws.ttsVoice });
+    if (route === 'mute') {
+      speechRequested.current = false;
+      setSpeechNotice('');
+      ws.stopSpeaking();
+    } else if (route === 'backend') {
+      speechRequested.current = true;
+      setSpeechNotice(ws.ttsState === 'starting' ? 'Local voice is warming up…' : '');
+      ws.speak(text);
+    } else {
+      setSpeechNotice('Local voice is unavailable. Start or update the GazeConnect backend.');
+    }
+  }, [ttsVolume, ws]);
+
+  // Rate is a WPM preference mapped to Kokoro speed around its natural pace.
+  // Volume zero cancels all active/pending speech in the shared voice worker.
   useEffect(() => {
     if (!ws.isConnected) return;
     if (ws.setTTSRate && Number.isFinite(ttsRate)) {
       const wpm = ttsRate >= 40 ? ttsRate : ttsRate * 150;
-      ws.setTTSRate(Math.max(80, Math.min(400, Math.round(wpm))));
+      ws.setTTSRate(Math.max(80, Math.min(250, Math.round(wpm))));
     }
     if (ws.setTTSVolume && Number.isFinite(ttsVolume)) {
       ws.setTTSVolume(Math.max(0, Math.min(1, ttsVolume)));
@@ -417,9 +390,16 @@ const InnerApp: React.FC = () => {
     }
   };
 
+  const voiceNotice = speechNotice ? <div role="status" aria-live="polite" style={{
+    position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)',
+    maxWidth: '70vw', padding: '8px 16px', borderRadius: 8, zIndex: 10000,
+    background: isDarkMode ? '#22313b' : '#fffdf8', color: isDarkMode ? '#fff' : '#23343f',
+    fontSize: 'clamp(16px, 1.3vw, 22px)', pointerEvents: 'none', textAlign: 'center',
+  }}>{speechNotice}</div> : null;
+
   // Alert Mode: unconditionally render the lock screen
   if (isAlertMode) {
-    return <div className="design-surface" data-design-screen="urgent"><AlertModeScreen onSpeak={handleSpeak} onHome={handleAlertModeHome} isDarkMode={isDarkMode} /></div>;
+    return <div className="design-surface" data-design-screen="urgent">{voiceNotice}<AlertModeScreen onSpeak={handleSpeak} onHome={handleAlertModeHome} isDarkMode={isDarkMode} /></div>;
   }
 
   // Show loading screen while settings are being loaded from disk
@@ -495,6 +475,7 @@ const InnerApp: React.FC = () => {
       fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
       display: 'flex', flexDirection: 'column',
     }}>
+      {voiceNotice}
       {/* Live clock — hidden on screens where top-right is crowded */}
       <LiveClock currentScreen={currentScreen} suppressed={isLiveClockSuppressed || currentScreen === 'home'} />
 
