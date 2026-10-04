@@ -247,7 +247,7 @@ const QuickWordPhraseOverlay: React.FC<QuickWordPhraseOverlayProps> = ({
   if (!isOpen || !word) return null;
 
   return (
-    <div
+    <div className="quickword-dialog" role="dialog" aria-modal="true" aria-label={word.en}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

@@ -1635,7 +1635,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
             flex: 1, display: 'flex', flexDirection: 'row',
             gap: 'clamp(16px, 1.8vw, 26px)',
             padding: 'clamp(14px, 1.6vh, 22px) clamp(20px, 2.2vw, 32px)',
-            paddingBottom: 'clamp(14px, 1.8vh, 24px)',
+            paddingBottom: 'clamp(28px, 3.5vh, 42px)',
             overflow: 'hidden',
             background: T_pageBg,
         }}>
@@ -2213,7 +2213,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     const playbackState = browser.videoPlaybackState;
 
     if (playing) return (
-        <div style={{
+        <div className="youtube-player" style={{
             flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(12px,1.5vh,20px)', gap: 'clamp(10px,1.2vh,16px)', overflow: 'hidden',
             marginTop: '0', transition: 'margin-top 0.3s ease',
             marginLeft: 'clamp(10px,1.5vw,20px)', marginRight: 'clamp(10px,1.5vw,20px)',
@@ -2360,9 +2360,9 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         </div>
     );
 
-    // ── LANDING: Sidebar (categories) + Thumbnail grid (Phrases pattern) ──
+    // Four categories and four videos retain their original actions.
     return (
-        <div style={{
+        <div className="youtube-library" style={{
             flex: 1, display: 'flex', flexDirection: 'row', gap: 'clamp(18px, 2vw, 28px)',
             padding: 'clamp(14px, 1.6vh, 22px) clamp(18px, 2vw, 28px)', overflow: 'hidden',
             paddingBottom: 'clamp(20px, 2.4vh, 32px)',
@@ -2464,7 +2464,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
             </div>
 
             {/* CONTENT — Thumbnail grid (2×2 — 4 large cards) */}
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridTemplateRows: 'repeat(2, minmax(0, 1fr))', gap: 'clamp(20px, 2.4vw, 32px)', overflow: 'hidden', minHeight: 0 }}>
+            <div className="youtube-videos" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridTemplateRows: 'repeat(2, minmax(0, 1fr))', gap: 'clamp(20px, 2.4vw, 32px)', overflow: 'hidden', minHeight: 0 }}>
                 {cat.videos.slice(0, 4).map((v, i) => {
                     // Defensive lookup — `id` may or may not exist on a video entry.
                     // Search-query entries have no id; static-watch entries do.
@@ -2486,7 +2486,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                 padding: 0,
                             }}>
                             {/* Thumbnail (top ~65%, 16:9) */}
-                            <div style={{
+                            <div className="youtube-thumbnail" style={{
                                 position: 'relative',
                                 width: '100%', flex: '1 1 52%', minHeight: 0,
                                 background: 'var(--ui-inset)',
@@ -2544,7 +2544,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                                 </div>}
                             </div>
                             {/* Title + channel */}
-                            <div style={{
+                            <div className="youtube-video-title" style={{
                                 flex: '0 0 auto', minHeight: 'clamp(106px, 12vh, 144px)',
                                 display: 'flex', flexDirection: 'column', justifyContent: 'center',
                                 padding: 'clamp(14px, 1.6vh, 22px) clamp(18px, 1.8vw, 26px)',
@@ -3160,7 +3160,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         <div style={{
             flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
             padding: 'clamp(14px, 1.6vh, 22px) clamp(28px, 3vw, 56px)',
-            paddingBottom: 'clamp(14px, 1.8vh, 24px)',
+            paddingBottom: 'clamp(28px, 3.5vh, 42px)',
             gap: 'clamp(14px, 1.8vh, 24px)',
             background: T_pageBg,
         }}>
@@ -3933,7 +3933,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 <GlobalNavBar currentPage="web" onNavigate={onNavigate} isDarkMode={isDarkMode} />
             </div>
 
-            <div style={{
+            <div className="web-hub-stage" style={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',

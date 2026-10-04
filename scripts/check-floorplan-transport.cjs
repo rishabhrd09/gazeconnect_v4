@@ -27,7 +27,14 @@ const { requestFloorplan } = require('../electron/floorplanTransport.ts');
     const failed=await requestFloorplan({endpoint:'/api/floorplan/generate',body:'{"test":true}'},port);
     assert.equal(failed.status,422);
     assert.equal(JSON.parse(Buffer.from(failed.bytes)).error,'example validation failure');
-    assert.deepEqual(received,[{url:'/api/health',method:'GET',body:''},{url:'/api/floorplan/generate',method:'POST',body:'{"test":true}'}]);
+    const originalReceived = received.slice();
+    for (const endpoint of ['/api/floorplan/compass/options', '/api/floorplan/compass/render']) {
+      const r = await requestFloorplan({endpoint, body:'{"scope":"ground"}'}, port);
+      assert.equal(r.status,422);
+      assert.equal(received.at(-1).url,endpoint);
+      assert.equal(received.at(-1).method,'POST');
+    }
+    assert.deepEqual(originalReceived,[{url:'/api/health',method:'GET',body:''},{url:'/api/floorplan/generate',method:'POST',body:'{"test":true}'}]);
   } finally { await new Promise(resolve=>server.close(resolve)); }
-  console.log('Floor-plan transport: 10 route/body/loopback/response checks passed.');
+  console.log('Floor-plan transport: 16 route/body/loopback/response checks passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

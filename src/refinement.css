@@ -211,7 +211,7 @@
 :root[data-theme] .browser-content-frame > div { color: var(--ui-muted) !important; }
 
 /* Shared survey workspace: stationary choices, clear hierarchy, no footer overlap. */
-:root[data-theme] :is(.survey-screen, .compass-screen, .design-home-screen, .advanced-map-screen) {
+:root[data-theme] :is(.survey-screen, .compass-screen, .design-home-screen ) {
   font-family: var(--ui-font); color: var(--ui-ink); background: var(--ui-page) !important;
 }
 :root[data-theme] :is(.foundation-layout, .survey-body) {
@@ -269,14 +269,14 @@
 :root[data-theme] .survey-command-bar {
   flex-shrink: 0; position: static !important; display: flex; flex-direction: column;
   border-top: 1px solid var(--ui-border); background: var(--ui-page) !important;
-  padding: clamp(12px, 2vh, 22px) clamp(18px, 2.5vw, 40px) !important;
+  padding: clamp(12px, 2vh, 22px) clamp(18px, 2.5vw, 40px) clamp(28px, 3.5vh, 42px) !important;
 }
 :root[data-theme] .survey-command-bar > div:first-child { display: none; }
 :root[data-theme] .survey-command-bar > div:last-child {
   display: flex !important; align-items: stretch !important; gap: clamp(10px, 1.1vw, 18px) !important; padding: 0 !important;
 }
 :root[data-theme] .survey-command-bar button, :root[data-theme] .survey-choice-pager button {
-  flex: 1; min-width: 80px !important; min-height: 80px !important; height: clamp(80px, 10vh, 108px) !important;
+  flex: 1; min-width: 80px !important; min-height: 80px !important; height: clamp(104px, 12vh, 136px) !important;
   width: auto !important; padding: 12px !important; border-radius: 12px !important;
   color: var(--ui-ink) !important; background: var(--ui-surface) !important;
   border: 1px solid var(--ui-border) !important; box-shadow: none !important; transform: none !important;
@@ -336,35 +336,6 @@
 :root[data-theme] .settings-choice-section { background: var(--ui-surface) !important; border-color: var(--ui-border) !important; }
 :root[data-theme] .settings-choice-section button { color: var(--ui-ink) !important; background: var(--ui-surface) !important; border: 1px solid var(--ui-border) !important; border-radius: 12px !important; box-shadow: none !important; }
 :root[data-theme] .settings-choice-section button[aria-pressed='true'] { background: var(--ui-selected) !important; border: 2px solid var(--ui-accent-ink) !important; color: var(--ui-accent-ink) !important; }
-:root[data-theme] .advanced-floating-nav { background: var(--ui-panel) !important; border-color: var(--ui-border) !important; box-shadow: none !important; backdrop-filter: none !important; }
-:root[data-theme] .advanced-map-screen button:not(.architectural-cell) {
-  min-height: 80px !important; color: var(--ui-ink) !important; background: var(--ui-surface) !important;
-  border-color: var(--ui-border) !important; border-radius: 12px !important; box-shadow: none !important;
-  font-family: var(--ui-font) !important; font-weight: 600 !important; transform: none !important;
-}
-:root[data-theme] .advanced-map-screen :is(#room-ready, #adv-generate, #adv-generate-ref) { background: var(--ui-selected) !important; border-color: var(--ui-accent-ink) !important; color: var(--ui-accent-ink) !important; }
-:root[data-theme] .advanced-canvas { min-height: 0; box-sizing: border-box; }
-:root[data-theme] .advanced-canvas[data-nav-open='true'] { padding-top: clamp(236px, 25vh, 270px); }
-:root[data-theme] .advanced-canvas .architectural-cell { min-height: 80px; border-radius: 8px !important; box-shadow: none !important; transform: none !important; }
-:root[data-theme] .advanced-canvas .architectural-cell span { font-family: var(--ui-font) !important; font-style: normal !important; }
-:root[data-theme] .advanced-room-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-template-rows: repeat(2, minmax(80px, 1fr)); gap: 10px !important; overflow: hidden !important; }
-:root[data-theme] .advanced-room-grid button { height: 100% !important; min-width: 80px !important; }
-:root[data-theme] .advanced-room-grid button span { white-space: normal !important; }
-:root[data-theme] .advanced-room-pager { display: flex; gap: 10px; padding: 6px 14px; flex-shrink: 0; }
-:root[data-theme] .advanced-room-pager button { flex: 1; min-width: 80px !important; height: 80px !important; font-size: 14px !important; }
-:root[data-theme] .advanced-room-actions { flex-direction: row !important; gap: 10px !important; }
-:root[data-theme] .advanced-room-actions button { flex: 1; min-width: 80px; width: auto !important; }
-@media (max-height: 900px) {
-  :root[data-theme] .advanced-room-controls { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  :root[data-theme] .advanced-room-controls > :is(span, div) { grid-column: 1 / -1; }
-  :root[data-theme] .advanced-room-controls button { min-width: 80px; }
-  :root[data-theme] .advanced-room-actions button { font-size: 14px !important; height: 80px !important; }
-}
-:root[data-theme] .advanced-room-grid button { width: 100% !important; }
-:root[data-theme] .advanced-room-grid button > div { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
-:root[data-theme] .advanced-room-grid button > div > span { line-height: 1.3 !important; }
-:root[data-theme] .advanced-room-grid button > div > span:first-of-type { font-size: clamp(15px, 1.9vh, 21px) !important; }
-:root[data-theme] .advanced-room-grid button > div > span:nth-of-type(2) { font-size: clamp(12px, 1.45vh, 16px) !important; }
 :root[data-theme] .survey-summary-dialog { height: 88vh; max-height: 900px; background: var(--ui-panel) !important; border-color: var(--ui-border) !important; }
 :root[data-theme] .survey-summary-dialog :is(h2, button, span, div) { font-family: var(--ui-font) !important; }
 :root[data-theme] .survey-summary-panel { min-height: 0; }

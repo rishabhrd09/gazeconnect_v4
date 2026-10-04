@@ -484,11 +484,11 @@ export const GazeCursor: React.FC = () => {
   }, []); // Stable — ref keeps registerTargets current
 
   // v9: Track keyboard screen for context-aware dwell timing
-  // v10: Also track compass/advanced-map screens for nav dwell boost
+  // v10: Also track compass screen for nav dwell boost
   useEffect(() => {
     clearKeyboardConfirmation();
     isKeyboardScreenRef.current = ws.currentScreen === 'keyboard';
-    isCompassScreenRef.current = ws.currentScreen === 'compass-map' || ws.currentScreen === 'advanced-map';
+    isCompassScreenRef.current = ws.currentScreen === 'compass-map';
   }, [ws.currentScreen, clearKeyboardConfirmation]);
   useEffect(() => () => {
     clearKeyboardConfirmation();
@@ -694,9 +694,21 @@ export const GazeCursor: React.FC = () => {
     if (isKeyboardScreenRef.current && keyboardKeysRef.current.length > 0 && !hasHighZOverlay) {
       const bestKey = findBestKeyboardKey(cx, cy, keyboardKeysRef.current, KEYBOARD_SNAP_MARGIN);
       if (bestKey) {
-        clickable = bestKey;
-        isToggle = false;
-        isAlwaysActive = false;
+        // Expanded letter hit zones must not cover a real action/suggestion
+        // beside them. In a compact keyboard, WORD and 123 can be less than
+        // 55px from the row above even at their centres. Containment wins;
+        // keep the existing expansion in otherwise empty gaps.
+        const direct = distanceToRect(cx, cy, bestKey.getBoundingClientRect()) > 0
+          ? findClickableElement(cx, cy) : null;
+        if (direct?.element && isGazeTargetAvailable(direct.element)) {
+          clickable = direct.element;
+          isToggle = direct.isToggle;
+          isAlwaysActive = direct.isAlwaysActive;
+        } else {
+          clickable = bestKey;
+          isToggle = false;
+          isAlwaysActive = false;
+        }
       }
     }
     // v17.8: Run snap-targets-nearest-center as a fallback even on keyboard

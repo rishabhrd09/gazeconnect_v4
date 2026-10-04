@@ -19,6 +19,7 @@ import { MAX_ACTIVE_PEOPLE } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
 import { normalizeKeyboardFeel } from '../config/dwellTimeConfig';
 import { normalizeGazeColors } from '../config/gazeColors';
+import { normalizeDesignMode } from '../config/designMode';
 import {
   CARE_ACTIVITY_CATEGORIES,
   CARE_CONTENT_ARCHITECTURE_VERSION,
@@ -42,6 +43,7 @@ const englishOnlySettings = (settings: AppSettings): AppSettings => ({
   ...settings, showHindi: false, ttsLanguage: 'english', gazeOffsetX: 0, gazeOffsetY: 0,
   keyboardFeel: normalizeKeyboardFeel(settings.keyboardFeel),
   gazeColors: normalizeGazeColors(settings.gazeColors),
+  designMode: normalizeDesignMode(settings.designMode),
 });
 const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
 

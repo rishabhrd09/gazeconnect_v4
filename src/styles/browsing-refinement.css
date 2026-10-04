@@ -21,12 +21,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(80px, 1fr));
   gap: 12px;
-  flex: 0 0 80px;
+  flex: 0 0 clamp(96px, 11vh, 120px);
 }
 :root[data-theme] .web-hub-screen .browse-page-controls button {
   width: 100% !important;
   min-width: 80px !important;
-  height: 80px !important;
+  height: clamp(96px, 11vh, 120px) !important;
   min-height: 80px !important;
   background: var(--ui-panel) !important;
   color: var(--ui-ink) !important;

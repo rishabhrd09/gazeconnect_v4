@@ -13,6 +13,7 @@
 """
 
 import os
+import io
 import sys
 import json
 import base64
@@ -37,6 +38,7 @@ if PYTHON_DIR.exists():
 
 from gazeconnect_floorplan_v5 import parse, CairoFloorPlan, Fl
 from floorplan_fusion_v1 import fuse_floorplan_inputs, pick_style_from_context
+from compass_resources import resources as compass_resources, RendererBusy, MAX_REQUEST_BYTES, validate_source
 try:
     from gazeplan_engine_v5.engine import generate_floorplan_v5
     HAS_V5 = True
@@ -120,6 +122,50 @@ def _prepare_fused_payload(data: dict):
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "engine": "pycairo", "version": "4.0"})
+
+
+# Compass presentation is isolated from survey fusion and the legacy viewer.
+@app.route("/api/floorplan/compass/options", methods=["POST"])
+def compass_plan_options():
+    from compass_presentation import options as compass_options
+    if (request.content_length or 0) > MAX_REQUEST_BYTES:
+        return jsonify({"error": "This map is too large for the Compass preview."}), 413
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("compass_map"), dict):
+        return jsonify({"error": "A Compass Map is required."}), 400
+    try:
+        validate_source(data['compass_map'])
+        with compass_resources.job():
+            result=compass_options(data["compass_map"], data.get("scope", "ground"))
+        return jsonify(result)
+    except RendererBusy as error:
+        return jsonify({"error": str(error)}), 429
+    except (ValueError, TypeError, KeyError) as error:
+        return jsonify({"error": str(error)}), 422
+
+
+@app.route("/api/floorplan/compass/render", methods=["POST"])
+def compass_plan_render():
+    from compass_presentation import render as compass_render
+    if (request.content_length or 0) > MAX_REQUEST_BYTES:
+        return jsonify({"error": "This map is too large for the Compass preview."}), 413
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("compass_map"), dict):
+        return jsonify({"error": "A Compass Map is required."}), 400
+    fmt = data.get("format", "png")
+    floor = data.get("floor", "ground")
+    try:
+        settings = {'floor': floor, 'view': data.get('view','2d'), 'fmt': fmt,
+                    'theme': data.get('theme','warm'), 'angle': data.get('angle',0),
+                    'room_id': data.get('room_id'), 'style': data.get('style','verandah')}
+        result = compass_resources.render(data['compass_map'], settings,
+                    lambda: compass_render(data['compass_map'], **settings))
+        return send_file(io.BytesIO(result), mimetype=MIME_MAP_V5[fmt],
+                         download_name=f"compass-{floor}.{fmt}")
+    except RendererBusy as error:
+        return jsonify({"error": str(error)}), 429
+    except (ValueError, TypeError, KeyError) as error:
+        return jsonify({"error": str(error)}), 422
 
 
 # ── Generate Floor Plan ───────────────────────────────────
@@ -568,4 +614,4 @@ if __name__ == "__main__":
     print(f"{'='*60}\n")
     # debug=False + use_reloader=False: prevents stat reloader from
     # spawning a child process that may crash silently in Electron
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)

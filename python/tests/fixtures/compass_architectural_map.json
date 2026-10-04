@@ -1,0 +1,79 @@
+{
+  "grid_size": {
+    "rows": 4,
+    "cols": 4
+  },
+  "plot": {
+    "width_ft": 40,
+    "depth_ft": 60,
+    "facing": "East"
+  },
+  "ground_floor": {
+    "placements": [
+      {
+        "room": "Living Hall",
+        "roomId": "living",
+        "cells": [
+          "r1_c1",
+          "r1_c2",
+          "r2_c1",
+          "r2_c2"
+        ]
+      },
+      {
+        "room": "Master Bedroom",
+        "roomId": "masterbed",
+        "cells": [
+          "r1_c3",
+          "r1_c4",
+          "r2_c3"
+        ]
+      },
+      {
+        "room": "Staircase",
+        "roomId": "staircase",
+        "cells": [
+          "r2_c4"
+        ]
+      },
+      {
+        "room": "Kitchen + Store",
+        "roomId": "kitchen",
+        "cells": [
+          "r3_c1",
+          "r3_c2"
+        ]
+      },
+      {
+        "room": "Dining Hall",
+        "roomId": "dining",
+        "cells": [
+          "r4_c1",
+          "r4_c2"
+        ]
+      },
+      {
+        "room": "Bedroom",
+        "roomId": "bedroom",
+        "cells": [
+          "r3_c3",
+          "r4_c3"
+        ]
+      },
+      {
+        "room": "Bathroom",
+        "roomId": "bathroom",
+        "cells": [
+          "r3_c4"
+        ]
+      },
+      {
+        "room": "Terrace",
+        "roomId": "terrace",
+        "cells": [
+          "r4_c4"
+        ]
+      }
+    ]
+  }
+}

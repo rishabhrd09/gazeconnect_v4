@@ -1,4 +1,4 @@
-/** Shared navigation. The reserved left cell keeps navigation and gaze targets stable. */
+/** Shared navigation with equal, centred gaze targets and a symmetric Home header. */
 
 import React from 'react';
 import { DWELL_GROUPS } from '../config/dwellTimeConfig';
@@ -55,6 +55,17 @@ const KeyboardNavIcon: React.FC = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={navIconStyle}>
         <rect x="3" y="6" width="18" height="12" rx="2.5" />
         <path d="M7 10h.01M10.5 10h.01M14 10h.01M17.5 10h.01M7 14h.01M10.5 14h7" />
+    </svg>
+);
+
+/** Small, consistent symbols; each button remains the only interactive target. */
+const ActionNavIcon: React.FC<{ kind: 'back' | 'zone' | 'phrases' | 'restart' | 'full' }> = ({ kind }) => (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={navIconStyle}>
+        {kind === 'back' && <path d="m10 5-7 7 7 7M3 12h18" />}
+        {kind === 'zone' && <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>}
+        {kind === 'phrases' && <><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2Z" /><path d="M7 8h10M7 12h7" /></>}
+        {kind === 'restart' && <><path d="M20 10a8 8 0 1 0-1 7M20 4v6h-6" /></>}
+        {kind === 'full' && <path d="M8 3H3v5m0-5 7 7m6-7h5v5m0-5-7 7M3 16v5h5m-5 0 7-7m11 2v5h-5m5 0-7-7" />}
     </svg>
 );
 
@@ -174,16 +185,27 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     const BACK_TARGETS: Record<string, string> = {
         'floor-plan-survey': 'floor-plan',
         'compass-map': 'floor-plan',
-        'advanced-map': 'compass-map',
     };
     const backTarget = BACK_TARGETS[currentPage] || null;
+    // Count rendered actions, not wrapper cells, so every card gets the same share.
+    // This is layout metadata only; selection handlers and gaze attributes stay on the buttons.
+    const navigationActionCount = currentPage === 'home' || isNavHidden ? 0
+        : 1 + Number(Boolean(onBack || backTarget)) + Number(Boolean(onRestartCompass))
+        + (isKbOrSpatial ? 1 + Number(currentPage === 'spatial' || showZoneBoardButton)
+            : 1 + Number(showZoneBoardButton));
+    const navActionCount = navigationActionCount + 1
+        + Number(Boolean(showMoreToggle && onMoreToggle))
+        + Number(currentPage === 'web' && Boolean(onNavHiddenToggle));
 
     return (
         <>
             <div
                 className="nav-bar-container"
                 data-gaze-screen={currentPage}
+                data-nav-count={navActionCount}
+                data-nav-actions={navigationActionCount}
                 style={{
+                    ...({ '--nav-action-count': navActionCount, '--nav-navigation-count': navigationActionCount, '--nav-control-count': navActionCount - navigationActionCount } as React.CSSProperties),
                     display: 'grid',
                     gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
                     alignItems: 'center',
@@ -241,9 +263,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 textShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.26)' : 'none',
                             }}
                         >
-                            <svg aria-hidden="true" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ width: 'clamp(30px, 4vh, 44px)', height: 'clamp(30px, 4vh, 44px)', flexShrink: 0 }}>
-                                <circle cx="24" cy="24" r="21" />
-                                <path d="M24 35V22m0 6c-8 0-12-5-12-12 8 0 12 4 12 12Zm0-4c0-7 4-11 12-12 0 8-4 12-12 12Z" />
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ width: 'clamp(30px, 4vh, 44px)', height: 'clamp(30px, 4vh, 44px)', flexShrink: 0 }}>
+                                <path d="M4 19c0-8 6-11 15-14 2 8 0 13-7 14-3 .5-5-1-6-2M3 22c2-5 6-8 11-10" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                             <span>GAZE</span>
                             <span>CONNECT</span>
@@ -274,8 +295,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         ...focusDisabledStyle,
                                     }}
                                 >
-                                    <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>←</span>
-                                    Back
+                                    <ActionNavIcon kind="back" />
+                                    <span className="nav-action-label">Back</span>
                                 </button>
                             )}
 
@@ -291,8 +312,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         ...focusDisabledStyle,
                                     }}
                                 >
-                                    <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>←</span>
-                                    Back
+                                    <ActionNavIcon kind="back" />
+                                    <span className="nav-action-label">Back</span>
                                 </button>
                             )}
 
@@ -311,7 +332,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                             >
                                 <HomeNavIcon />
                                 <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>🏠</span>
-                                Home
+                                <span className="nav-action-label">Home</span>
                             </button>
 
                             {/* Dead zone — compass map: between Home and Keyboard */}
@@ -336,7 +357,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         >
                                             <KeyboardNavIcon />
                                             <span style={{ fontSize: keyboardNavIconSize }}>⌨️</span>
-                                            Keyboard
+                                            <span className="nav-action-label">Keyboard</span>
                                         </button>
                                     )}
 
@@ -349,8 +370,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('spatial'), ...focusDisabledStyle }}
                                         >
-                                            <span style={{ fontSize: keyboardNavIconSize }}>🔲</span>
-                                            Zone Board
+                                            <ActionNavIcon kind="zone" />
+                                            <span className="nav-action-label">Zone Board</span>
                                         </button>
                                     )}
 
@@ -365,8 +386,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         data-gaze-context="navigation"
                                         style={{ ...getButtonStyle('quick-words'), ...focusDisabledStyle }}
                                     >
-                                        <span style={{ fontSize: keyboardNavIconSize }}>💬</span>
-                                        Quick Words
+                                        <ActionNavIcon kind="phrases" />
+                                        <span className="nav-action-label">Quick Words</span>
                                     </button>
                                 </>
                             )}
@@ -384,7 +405,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                     >
                                         <KeyboardNavIcon />
                                         <span style={{ fontSize: standardNavIconSize }}>⌨️</span>
-                                        Keyboard
+                                        <span className="nav-action-label">Keyboard</span>
                                     </button>
 
                                     {/* ZONE BOARD — conditional */}
@@ -396,8 +417,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                             data-gaze-context="navigation"
                                             style={{ ...getButtonStyle('spatial'), ...focusDisabledStyle }}
                                         >
-                                            <span style={{ fontSize: standardNavIconSize }}>🔲</span>
-                                            Zone Board
+                                            <ActionNavIcon kind="zone" />
+                                            <span className="nav-action-label">Zone Board</span>
                                         </button>
                                     )}
                                 </>
@@ -420,8 +441,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                         ...focusDisabledStyle,
                                     }}
                                 >
-                                    <span style={{ fontSize: isCompassMap ? compassNavTextSize : standardNavIconSize }}>🔄</span>
-                                    Restart Maps
+                                    <ActionNavIcon kind="restart" />
+                                    <span className="nav-action-label">Restart Maps</span>
                                 </button>
                             )}
 
@@ -439,7 +460,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                 }}>
                     {/* GAZE TOGGLE — the Zone Board's gaze card; on the spatial keyboard it sits between two lines */}
                     {currentPage === 'spatial' ? (
-                        <div style={{
+                        <div className="nav-gaze-slot" style={{
                             display: 'flex', alignItems: 'stretch', height: keyboardNavTargetHeight,
                             minWidth: 'clamp(160px, 18vw, 240px)',
                         }}>
@@ -454,6 +475,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 id="gaze-toggle-nav"
                                 onClick={toggleGaze}
                                 className="gaze-button gaze-toggle"
+                                aria-pressed={isGazeEnabled}
+                                aria-label={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'}
                                 data-gaze="true"
                                 data-gaze-toggle="true"
                                 data-gaze-always="true"
@@ -468,7 +491,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 }}
                             >
                                 {/* Visual card (the same face as on every other screen) */}
-                                <div style={{
+                                <div className="nav-gaze-surface" style={{
                                     width: gazeTileWidth('clamp(98px, 12vh, 122px)'),
                                     height: 'clamp(98px, 12vh, 122px)',
                                     borderRadius: 14, margin: 0, flexShrink: 0,
@@ -552,8 +575,8 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
                                 fontFamily: navFontFamily,
                             }}
                         >
-                            FULL SCREEN
-                            <span style={{ fontSize: isKbOrSpatial ? keyboardNavIconSize : standardNavIconSize }}>↓</span>
+                            <ActionNavIcon kind="full" />
+                            <span className="nav-action-label">FULL SCREEN</span>
                         </button>
                     )}
 

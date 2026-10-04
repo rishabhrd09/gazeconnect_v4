@@ -32,6 +32,8 @@ import './warmmode.css';
 import './refinement.css';
 import './styles/gazespell-look.css';
 import './styles/midnight-navy.css';
+import './styles/design-modes.css';
+import './styles/keyboard-design-colors.css';
 
 import HomeScreen from './screens/HomeScreen';
 import AlertModeScreen from './screens/AlertModeScreen';
@@ -55,7 +57,6 @@ const FloorPlanSurveyScreen = React.lazy(() => import('./screens/FloorPlanSurvey
 const CompassMapScreen = React.lazy(() => import('./screens/CompassMapScreen'));
 const DesignHomeLandingScreen = React.lazy(() => import('./screens/DesignHomeLandingScreen'));
 const CustomizeScreen = React.lazy(() => import('./screens/CustomizeScreen'));
-const AdvancedMapScreen = React.lazy(() => import('./screens/AdvancedMapScreen'));
 const QuickWordsScreen = React.lazy(() => import('./screens/QuickWordsScreen'));
 const MusicScreen = React.lazy(() => import('./screens/MusicScreen'));
 
@@ -77,7 +78,6 @@ const SCREEN_LOADERS: Array<() => Promise<unknown>> = [
   () => import('./screens/DesignHomeLandingScreen'),
   () => import('./screens/FloorPlanSurveyScreen'),
   () => import('./screens/CompassMapScreen'),
-  () => import('./screens/AdvancedMapScreen'),
   () => import('./screens/MusicScreen'),
 ];
 
@@ -90,7 +90,7 @@ const ScreenLoading: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
 
 type Screen = 'home' | 'keyboard' | 'phrases' | 'feelings' | 'needs' |
   'people' | 'medical' | 'settings' | 'activities' | 'spatial' | 'web' |
-  'floor-plan' | 'floor-plan-survey' | 'compass-map' | 'customize' | 'advanced-map' |
+  'floor-plan' | 'floor-plan-survey' | 'compass-map' | 'customize' |
   'quickwords' | 'music';
 
 const KEYBOARD_TEXT_SESSION_KEY = 'gazeconnect_keyboard_text_session';
@@ -407,7 +407,6 @@ const InnerApp: React.FC = () => {
       case 'floor-plan-survey': return <FloorPlanSurveyScreen {...common} />;
       case 'compass-map': return <CompassMapScreen {...common} />;
       case 'customize': return <CustomizeScreen {...common} />;
-      case 'advanced-map': return <AdvancedMapScreen {...common} />;
       case 'music': return <MusicScreen {...common} />;
       case 'quickwords': return <QuickWordsScreen {...common}
         injectMode={!!quickWordsReturnScreen}
@@ -420,7 +419,7 @@ const InnerApp: React.FC = () => {
 
   // Alert Mode: unconditionally render the lock screen
   if (isAlertMode) {
-    return <AlertModeScreen onSpeak={handleSpeak} onHome={handleAlertModeHome} isDarkMode={isDarkMode} />;
+    return <div className="design-surface" data-design-screen="urgent"><AlertModeScreen onSpeak={handleSpeak} onHome={handleAlertModeHome} isDarkMode={isDarkMode} /></div>;
   }
 
   // Show loading screen while settings are being loaded from disk
@@ -500,7 +499,7 @@ const InnerApp: React.FC = () => {
       <LiveClock currentScreen={currentScreen} suppressed={isLiveClockSuppressed || currentScreen === 'home'} />
 
       {/* Screen content */}
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div className={currentScreen === 'keyboard' ? undefined : 'design-surface'} data-design-screen={currentScreen} style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         <ErrorBoundary>
           <React.Suspense fallback={<ScreenLoading isDarkMode={isDarkMode} />}>
             {renderScreen()}

@@ -123,6 +123,7 @@ function provideTheme({ saved, isLoaded = true, isDarkMode = true }) {
     },
     'react/jsx-runtime': { jsx: (_type, props) => { value = props.value; return null; }, jsxs: () => null, Fragment: 'fragment' },
     './CustomizationContext': { useCustomization: () => ({ isLoaded, settings: { isDarkMode }, updateSetting: (k, v) => updates.push([k, v]) }) },
+    '../config/designMode': loadModule('src/config/designMode.ts'),
     '../utils/design': { darkColors: { name: 'dark' }, midnightNavyColors: { name: 'midnight-navy' } },
   };
   const mod = loadModule('src/contexts/ThemeContext.tsx', stubs, { localStorage, document });
@@ -234,6 +235,22 @@ test("Midnight Navy uses Iris's exact palette, in the stylesheet and in src/conf
   const camel = k => k.replace(/^iris-/, '').replace(/^state-(\w)/, (_, c) => `state${c.toUpperCase()}`).replace(/-(\w)/g, (_, c) => c.toUpperCase());
   for (const [k, v] of Object.entries(IRIS)) if (!k.startsWith('scene-')) assert.equal(MIDNIGHT_NAVY[camel(k)], v, k);
   assert.equal(MIDNIGHT_NAVY_PAGE_GRADIENT, 'radial-gradient(ellipse 52% 48% at 50% 53%, #001538 0%, #00102E 38%, #000B24 66%, #000918 100%)');
+});
+
+test('the keyboard design layer changes only colours, never geometry, type or gaze feedback', () => {
+  const css = read('src/styles/keyboard-design-colors.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const selector of selectors(css)) {
+    assert.ok(selector.startsWith(':root[data-design][data-theme][data-look] #root .keyboard-screen'), selector);
+    assert.ok(!selector.includes('data-cursor'), 'live cursor must stay outside the keyboard paint layer');
+  }
+  const colours = /^(--kb-ink|background|background-color|color|border-color|stroke)$/;
+  for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const declaration of rule[2].split(';').map(s => s.trim()).filter(Boolean)) {
+      const property = declaration.slice(0, declaration.indexOf(':')).trim();
+      assert.ok(colours.test(property), `${property} is not a keyboard colour`);
+    }
+  }
+  assert.match(read('src/App.tsx'), /import '\.\/styles\/design-modes\.css';\s+import '\.\/styles\/keyboard-design-colors\.css';/);
 });
 
 console.log(`${passed} look checks passed.`);

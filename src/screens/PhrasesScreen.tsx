@@ -93,6 +93,7 @@ const PhrasesCategoryButton: React.FC<{
     <GazeButton
       id={`cat-${category.id}`}
       size="lg"
+      selected={isSelected}
       variant={isSelected ? 'primary' : 'default'}
       onClick={onSelect}
       isDarkMode={isDarkMode}
@@ -223,7 +224,7 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
       />
 
       {/* Main content - Sidebar + Phrases + Enable Gaze */}
-      <div style={{
+      <div className="patient-stage phrases-stage" style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'row',

@@ -381,7 +381,7 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
         </div>
       )}
 
-      <div style={{
+      <div className="patient-stage assistance-stage" data-view={activeSectionIndex === null ? 'categories' : 'phrases'} style={{
         flex: 1,
         minHeight: 0,
         display: 'flex',

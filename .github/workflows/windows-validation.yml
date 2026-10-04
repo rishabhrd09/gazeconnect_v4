@@ -5,6 +5,10 @@ name: Windows source validation
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches:
+      - codex/aac-visual-exploration
+      - feature/aac-comfort-timing-keyboard-home
 
 permissions:
   contents: read
@@ -70,3 +74,13 @@ jobs:
           . .\scripts\windows\Common.ps1
           Invoke-Checked $VenvPython @('-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_deterministic_*.py')
           Invoke-Checked $VenvPython @('-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_prediction_pipeline.py')
+      - name: Gaze transport, coordinate mapping and backend lifecycle
+        run: |
+          . .\scripts\windows\Common.ps1
+          Invoke-Checked $VenvPython @('-m', 'unittest', 'python.tests.test_adaptive_cursor_filter', 'python.tests.test_gap_hold_mark', 'python.tests.test_gaze_edge_stability', 'python.tests.test_gaze_transport', 'python.tests.test_magnet_params', 'python.tests.test_pipeline_mapping', 'python.tests.test_port_contract', 'python.tests.test_tts_available')
+      - name: Compass geometry, lightweight previews and all download formats
+        run: |
+          . .\scripts\windows\Common.ps1
+          $env:PYTHONPATH = (Join-Path $ProjectRoot 'tools') + ';' + (Join-Path $ProjectRoot 'python')
+          Invoke-Checked $VenvPython @('-m', 'unittest', 'python.tests.test_compass_presentation', 'python.tests.test_compass_room_views', 'python.tests.test_gazeplan_candidates', 'python.tests.test_floorplan_candidate_api_contract')
+          Invoke-Checked $VenvPython @('scripts/windows/floorplan_entry.py', '--self-test')

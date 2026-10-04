@@ -13,7 +13,6 @@ const validEventChannels = [
   'focus-mode-changed',
   'alert-mode-changed',
   'alert-mode-lock-changed',
-  'refinement-map-changed',
   'webview:navigation-state',
   'webview:links',
   'webview:edge-scroll',

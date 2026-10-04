@@ -501,27 +501,8 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                   padding: '0 clamp(4px, 0.3vw, 8px)',
                 }}>
                   {categoryIconSrc && (
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: 'clamp(70px, 7.6vh, 96px)',
-                        height: 'clamp(70px, 7.6vh, 96px)',
-                        display: 'block',
-                        flexShrink: 0,
-                        opacity: 0.9,
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                        backgroundColor: getStandaloneIconColor(category.id, isMix, isDarkMode, isWarm),
-                        WebkitMaskImage: `url(${categoryIconSrc})`,
-                        maskImage: `url(${categoryIconSrc})`,
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskPosition: 'center',
-                        WebkitMaskSize: 'contain',
-                        maskSize: 'contain',
-                      }}
-                    />
+                    <img src={categoryIconSrc} className="quickword-category-illustration" alt="" aria-hidden="true" draggable={false}
+                      style={{ width: 'clamp(56px, 7.6vh, 82px)', height: 'clamp(56px, 7.6vh, 82px)', objectFit: 'contain', flexShrink: 0, pointerEvents: 'none' }} />
                   )}
                   <h3 style={{
                     margin: 0,
@@ -541,7 +522,7 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
               </div>
             )}
 
-            <div style={{
+            <div className="quickword-category-grid" style={{
               flex: 1,
               minHeight: 0,
               display: 'grid',

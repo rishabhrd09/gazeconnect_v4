@@ -584,6 +584,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
   // ============================================
   settings: {
     isDarkMode: true,
+    designMode: 'focus',
     showHindi: false,
     dwellTime: 900,
     filterPreset: 'balanced',

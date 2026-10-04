@@ -727,12 +727,10 @@ html[data-theme="warm"] .design-home-screen,
 html[data-theme="warm"] .floor-plan-screen,
 html[data-theme="warm"] .survey-screen,
 html[data-theme="warm"] .compass-screen,
-html[data-theme="warm"] .advanced-map-screen,
 html.theme-warm .design-home-screen,
 html.theme-warm .floor-plan-screen,
 html.theme-warm .survey-screen,
-html.theme-warm .compass-screen,
-html.theme-warm .advanced-map-screen {
+html.theme-warm .compass-screen {
   background: var(--wm-root) !important;
 }
 

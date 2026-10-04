@@ -57,6 +57,7 @@ const GroupedSettingsLayout: React.FC<GroupedSettingsLayoutProps> = ({
       updateSettings({ ttsRate: defaults.ttsRate, ttsVolume: defaults.ttsVolume });
     } else if (page === 'display') {
       setTheme(defaults.isDarkMode ? 'dark' : 'warm');
+      updateSettings({ designMode: defaults.designMode });
     }
     setConfirmReset(false);
     showSaved();

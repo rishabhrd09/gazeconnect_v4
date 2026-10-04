@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const HIDDEN_SCREENS = new Set(['settings', 'quickwords', 'keyboard', 'spatial', 'web', 'compass-map', 'advanced-map', 'floor-plan-survey']);
+const HIDDEN_SCREENS = new Set(['settings', 'quickwords', 'keyboard', 'spatial', 'web', 'compass-map', 'floor-plan-survey']);
 interface LiveClockProps {
   currentScreen?: string;
   suppressed?: boolean;

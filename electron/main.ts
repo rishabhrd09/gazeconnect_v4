@@ -77,7 +77,6 @@ let isAlertModeActive = false;
 // unlock (or disable Alert Mode entirely) via right-click. The lock is
 // automatically cleared whenever Alert Mode is disabled.
 let isAlertModeLocked = false;
-let isRefinementMapEnabled = true;
 
 // Dynamic App State for Features
 let currentAppScreen = 'home';
@@ -988,8 +987,9 @@ function startFloorplanServer(): void {
   let args: string[];
 
   if (isDev) {
-    const venvPython = path.join(__dirname, '..', 'python', '.venv', 'Scripts', 'python.exe');
-    command = fs.existsSync(venvPython) ? venvPython : 'python';
+    const venvPython = path.join(__dirname, '..', 'python', '.venv',
+      ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
+    command = fs.existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3');
     const scriptPath = path.join(__dirname, '..', 'tools', 'floorplan_server.py');
     if (!fs.existsSync(scriptPath)) {
       console.warn(`Floor plan server script not found at: ${scriptPath}`);
@@ -1248,17 +1248,6 @@ function createWindow(): void {
           }
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('focus-mode-changed', isFocusModeActive);
-          }
-        },
-      },
-      {
-        label: '✂ Refinement Map (Compass)',
-        type: 'checkbox',
-        checked: isRefinementMapEnabled,
-        click: (menuItem) => {
-          isRefinementMapEnabled = menuItem.checked;
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('refinement-map-changed', isRefinementMapEnabled);
           }
         },
       },

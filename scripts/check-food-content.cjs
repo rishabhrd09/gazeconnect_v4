@@ -6,12 +6,13 @@ require.extensions['.ts'] = (mod, filename) => mod._compile(ts.transpileModule(f
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText, filename);
 const { CustomizationService } = require('../src/services/CustomizationService.ts');
-const { FOOD_PHRASES, FOOD_CONTENT_VERSION } = require('../src/services/careContentPresets.ts');
+const { FOOD_PHRASES, FOOD_CONTENT_VERSION, HOME_LAYOUT_VERSION } = require('../src/services/careContentPresets.ts');
 const service = new CustomizationService();
 const daily = data => data.medicalSections.find(section => section.id === 'daily');
 const words = data => data.quickWords.categories.find(category => category.id === 'daily').words;
 const fresh = service.getData();
-assert.equal(fresh.version, FOOD_CONTENT_VERSION);
+// Home migration runs after the food migration and advances the shared version.
+assert.equal(fresh.version, Math.max(FOOD_CONTENT_VERSION, HOME_LAYOUT_VERSION));
 assert.deepEqual(words(fresh).find(word => word.id === 'daily_food').phrases, FOOD_PHRASES);
 for (const phrase of FOOD_PHRASES) assert(daily(fresh).items.some(item => item.en === phrase.en && item.hi === phrase.hi));
 console.log('PASS fresh profiles include all three food phrases in both care menus');

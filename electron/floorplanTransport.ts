@@ -6,6 +6,8 @@ const ROUTES = new Set([
   '/api/floorplan/generate-advanced',
   '/api/floorplan/generate-all',
   '/api/floorplan/preview',
+  '/api/floorplan/compass/options',
+  '/api/floorplan/compass/render',
   '/api/floorplan/candidates',
   '/api/floorplan/candidates/adjust',
 ]);

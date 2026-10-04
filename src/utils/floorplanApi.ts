@@ -465,3 +465,78 @@ export function enrichWithSurveyData(
 
   return enriched;
 }
+
+// Compass studio deliberately bypasses survey fusion: preview and export share
+// the exact selected geometry, and a ground-only request never edits the draft.
+export type CompassPlanScope = 'ground' | 'all';
+export type CompassView = '2d' | '3d' | 'exterior';
+export type CompassExteriorStyle = 'verandah' | 'warm-modern' | 'terracotta';
+export interface CompassPlanOption {
+  id: string;
+  label: string;
+  summary: string;
+  compassData: CompassMapPayload;
+  valid: boolean;
+  notes: string[];
+  changes?: Array<{ floor: string; placementId: string; room: string; area_delta_sqft: number }>;
+}
+async function compassRequest(endpoint: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  await ensureFloorplanServerReady();
+  signal?.throwIfAborted();
+  const timeout = new AbortController();
+  const abort = () => timeout.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(abort, 60000);
+  try {
+    // IPC cannot cancel a main-process HTTP request; still release the UI on
+    // close/timeout and ignore its eventual reply. Browser fetch also aborts.
+    const request = () => new Promise<Response>((resolve, reject) => {
+      const cancel = () => reject(new DOMException('Plan request cancelled', 'AbortError'));
+      timeout.signal.addEventListener('abort', cancel, { once: true });
+      floorplanFetch(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: timeout.signal,
+      }).then(resolve, reject).finally(() => timeout.signal.removeEventListener('abort', cancel));
+    });
+    let response = await request();
+    // Closing a native IPC request cannot stop Python's already-running job.
+    // Briefly retry backpressure after a view change; never queue CPU jobs or
+    // retry a malformed map. The outer deadline and abort still bound this.
+    for (let attempt = 0; response.status === 429 && attempt < 6; attempt++) {
+      await response.body?.cancel();
+      await new Promise<void>((resolve, reject) => {
+        const cancel = () => { clearTimeout(wait); reject(new DOMException('Plan request cancelled', 'AbortError')); };
+        const wait = setTimeout(() => { timeout.signal.removeEventListener('abort', cancel); resolve(); }, Math.min(300 * (attempt + 1), 1000));
+        timeout.signal.addEventListener('abort', cancel, { once: true });
+        if (timeout.signal.aborted) cancel();
+      });
+      timeout.signal.throwIfAborted();
+      response = await request();
+    }
+    signal?.throwIfAborted();
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'The plan could not be generated. Please try again.');
+    }
+    return response;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof TypeError) throw new Error('The floor plan service is unavailable. Start the app’s floor plan service, then try again.');
+    if (timeout.signal.aborted) throw new Error('The floor plan service took too long. Please try again.');
+    throw error;
+  } finally {
+    clearTimeout(timer); signal?.removeEventListener('abort', abort);
+  }
+}
+export async function getCompassPlanOptions(compassData: CompassMapPayload, scope: CompassPlanScope, signal?: AbortSignal): Promise<{ options: CompassPlanOption[]; notes: string[] }> {
+  const response = await compassRequest('/api/floorplan/compass/options', { compass_map: compassData, scope }, signal);
+  return response.json();
+}
+export async function renderCompassPlan(compassData: CompassMapPayload, options: {
+  floor: 'ground' | 'first'; view: CompassView | 'technical';
+  format: 'svg' | 'png' | 'pdf' | 'dxf'; theme: string; angle: number;
+  room_id?: string; style?: CompassExteriorStyle;
+}, signal?: AbortSignal): Promise<Blob> {
+  const response = await compassRequest('/api/floorplan/compass/render', { compass_map: compassData, ...options }, signal);
+  return response.blob();
+}

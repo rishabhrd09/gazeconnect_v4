@@ -98,4 +98,23 @@ test('gaze colours: Standard for new and older profiles, a choice persists, bad 
   assert.equal(bad.getData().settings.gazeColors, 'standard');
 });
 
+test('Focus is the default design; Serene persists, imports normalize and reset restores Focus', () => {
+  assert.equal(DEFAULT_CUSTOMIZATION.settings.designMode, 'focus');
+  for (const value of [undefined, null, 'clarity', 'Focus', 42]) {
+    const service = new CustomizationService();
+    service.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { designMode: value, dwellTimingSet: 'relaxed', keyboardFeel: 'familiar' } }));
+    assert.equal(service.getData().settings.designMode, 'focus');
+    service.updateSetting('designMode', 'serene');
+    const restored = new CustomizationService();
+    restored.importJSON(service.exportJSON());
+    assert.equal(restored.getData().settings.designMode, 'serene');
+    assert.equal(restored.getData().settings.dwellTimingSet, 'relaxed');
+    assert.equal(restored.getData().settings.keyboardFeel, 'familiar');
+    restored.updateSetting('designMode', 'focus');
+    assert.equal(restored.getData().settings.designMode, 'focus');
+    restored.updateSetting('designMode', 'serene');
+    restored.resetToDefaults();
+    assert.equal(restored.getData().settings.designMode, 'focus');
+  }
+});
 console.log(`${passed} settings checks passed.`);

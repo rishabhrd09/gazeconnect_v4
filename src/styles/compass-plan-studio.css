@@ -1,0 +1,69 @@
+/* Isolated to the Compass generated-plan flow. No keyboard or gaze-engine rules. */
+.compass-plan-studio {
+  position: fixed; inset: 0; z-index: 7000; box-sizing: border-box;
+  padding: clamp(20px, 2.4vh, 30px) clamp(24px, 2.4vw, 48px) 28px;
+  display: flex; flex-direction: column; gap: clamp(12px, 1.5vh, 20px);
+  background: var(--design-page); color: var(--design-ink); font-family: var(--design-font); overflow: hidden;
+}
+.compass-plan-studio * { box-sizing: border-box; }
+.compass-plan-studio .studio-header { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2.8fr) minmax(220px, 1fr); gap: clamp(18px, 2vw, 36px); flex-shrink: 0; height: clamp(104px, 13vh, 144px); }
+.compass-plan-studio .studio-button, .compass-plan-studio .gaze-switch-card {
+  width: 100% !important; height: 100% !important; min-height: 104px; min-width: 0;
+  border: 1px solid var(--design-border) !important; border-radius: var(--design-radius) !important;
+  background: var(--design-card) !important; color: var(--design-ink) !important;
+  padding: clamp(12px, 1.6vh, 22px) !important; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; font: 600 clamp(23px, 2.3vw, 34px)/1.25 var(--design-font) !important; text-align: center;
+  box-shadow: none !important;
+}
+.compass-plan-studio .studio-button small { display: block; font-size: clamp(17px, 1.5vw, 23px); font-weight: 500; color: var(--design-muted); margin-top: 8px; line-height: 1.35; }
+.compass-plan-studio .studio-button:disabled { opacity: .58; cursor: default; }
+.compass-plan-studio .studio-selected, .compass-plan-studio .gaze-switch-card[aria-pressed='true'] { background: var(--design-selected) !important; border-color: var(--design-accent) !important; }
+.compass-plan-studio .studio-heading { text-align: center; align-self: center; min-width: 0; }
+.compass-plan-studio h1 { font-size: clamp(28px, 3vw, 44px); line-height: 1.2; margin: 8px 0 0; font-weight: 650; }
+.compass-plan-studio .studio-heading p { color: var(--design-muted); font-size: clamp(15px, 1.3vw, 21px); letter-spacing: .07em; margin: 0; }
+.compass-plan-studio .studio-caption { text-align: center; color: var(--design-muted); font-size: clamp(18px, 1.7vw, 25px); line-height: 1.3; flex-shrink: 0; }
+.compass-plan-studio .studio-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(230px, 21vw, 360px); gap: clamp(20px, 2vw, 36px); }
+.compass-plan-studio .studio-drawing { position: relative; min-height: 0; overflow: hidden; border-radius: 22px; border: 1px solid var(--design-border); background: var(--design-panel); display: flex; align-items: center; justify-content: center; }
+.compass-plan-studio .studio-drawing img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.compass-plan-studio .studio-zoom-name { position: absolute; left: 20px; top: 16px; background: var(--design-panel); padding: 10px 18px; border-radius: 12px; font-size: 21px; }
+.compass-plan-studio .studio-tools { display: grid; grid-template-rows: repeat(4, minmax(104px, 1fr)); gap: clamp(12px, 1.6vh, 20px); min-height: 0; }
+.compass-plan-studio .studio-footer { flex-shrink: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(18px, 2vw, 32px); height: clamp(104px, 12vh, 136px); }
+.compass-plan-studio .studio-footer p { align-self: center; text-align: center; font-size: clamp(18px, 1.65vw, 24px); color: var(--design-muted); margin: 0; }
+.compass-plan-studio .studio-footnote { flex-shrink: 0; text-align: center; font-size: clamp(15px, 1.3vw, 20px); color: var(--design-muted); line-height: 1.25; }
+.compass-plan-studio .studio-downloads { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr) auto; gap: 24px; }
+.compass-plan-studio .studio-format { display: block; color: var(--design-accent); font-size: clamp(38px, 4vw, 60px); margin-bottom: 24px; }
+.compass-plan-studio .studio-export-status { grid-column: 1 / -1; font-size: clamp(18px, 1.7vw, 26px); text-align: center; color: var(--design-muted); margin: 0; }
+.compass-plan-studio .studio-swatches { display: flex; gap: 10px; margin-bottom: 22px; }
+.compass-plan-studio .studio-swatches i { width: clamp(36px, 4vw, 62px); height: clamp(36px, 4vw, 62px); border-radius: 50%; border: 1px solid var(--design-muted); }
+.compass-plan-studio .studio-details { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.compass-plan-studio .studio-room { background: var(--design-card); border: 1px solid var(--design-border); border-radius: var(--design-radius); padding: clamp(20px, 2vw, 36px); display: flex; gap: 20px; align-items: center; }
+.compass-plan-studio .studio-room h2 { font-size: clamp(24px, 2.6vw, 38px); margin: 0 0 12px; }
+.compass-plan-studio .studio-room p { font-size: clamp(18px, 1.6vw, 25px); color: var(--design-muted); margin: 8px 0; }
+.compass-plan-studio .studio-room-number { width: 56px; height: 56px; flex-shrink: 0; border-radius: 50%; background: var(--design-selected); color: var(--design-accent); display: grid; place-items: center; font-size: 28px; }
+.compass-plan-studio .studio-notes { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px; }
+.compass-plan-studio .studio-notes article { flex: 1; display: flex; align-items: center; border-radius: 20px; background: var(--design-panel); padding: 24px; font-size: clamp(23px, 2.2vw, 32px); }
+.compass-plan-studio .studio-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; text-align: center; font-size: 28px; }
+.compass-plan-studio .studio-empty p { max-width: 900px; line-height: 1.5; }
+.compass-plan-studio .studio-error-actions { display: flex; gap: 24px; width: 70%; }
+.compass-plan-studio .studio-image-status { padding: 28px; text-align: center; font-size: 26px; }
+/* At laptop heights keep targets at 104 px by trimming decoration, never keys. */
+@media (max-height: 850px) {
+  .compass-plan-studio { padding-top: 16px; gap: 10px; }
+  .compass-plan-studio .studio-header { height: 104px; }
+  .compass-plan-studio .studio-tools { gap: 10px; }
+  .compass-plan-studio .studio-button small { font-size: 17px; margin-top: 4px; }
+  .compass-plan-studio .studio-caption { font-size: 18px; }
+  .compass-plan-studio .studio-footnote { font-size: 15px; }
+}
+
+@media (max-height: 850px) {
+  .compass-plan-studio .studio-main { grid-template-columns: minmax(0, 1fr) clamp(360px, 34vw, 470px); }
+  .compass-plan-studio .studio-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(104px, 1fr)); gap: 16px; }
+}
+.compass-plan-choice { position: fixed; inset: 0; z-index: 7000; background: var(--design-page); display: grid; place-items: center; padding: 32px; }
+.compass-plan-choice-panel { max-width: 1300px; width: 100%; text-align: center; color: var(--design-ink); font-family: var(--design-font); }
+.compass-plan-choice-panel h2 { font-size: clamp(30px, 3.5vw, 48px); margin-bottom: 24px; }
+.compass-plan-choice-panel p { font-size: clamp(24px, 2.2vw, 32px); line-height: 1.5; max-width: 1000px; margin: 0 auto 48px; }
+.compass-plan-choice-actions { display: flex; gap: 28px; }
+.compass-plan-choice-actions button { flex: 1; min-width: 0; min-height: clamp(160px, 24vh, 250px); padding: 24px !important; background: var(--design-card) !important; color: var(--design-ink) !important; border: 1px solid var(--design-border) !important; border-radius: var(--design-radius) !important; font: 600 clamp(25px, 2.4vw, 36px)/1.4 var(--design-font) !important; }
+.compass-plan-choice-actions small { font-size: clamp(19px, 1.8vw, 25px); color: var(--design-muted); }

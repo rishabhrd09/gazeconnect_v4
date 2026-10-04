@@ -148,13 +148,13 @@ test('every Music style is scoped to the Music screen', () => {
   assert.deepEqual(loose, []);
 });
 
-test('Home gains one Music tile, below Design Home, in the slot that was empty', () => {
+test('the approved Home retains exactly one Music tile wired through its gaze button', () => {
   const home = fs.readFileSync(path.join(root, 'src/screens/HomeScreen.tsx'), 'utf8');
-  const right = home.slice(home.indexOf('const rightPanelTiles'), home.indexOf('];', home.indexOf('const rightPanelTiles')));
-  assert.deepEqual([...right.matchAll(/\{ id: '(\w+)'/g)].map(m => m[1]), ['web', 'fp', 'music']);
-  assert.match(right, /screen: 'music', cardClass: 'grid-card-music'/);
-  const column = home.slice(home.indexOf('{rightPanelTiles.map('), home.indexOf('{/* FOOTER'));
-  assert.doesNotMatch(column, /minHeight: 0 \}\} \/>/, 'the empty placeholder is gone, so the three rows stay as they were');
+  const tiles = home.slice(home.indexOf('const HOME_TILES'), home.indexOf('];', home.indexOf('const HOME_TILES')));
+  assert.equal([...tiles.matchAll(/id: 'music'/g)].length, 1);
+  assert.match(tiles, /id: 'music', label: 'Music', screen: 'music', icon: MusicNoteIcon/);
+  assert.match(home, /HOME_TILES\.map\(tile => <GazeButton[^>]*id=\{tile\.id\}/);
+  assert.match(home, /dwellCategory="homeScreenTile" onClick=\{\(\) => onNavigate\(tile\.screen\)\}/);
 });
 
 console.log(`${passed} music checks passed.`);

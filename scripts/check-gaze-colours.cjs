@@ -38,6 +38,20 @@ const THEMES = {
           surface: token('src/styles/midnight-navy.css', ":root[data-theme='midnight-navy'] {", 'iris-card') },
 };
 
+// The approved designs have their own patient surfaces. Measure the real CSS tokens,
+// including the keyboard's recessed and selected surfaces, without changing gaze palettes.
+for (const design of ['focus', 'serene']) {
+  for (const theme of ['dark', 'warm', 'midnight-navy']) {
+    const opener = `:root[data-design='${design}'][data-theme='${theme}']`;
+    for (const surface of ['panel', 'card', 'selected', 'danger-bg']) {
+      THEMES[`${theme} (${design} ${surface})`] = {
+        page: token('src/styles/design-modes.css', opener, 'design-page'),
+        surface: token('src/styles/design-modes.css', opener, `design-${surface}`),
+      };
+    }
+  }
+}
+
 const rgb = (c) => {
   const m = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(c);
   if (m) return { rgb: [m[1], m[2], m[3]].map((v) => v / 255), alpha: Number(m[4]) };
@@ -103,7 +117,7 @@ for (const key of Object.keys(GAZE_COLOR_PALETTES)) {
     if (key === 'standard') continue; // Kept as it was; measured and reported below.
     test(`${key} on ${theme}: ring and square clear the page and the keys`, () => {
       for (const [name, value] of Object.entries({ ringPage: m.ringPage, ringKey: m.ringKey, squarePage: m.squarePage, squareKey: m.squareKey })) {
-        assert.ok(value >= 4.5, `${name} ${value.toFixed(2)}:1 is under 4.5:1`);
+        assert.ok(value >= 4.5, `${key} on ${theme}: ${name} ${value.toFixed(2)}:1 is under 4.5:1`);
       }
     });
     test(`${key} on ${theme}: the fill is seen against the ring it covers or the key round it`, () => {
@@ -114,6 +128,22 @@ for (const key of Object.keys(GAZE_COLOR_PALETTES)) {
     });
     test(`${key} on ${theme}: marks at least 2 px wide (WCAG 2.4.13)`, () => {
       assert.ok(palette.squarePx >= 2 && palette.ringShare * 64 >= 4, 'too thin');
+    });
+  }
+}
+
+for (const design of ['focus', 'serene']) {
+  for (const theme of ['dark', 'warm', 'midnight-navy']) {
+    const opener = `:root[data-design='${design}'][data-theme='${theme}']`;
+    const colour = name => rgb(token('src/styles/design-modes.css', opener, `design-${name}`)).rgb;
+    test(`${design} ${theme}: primary and supporting text reach 4.5:1 on every card state`, () => {
+      for (const ink of ['ink', 'muted']) {
+        for (const surface of ['page', 'panel', 'card', 'selected']) {
+          const ratio = contrast(colour(ink), colour(surface));
+          assert.ok(ratio >= 4.5, `${design} ${theme} ${ink} on ${surface}: ${ratio.toFixed(2)}:1`);
+        }
+      }
+      assert.ok(contrast(colour('danger'), colour('danger-bg')) >= 4.5, 'care phrase text must remain readable');
     });
   }
 }

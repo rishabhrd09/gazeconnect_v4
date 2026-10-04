@@ -71,6 +71,10 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
         App Settings
       </div>
 
+      <SelectSetting label="Design" description="Choose Focus or Serene. The full-screen keyboard stays the same."
+        value={settings.designMode} options={[{ value: 'focus', label: 'Focus (default)' }, { value: 'serene', label: 'Serene' }]}
+        onChange={value => updateSetting('designMode', value === 'serene' ? 'serene' : 'focus')} isDarkMode={isDarkMode} />
+
       {/* Appearance */}
       <section>
         <h3 style={sectionHeading}>Appearance</h3>

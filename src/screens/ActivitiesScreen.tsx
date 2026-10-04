@@ -214,7 +214,7 @@ const ActivitiesScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t:
     }}>
       <GlobalNavBar currentPage="activities" onNavigate={onNavigate} isDarkMode={isDarkMode} />
 
-      <div style={{
+      <div className="patient-stage activity-stage" data-view={activeCategory ? activeCategory.id : 'categories'} style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',

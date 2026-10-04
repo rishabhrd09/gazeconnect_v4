@@ -88,7 +88,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
         isDarkMode={isDarkMode}
       />
 
-      <div
+      <div className="people-choices" data-dense={isDensePeopleGrid}
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -112,6 +112,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
               dwellCategory="phraseButton"
+              selected={isSelected}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -157,7 +158,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
       </div>
 
       {selectedPerson && (
-        <div style={{
+        <div className="people-speak" style={{
           flex: 1,
           minHeight: 0,
           display: 'flex',

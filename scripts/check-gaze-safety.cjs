@@ -84,6 +84,10 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
   const target = new Element();
   const others = (opts.others || []).map((r, i) => new Element(r, `other-${i}`));
   const all = [target, ...others];
+  const measuredKeys = (opts.keyboardIndices || []).map(i => {
+    const element=all[i], r=element.getBoundingClientRect();
+    return {element,...r,centerX:r.left+r.width/2,centerY:r.top+r.height/2};
+  });
   // Anything outside the buttons is plain page background, not a control.
   const background = {tagName:'DIV',className:'',id:'',parentElement:null,getAttribute:()=>null,closest:()=>null,matches:()=>false,contains:node=>node===background};
   const at = (x, y) => all.find(el => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }) || background;
@@ -106,7 +110,8 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
     '../../utils/edgeHitZone':{computeEdgeExpansion:()=>0,isPointInExpandedRect:()=>false},
     '../../utils/screenProfile':{computeScreenProfile:()=>({})},
     '../../contexts/ThemeContext':{useTheme:()=>({isLight:false,isWarm:false})},
-    '../../utils/hitZoneExpansion':{...hitZones,collectKeyboardKeys:()=>[],findBestKeyboardKey:()=>null},
+    '../../utils/hitZoneExpansion':{...hitZones,collectKeyboardKeys:()=>measuredKeys,
+      findBestKeyboardKey:opts.keyboardIndices ? hitZones.findBestKeyboardKey : ()=>null},
     '../../utils/gazeFocus':focus,
     '../../utils/dwellProgressBank':bank,
     // Measurement only; dwell interruptions are kept so a test can see a lock break.
@@ -145,6 +150,20 @@ function cursorHarness(height = 1080, cursorSettings = {}, flags = {}, box = nul
       listeners.get('click')?.({isTrusted,target:on,preventDefault(){swallowed=true;},stopPropagation(){}});return swallowed;},
   };
 }
+test('a compact keyboard action owns its box even inside a letter expansion', () => {
+  const box={left:860,top:430,width:200,height:88};
+  const opts={screen:'keyboard',targetKind:'special',keyboardIndices:[1],
+    others:[{left:860,top:330,width:200,height:96}]};
+  const h=cursorHarness(768,{}, {},box,opts);
+  h.run(3500,true,{x:960/1920,y:474/768,intent_x:960/1920,intent_y:474/768});
+  assert.deepEqual(h.clickLog,['test-button'],'WORD/123 must not activate the letter above');
+});
+test('keyboard expansion still acquires a letter in the empty gap beside it', () => {
+  const h=cursorHarness(768,{}, {},{left:860,top:330,width:200,height:96},
+    {screen:'keyboard',keyboardIndices:[0]});
+  h.run(2300,true,{x:960/1920,y:446/768,intent_x:960/1920,intent_y:446/768});
+  assert.deepEqual(h.clickLog,['test-button']);
+});
 // Bottom rows of the traditional keyboard at 1920 px: letters 150x110, and a
 // space bar several keys wide directly beneath them.
 const key = (id, left, top, width, height = 110) => ({ element: { id }, left, top, right: left + width, bottom: top + height,

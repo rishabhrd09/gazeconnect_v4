@@ -185,6 +185,7 @@ export interface AACCategory {
 
 export interface AppSettings {
   isDarkMode: boolean;
+  designMode: 'focus' | 'serene'; // Visual design, independent of theme and gaze behaviour
   showHindi: boolean; // Legacy storage field; normalized to false for this English-only release.
   dwellTime: number;
   filterPreset: string;

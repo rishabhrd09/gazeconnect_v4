@@ -31,6 +31,8 @@ _PROFILE_NAMES = (
     ("room_balance", "Room balance", "Gives priority to living and bedroom space where a shared boundary can move."),
     ("circulation", "Circulation space", "Gives priority to living, porch and stair-adjacent space where possible."),
     ("private_rooms", "Private rooms", "Gives priority to bedrooms and bathrooms where a shared boundary can move."),
+    ("kitchen_dining", "Kitchen & dining", "Gives kitchen and dining rooms a little more width within your chosen positions."),
+    ("living_depth", "Living space", "Gives living and drawing rooms a little more depth within your chosen positions."),
 )
 _OUTDOOR = ("lawn", "garden", "porch", "verandah", "backyard", "balcony", "terrace")
 _DOOR_WIDTH_FT = 3.0
@@ -245,6 +247,10 @@ def _priority(profile: str, kind: str) -> int:
         return {"staircase": 6, "porch": 5, "verandah": 5, "living": 4, "dining": 3, "drawing": 2}.get(kind, 0)
     if profile == "private_rooms":
         return {"masterbed": 6, "bedroom": 5, "icu": 5, "bathroom": 4, "study": 3}.get(kind, 0)
+    if profile == "kitchen_dining":
+        return {"kitchen": 6, "dining": 5}.get(kind, 0)
+    if profile == "living_depth":
+        return {"living": 6, "drawing": 5, "dining": 3}.get(kind, 0)
     return 0
 
 
@@ -268,7 +274,7 @@ def _apply_profile(compass_map: Dict[str, Any], profile: str) -> None:
     cols = compass_map["grid_size"]["cols"]
     # Shift a single axis per profile.  Crossing independent X/Y seam shifts
     # at a four-cell junction can otherwise create a small diagonal overlap.
-    active_axis = "y" if profile == "circulation" else "x"
+    active_axis = "y" if profile in {"circulation", "living_depth"} else "x"
     for floor in _FLOORS:
         floor_obj = compass_map.get(floor)
         if not isinstance(floor_obj, dict):
@@ -296,7 +302,8 @@ def _apply_profile(compass_map: Dict[str, Any], profile: str) -> None:
                     difference = _priority(profile, kind_a) - _priority(profile, kind_b)
                     if difference == 0:
                         continue
-                    shift = 0.8 if difference > 0 else -0.8
+                    distance = 1.2 if profile == "living_depth" else 0.8
+                    shift = distance if difference > 0 else -distance
                     ra = rect_maps[left_or_top["placementId"]][cell]
                     rb = rect_maps[right_or_bottom["placementId"]][neighbor]
                     _move_shared_edge(ra, rb, axis, shift)
@@ -798,7 +805,7 @@ def _candidate(base: Dict[str, Any], current: Dict[str, Any], profile: str, titl
 
 
 def generate_layout_candidates(compass_map: Dict[str, Any], *, max_candidates: int = 4, timeout_seconds: float = 8) -> Dict[str, Any]:
-    """Return up to four truly different validated layouts; never seed-fallback.
+    """Return up to six truly different validated layouts; four by default.
 
     Candidate 1 is the user's literal occupied-cell geometry.  Other candidates
     shift only shared room boundaries within a selected cell's neighborhood.
@@ -808,15 +815,15 @@ def generate_layout_candidates(compass_map: Dict[str, Any], *, max_candidates: i
         status = "unsupported_refinements" if any("refinement" in e or "cell layouts" in e for e in errors) else "invalid_input"
         return _error(status, "Compass Map cannot be converted to exact candidate geometry.", details=errors)
     try:
-        limit = max(1, min(4, int(max_candidates)))
+        limit = max(1, min(6, int(max_candidates)))
     except (TypeError, ValueError):
-        return _error("invalid_input", "max_candidates must be an integer from 1 to 4.")
+        return _error("invalid_input", "max_candidates must be an integer from 1 to 6.")
     deadline = time.monotonic() + max(0.1, float(timeout_seconds))
     source_hash = _source_hash(base)
     candidates: List[Dict[str, Any]] = []
     rejected: List[Dict[str, Any]] = []
     signatures: set[str] = set()
-    for profile, title, description in _PROFILE_NAMES:
+    for profile, title, description in (_PROFILE_NAMES[:4] if limit <= 4 else _PROFILE_NAMES):
         if len(candidates) >= limit or time.monotonic() >= deadline:
             break
         current = copy.deepcopy(base)

@@ -6,6 +6,7 @@ import { APP_LOOK } from './config/look';
 
 // The look is chosen once, before the first paint (src/config/look.ts).
 document.documentElement.dataset.look = APP_LOOK;
+document.documentElement.dataset.design = 'focus';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

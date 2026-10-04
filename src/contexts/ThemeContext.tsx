@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useLayoutEffect, type ReactNode } from 'react';
 import { useCustomization } from './CustomizationContext';
 import { darkColors, midnightNavyColors } from '../utils/design';
+import { normalizeDesignMode } from '../config/designMode';
 
 export type Theme = 'dark' | 'warm' | 'midnight-navy';
 /** Saved 'warm' and the retired 'light' are Warm; 'midnight-navy' stays itself; anything else
@@ -52,6 +53,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch { return null; }
   });
   const theme = preference ?? (settings.isDarkMode ? 'dark' : 'warm');
+  const designMode = normalizeDesignMode(settings.designMode);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.design = designMode;
+  }, [designMode]);
 
   useLayoutEffect(() => {
     applyTheme(theme, isLoaded || preference !== null);

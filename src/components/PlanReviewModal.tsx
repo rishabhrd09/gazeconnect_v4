@@ -26,7 +26,6 @@ interface PlanReviewModalProps {
   onOpenOriginalPlan?: () => void;
   showOriginalOnError?: boolean;
   onOpenSavedPlan?: () => void;
-  startInArea?: boolean;
   onSpeak: (message: string) => void;
 }
 
@@ -91,13 +90,12 @@ export function PlanReviewModal({
   onOpenOriginalPlan,
   showOriginalOnError = false,
   onOpenSavedPlan,
-  startInArea = false,
   onSpeak,
 }: PlanReviewModalProps) {
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { isWarm } = useTheme();
   const [index, setIndex] = useState(0);
-  const [step, setStep] = useState<ReviewStep>(startInArea ? 'area' : 'review');
+  const [step, setStep] = useState<ReviewStep>('review');
   const [floor, setFloor] = useState<ReviewFloor>('ground');
   const [selectedRoom, setSelectedRoom] = useState<SelectedRoom | null>(null);
   const [edge, setEdge] = useState<Edge>('N');
@@ -109,7 +107,7 @@ export function PlanReviewModal({
   const [undoStack, setUndoStack] = useState<Record<number, PlanCandidate[]>>({});
   const [warningsSeen, setWarningsSeen] = useState(false);
   const [warningPage, setWarningPage] = useState(0);
-  const [warningReturnStep, setWarningReturnStep] = useState<'review' | 'area'>(startInArea ? 'area' : 'review');
+  const [warningReturnStep, setWarningReturnStep] = useState<'review' | 'area'>('review');
   const [areaUnavailable, setAreaUnavailable] = useState(false);
 
   const safeIndex = Math.min(index, Math.max(0, candidates.length - 1));

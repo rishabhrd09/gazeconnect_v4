@@ -1,0 +1,142 @@
+{
+  "date": "2026-10-04",
+  "baseline": "b1acc7020682a57cb006f76dcbcc00b2e7916225",
+  "branch": "codex/aac-visual-exploration",
+  "local_platform": "Darwin arm64",
+  "result": "Local software checks passed; native Windows CI and physical Tobii validation are separate.",
+  "coverage": {
+    "viewports": [
+      "1366x768",
+      "1920x1080"
+    ],
+    "designs": [
+      "Focus",
+      "Serene"
+    ],
+    "themes": [
+      "Dark",
+      "Warm",
+      "Midnight Navy"
+    ],
+    "screen_configurations": 672,
+    "patient_target_probes": 56700,
+    "keyboard_states": 144,
+    "keyboard_element_comparisons": 21192,
+    "compass_states": 179,
+    "compass_target_probes": 10935,
+    "screen_dwell_activations": 183,
+    "studio_dwell_activations": 64,
+    "real_prediction_configurations": 12,
+    "python_runtime_tests_passed": 212,
+    "python_runtime_tests_skipped": 1,
+    "windows_bundle_failure_injection_tests_passed": 12,
+    "gaze_safety_regressions_passed": 61
+  },
+  "verified": [
+    "Frontend production build and Electron TypeScript build.",
+    "All active routes, 14 Settings pages, navigation centring/equal dimensions, target clearance, overlap, text fit and viewport fit in the screen matrix.",
+    "Production target picker at nine interior points per measured patient target; registered backend geometry agrees with the painted DOM.",
+    "Target registry follows resize, navigation, mode changes and keyboard expanded display.",
+    "Keyboard geometry, typography and gaze attributes unchanged by colour layer; both keyboard feels, numeric/letter/expanded views, populated and empty predictions.",
+    "Real isolated backend: word/phrase suggestions, top/bottom slots, insertion and recovery after WebSocket reconnection.",
+    "Synthetic gaze dwell: one correct activation, no duplicates; real room opening, zoom, rotation, finish selection and return-to-map actions.",
+    "Compass geometry, ground-only scope, incomplete upper floor, four alternatives, previews, PNG/PDF/DXF, resource bounds, cancellation, 429 recovery, object URL disposal and legacy saved-plan compatibility.",
+    "Windows source/vendor inputs, release validator failure cases, startup/stdio contracts and allowlisted Electron floorplan transport.",
+    "Dwell sets, gaze palettes, home migration, Settings persistence, word slots, Zone Board, browser gaze/lifecycle and TTS routing regressions."
+  ],
+  "baseline_identical": [
+    {
+      "file": "python/main.py",
+      "identical": true,
+      "sha256": "585bbbfa43fcd7c75146049d210e26b86a6af0ff6e4e9d51b300f98300bb3559"
+    },
+    {
+      "file": "python/services/adaptive_cursor_filter.py",
+      "identical": true,
+      "sha256": "3ca9882a086beb611c5e6d299ba229a48f072539d1f3970ed41a7370c57c1b58"
+    },
+    {
+      "file": "python/services/gaze_classifier.py",
+      "identical": true,
+      "sha256": "21b18ff582068eabddd34bf76ce6312199f09c588f59efe5a9f700ffcd91113c"
+    },
+    {
+      "file": "python/services/signal_conditioner.py",
+      "identical": true,
+      "sha256": "77b297f7640975255cbd1dc5e99a2179829ef199657b1a15c5b60346d9ed57cc"
+    },
+    {
+      "file": "src/utils/gazeFocus.ts",
+      "identical": true,
+      "sha256": "5362308d91fe421ef9dcdbcf83524ed230e24198906a864a27e3b694bd82ba26"
+    },
+    {
+      "file": "src/utils/gazeSnapping.ts",
+      "identical": true,
+      "sha256": "e0f3d977f03b48c42776bbd6dadbc745725636eee1c561cf348e16ba2546eaff"
+    },
+    {
+      "file": "src/utils/hitZoneExpansion.ts",
+      "identical": true,
+      "sha256": "fbb0f420399b022c5ee04981e38be22dfa786dfae3da6aeeaa84fa911db19c82"
+    },
+    {
+      "file": "src/utils/dwellProgressBank.ts",
+      "identical": true,
+      "sha256": "11a90cb8ea6ae32d1a35ddc06b1c095b4b450aec1fc2311ed7dd3ea9e14e83c9"
+    },
+    {
+      "file": "src/config/dwellTimeConfig.ts",
+      "identical": true,
+      "sha256": "55322b5abbfa76ea340cb5808e36b7a658a60808482c97938656068969065cbc"
+    },
+    {
+      "file": "src/components/core/GazeButton.tsx",
+      "identical": true,
+      "sha256": "87301b9fc2a7f6d6a482bed71b51d1d57821c3e4d06ac7c345f0cf2616cfcbde"
+    },
+    {
+      "file": "src/styles/keyboard-layout.css",
+      "identical": true,
+      "sha256": "c3f70a89084c6e14be589a83edd64fd0b9d42391c0d738446c8bbc4f7cc88f58"
+    },
+    {
+      "file": "electron/stdioGuard.ts",
+      "identical": true,
+      "sha256": "4603dc510fbb89303515f315b47acea941092559c60cf27c3d9b7271fd4954b3"
+    }
+  ],
+  "also_unchanged": [
+    "All Tobii helper source",
+    "All Python service source",
+    "All embedded-browser source"
+  ],
+  "intentional_cursor_difference": "When an expanded letter hit area reaches a real keyboard action, the visible action owns its own rectangle. Empty-gap letter assistance is retained. Two targeted gaze regressions cover this baseline defect.",
+  "verification_repairs": [
+    "Food migration check now accounts for the later Home profile version.",
+    "Music check verifies the current Home tile/action contract.",
+    "Compass browser audit waits for the new preview to finish; consecutive room-picker dwell cases close the preceding modal."
+  ],
+  "limitations": [
+    "No physical Tobii tracker, Windows 11 laptop, installed EXE or patient comfort/latency session was available on this Mac. Passing virtual gaze checks is not a hardware accuracy guarantee.",
+    "Native Windows CI is configured on push for this branch and the source feature branch; consult the GitHub run for its result. Windows hosted CI does not replace a Windows 11/Tobii session.",
+    "One pyttsx3 runtime test skipped because pyttsx3 is absent here; browser speech and Windows SAPI output were not heard/validated.",
+    "Legacy offline ML training tests excluded because optional PyTorch is absent. The default deterministic prediction runtime was tested, including spawned worker recovery.",
+    "ORTools is absent from this Mac venv, so the complete legacy floorplan executable self-test was not run locally. Its Compass-specific self-test passed; Windows CI installs the pinned runtime and runs the complete self-test.",
+    "The 25 local music files are not imported in this checkout. Music navigation/player layout was verified, not playback of those files.",
+    "Native YouTube playback and graphics-driver stalls were not measured; IPC wiring, BrowserView bounds/closure and browser gaze safeguards were checked."
+  ],
+  "reproduction": [
+    "npm run build && npm run build:electron",
+    "npm run check:gaze-safety && npm run check:dwell-groups && npm run check:gaze-colours && npm run check:browser-gaze-safety && npm run check:browser-cursor",
+    "npm run check:design-layout (running Vite, existing Playwright supplied by PLAYWRIGHT_MODULE)",
+    "node scripts/check-design-target-refresh.cjs",
+    "node scripts/check-design-browser-dwell.cjs (DWELL_QA_SCREENS can include Compass states)",
+    "node scripts/check-design-map-actions.cjs",
+    "node scripts/check-design-predictions.cjs (isolated temporary backend via PREDICTION_QA_WS_URL; never patient port 8765)",
+    "node scripts/check-compass-studio.cjs && node scripts/check-compass-room-dwell.cjs (running local floorplan service)",
+    "python -m unittest python.tests.test_compass_presentation python.tests.test_compass_room_views python.tests.test_gazeplan_candidates python.tests.test_floorplan_candidate_api_contract",
+    "python scripts/windows/test_verify_windows_bundle.py",
+    "python scripts/verify_windows_bundle.py source --root ."
+  ]
+}

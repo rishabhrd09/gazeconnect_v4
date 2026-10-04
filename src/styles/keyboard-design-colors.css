@@ -1,0 +1,127 @@
+/* Focus / Serene keyboard, 4 Oct 2026: colours ONLY, at the maintainer's request.
+ * Keep this separate from design-surface: no type, spacing, corners or key geometry.
+ * Shared design tokens match the surrounding screens in all three display themes.
+ * The cursor, dwell overlays, focus outlines and completed-key feedback keep their
+ * original colours. Standard / Familiar timing and typography stay independent.
+ */
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] {
+  --kb-ink: var(--design-ink);
+  background: var(--design-page) !important;
+  color: var(--design-ink) !important;
+}
+
+/* Recessed message and suggestion strips; ordinary keys use the app's cards. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen :is(.keyboard-letter-panel, .keyboard-prediction-bar) {
+  background: var(--design-page) !important;
+  border-color: var(--design-border) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-message {
+  background: var(--design-panel) !important;
+  border-color: var(--design-border) !important;
+  color: var(--design-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-message-text {
+  color: var(--kb-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-message-caret {
+  background: var(--design-accent) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key[data-action] {
+  color: var(--kb-ink) !important;
+  border-color: var(--design-border) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key[data-action]:where(:not([data-keyboard-confirmed='true'])) {
+  background: var(--design-card) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key[data-action='shift']:not([data-keyboard-confirmed='true']) {
+  background: var(--design-panel) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key:is([data-action='backspace'], [data-action='deleteWord']) {
+  background: var(--design-danger-bg) !important;
+  color: var(--design-danger) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key[data-action='quickWords'] {
+  background: var(--design-selected) !important;
+}
+/* 123 / ABC use a separate button branch without data-action. Keep that wiring. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key:not([data-action]) {
+  background: var(--design-card) !important;
+  border-color: var(--design-border) !important;
+  color: var(--kb-ink) !important;
+}
+
+/* Suggestions retain their full-size ink, including the nested Navy labels. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) {
+  background: var(--design-panel) !important;
+  color: var(--kb-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) span {
+  color: var(--kb-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-word-slot-best {
+  background: var(--design-selected) !important;
+}
+
+/* Speak and navigation use the same quiet selected surface as the app. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen .message-display-action {
+  background: var(--design-card) !important;
+  color: var(--design-muted) !important;
+  border-color: var(--design-border) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen :is(.message-display-speak, #nav-restore-btn) {
+  background: var(--design-selected) !important;
+  color: var(--design-accent) !important;
+}
+/* Navy's legacy GazeButton wrapper has its own ink. Colour the content itself
+ * without touching the neighbouring dwell-feedback layers inside the button. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen .message-display-action .message-action-content {
+  color: var(--design-muted) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .message-display-speak .message-action-content {
+  color: var(--design-accent) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen #close-expanded-display {
+  background: var(--design-panel) !important;
+  border-color: var(--design-border) !important;
+  color: var(--design-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen #close-expanded-display span {
+  color: var(--design-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen #close-expanded-display svg {
+  stroke: var(--design-accent) !important;
+}
+
+/* Only the static gaze BUTTON changes paint, never the live gaze cursor. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-gaze-hub {
+  background: var(--design-panel) !important;
+  border-color: var(--design-accent) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-gaze-hub > div:first-child {
+  border-color: color-mix(in srgb, var(--design-accent) 22%, transparent) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-gaze-hub > div:nth-child(2) {
+  background-color: var(--design-muted) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-gaze-label {
+  color: var(--design-ink) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-inline-gaze[aria-label='Pause gaze'] .keyboard-gaze-hub {
+  background: var(--design-selected) !important;
+  border-color: var(--design-green) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen .keyboard-inline-gaze[aria-label='Pause gaze'] .keyboard-gaze-hub > div:nth-child(2) {
+  background-color: var(--design-green) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen :is(div:has(+ .keyboard-inline-gaze), .keyboard-inline-gaze + div) {
+  background-color: var(--design-border) !important;
+}
+
+/* Pointer hover keeps the existing focus-border colour. No onset paint added. */
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key:hover {
+  border-color: var(--ui-accent) !important;
+}
+:root[data-design][data-theme][data-look] #root .keyboard-screen[data-keyboard-feel] .keyboard-key[data-action='letter']:not([data-keyboard-confirmed='true']):hover,
+:root[data-design][data-theme][data-look] #root .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot, .message-display-action):not(:disabled):hover {
+  background: var(--design-selected) !important;
+}

@@ -33,7 +33,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import main  # noqa: E402
 
-VENV_PYTHON = ROOT / 'python' / '.venv' / 'Scripts' / 'python.exe'
+VENV_PYTHON = ROOT / 'python' / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
 START_TIMEOUT_S = 90      # Cold start loads the prediction engine.
 STOP_TIMEOUT_S = 30
 PREDICTION_TIMEOUT_S = 30  # The first request also waits for the worker to warm up.
@@ -210,6 +210,9 @@ class BackendProcessTest(unittest.TestCase):
         process = self.start_backend('--parent-pid', str(parent.pid))
         self.wait_for_listening(process)
         parent.kill()                             # What a crashed Electron looks like.
+        # POSIX keeps an unreaped child PID alive as a zombie. A real Electron
+        # parent is reaped by its launcher; reproduce that on Mac/Linux too.
+        parent.wait(timeout=10)
         try:
             process.wait(timeout=STOP_TIMEOUT_S)
         except subprocess.TimeoutExpired:

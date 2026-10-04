@@ -338,8 +338,8 @@ export const VoicePage: React.FC<{ onSaved: () => void; onSpeak: (text: string) 
 
 // Each theme's own page, card, accent and type colours (Midnight Navy's page swatch is its gradient).
 const THEME_OPTIONS: Array<{ value: Theme; label: string; sub: string; swatches: string[] }> = [
-  { value: 'warm', label: 'Warm', sub: 'Warm off-white surfaces, true black type, olive accents.', swatches: ['#fdf4ed', '#fcf2ea', '#5c6c3e', '#000000'] },
-  { value: 'dark', label: 'Dark', sub: 'Deep green-grey surfaces, soft light type.', swatches: ['#171c19', '#212823', '#a5d0b9', '#f1f3ed'] },
+  { value: 'warm', label: 'Warm', sub: 'Warm off-white surfaces with deep, readable text.', swatches: ['#fdf4ed', '#fcf2ea', '#5c6c3e', '#000000'] },
+  { value: 'dark', label: 'Dark', sub: 'Quiet dark surfaces with soft, light text.', swatches: ['#171c19', '#212823', '#a5d0b9', '#f1f3ed'] },
   {
     value: 'midnight-navy', label: 'Midnight Navy', sub: 'Matte deep navy, pale text, and quiet blue accents.',
     swatches: [MIDNIGHT_NAVY_PAGE_GRADIENT, MIDNIGHT_NAVY.card, MIDNIGHT_NAVY.accent, MIDNIGHT_NAVY.textPrimary],
@@ -348,7 +348,23 @@ const THEME_OPTIONS: Array<{ value: Theme; label: string; sub: string; swatches:
 
 export const DisplayPage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   const { theme, setTheme } = useTheme();
+  const { settings, save } = useInstantSetting(onSaved);
   return (
+    <div className="gss-display-design">
+    <Card title="Design" note="Choose the layout and typography you find most comfortable. The tested full-screen keyboard stays the same.">
+      <div role="radiogroup" aria-label="Design" className="gss-design-options">
+        {(['focus', 'serene'] as const).map(mode => (
+          <button key={mode} type="button" role="radio" aria-label={mode === 'focus' ? 'Focus' : 'Serene'}
+            aria-checked={settings.designMode === mode} className="gss-option gss-design-option"
+            onClick={() => { if (settings.designMode !== mode) save('designMode', mode); }}>
+            <span className={`design-preview design-preview-${mode}`} aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
+            <span className="gss-option-label">{mode === 'focus' ? 'Focus' : 'Serene'}</span>
+            <span className="gss-option-sub">{mode === 'focus' ? 'Centred layouts, clear type. Default.' : 'Softer shapes, open and distinct letterforms.'}</span>
+            {settings.designMode === mode && <LineIcon d={ICON.check} className="gss-option-check" />}
+          </button>
+        ))}
+      </div>
+    </Card>
     <Card title="Theme" note="Three themes. Every screen follows this choice.">
       <div role="radiogroup" aria-label="Theme" className="gss-themes">
         {THEME_OPTIONS.map(option => {
@@ -356,6 +372,7 @@ export const DisplayPage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
           return (
             <button key={option.value} type="button" role="radio" aria-checked={checked} className="gss-option gss-theme"
               aria-label={option.label} aria-describedby={`theme-option-${option.value}-sub`}
+              data-preview-theme={option.value}
               onClick={() => { if (!checked) { setTheme(option.value); onSaved(); } }}>
               <span className="gss-swatches" aria-hidden="true">
                 {option.swatches.map(colour => <span key={colour} style={{ background: colour }} />)}
@@ -368,6 +385,7 @@ export const DisplayPage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         })}
       </div>
     </Card>
+    </div>
   );
 };
 

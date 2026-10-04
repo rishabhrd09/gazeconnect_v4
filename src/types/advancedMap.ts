@@ -1,3 +1,4 @@
+/** Legacy saved-plan schema only. The interactive Refine Map editor has been retired. */
 export type SplitDirection = 'vertical' | 'horizontal';
 export type WallEdgeType = 'full_wall' | 'half_wall_glass' | 'open_archway' | 'no_wall';
 
@@ -62,5 +63,3 @@ export interface AdvancedRefinements {
   accessibilityMarkers: AccessibilityMarker[];
   cellLayouts?: Record<string, 'left' | 'right' | 'top' | 'bottom'>;
 }
-
-export type AdvancedPhase = 'room_selection' | 'overview' | 'split' | 'walls' | 'void' | 'rotate' | 'expand' | 'notes';
