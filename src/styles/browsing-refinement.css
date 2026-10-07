@@ -93,7 +93,8 @@
   border-radius: 12px !important;
   font-weight: 600 !important;
 }
-:root[data-theme] .web-hub-screen :is([id^='bv-links-'], #bv-links-size-toggle) {
+/* The Links sidebar's own buttons; the bar's Links button (bv-links-toggle) keeps the bar's size. */
+:root[data-theme] .web-hub-screen :is([id^='bv-links-']:not(#bv-links-toggle), #bv-links-size-toggle) {
   min-width: 80px !important;
   padding: 10px 6px !important;
   flex-direction: column !important;
@@ -175,7 +176,7 @@
   height: 80px !important;
   min-height: 80px !important;
 }
-:root[data-theme] .web-hub-screen :is([id^='bv-links-'], #bv-links-size-toggle) > div:last-child,
+:root[data-theme] .web-hub-screen :is([id^='bv-links-']:not(#bv-links-toggle), #bv-links-size-toggle) > div:last-child,
 :root[data-theme] .web-hub-screen .browser-toolbar button > div:last-child {
   display: flex;
   align-items: center;
@@ -191,7 +192,7 @@
 }
 @media (max-height: 900px) {
   :root[data-theme] .web-hub-screen .browser-toolbar button > div:last-child,
-  :root[data-theme] .web-hub-screen :is([id^='bv-links-']) > div:last-child { flex-direction: column; }
+  :root[data-theme] .web-hub-screen :is([id^='bv-links-']:not(#bv-links-toggle)) > div:last-child { flex-direction: column; }
 }
 :root[data-theme] .web-hub-screen .browse-reader-choices button {
   background: var(--ui-surface) !important;
@@ -276,4 +277,40 @@
   width: min(100%, 340px) !important;
   height: clamp(88px, 11vh, 112px) !important;
   margin-top: clamp(12px, 2vh, 24px);
+}
+/* YouTube's own Search and Home above the library, and Quick Search's typed search
+   (6 Oct 2026). Both draw their icon and label in one centred row. */
+:root[data-theme] .web-hub-screen :is(.youtube-action, #qs-type-search) {
+  min-width: 80px !important;
+  min-height: 80px !important;
+  color: var(--ui-ink) !important;
+  font-family: var(--ui-font) !important;
+  font-size: clamp(23px, 2.8vh, 31px) !important;
+  font-weight: 650 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+}
+:root[data-theme] .web-hub-screen :is(.youtube-action, #qs-type-search) > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 1.2vw, 18px);
+}
+:root[data-theme] .web-hub-screen :is(.youtube-action, #qs-type-search) svg {
+  flex-shrink: 0;
+  color: var(--ui-accent-ink);
+}
+/* Skip Ad is on the bar only while YouTube's own Skip button can be pressed. */
+:root[data-theme] .web-hub-screen .browser-toolbar .browser-attention {
+  background: var(--ui-selected) !important;
+  color: var(--ui-ink) !important;
+}
+/* News (Refresh, Auto-Read) and the Quick Search answer card: icon and label in one
+   centred row with the gap every other web control uses (6 Oct 2026); the label
+   used to sit against its icon. */
+:root[data-theme] .web-hub-screen :is(#n-ref, #n-auto, [id^='qs-card-']) > div:last-child:has(> svg + span) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }

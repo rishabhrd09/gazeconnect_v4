@@ -281,8 +281,6 @@
 :root[data-design][data-theme][data-look] :is([id^='act-cat-'],[id^='hub-']) svg { width: clamp(58px,7.8vh,84px) !important; height: clamp(58px,7.8vh,84px) !important; }
 :root[data-design][data-theme][data-look] :is(.medical-screen,.activities-screen) [id^='phrase-'] span,
 :root[data-design][data-theme][data-look] .activities-screen [id^='act-']:not([id^='act-cat-']) span { font-size: clamp(27px,3.5vh,38px) !important; line-height: 1.3 !important; }
-:root[data-design][data-theme][data-look] .web-hub-stage { flex: 0 1 auto !important; width: min(87.5vw,2100px) !important; height: 56vh; margin: auto !important; padding: 0 !important; gap: clamp(20px,2.4vh,26px) !important; }
-:root[data-design][data-theme][data-look] .web-hub-stage > div { flex: 1; grid-template-columns: repeat(2,minmax(0,1fr)) !important; grid-auto-rows: minmax(0,1fr) !important; min-height: 0; gap: clamp(20px,2.4vh,26px) !important; }
 
 /* Quick Phrases keeps all three groups, care colours, and the original picture assets. */
 :root[data-design][data-theme][data-look] .quickwords-screen > div:last-child { padding: 1.5vh 4.3vw 5vh !important; }
@@ -336,6 +334,9 @@
 /* YouTube library: four stable choices, four category targets. No extra content. */
 :root[data-design][data-theme][data-look] .youtube-library { display: flex !important; flex-direction: column !important; flex: 1 1 auto !important; min-height: 0; width: 87.5vw; margin: 0 auto; padding: 3vh 0 6vh !important; gap: 2.6vh !important; }
 :root[data-design][data-theme][data-look] .youtube-videos { order: 0; flex: 1 1 0 !important; gap: clamp(18px,2.4vh,26px) !important; }
+/* YouTube's own Search and Home lead the library in both designs (6 Oct 2026). */
+:root[data-design][data-theme][data-look] .youtube-library .youtube-actions { order: -2; flex: 0 0 auto !important; height: clamp(92px,11.5vh,124px) !important; gap: clamp(18px,2.4vh,26px) !important; }
+:root[data-design][data-theme][data-look] .youtube-actions .gaze-button { background: var(--design-panel) !important; }
 :root[data-design][data-theme][data-look] .browse-youtube-categories { order: 1; width: 100% !important; height: clamp(122px,15.2vh,164px); flex: 0 0 auto !important; display: grid !important; grid-template-columns: repeat(4,minmax(0,1fr)) !important; grid-template-rows: minmax(0,1fr) !important; padding: 0 !important; gap: clamp(18px,2.4vh,26px) !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
 :root[data-design][data-theme][data-look] .browse-youtube-categories .gaze-button { padding: clamp(12px,1.4vh,18px) !important; background: var(--design-panel) !important; }
 :root[data-design][data-theme][data-look] .browse-youtube-categories .gaze-button > div:last-child { align-items: center !important; gap: 10px; }
@@ -356,10 +357,17 @@
 :root[data-design='serene'][data-theme][data-look] .youtube-video-title > div:first-child { font-size: clamp(26px,3vh,34px) !important; }
 /* The frame keeps the same ref: its measured bounds still position the native BrowserView. */
 :root[data-design][data-theme][data-look] .youtube-player { padding: 2vh 2vw 3vh !important; gap: 2vh !important; }
-:root[data-design][data-theme][data-look] .youtube-player .browser-toolbar { order: 2; gap: clamp(12px,1vw,20px) !important; border: 0 !important; background: transparent !important; height: clamp(108px,14vh,152px) !important; }
-:root[data-design][data-theme][data-look] .youtube-player .browser-toolbar button { min-height: 96px !important; height: 100% !important; font-size: clamp(22px,2.7vh,29px) !important; padding: 10px !important; }
-:root[data-design][data-theme][data-look] .youtube-player .browser-toolbar button > div:last-child { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; }
-:root[data-design][data-theme][data-look] .youtube-player .browser-content-frame { background: var(--design-page) !important; border-color: var(--design-border) !important; box-shadow: none !important; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar { order: 2; gap: clamp(12px,1vw,20px) !important; border: 0 !important; background: transparent !important; height: clamp(108px,14vh,152px) !important; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar button { min-height: 96px !important; height: 100% !important; font-size: clamp(22px,2.7vh,29px) !important; padding: 10px !important; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar button > div:last-child { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; }
+/* Seven buttons (a video page in Browse) share the width: every button puts its icon
+   above its label, with a little less gap, side padding and type (1px), so each label
+   keeps one line and a label that still wraps stays inside its button. */
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar:has(> button:nth-child(7)) { gap: clamp(8px,0.6vw,16px) !important; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar:has(> button:nth-child(7)) button { padding: 10px 6px !important; font-size: clamp(21px,2.6vh,28px) !important; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar:has(> button:nth-child(7)) button > div:last-child { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-toolbar:has(> button:nth-child(7)) button span { line-height: 1.1 !important; }
+:root[data-design][data-theme][data-look] :is(.youtube-player, .web-page-view) .browser-content-frame { background: var(--design-page) !important; border-color: var(--design-border) !important; box-shadow: none !important; }
 
 /* Maps, music, other choices, and caregiver tools keep their full content and structure. */
 :root[data-design][data-theme][data-look] #music-view { --mu-bg: var(--design-page); --mu-raised: var(--design-panel); --mu-text: var(--design-ink); --mu-muted: var(--design-muted); --mu-left: var(--design-green); --mu-right: var(--design-gold); --mu-accent: var(--design-accent); }

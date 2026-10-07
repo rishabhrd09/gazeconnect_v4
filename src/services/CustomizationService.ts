@@ -13,13 +13,14 @@ import type {
   CustomizationData, Person, PhraseCategory,
   MedicalSection, HomeQuickActions, HomeEmergencyCard,
   ActivityCategory, AACCategory, Phrase, AppSettings, QuickWordsConfig,
-  AlertModeCard, QuickWord,
+  AlertModeCard, QuickWord, WebSearchData, WebSearchTarget,
 } from '../types/customization';
 import { MAX_ACTIVE_PEOPLE } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
-import { normalizeKeyboardFeel } from '../config/dwellTimeConfig';
+import { normalizeKeyboardFeel, normalizeVideoRevealHoldMs } from '../config/dwellTimeConfig';
 import { normalizeGazeColors } from '../config/gazeColors';
 import { normalizeDesignMode } from '../config/designMode';
+import { normalizeWebSearch, recordSearch } from '../components/browser/searchSuggestions';
 import {
   CARE_ACTIVITY_CATEGORIES,
   CARE_CONTENT_ARCHITECTURE_VERSION,
@@ -44,6 +45,9 @@ const englishOnlySettings = (settings: AppSettings): AppSettings => ({
   keyboardFeel: normalizeKeyboardFeel(settings.keyboardFeel),
   gazeColors: normalizeGazeColors(settings.gazeColors),
   designMode: normalizeDesignMode(settings.designMode),
+  // Calm full-screen video: on unless switched off; the look time is one of 3, 4 or 5 s.
+  calmFullScreenVideo: settings.calmFullScreenVideo !== false,
+  videoRevealHoldMs: normalizeVideoRevealHoldMs(settings.videoRevealHoldMs),
 });
 const LEGACY_PEOPLE_NAMES = new Set(['Mummy', 'Nilesh', 'Rahul', 'Durgesh']);
 
@@ -299,6 +303,8 @@ export class CustomizationService {
       feelings: saved.feelings ?? defaults.feelings,
       basicNeeds: saved.basicNeeds ?? defaults.basicNeeds,
       alertModeCards: saved.alertModeCards ?? defaults.alertModeCards,
+      // Search suggestions: shapes, repeats and limits checked whatever was saved.
+      webSearch: normalizeWebSearch(saved.webSearch ?? defaults.webSearch),
       version: saved.version ?? defaults.version,
     };
 
@@ -740,6 +746,23 @@ export class CustomizationService {
   // --- Alert Mode Cards ---
   updateAlertModeCards(cards: AlertModeCard[]): void {
     this.data = { ...this.data, alertModeCards: cards };
+    this.scheduleSave();
+    this.notify();
+  }
+
+  // --- Web search suggestions (Settings > Web Search, the search keyboard) ---
+  updateWebSearch(webSearch: WebSearchData): void {
+    this.data = { ...this.data, webSearch: normalizeWebSearch(webSearch) };
+    this.scheduleSave();
+    this.notify();
+  }
+
+  /** A search was made from the keyboard: remembered for suggestions (unless that is off). */
+  recordWebSearch(target: WebSearchTarget, query: string): void {
+    const current = normalizeWebSearch(this.data.webSearch);
+    const next = recordSearch(current, target, query, Date.now());
+    if (next === current) return;
+    this.data = { ...this.data, webSearch: next };
     this.scheduleSave();
     this.notify();
   }

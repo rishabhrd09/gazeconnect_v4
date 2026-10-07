@@ -283,6 +283,12 @@ function makeEnv({ viewW = 1585, viewH = 891, zoom = 1.0, host = 'www.youtube.co
     MutationObserver: MutationObserverStub,
     console: { log() {}, warn() {}, error() {} },
   };
+  // Window listeners (scroll, resize, popstate...), so scenarios can fire them.
+  const windowListeners = {};
+  ctx.addEventListener = (name, fn) => { (windowListeners[name] = windowListeners[name] || []).push(fn); };
+  ctx.removeEventListener = (name, fn) => {
+    windowListeners[name] = (windowListeners[name] || []).filter((f) => f !== fn);
+  };
   ctx.window = ctx;
   ctx.globalThis = ctx;
   vm.createContext(ctx);
@@ -302,14 +308,18 @@ function makeEnv({ viewW = 1585, viewH = 891, zoom = 1.0, host = 'www.youtube.co
     }
   }
 
-  return { ctx, doc, body, clock, advance, observers, zoom, viewW, viewH, cssW, cssH };
+  function fireWindow(name, event) {
+    (windowListeners[name] || []).slice().forEach((fn) => { try { fn(event || {}); } catch (_) {} });
+  }
+
+  return { ctx, doc, body, clock, advance, observers, zoom, viewW, viewH, cssW, cssH, fireWindow };
 }
 
 function inject(env, seedConfig) {
-  // Existing gap/retention scenarios use an explicit allowed 1900ms hold: Balanced
-  // navigation, which is also the browser's own default, so retuning the slower
-  // sets does not move them (their 2000ms left the sets on 29 Sep 2026).
-  // S18 covers every duration; S19 below covers the unconfigured default.
+  // Existing gap/retention scenarios use an explicit allowed 1900ms hold (Balanced
+  // navigation until 5 Oct 2026, Balanced deliberate since), so retuning the sets
+  // does not move them. S18 covers every duration; S19 below covers the
+  // unconfigured default, now the 1700ms Balanced navigation time.
   seedConfig = { dwellMs: 1900, ...seedConfig };
   if (seedConfig) {
     vm.runInContext(`window.gcConfig = ${JSON.stringify(seedConfig)};`, env.ctx);
@@ -602,8 +612,8 @@ scenario('S17 hide cancels pending dwell and all saved progress', (t) => {
   t.expect(out.clicks.length === 0, 'reappearance completed the old dwell');
 });
 
-scenario('S18 every duration of the four timing sets excludes onset', (t) => {
-  for (const dwellMs of [750, 800, 900, 1100, 1300, 1400, 1450, 1600, 1900, 2250, 2400, 2500, 2600, 2750, 2800, 3200, 3250, 3800, 4000]) {
+scenario('S18 every duration of the six timing sets excludes onset', (t) => {
+  for (const dwellMs of [750, 800, 900, 950, 1100, 1300, 1400, 1450, 1550, 1600, 1700, 1850, 1900, 2000, 2050, 2200, 2250, 2300, 2400, 2500, 2600, 2650, 2700, 2800, 2900, 3050, 3100, 3200, 3250, 3350, 3600, 3800, 3850, 4000]) {
     for (const onsetMs of [120, 320]) {
       const env = makeEnv({ host: 'example.com' });
       inject(env, { dwellMs, onsetMs });
@@ -621,17 +631,18 @@ scenario('S18 every duration of the four timing sets excludes onset', (t) => {
   }
 });
 
-scenario('S19 default and unknown browser durations use the Balanced 1900ms navigation', (t) => {
-  // 2000 was a duration until 29 Sep 2026; like any value outside the sets it now falls back.
-  for (const dwellMs of [undefined, 1800, 2000, 450]) {
+scenario('S19 default and unknown browser durations use the Balanced 1700ms navigation', (t) => {
+  // 2000 left the sets on 29 Sep 2026 (and came back on 5 Oct); 3000 has never been one.
+  for (const dwellMs of [undefined, 1800, 3000, 450]) {
     const env = makeEnv({ zoom: 1.0 });
     inject(env, { dwellMs });
     const { anchor } = addGridCard(env, { left: 200, top: 150, vid: 'default' });
     const c = centerOfRect(anchor.rect);
     const out = runTrace(env, Array(95).fill([c.x, c.y]));
     t.expect(out.clicks.length === 1, 'expected exactly one navigation selection');
-    if (out.clicks.length) t.expect(out.clicks[0].frameIndex >= 72 && out.clicks[0].frameIndex <= 76,
-      `navigation did not use 1900ms plus onset (frame ${out.clicks[0].frameIndex})`);
+    // 1700ms after the 280ms onset at 30ms frames: about frame 66.
+    if (out.clicks.length) t.expect(out.clicks[0].frameIndex >= 65 && out.clicks[0].frameIndex <= 69,
+      `navigation did not use 1700ms plus onset (frame ${out.clicks[0].frameIndex})`);
   }
 });
 
@@ -780,15 +791,31 @@ scenario('S7 playing video: no in-video clicks, skip-ad still works', (t) => {
   const supEvents = events2(env).filter((e) => e.kind === 'dwellSuppressed').length;
   t.expect(supEvents <= 5, `dwellSuppressed not rate-limited: ${supEvents} events in 3s`);
 
-  // Skip-ad exemption: same geometry + a skip button inside the video rect.
+  // Skip-ad exemption: same geometry + a skip button inside the video rect. The page's
+  // own Skip button is a target only with the strict YouTube rule rolled back (S28).
   env = makeEnv({ zoom: 1.0 });
-  inject(env);
+  inject(env, { youtubeStrictTargets: false });
   addVideoPlayer(env, { ...playerRect, playing: true });
   const skip = addSkipButton(env, playerRect);
   const sc = centerOfRect(skip.rect);
   const { clicks } = runTrace(env, Array(110).fill([sc.x, sc.y]));
   t.expect(clicks.length === 1 && clicks[0].kind === 'youtube_skip_ad',
     `skip-ad not clickable during playback: ${JSON.stringify(clicks.map((k) => k.kind))}`);
+});
+
+// === S28: strict YouTube targets: Skip Ad is pressed from the app's bar ======
+scenario('S28 YouTube: the page\'s own Skip Ad, play and pause are never page targets', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  const playerRect = { left: 100, top: 80, width: 900, height: 500 };
+  addVideoPlayer(env, { ...playerRect, playing: true });
+  const skip = addSkipButton(env, playerRect);
+  const sc = centerOfRect(skip.rect);
+  let out = runTrace(env, Array(110).fill([sc.x, sc.y]));
+  t.expect(out.clicks.length === 0, `the page's Skip Ad was selected: ${JSON.stringify(out.clicks.map((k) => k.kind))}`);
+  const mid = { x: playerRect.left + 300, y: playerRect.top + 200 };
+  out = runTrace(env, Array(110).fill([mid.x, mid.y]));
+  t.expect(out.clicks.length === 0, `the video itself was selected: ${JSON.stringify(out.clicks.map((k) => k.kind))}`);
 });
 
 // === S8: probe snap — acquires near, never fires far ======================
@@ -1039,6 +1066,363 @@ scenario('S22 moving to another card: the ring goes centre to centre, B is click
   t.expect(!positionedByLayout(cursor), 'ring positioned with left/top: the page lays out on every gaze frame');
   t.expect(clicks.length === 1 && clicks[0].href && clicks[0].href.includes('bbb'),
     `expected one click on B, got ${JSON.stringify(clicks.map(c => c.href || c.key))}`);
+});
+
+// === S23-S28: few selection points on YouTube (6 Oct 2026) ===============
+// On www/m.youtube.com only video, playlist and mix cards, Skip Ad and buttons
+// inside a dialog are targets. The masthead (Sign in, voice search, the search
+// box), filter chips and channel buttons are not: the app's own buttons do
+// Search, Home, Back, play/pause and full screen.
+scenario('S23 YouTube: only cards are targets, never Sign in or a filter chip', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  const signIn = addLink(env, { left: 1300, top: 20, width: 140, height: 48, href: 'https://accounts.google.com/', text: 'Sign in' });
+  const chip = new StubEl({ tag: 'button', tokens: ['button'], text: 'Shorts', rect: { left: 300, top: 90, width: 110, height: 44 } });
+  env.body.appendChild(chip);
+  const card = addGridCard(env, { left: 300, top: 520, width: 420, height: 260, vid: 'ccc' });
+  const sc = centerOfRect(signIn.rect);
+  let out = runTrace(env, Array(90).fill([sc.x, sc.y]));
+  t.expect(out.clicks.length === 0, `Sign in was selectable: ${JSON.stringify(out.clicks.map((c) => c.kind))}`);
+  t.expect(out.states.every((s) => s === 'idle'), 'the dwell ran on the masthead');
+  const chipCenter = centerOfRect(chip.rect);
+  out = runTrace(env, Array(90).fill([chipCenter.x, chipCenter.y]));
+  t.expect(out.clicks.length === 0, `a filter chip was selectable: ${JSON.stringify(out.clicks.map((c) => c.kind))}`);
+  const cc = centerOfRect(card.anchor.rect);
+  out = runTrace(env, Array(90).fill([cc.x, cc.y]));
+  t.expect(out.clicks.length === 1 && /^youtube_/.test(out.clicks[0].kind) && out.clicks[0].href.includes('ccc'),
+    `the video card was not selected: ${JSON.stringify(out.clicks.map((c) => [c.kind, c.href]))}`);
+});
+
+scenario('S24 YouTube lockup cards (watch-page suggestions, mixes) are targets', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  const card = new StubEl({ tag: 'yt-lockup-view-model', tokens: ['yt-lockup-view-model'],
+    rect: { left: 900, top: 200, width: 380, height: 110 } });
+  const anchor = new StubEl({ tag: 'a', tokens: ANCHOR_TOKENS, href: 'https://www.youtube.com/watch?v=lll',
+    text: 'Suggested mix', rect: { left: 900, top: 200, width: 168, height: 110 } });
+  card.appendChild(anchor);
+  env.body.appendChild(card);
+  // Looking at the card's text, not its thumbnail link: the card's own link is chosen.
+  const out = runTrace(env, Array(90).fill([1150, 255]));
+  t.expect(out.clicks.length === 1 && out.clicks[0].href.includes('lll') && /^youtube_/.test(out.clicks[0].kind),
+    `lockup card not selected: ${JSON.stringify(out.clicks.map((c) => [c.kind, c.href]))}`);
+});
+
+scenario('S25 YouTube: a button in a dialog stays selectable, a card behind the dialog does not', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  addGridCard(env, { left: 400, top: 250, width: 500, height: 300, vid: 'behind' });
+  const dialog = new StubEl({ tag: 'tp-yt-paper-dialog', tokens: ['tp-yt-paper-dialog'],
+    rect: { left: 450, top: 300, width: 400, height: 200 } });
+  const notNow = new StubEl({ tag: 'button', tokens: ['button'], text: 'Not now',
+    rect: { left: 600, top: 440, width: 120, height: 44 } });
+  dialog.appendChild(notNow);
+  env.body.appendChild(dialog);
+  // The dialog's empty area first: no card behind it may be chosen.
+  let out = runTrace(env, Array(90).fill([500, 330]));
+  t.expect(out.clicks.length === 0, `a card behind the dialog was chosen: ${JSON.stringify(out.clicks.map((c) => [c.kind, c.href]))}`);
+  const bc = centerOfRect(notNow.rect);
+  out = runTrace(env, Array(90).fill([bc.x, bc.y]));
+  t.expect(out.clicks.length === 1 && out.clicks[0].kind === 'interactive',
+    `the dialog button was not selectable: ${JSON.stringify(out.clicks.map((c) => c.kind))}`);
+});
+
+scenario('S27 YouTube: the header and filter chips never select the card beside them', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  // A card 30 px below the chips and 90 px below the search box: inside the
+  // nearest-card snap distance of both (measured on the live results page).
+  const masthead = new StubEl({ tag: 'div', id: 'masthead-container', tokens: ['#masthead-container'],
+    rect: { left: 0, top: 0, width: 1600, height: 76 } });
+  const searchBox = new StubEl({ tag: 'input', tokens: ['input'], rect: { left: 480, top: 14, width: 600, height: 48 } });
+  masthead.appendChild(searchBox);
+  env.body.appendChild(masthead);
+  const chips = new StubEl({ tag: 'yt-chip-cloud-renderer', tokens: ['yt-chip-cloud-renderer'],
+    rect: { left: 130, top: 90, width: 1100, height: 60 } });
+  const chip = new StubEl({ tag: 'div', tokens: ['div'], text: 'Music', rect: { left: 300, top: 100, width: 110, height: 44 } });
+  chips.appendChild(chip);
+  env.body.appendChild(chips);
+  const card = addGridCard(env, { left: 130, top: 180, width: 560, height: 300, vid: 'near' });
+  for (const [label, el] of [['search box', searchBox], ['filter chip', chip]]) {
+    const p = centerOfRect(el.rect);
+    const out = runTrace(env, Array(120).fill([p.x, p.y]));
+    t.expect(out.clicks.length === 0, `the ${label} selected a card: ${JSON.stringify(out.clicks.map((c) => [c.kind, c.href]))}`);
+  }
+  // The card itself is still chosen.
+  const cc = centerOfRect(card.anchor.rect);
+  const out = runTrace(env, Array(90).fill([cc.x, cc.y]));
+  t.expect(out.clicks.length === 1 && out.clicks[0].href.includes('near'),
+    `the card beside the header was not selectable: ${JSON.stringify(out.clicks.map((c) => [c.kind, c.href]))}`);
+});
+
+scenario('S26 the strict YouTube rule rolls back, and never applies on consent.youtube.com', (t) => {
+  let env = makeEnv({ zoom: 1.0 });
+  inject(env, { youtubeStrictTargets: false });
+  const link = addLink(env, { left: 1300, top: 20, width: 140, height: 48, href: 'https://accounts.google.com/', text: 'Sign in' });
+  const lc = centerOfRect(link.rect);
+  let out = runTrace(env, Array(90).fill([lc.x, lc.y]));
+  t.expect(out.clicks.length === 1, `rollback: the link was not selectable (${out.clicks.length})`);
+  env = makeEnv({ zoom: 1.0, host: 'consent.youtube.com' });
+  inject(env);
+  const accept = new StubEl({ tag: 'button', tokens: ['button'], text: 'Accept all',
+    rect: { left: 600, top: 500, width: 200, height: 56 } });
+  env.body.appendChild(accept);
+  const ac = centerOfRect(accept.rect);
+  out = runTrace(env, Array(90).fill([ac.x, ac.y]));
+  t.expect(out.clicks.length === 1 && out.clicks[0].kind === 'interactive',
+    `consent page button not selectable: ${JSON.stringify(out.clicks.map((c) => c.kind))}`);
+});
+
+// === S29-S34: a steadier page cursor (7 Oct 2026, maintainer request) ======
+// The app's focus rules (src/utils/gazeFocus.ts) for page targets, smooth glides,
+// a resting ring away from targets and a pause while the page scrolls. "Before"
+// runs switch the new rules off to show what they change.
+const OLD_RULES = { focusHysteresisEnabled: false, ringFreeHoldPx: 0, ringGlideMs: 0, scrollSettleMs: 0, probeSnapHysteresisPx: 0 };
+const steadiness = (env) => vm.runInContext('window.__gcTelemetry.steadiness()', env.ctx);
+// Ring hops: moves of the drawn ring longer than `far` px between frames.
+function traceHops(env, samples, far = 100) {
+  const cursor = env.doc.getElementById('gazeconnect-cursor');
+  const clicks = [];
+  const drawn = [];
+  let hops = 0;
+  let last = null;
+  let steadyAtFirstClick = null;
+  for (const [x, y] of samples) {
+    const res = frame(env, x, y, 30);
+    if (res.c) clicks.push(res.c);
+    // A real page usually leaves on its first selection: how steady the focus was until then.
+    if (res.c && clicks.length === 1) steadyAtFirstClick = steadiness(env);
+    const p = drawnAt(cursor);
+    if (Number.isFinite(p.x)) {
+      if (last && Math.hypot(p.x - last.x, p.y - last.y) > far) hops++;
+      last = p;
+      drawn.push(p);
+    }
+  }
+  return { clicks, hops, drawn, steadyAtFirstClick };
+}
+
+scenario('S29 eyes on the border between two cards: the ring stays instead of hopping', (t) => {
+  const rng = mulberry32(29);
+  const samples = Array.from({ length: 200 }, () => [428 + gauss(rng) * 12, 300 + gauss(rng) * 12]); // 6 s
+  const centres = [{ x: 260, y: 310 }, { x: 596, y: 310 }];
+  const atCentre = (p) => centres.findIndex((c) => Math.hypot(p.x - c.x, p.y - c.y) < 1);
+  const run = (config) => {
+    const env = makeEnv({ zoom: 1.0 });
+    inject(env, config);
+    addGridCard(env, { left: 100, top: 200, width: 320, height: 220, vid: 'left' });   // ends at x 420
+    addGridCard(env, { left: 436, top: 200, width: 320, height: 220, vid: 'right' });  // the 16 px gap is 420-436
+    const out = traceHops(env, samples);
+    // Hops: the ring going from one card's centre to the other's.
+    let hops = 0;
+    for (let i = 1; i < out.drawn.length; i++) {
+      const from = atCentre(out.drawn[i - 1]), to = atCentre(out.drawn[i]);
+      if (from >= 0 && to >= 0 && from !== to) hops++;
+    }
+    return { ...out, hops, steady: steadiness(env) };
+  };
+  const before = run(OLD_RULES);
+  const after = run({});
+  metrics.S29 = { hopsBefore: before.hops, hopsAfter: after.hops, focusSwitches: after.steady.focusSwitches, focusHolds: after.steady.focusHolds, clicksBefore: before.clicks.length, clicksAfter: after.clicks.length,
+    switchesBeforeFirstClick: after.steadyAtFirstClick && after.steadyAtFirstClick.focusSwitches };
+  // Six seconds staring exactly at the border is the worst case: a hand-off when the eyes
+  // really go 30 px past it for two samples is the rule (as on the app's own screens).
+  t.expect(after.hops <= 3 && after.hops * 4 <= before.hops, `the ring hopped ${after.hops} times between the two cards in 6 s (before: ${before.hops})`);
+  t.expect(before.hops >= 8, `the trace no longer reproduces the old hopping (${before.hops})`);
+  t.expect(after.clicks.length >= 1, 'resting on the border never selected the card holding the focus');
+  // The first selection goes to the card that held the focus, at most one hand-off before it.
+  // (This page does not leave when a card is chosen, so a later selection starts afresh
+  // wherever the eyes are; on YouTube the first one opens the video.)
+  t.expect(after.steadyAtFirstClick && after.steadyAtFirstClick.focusSwitches <= 1,
+    `the focus changed cards ${after.steadyAtFirstClick && after.steadyAtFirstClick.focusSwitches} times before the selection`);
+});
+
+scenario('S30 dense results (Google-like): the looked-at link is chosen, without flicker', (t) => {
+  const rng = mulberry32(30);
+  const samples = Array.from({ length: 150 }, () => [510 + gauss(rng) * 20, 301 + gauss(rng) * 9]); // 4.5 s on result 3
+  const run = (config) => {
+    const env = makeEnv({ zoom: 1.0, host: 'www.google.com' });
+    inject(env, config);
+    for (let i = 0; i < 8; i++) addLink(env, { left: 300, top: 200 + i * 30, width: 420, height: 22, href: `https://example.com/r${i}`, text: `Result ${i}` });
+    return { ...traceHops(env, samples, 20), steady: steadiness(env) };
+  };
+  const before = run(OLD_RULES);
+  const after = run({});
+  metrics.S30 = { hopsBefore: before.hops, hopsAfter: after.hops, focusSwitches: after.steady.focusSwitches, clicksBefore: before.clicks.map((c) => c.href.slice(-2)), clicksAfter: after.clicks.map((c) => c.href.slice(-2)) };
+  t.expect(after.clicks.length >= 1 && after.clicks[0].href.endsWith('/r3'), `expected result 3 first, got ${JSON.stringify(after.clicks.map((c) => c.href))}`);
+  t.expect(after.clicks.every((c) => c.href.endsWith('/r3')), `a neighbour was chosen: ${JSON.stringify(after.clicks.map((c) => c.href))}`);
+  t.expect(after.hops <= Math.max(2, Math.floor(before.hops / 3)), `ring moves between results: ${after.hops} (before ${before.hops})`);
+});
+
+scenario('S31 a deliberate move to another card: switches at once, selection no slower', (t) => {
+  const clickTimeOnB = (prefix) => {
+    const env = makeEnv({ zoom: 1.0 });
+    inject(env);
+    const A = addGridCard(env, { left: 100, top: 200, width: 320, height: 220, vid: 'aaa' }).anchor;
+    const B = addGridCard(env, { left: 900, top: 200, width: 320, height: 220, vid: 'bbb' }).anchor;
+    const ca = centerOfRect(A.rect), cb = centerOfRect(B.rect);
+    const cursor = env.doc.getElementById('gazeconnect-cursor');
+    for (let i = 0; i < prefix; i++) frame(env, ca.x, ca.y, 30);
+    let arrived = -1;
+    for (let i = 0; i < 120; i++) {
+      const res = frame(env, cb.x, cb.y, 30);
+      const p = drawnAt(cursor);
+      if (arrived < 0 && Math.hypot(p.x - cb.x, p.y - cb.y) < 1) arrived = i;
+      if (res.c) return { frames: i, href: res.c.href, arrived };
+    }
+    return { frames: -1, href: null, arrived };
+  };
+  const fresh = clickTimeOnB(0);
+  const moved = clickTimeOnB(20);          // 0.6 s on A first: B is now a challenger
+  metrics.S31 = { freshFrames: fresh.frames, afterMoveFrames: moved.frames, ringArrivedFrame: moved.arrived };
+  t.expect(moved.href && moved.href.includes('bbb'), `B was not selected (${moved.href})`);
+  t.expect(moved.frames >= 0 && moved.frames <= fresh.frames + 1, `selection after a move took ${moved.frames} frames, from rest ${fresh.frames}`);
+  t.expect(moved.arrived >= 0 && moved.arrived <= 1, `the ring reached B's centre on frame ${moved.arrived}`);
+});
+
+scenario('S32 a wobble near the end of a selection keeps it; a real move hands it over', (t) => {
+  const setup = (config) => {
+    const env = makeEnv({ zoom: 1.0 });
+    inject(env, config);
+    const A = addCompactCard(env, { left: 1050, top: 80, vid: 'top' });      // 80-174
+    const B = addCompactCard(env, { left: 1050, top: 182, vid: 'below' });   // 182-276
+    return { env, a: centerOfRect(A.anchor.rect), b: centerOfRect(B.anchor.rect) };
+  };
+  // 60 % of the way, then three samples 40 px past A's edge (inside B), then back on A.
+  let { env, a } = setup({});
+  const clicks = [];
+  const go = (x, y, n) => { for (let i = 0; i < n; i++) { const r = frame(env, x, y, 30); if (r.c) clicks.push({ ...r.c, at: env.clock.t }); } };
+  go(a.x, a.y, 48);
+  go(a.x, 174 + 40, 3);
+  go(a.x, a.y, 40);
+  t.expect(clicks.length >= 1 && clicks[0].href.includes('top'), `the wobble lost the selection: ${JSON.stringify(clicks.map((c) => c.href))}`);
+  t.expect(!clicks.some((c) => c.href.includes('below')), 'the card below was chosen by a wobble');
+  const keptAt = clicks.length ? clicks[0].at : -1;
+  // A real move: the eyes go to B and stay.
+  ({ env, a } = setup({}));
+  const b = centerOfRect({ left: 1050, top: 182, width: 168, height: 94 });
+  const later = [];
+  for (let i = 0; i < 48; i++) frame(env, a.x, a.y, 30);
+  for (let i = 0; i < 100; i++) { const r = frame(env, b.x, b.y, 30); if (r.c) later.push(r.c); }
+  t.expect(later.length >= 1 && later[0].href.includes('below'), `a real move did not hand over: ${JSON.stringify(later.map((c) => c.href))}`);
+  t.expect(steadiness(env).focusSwitches >= 1, 'no hand-off was counted');
+  metrics.S32 = { wobbleKeptClickMs: keptAt };
+});
+
+scenario('S33 while the page scrolls nothing is chosen; after it stops, selection works', (t) => {
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  const { card, anchor } = addGridCard(env, { left: 400, top: 600, width: 320, height: 220, vid: 'scrolled' });
+  const gaze = { x: 560, y: 400 };
+  const states = [];
+  const clicks = [];
+  // One second of scrolling: the card slides up under the eyes, a scroll event every frame.
+  for (let i = 0; i < 34; i++) {
+    card.rect.top -= 10;
+    anchor.rect.top -= 10;
+    env.fireWindow('scroll', { target: env.doc });
+    const res = frame(env, gaze.x, gaze.y, 30);
+    states.push(res.s);
+    if (res.c) clicks.push(res.c);
+  }
+  t.expect(clicks.length === 0, 'something was chosen while the page moved');
+  const busy = states.filter((s) => s !== 'idle').length;
+  t.expect(busy === 0, `dwell ran during the scroll on ${busy} frames (it would pause Gaze Scroll)`);
+  // The page stops with the card under the eyes: chosen after the settle time, onset and dwell.
+  let clickedAfter = -1;
+  for (let i = 0; i < 120 && clickedAfter < 0; i++) {
+    const res = frame(env, gaze.x, gaze.y, 30);
+    if (res.c) clickedAfter = (i + 1) * 30;
+  }
+  metrics.S33 = { clickedMsAfterScroll: clickedAfter };
+  t.expect(clickedAfter > 0, 'the card was never chosen after the page stopped');
+  t.expect(clickedAfter >= 300 + 280 + 1900 - 30 && clickedAfter <= 300 + 280 + 1900 + 120,
+    `chosen ${clickedAfter} ms after the scroll (settle 300 + onset 280 + dwell 1900 expected)`);
+});
+
+scenario('S34 away from targets the ring rests; a real shift moves it', (t) => {
+  const env = makeEnv({ zoom: 1.0, host: 'www.example.com' });
+  inject(env);
+  const rng = mulberry32(34);
+  const jitter = Array.from({ length: 60 }, () => [500 + gauss(rng) * 7, 400 + gauss(rng) * 7]); // 1.8 s
+  const out = traceHops(env, jitter, 2);
+  const distinct = new Set(out.drawn.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)).size;
+  t.expect(distinct <= 3, `the ring moved to ${distinct} places while the eyes rested`);
+  const cursor = env.doc.getElementById('gazeconnect-cursor');
+  let arrived = -1;
+  for (let i = 0; i < 12; i++) {
+    frame(env, 600, 400, 30);
+    const p = drawnAt(cursor);
+    if (arrived < 0 && Math.hypot(p.x - 600, p.y - 400) < 1) arrived = i;
+  }
+  metrics.S34 = { restingPlaces: distinct, followedOnFrame: arrived };
+  t.expect(arrived >= 0 && arrived <= 4, `the ring followed a 100 px shift on frame ${arrived}`);
+  const rolledBack = makeEnv({ zoom: 1.0, host: 'www.example.com' });
+  inject(rolledBack, { ringFreeHoldPx: 0 });
+  const old = traceHops(rolledBack, jitter, 2);
+  const oldDistinct = new Set(old.drawn.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)).size;
+  t.expect(oldDistinct > 20, `rollback (ringFreeHoldPx 0) should follow every sample (${oldDistinct})`);
+});
+
+scenario('S35 eyes hovering near the border, then one stray sample past the zone: the focus stays', (t) => {
+  // The live YouTube results of 7 Oct 2026: samples on the neighbour but still inside the
+  // focused card's zone were counted as evidence for it, so after a hover one stray sample
+  // past the zone handed the focus over. As in the app (gazeFocus.ts) only samples outside
+  // the zone count, and a sample back inside starts the count over.
+  const env = makeEnv({ zoom: 1.0 });
+  inject(env);
+  addGridCard(env, { left: 100, top: 200, width: 320, height: 220, vid: 'left' });   // ends at x 420
+  addGridCard(env, { left: 436, top: 200, width: 320, height: 220, vid: 'right' });  // zone of the left card: to x 450
+  for (let i = 0; i < 10; i++) frame(env, 260, 310, 30);          // the left card has the focus
+  for (let i = 0; i < 8; i++) frame(env, 444, 310, 30);           // on the right card, inside the left card's zone
+  frame(env, 470, 310, 30);                                        // one stray sample past the zone
+  frame(env, 444, 310, 30);                                        // back inside it
+  const afterStray = steadiness(env).focusSwitches;
+  frame(env, 470, 310, 30);                                        // a real move: two samples past it
+  frame(env, 470, 310, 30);
+  const afterMove = steadiness(env).focusSwitches;
+  metrics.S35 = { switchesAfterStraySample: afterStray, switchesAfterRealMove: afterMove };
+  t.expect(afterStray === 0, `one stray sample past the zone handed the focus over (${afterStray})`);
+  t.expect(afterMove === 1, `two samples past the zone did not hand the focus over (${afterMove})`);
+});
+
+scenario('S36 eyes resting between two results, one above the other: the focus stays with one', (t) => {
+  // The live YouTube results of 7 Oct 2026 (zoom 1.35), as measured on the page: a video whose
+  // card (thumbnail, title, details) reaches 17 px below its thumbnail link, 16 px of empty
+  // page, then a Mix whose link starts at its top. The eyes rest at the middle between the
+  // two links. The card is what competes for the gaze, so the focused card's zone is drawn
+  // around the card, not around its thumbnail link alone (whose zone only reached the middle).
+  const Z = 1.35;
+  const rng = mulberry32(36);
+  const samples = Array.from({ length: 200 }, () => [(264 + gauss(rng) * 12) * Z, (231.5 + gauss(rng) * 12) * Z]); // 6 s
+  const linkCentres = [{ x: 264, y: 115.5 }, { x: 276, y: 345.5 }]; // where the ring is drawn (page px)
+  const atCentre = (p) => linkCentres.findIndex((c) => Math.hypot(p.x - c.x, p.y - c.y) < 2);
+  const addResult = (env, { tag, tokens, card, link, vid }) => {
+    const box = new StubEl({ tag, tokens, rect: card });
+    box.appendChild(new StubEl({ tag: 'a', tokens: ANCHOR_TOKENS, href: `https://www.youtube.com/watch?v=${vid}`, rect: link, text: `Video ${vid}` }));
+    env.body.appendChild(box);
+  };
+  const run = (config) => {
+    const env = makeEnv({ zoom: Z });
+    inject(env, config);
+    addResult(env, { tag: 'ytd-video-renderer', tokens: ['ytd-video-renderer'], card: { left: 96, top: 21, width: 689, height: 206 }, link: { left: 96, top: 21, width: 336, height: 189 }, vid: 'upper' });
+    addResult(env, { tag: 'yt-lockup-view-model', tokens: ['yt-lockup-view-model'], card: { left: 96, top: 243, width: 689, height: 204 }, link: { left: 96, top: 244, width: 360, height: 203 }, vid: 'lower' });
+    const out = traceHops(env, samples);
+    let hops = 0;
+    for (let i = 1; i < out.drawn.length; i++) {
+      const from = atCentre(out.drawn[i - 1]), to = atCentre(out.drawn[i]);
+      if (from >= 0 && to >= 0 && from !== to) hops++;
+    }
+    return { ...out, hops, steady: steadiness(env) };
+  };
+  const before = run(OLD_RULES);
+  const after = run({});
+  metrics.S36 = { hopsBefore: before.hops, hopsAfter: after.hops, focusSwitches: after.steady.focusSwitches, clicksBefore: before.clicks.length, clicksAfter: after.clicks.length,
+    switchesBeforeFirstClick: after.steadyAtFirstClick && after.steadyAtFirstClick.focusSwitches };
+  t.expect(after.hops <= 2, `the ring hopped ${after.hops} times between the two results in 6 s (before: ${before.hops})`);
+  t.expect(after.clicks.length >= 1, 'resting between them never selected the result holding the focus');
+  t.expect(after.steadyAtFirstClick && after.steadyAtFirstClick.focusSwitches <= 1,
+    `the focus changed results ${after.steadyAtFirstClick && after.steadyAtFirstClick.focusSwitches} times before the selection`);
 });
 
 // ---------------------------------------------------------------------------

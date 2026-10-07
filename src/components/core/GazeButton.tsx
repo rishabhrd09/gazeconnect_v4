@@ -316,7 +316,9 @@ const GazeButton: React.FC<GazeButtonProps> = ({
                             : dwellCategory === 'gazeToggle' ? 'gazeToggle'
                               : dwellCategory === 'compassMapAction' ? 'compassMapAction'
                                 : dwellCategory === 'standardButton' ? 'standard'
-                                  : undefined)
+                                  : dwellCategory === 'quickWordChoice' ? 'quickWordChoice'
+                                    : dwellCategory === 'videoControl' ? 'videoControl'
+                                      : undefined)
     || (variant === 'emergency' ? 'emergency'
       : variant === 'quickfire' ? 'quickfire'
         : 'navigation');

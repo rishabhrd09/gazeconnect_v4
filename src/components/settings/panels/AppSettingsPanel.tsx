@@ -6,12 +6,12 @@ import SliderSetting from '../shared/SliderSetting';
 import SelectSetting from '../shared/SelectSetting';
 import { useCustomization } from '../../../contexts/CustomizationContext';
 import { useTheme, type Theme, useDarkPalette } from '../../../contexts/ThemeContext';
-import { DWELL_TIMING_SETS, normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet } from '../../../config/dwellTimeConfig';
+import { DWELL_TIMING_SETS, VIDEO_REVEAL_HOLD_CHOICES_MS, describeTimingSet, normalizeDwellTimingSet, normalizeKeyboardFeel, normalizeVideoRevealHoldMs, type DwellTimingSet } from '../../../config/dwellTimeConfig';
 import { GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors } from '../../../config/gazeColors';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
 
-// Four complete timing sets; the displayed advice avoids promising an exact
-// total selection time because gaze acquisition and onset precede the ring.
+// Six complete timing sets. The ring times shown are the dwell fill only:
+// gaze acquisition and onset precede the ring, so no total time is promised.
 const DwellTimeSection: React.FC = () => {
   const { timingSet } = useDwellTime();
   const { settings } = useCustomization();
@@ -19,7 +19,7 @@ const DwellTimeSection: React.FC = () => {
   return (
     <div className="settings-section dwell-guide">
       <h3>{DWELL_TIMING_SETS[timingSet].label.replace(' (default)', '')}</h3>
-      <p>{DWELL_TIMING_SETS[timingSet].description}. {familiar
+      <p>{DWELL_TIMING_SETS[timingSet].description} ({describeTimingSet(timingSet)}). {familiar
         ? 'Familiar keyboard sets its own pace for keys and suggestions; this speed still controls other choices.'
         : 'A short settling phase comes before the dwell ring fills, and a pause follows each selection.'}</p>
     </div>
@@ -132,10 +132,10 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
           />
           <SelectSetting
             label="Selection Speed"
-            description="Choose a comfortable pace for general choices. Standard keyboard follows this speed; Familiar keyboard has its own key and suggestion pace."
+            description="Six paces, fastest first, each a little slower than the one before. Standard keyboard follows this speed; Familiar keyboard has its own key and suggestion pace."
             value={normalizeDwellTimingSet(settings.dwellTimingSet)}
             options={(Object.keys(DWELL_TIMING_SETS) as DwellTimingSet[]).map(key => ({
-              value: key, label: DWELL_TIMING_SETS[key].label,
+              value: key, label: `${DWELL_TIMING_SETS[key].label} · ${describeTimingSet(key)}`,
             }))}
             onChange={v => updateSetting('dwellTimingSet', normalizeDwellTimingSet(v))}
             isDarkMode={isDarkMode}
@@ -179,6 +179,21 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
               value: key, label: GAZE_COLOR_PALETTES[key].label,
             }))}
             onChange={v => updateSetting('gazeColors', normalizeGazeColors(v))}
+            isDarkMode={isDarkMode}
+          />
+          <ToggleSetting
+            label="Calm Full-Screen Video"
+            description="While a video plays in full screen, no buttons are on screen, so nothing is chosen by accident. Looking at the black strip under the video brings up Show options; the bar also comes back when the video ends."
+            value={settings.calmFullScreenVideo !== false}
+            onChange={v => updateSetting('calmFullScreenVideo', v)}
+            isDarkMode={isDarkMode}
+          />
+          <SelectSetting
+            label="Look at the Strip For"
+            description="How long to look at the black strip under a full-screen video before Show options appears."
+            value={String(normalizeVideoRevealHoldMs(settings.videoRevealHoldMs))}
+            options={VIDEO_REVEAL_HOLD_CHOICES_MS.map(ms => ({ value: String(ms), label: `${ms / 1000} seconds` }))}
+            onChange={v => updateSetting('videoRevealHoldMs', normalizeVideoRevealHoldMs(Number(v)))}
             isDarkMode={isDarkMode}
           />
           <GazeFilterTuningSection isDarkMode={isDarkMode} />

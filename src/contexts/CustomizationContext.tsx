@@ -10,7 +10,7 @@ import type {
   CustomizationData, Person, PhraseCategory,
   MedicalSection, HomeQuickActions, HomeEmergencyCard,
   ActivityCategory, AACCategory, Phrase, AppSettings, QuickWordsConfig,
-  AlertModeCard,
+  AlertModeCard, WebSearchData, WebSearchTarget,
 } from '../types/customization';
 import { CustomizationService, customizationService } from '../services/CustomizationService';
 
@@ -70,6 +70,10 @@ interface CustomizationContextValue {
 
   // Alert Mode Cards
   updateAlertModeCards: (cards: AlertModeCard[]) => void;
+
+  // Web search suggestions
+  updateWebSearch: (webSearch: WebSearchData) => void;
+  recordWebSearch: (target: WebSearchTarget, query: string) => void;
 
   // Settings operations
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
@@ -151,6 +155,8 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     customizationService.updateSetting(key, value);
   }, []);
   const updateSettings = useCallback((partial: Partial<AppSettings>) => customizationService.updateSettings(partial), []);
+  const updateWebSearch = useCallback((webSearch: WebSearchData) => customizationService.updateWebSearch(webSearch), []);
+  const recordWebSearch = useCallback((target: WebSearchTarget, query: string) => customizationService.recordWebSearch(target, query), []);
 
   const exportJSON = useCallback(() => customizationService.exportJSON(), []);
   const importJSON = useCallback((json: string) => customizationService.importJSON(json), []);
@@ -178,6 +184,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     updateAACCategories,
     updateFeelings, updateBasicNeeds,
     updateAlertModeCards,
+    updateWebSearch, recordWebSearch,
     updateSetting, updateSettings,
     exportJSON, importJSON, resetToDefaults,
     service: customizationService,

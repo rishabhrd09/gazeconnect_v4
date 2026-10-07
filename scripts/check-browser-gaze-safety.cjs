@@ -52,8 +52,14 @@ const source = ts.createSourceFile('main.ts', fs.readFileSync(path.join(root, 'e
   ts.ScriptTarget.ES2020, true, ts.ScriptKind.TS);
 const dispatcher = source.statements.find((s) => ts.isFunctionDeclaration(s) && s.name?.text === 'sendTrustedBrowserClick');
 assert.ok(dispatcher, 'native click dispatcher exists');
+// Which pages count as YouTube, as the main process decides it.
+const urlHelpers = ['getDomainFromUrl', 'isYoutubeUrl'].map((name) => {
+  const fn = source.statements.find((s) => ts.isFunctionDeclaration(s) && s.name?.text === name);
+  assert.ok(fn, name + ' exists');
+  return fn.getText(source);
+}).join('\n');
 
-function harness() {
+function harness(pageUrl = 'https://www.youtube.com/results?search_query=lata') {
   let now = 10000;
   let destroyed = false;
   const events = [];
@@ -66,6 +72,7 @@ function harness() {
     webContents: {
       isDestroyed: () => destroyed,
       getZoomFactor: () => 1.35,
+      getURL: () => pageUrl,
       executeJavaScript: () => Promise.resolve(),
       sendInputEvent: (event) => events.push(event),
     },
@@ -80,8 +87,9 @@ function harness() {
     lastBrowserDwellState: 'idle',
     sendBrowserNavState: () => {},
     setTimeout: (fn, delay) => timers.push({ fn, at: now + delay }),
+    URL,
   });
-  vm.runInContext(compile(dispatcher.getText(source)), context);
+  vm.runInContext(compile(urlHelpers + '\n' + dispatcher.getText(source)), context);
   return {
     events, context, gate: g,
     call: (manual = false) => context.sendTrustedBrowserClick(100, 200, 1,
@@ -136,6 +144,32 @@ h.advance(100);
 expect(h.events.some((e) => e.type === 'mouseDown') && h.events.some((e) => e.type === 'mouseUp'),
   'explicit manual/toolbar click remains usable without gaze eligibility');
 
+// 8 Oct 2026: on YouTube the page's mouse leaves once the click is done (YouTube plays a preview
+// of the video under a resting mouse, which the page cursor will not dwell inside); elsewhere
+// it stays where it clicked.
+h = harness();
+h.call();
+h.advance(400);
+const kinds = h.events.map((e) => e.type);
+expect(kinds.join(',') === 'mouseMove,mouseDown,mouseUp,mouseLeave', 'YouTube: the mouse leaves after the click (' + kinds.join(',') + ')');
+const leave = h.events[3];
+const up = h.events[2];
+expect(leave.x === up.x && leave.y === up.y, 'the mouse leaves from where it clicked');
+h = harness('https://www.google.com/search?q=weather');
+h.call();
+h.advance(400);
+expect(h.events.every((e) => e.type !== 'mouseLeave'), 'other sites: the mouse stays where it clicked');
+h = harness('https://notyoutube.com/watch?v=x');
+h.call();
+h.advance(400);
+expect(h.events.every((e) => e.type !== 'mouseLeave'), 'a look-alike address is not YouTube');
+h = harness();
+h.call();
+h.advance(100);
+h.destroy();
+h.advance(300);
+expect(h.events.every((e) => e.type !== 'mouseLeave'), 'no mouseLeave to a page that is gone');
+
 // Page requests are spaced out (28 Sep 2026): the Eye Tracker 5's ~66 frames a second, each a
 // hit test on the page, saturated YouTube's main thread. Runs the real per-frame handler and the
 // real interval from main.ts against a fake clock and a page that answers at once.
@@ -148,7 +182,7 @@ async function checkRequestSpacing() {
   const interval = source.statements.find((s) => ts.isVariableStatement(s) &&
     s.declarationList.declarations.some((d) => d.name.getText(source) === 'BROWSER_GAZE_MIN_INTERVAL_MS'));
   assert.ok(handler && interval, 'gaze frame handler and request interval exist');
-  const run = async (frameMs, durationMs) => {
+  const run = async (frameMs, durationMs, hidden = false) => {
     let now = 50000;
     const requests = [];
     const answers = [];
@@ -163,7 +197,7 @@ async function checkRequestSpacing() {
       getBounds: () => ({ x: 0, y: 0, width: 1600, height: 850 }),
     };
     const context = vm.createContext({
-      activeBrowserView: view, activeBrowserViewSessionId: 1, gazeGateFor: () => g, BrowserGazeGate,
+      activeBrowserView: view, activeBrowserViewSessionId: 1, gazeGateFor: () => g, BrowserGazeGate, browserViewHidden: hidden,
       invalidateBrowserGaze: () => {}, flushBrowserGazeReset: () => {}, resetEdgeScrollState: () => {},
       sendEdgeScrollState: () => {}, sendTrustedBrowserClick: () => {}, buildGazeUpdateAndPollScript: () => 'poll',
       browserDiagnostics: { recordIpcTick: () => {}, info: () => {} },
@@ -190,7 +224,47 @@ async function checkRequestSpacing() {
   expect(gaps.every((gap) => gap >= 25), `page requests are at least 25 ms apart (smallest gap ${Math.min(...gaps)} ms)`);
   const slow = await run(33, 3000);
   expect(slow.length === Math.ceil(3000 / 33), `frames 33 ms apart are all sent (got ${slow.length} of ${Math.ceil(3000 / 33)})`);
+  // 6 Oct 2026: while the search keyboard is shown the page is off the window; gaze must never reach it.
+  const hidden = await run(15, 1000, true);
+  expect(hidden.length === 0, `a page taken off the window received ${hidden.length} gaze requests`);
   return fast.length;
+}
+
+// 7 Oct 2026: the page cursor uses the app's focus rules (src/utils/gazeFocus.ts) with the
+// same numbers, and the main process seeds every page with the same defaults.
+{
+  const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+  const focus = read('src/utils/gazeFocus.ts');
+  const page = read('electron/browser/browserGazeController.ts');
+  const main = read('electron/main.ts');
+  // The first number written after a marker (a type line or a call in between is skipped).
+  const numberAfter = (text, marker) => {
+    for (let i = text.indexOf(marker); i >= 0; i = text.indexOf(marker, i + 1)) {
+      const value = parseFloat(text.slice(i + marker.length, i + marker.length + 16));
+      if (Number.isFinite(value)) return value;
+    }
+    return NaN;
+  };
+  const constant = (name) => numberAfter(focus, 'export const ' + name + ' = ');
+  const pageDefault = (key) => numberAfter(page, '        ' + key + ': ');
+  const mainDefault = (key) => numberAfter(main, '  ' + key + ': ');
+  const pairs = [
+    ['focusExitMarginPx', 'EXIT_MARGIN_PX'], ['focusCommitFrom', 'COMMIT_FROM'],
+    ['focusCommitExitMarginPx', 'COMMIT_EXIT_MARGIN_PX'], ['focusCommitConfirmMs', 'COMMIT_CONFIRM_MS'],
+    ['focusReleaseMs', 'RELEASE_MS'], ['ringFreeHoldPx', 'FREE_HOLD_PX'], ['ringFreeMoveMs', 'FREE_MOVE_MS'],
+  ];
+  for (const [key, name] of pairs) {
+    expect(Number.isFinite(constant(name)), `gazeFocus.ts ${name} not found`);
+    expect(pageDefault(key) === constant(name), `page ${key} ${pageDefault(key)} != gazeFocus ${name} ${constant(name)}`);
+    expect(mainDefault(key) === pageDefault(key), `main ${key} ${mainDefault(key)} != page ${pageDefault(key)}`);
+  }
+  // FOCUS_CONFIRM_MS (25 ms) is the second sample at 33 Hz: two samples on the page.
+  expect(constant('FOCUS_CONFIRM_MS') < 33 && pageDefault('focusConfirmSamples') === 2, 'the hand-off waits for the second sample');
+  for (const key of ['focusSmallMarginRatio', 'focusSmallMarginMinPx', 'ringGlideMs', 'scrollSettleMs', 'probeSnapHysteresisPx']) {
+    expect(Number.isFinite(pageDefault(key)) && mainDefault(key) === pageDefault(key), `main and page ${key}: ${mainDefault(key)} / ${pageDefault(key)}`);
+  }
+  expect(page.includes('        focusHysteresisEnabled: true,') && main.includes('  focusHysteresisEnabled: true,'), 'the focus rules are on by default in page and main');
+  expect(main.split('...pageSteadinessConfig(),').length === 3, 'main sends the steadiness settings both on a new page and on a live change');
 }
 
 checkRequestSpacing().then((perThreeSeconds) => {

@@ -3,24 +3,40 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/browsing-refinement.css';
+import '../styles/web-design.css';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { screenThemes, typography, warmScreenTokens } from '../utils/design';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
-import { useGazeBrowser } from '../hooks/useGazeBrowser';
+import { useGazeBrowser, youtubeSearchUrl, googleSearchUrl, YOUTUBE_HOME_URL, type BrowserNotice } from '../hooks/useGazeBrowser';
+import SearchKeyboard, { type SearchTarget } from '../components/browser/SearchKeyboard';
+import * as WI from '../components/icons/WebIcons';
+import { searchedWordsOf } from '../components/browser/searchText';
+import { CalmWatchStrip, useCalmWatch, type GazePointSource } from '../components/browser/CalmWatchStrip';
+import type { CalmPlayback } from '../components/browser/calmWatch';
 import { useRealGaze } from '../contexts/RealGazeContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useDwellTime } from '../contexts/DwellTimeContext';
+import { normalizeVideoRevealHoldMs } from '../config/dwellTimeConfig';
 import { gazeFlags } from '../utils/gazeFlags';
 import { isUsableGaze, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../utils/gazeSafety';
 import {
     BackIcon,
     BrainIcon,
+    EyeIcon,
+    EyeOffIcon,
+    FullscreenIcon,
     GlobalIcon,
+    GridIcon,
+    HomeIcon,
+    KeyboardIcon,
+    MinimizeIcon,
+    PauseIcon,
     PlayIcon,
     RefreshIcon,
+    SparklesIcon,
     SpeakIcon,
     WebLayoutIcon,
     WhatsAppIcon,
@@ -37,7 +53,6 @@ const T = screenThemes.web;
 const GAP = 'clamp(24px, 3vh, 40px)'; // Even larger gap
 const CR = '24px';
 const FONT_PRIMARY = typography.fontFamily.primary;
-const CB = T.cardBorder;
 const GL = T.glass;
 const TL = T.ai;
 const AC = T.accent;
@@ -162,6 +177,15 @@ const NextIcon: React.FC<WebIconProps> = ({ size = 24, color = 'currentColor', s
     </svg>
 );
 
+// Skip forward: YouTube's own Skip Ad button, pressed from the bar.
+const SkipIcon: React.FC<WebIconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
+        <path d="M4 6l7 6-7 6V6Z" />
+        <path d="M12 6l7 6-7 6V6Z" />
+        <path d="M21 5v14" />
+    </svg>
+);
+
 const ZoomIcon: React.FC<WebIconProps & { direction?: 'in' | 'out' }> = ({ size = 24, color = 'currentColor', strokeWidth = 2, direction = 'in', style }) => (
     <svg width={size} height={size} viewBox="0 0 96 96" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
         <circle cx="42" cy="42" r="22" />
@@ -276,6 +300,35 @@ const renderHubIcon = (id: string, size: number, color: string) => {
     if (svg) return <WebAssetIcon svg={svg} size={size} color={color} />;
 
     return <GlobalIcon size={Math.round(size * 0.9)} color={color} strokeWidth={2.1} style={iconInlineStyle} />;
+};
+
+// News categories: a distinct icon, accent and one short line each (the backend's
+// five, and the fallback list used while it is not connected).
+type ListLook = { icon: (size: number) => React.ReactNode; accent: WebAccent; sub: string };
+const NEWS_CATEGORY_LOOK: Record<string, ListLook> = {
+    positive_india: { icon: (s) => <SparklesIcon size={s} strokeWidth={1.9} />, accent: 'gold', sub: 'Hopeful stories' },
+    india_official: { icon: (s) => <WI.LandmarkIcon size={s} strokeWidth={1.9} />, accent: 'blue', sub: 'News from across India' },
+    health_als: { icon: (s) => <BrainIcon size={s} strokeWidth={1.9} />, accent: 'violet', sub: 'Research and care' },
+    cricket: { icon: (s) => <WI.CricketIcon size={s} strokeWidth={1.9} />, accent: 'green', sub: 'Scores and match news' },
+    science: { icon: (s) => <WI.FlaskIcon size={s} strokeWidth={1.9} />, accent: 'accent', sub: 'Space, health, discovery' },
+    top: { icon: (s) => <WI.NewspaperIcon size={s} strokeWidth={1.9} />, accent: 'blue', sub: 'Main headlines' },
+    india: { icon: (s) => <WI.LandmarkIcon size={s} strokeWidth={1.9} />, accent: 'blue', sub: 'News from India' },
+    world: { icon: (s) => <GlobalIcon size={s} strokeWidth={1.9} />, accent: 'green', sub: 'Around the world' },
+    health: { icon: (s) => <WI.HeartPulseIcon size={s} strokeWidth={1.9} />, accent: 'rose', sub: 'Health and care' },
+    sports: { icon: (s) => <WI.CricketIcon size={s} strokeWidth={1.9} />, accent: 'green', sub: 'Games and scores' },
+    tech: { icon: (s) => <WI.MonitorIcon size={s} strokeWidth={1.9} />, accent: 'violet', sub: 'Technology' },
+};
+const newsCategoryLook = (id: string): ListLook =>
+    NEWS_CATEGORY_LOOK[id] || { icon: (s) => <WI.NewspaperIcon size={s} strokeWidth={1.9} />, accent: 'accent', sub: 'Latest stories' };
+
+// Quick Search topics on the redesigned landing: one icon family, one accent each.
+const QUICK_TOPIC_LOOK: Record<string, { icon: React.ReactNode; accent: WebAccent }> = {
+    india_news: { icon: <WI.NewspaperIcon size={64} strokeWidth={1.8} />, accent: 'blue' },
+    local_weather: { icon: <WI.CloudSunIcon size={64} strokeWidth={1.8} />, accent: 'gold' },
+    global_news: { icon: <GlobalIcon size={64} strokeWidth={1.8} />, accent: 'green' },
+    als_research: { icon: <BrainIcon size={64} strokeWidth={1.8} />, accent: 'violet' },
+    cricket_score: { icon: <WI.CricketIcon size={64} strokeWidth={1.8} />, accent: 'green' },
+    stock_market: { icon: <WI.TrendUpIcon size={64} strokeWidth={1.8} />, accent: 'blue' },
 };
 
 const renderQuickTopicIcon = (id: string, size: number, color: string) => {
@@ -465,34 +518,45 @@ const toolbarBtnConnected = (role: ToolbarRole, hidden: boolean, position: 'firs
     };
 };
 
-// In-content scroll dock — vertical column on the right edge of the
-// embedded-browser content area. Up (top), optional Maximize toggle (middle),
-// Down (bottom). Sits in a dedicated gutter column outside the BrowserView
-// bounds since BrowserView always renders above HTML — floating overlays
-// don't work here.
-//
-// Maximize is YouTube-only: spatially placed between Up and Down because all
-// three are "video state" controls (scroll position + window state).
+// Up / Down beside the page, in a gutter outside the BrowserView (the page is a
+// native layer drawn above the interface, so nothing can float over it). Each press
+// moves the page itself most of a screen, smoothly (main.ts 'webview:scrollPage'):
+// the document, or the panel that actually scrolls -- never just whatever lies under
+// the middle of the view, which on YouTube is the video. At the top or the end the
+// button dims and says so; it still answers, so it can never trap the page.
+// Between them, as before 6 Oct 2026: Gaze Scroll (hands free: looking at the top or
+// bottom edge of the page moves it, main.ts edge scrolling) and, while browsing a
+// YouTube video page, Full Screen.
 type ScrollDockProps = {
     onUp: () => void;
-    onToggleAutoScroll?: () => void;
-    autoScrollEnabled?: boolean;
-    onMaximize?: () => void;
-    /** Toggle state for the maximize button: true = the video is currently
-     * maximized, so the button reads "Exit Full" and restores the page. */
-    maximized?: boolean;
     onDown: () => void;
+    atTop?: boolean;
+    atBottom?: boolean;
+    gazeScrollOn?: boolean;
+    onToggleGazeScroll?: () => void;
+    onFullScreen?: () => void;
     gazeEnabled: boolean;
     gazeTimestamp: number;
 };
 
-const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll, autoScrollEnabled = false, onMaximize, maximized = false, onDown, gazeEnabled, gazeTimestamp }) => {
-    const hasMax = !!onMaximize;
-    const hasAutoScroll = !!onToggleAutoScroll;
-    const buttonStyle: React.CSSProperties = {
+// Gaze Scroll: arrows both ways along one line.
+const MoveVerticalIcon: React.FC<WebIconProps> = ({ size = 24, color = 'currentColor', strokeWidth = 2, style }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden="true">
+        <path d="M12 2v20" />
+        <path d="M8 6l4-4 4 4" />
+        <path d="M8 18l4 4 4-4" />
+    </svg>
+);
+
+const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onDown, atTop = false, atBottom = false, gazeScrollOn = false, onToggleGazeScroll, onFullScreen, gazeEnabled, gazeTimestamp }) => {
+    const buttonCount = 2 + (onToggleGazeScroll ? 1 : 0) + (onFullScreen ? 1 : 0);
+    const compact = buttonCount > 2;
+    const iconSize = compact ? 34 : 42;
+    const buttonStyle = (dimmed: boolean): React.CSSProperties => ({
         width: '100%',
         flex: '1 1 0',
-        minHeight: hasMax || hasAutoScroll ? 'clamp(86px, 10.5vh, 140px)' : 'clamp(120px, 16vh, 200px)',
+        // Two buttons share the height generously; more share it equally, never below 80 px.
+        minHeight: compact ? '80px' : 'clamp(120px, 16vh, 200px)',
         background: 'var(--ui-surface)',
         border: '1px solid var(--ui-border)',
         borderRadius: '20px',
@@ -508,76 +572,53 @@ const ContentScrollDock: React.FC<ScrollDockProps> = ({ onUp, onToggleAutoScroll
         fontSize: 'clamp(19px, 2vh, 23px)',
         letterSpacing: '0.005em',
         boxShadow: 'none',
-        transition: 'background-color 120ms ease, border-color 120ms ease',
-    };
-    const iconSize = hasMax || hasAutoScroll ? 36 : 42;
+        opacity: dimmed ? 0.55 : 1,
+        transition: 'background-color 120ms ease, border-color 120ms ease, opacity 160ms ease',
+    });
+    const note: React.CSSProperties = { fontSize: 'clamp(14px, 1.6vh, 17px)', fontWeight: 600 };
     return (
-        <div style={{
+        <div className="browser-scroll-dock" data-buttons={buttonCount} style={{
             flex: '0 0 clamp(150px, 12vw, 180px)',
             display: 'flex',
             flexDirection: 'column',
             gap: 'clamp(10px, 1.4vh, 18px)',
             paddingLeft: 'clamp(10px, 1vw, 16px)',
+            minHeight: 0,
         }}>
             <GazeButton id="content-scroll-up" onClick={onUp}
                 gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                 dwellCategory="navigationButton"
-                style={buttonStyle}>
-                <ArrowUpIcon size={iconSize} color="currentColor" strokeWidth={2.4} />
+                style={buttonStyle(atTop)}>
+                <ArrowUpIcon size={iconSize} color="currentColor" strokeWidth={7} />
                 <span>Up</span>
+                {atTop && <span style={note}>At the top</span>}
             </GazeButton>
-            {onToggleAutoScroll && (
-                <GazeButton id="content-auto-scroll" selected={!!autoScrollEnabled} onClick={onToggleAutoScroll}
+            {onToggleGazeScroll && (
+                <GazeButton id="content-auto-scroll" onClick={onToggleGazeScroll} selected={gazeScrollOn}
                     gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                     dwellCategory="navigationButton"
-                    style={{
-                        ...buttonStyle,
-                        color: autoScrollEnabled ? '#86F0D3' : '#D8DEE6',
-                        borderColor: autoScrollEnabled ? 'rgba(134, 240, 211, 0.46)' : 'rgba(180, 195, 220, 0.18)',
-                        background: autoScrollEnabled ? 'rgba(22, 96, 78, 0.36)' : buttonStyle.background,
-                    }}>
-                    <PointerIcon size={iconSize} color="currentColor" strokeWidth={2.3} />
-                    <span>{autoScrollEnabled ? 'Scroll On' : 'Scroll'}</span>
+                    style={buttonStyle(false)}>
+                    <MoveVerticalIcon size={iconSize} color="currentColor" strokeWidth={2.2} />
+                    <span>Gaze Scroll</span>
+                    <span style={note}>{gazeScrollOn ? 'On' : 'Off'}</span>
                 </GazeButton>
             )}
-            {onMaximize && (
-                <GazeButton id="content-maximize" selected={!!maximized} onClick={onMaximize}
+            {onFullScreen && (
+                <GazeButton id="content-maximize" onClick={onFullScreen}
                     gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                     dwellCategory="navigationButton"
-                    style={maximized ? {
-                        // Active state mirrors the Scroll On pattern so the
-                        // patient can see the button will now EXIT full screen.
-                        ...buttonStyle,
-                        color: '#86F0D3',
-                        borderColor: 'rgba(134, 240, 211, 0.46)',
-                        background: 'rgba(22, 96, 78, 0.36)',
-                    } : { ...buttonStyle, color: 'var(--ui-accent-ink)', borderColor: 'rgba(157, 183, 204, 0.36)' }}>
-                    {maximized ? (
-                        // Contract glyph — arrows point inward (exit full screen).
-                        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M9 4v5H4" />
-                            <path d="M15 4v5h5" />
-                            <path d="M9 20v-5H4" />
-                            <path d="M15 20v-5h5" />
-                        </svg>
-                    ) : (
-                        // Expand glyph — arrows point outward (enter full screen).
-                        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M4 9V4h5" />
-                            <path d="M20 9V4h-5" />
-                            <path d="M4 15v5h5" />
-                            <path d="M20 15v5h-5" />
-                        </svg>
-                    )}
-                    <span>{maximized ? 'Exit Full' : 'Full Screen'}</span>
+                    style={buttonStyle(false)}>
+                    <FullscreenIcon size={iconSize} color="currentColor" strokeWidth={2.2} />
+                    <span>Full Screen</span>
                 </GazeButton>
             )}
             <GazeButton id="content-scroll-down" onClick={onDown}
                 gazeEnabled={gazeEnabled} gazeEnabledTimestamp={gazeTimestamp} isDarkMode
                 dwellCategory="navigationButton"
-                style={buttonStyle}>
-                <ArrowDownIcon size={iconSize} color="currentColor" strokeWidth={2.4} />
+                style={buttonStyle(atBottom)}>
+                <ArrowDownIcon size={iconSize} color="currentColor" strokeWidth={7} />
                 <span>Down</span>
+                {atBottom && <span style={note}>At the end</span>}
             </GazeButton>
         </div>
     );
@@ -648,23 +689,6 @@ const browserModeButtonStyle = (mode: BrowserInteractionMode, hidden = false): R
     return hidden ? hiddenBrowserButton(accent, bg, border) : browserToolbarButton(accent, bg, border);
 };
 
-const watchModeBadgeStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 'clamp(10px, 1.3vh, 16px)',
-    right: 'clamp(10px, 1.3vw, 18px)',
-    zIndex: 7,
-    pointerEvents: 'none',
-    padding: '10px 14px',
-    borderRadius: '999px',
-    background: 'rgba(26, 35, 30, 0.88)',
-    color: WATCH_MODE_TEXT,
-    border: '1px solid rgba(220, 200, 155, 0.18)',
-    fontSize: 'clamp(13px, 1.55vh, 17px)',
-    fontWeight: 650,
-    letterSpacing: '0.04em',
-    boxShadow: '0 8px 18px rgba(0,0,0,0.18)',
-};
-
 const useBrowserViewBoundsSync = (
     viewRef: React.RefObject<HTMLElement>,
     updateBounds: ReturnType<typeof useGazeBrowser>['updateBounds'],
@@ -705,6 +729,85 @@ const useBrowserViewBoundsSync = (
             window.clearInterval(interval);
         };
     }, [active, updateBounds, viewRef]);
+};
+
+// Short messages from the browser (useGazeBrowser notice): something refused for
+// safety, or the page refreshed or restarted on its own.
+const describeBrowserNotice = (notice: BrowserNotice): string => {
+    if (notice.kind === 'refreshed') return 'The page was refreshed to free memory.';
+    if (notice.kind === 'recovered') return 'The page stopped responding and was restarted.';
+    if (notice.what === 'download') return 'Downloads are turned off here, for safety.';
+    if (notice.what === 'popup') return 'A pop-up window was blocked.';
+    return 'That link cannot be opened here, for safety.';
+};
+
+// One quiet line beside the page: what it is doing, or a notice for five seconds.
+// It is drawn outside the page (a native layer covers anything beneath it) and is
+// never a gaze target.
+const BrowserStatusLine = ({ text, notice }: { text: string; notice: BrowserNotice | null }) => (
+    <div className="browser-status" role="status" aria-live="polite" data-notice={notice ? notice.kind : undefined} style={{
+        flex: '0 0 auto', minHeight: 'clamp(30px, 3.8vh, 42px)', minWidth: 0,
+        display: 'flex', alignItems: 'center', padding: '0 clamp(8px, 1vw, 14px)', boxSizing: 'border-box',
+        fontFamily: FONT_PRIMARY, fontSize: 'clamp(16px, 2vh, 21px)', fontWeight: 600,
+        color: notice ? 'var(--ui-ink)' : 'var(--ui-muted)',
+    }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {notice ? describeBrowserNotice(notice) : text}
+        </span>
+    </div>
+);
+
+// ── Shared choice card (6 Oct 2026 redesign) ──
+// One choice on a web screen (hub, Quick Search topics, Social): an accent icon, a
+// title and one short line. Focus draws it like the Home and Activities cards (icon
+// above, centred); Serene puts the icon in a soft badge beside the words
+// (web-design.css). Accents are design tokens, so every theme keeps its own colours.
+type WebAccent = 'blue' | 'green' | 'gold' | 'violet' | 'rose' | 'accent';
+const WEB_ACCENT: Record<WebAccent, string> = {
+    blue: 'var(--design-blue, #b6d9ef)',
+    green: 'var(--design-green, #b4dfcf)',
+    gold: 'var(--design-gold, #e7cd9f)',
+    violet: 'var(--design-violet, #d3cae8)',
+    rose: 'var(--design-danger, #fac5bd)',
+    accent: 'var(--design-accent, #b8dfe7)',
+};
+
+const WebChoiceCard = ({ id, title, subtitle, icon, accent, onClick, ige, ts, dwellCategory = 'navigationButton', selected }: {
+    id: string;
+    title: string;
+    subtitle?: string;
+    icon: React.ReactNode;
+    accent: WebAccent;
+    onClick: () => void;
+    ige: boolean;
+    ts: number;
+    dwellCategory?: 'navigationButton' | 'homeScreenTile';
+    selected?: boolean;
+}) => (
+    <GazeButton id={id} className="web-card" onClick={onClick} selected={selected}
+        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory={dwellCategory}
+        contentFill
+        style={{
+            width: '100%', height: '100%', minHeight: 0,
+            position: 'relative', overflow: 'hidden',
+            borderRadius: '22px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: FONT_PRIMARY,
+        }}>
+        <div className="web-card-icon" style={{ color: WEB_ACCENT[accent] }}>{icon}</div>
+        <div className="web-card-text">
+            <span className="web-card-title">{title}</span>
+            {subtitle && <span className="web-card-sub">{subtitle}</span>}
+        </div>
+    </GazeButton>
+);
+
+const isYoutubeHost = (url: string | null | undefined): boolean => {
+    try {
+        return /(^|\.)(youtube\.com|youtu\.be)$/i.test(new URL(url || '').hostname);
+    } catch {
+        return false;
+    }
 };
 
 const BackBtn = ({ onClick, ige, ts, toggleGaze, label = "← Home Grid", showHome = true, centerGaze = false }: { onClick: () => void; ige: boolean; ts: number; toggleGaze: () => void; label?: string; showHome?: boolean; centerGaze?: boolean }) => (
@@ -866,141 +969,17 @@ const YT_CATS = [
     },
 ];
 
-// ── YOUTUBE PAGE CONTROL SCRIPTS (injected via webview.executeJs) ─────────
-// Browser keyboard shortcuts ('f', 'l') require focus + user-gesture context
-// that BrowserView doesn't reliably provide. JS injection with userGesture=true
-// is the production AAC pattern (used by Tobii Computer Control + Grid 3
-// browser overlays for in-page automation).
-//
-// v17.16 safety path: this maximizes YouTube inside the BrowserView, without
-// entering true browser fullscreen. True fullscreen hides every gaze-accessible
-// app control, so the injected cursor still auto-exits it if a page enters it.
-const YT_MAXIMIZE_SCRIPT = `
-(function () {
-  try {
-    if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(function () {});
-    }
-  } catch (_) {}
-
-  // v17.23 — use YouTube's OWN theater mode instead of CSS-forcing the
-  // player size. Two earlier approaches both broke the player:
-  //   (1) forcing 100vw/100vh on YouTube's nested container IDs never
-  //       fired the player's resize-repaint -> blank WHITE player;
-  //   (2) pinning #movie_player position:fixed got trapped by an ancestor
-  //       transform (so it filled only its column -> black/mis-sized video
-  //       while the sidebar stayed visible and the page hung).
-  // Both share one root cause: manually sizing the player without letting
-  // YouTube's own code lay it out. Theater mode sidesteps it entirely —
-  // YouTube sizes AND repaints the player itself (no white, no black, no
-  // stuck), and we only HIDE the chrome around it (hiding can never blank
-  // the player). Robust to DOM drift: if a selector is missing the page
-  // simply stays normal (a safe no-op) instead of breaking. This is still
-  // NOT true browser fullscreen — the gaze-accessible app toolbar lives
-  // outside the BrowserView and stays visible.
-  var flexy = document.querySelector('ytd-watch-flexy');
-  if (flexy && !flexy.hasAttribute('theater')) {
-    var sizeBtn = document.querySelector('.ytp-size-button');
-    if (sizeBtn) {
-      try { sizeBtn.click(); } catch (_) {}
-    } else {
-      // Fallback: 't' is YouTube's theater-mode hotkey.
-      var pl = document.querySelector('#movie_player') || document.body;
-      try {
-        pl.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', keyCode: 84, which: 84, bubbles: true }));
-      } catch (_) {}
-    }
-  }
-
-  var styleId = 'gazeconnect-youtube-inapp-maximize-style';
-  var style = document.getElementById(styleId);
-  if (!style) {
-    style = document.createElement('style');
-    style.id = styleId;
-    (document.head || document.documentElement).appendChild(style);
-  }
-  // CSS only HIDES surrounding chrome — it never sizes or positions the
-  // player, so it cannot blank it. The #columns hide is scoped to
-  // [theater] because only in theater mode does the player live in
-  // #full-bleed-container ABOVE #columns; in normal mode the player is
-  // INSIDE #columns, so an unscoped hide would remove the video.
-  style.textContent = [
-    'html.gazeconnect-youtube-inapp-maximize, html.gazeconnect-youtube-inapp-maximize body {',
-    '  overflow: hidden !important; background: #000 !important;',
-    '}',
-    'html.gazeconnect-youtube-inapp-maximize #masthead-container { display: none !important; }',
-    'html.gazeconnect-youtube-inapp-maximize ytd-watch-flexy[theater] #columns { display: none !important; }'
-  ].join('\\n');
-
-  document.documentElement.classList.add('gazeconnect-youtube-inapp-maximize');
-
-  var player = document.querySelector('#movie_player');
-  if (player) {
-    try { player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 })); } catch (_) {}
-  }
-  try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch (_) { window.scrollTo(0, 0); }
-  // Theater mode already repaints the player; this single resize just lets
-  // it settle after the masthead hide changes the available height. No
-  // resize storm (the prior version's 4× resize + fixed reflow caused the
-  // lag/"delayed response").
-  try { window.dispatchEvent(new Event('resize')); } catch (_) {}
-  return 'in-app-video-theater';
-})();
-`;
-
-// Exact reverse of YT_MAXIMIZE_SCRIPT — restore chrome, page scrolling and
-// the normal player size. Idempotent (every step is guarded), so running it
-// when nothing is maximized is a safe no-op: the toggle button self-heals if
-// its label ever drifts from the page's real state.
-const YT_MINIMIZE_SCRIPT = `
-(function () {
-  // Un-hide the chrome and restore scrolling: removing the class disables
-  // every rule in the injected stylesheet (incl. overflow:hidden on
-  // html/body — the reason Up/Down scrolling was dead while maximized).
-  try { document.documentElement.classList.remove('gazeconnect-youtube-inapp-maximize'); } catch (_) {}
-  var style = document.getElementById('gazeconnect-youtube-inapp-maximize-style');
-  if (style && style.parentNode) {
-    try { style.parentNode.removeChild(style); } catch (_) {}
-  }
-
-  // Leave YouTube's theater mode (mirror of the enter path: size button,
-  // 't' hotkey fallback). Guarded on [theater] so it never toggles INTO
-  // theater by mistake.
-  var flexy = document.querySelector('ytd-watch-flexy');
-  if (flexy && flexy.hasAttribute('theater')) {
-    var sizeBtn = document.querySelector('.ytp-size-button');
-    if (sizeBtn) {
-      try { sizeBtn.click(); } catch (_) {}
-    } else {
-      var pl = document.querySelector('#movie_player') || document.body;
-      try {
-        pl.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', keyCode: 84, which: 84, bubbles: true }));
-      } catch (_) {}
-    }
-  }
-
-  var player = document.querySelector('#movie_player');
-  if (player) {
-    try { player.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 30, clientY: 30 })); } catch (_) {}
-  }
-  // Same single settle-resize as the maximize path — lets YouTube relay the
-  // player out after the masthead/columns reappear.
-  try { window.dispatchEvent(new Event('resize')); } catch (_) {}
-  return 'in-app-video-restored';
-})();
-`;
-
-// One-line truth probe: is the in-app maximize currently applied to this
-// document? Used to re-sync the toggle-button label after navigations
-// (Back swaps documents and drops the class; SPA sidebar-nav keeps it).
-const YT_PROBE_MAXIMIZED_SCRIPT = `document.documentElement.classList.contains('gazeconnect-youtube-inapp-maximize');`;
+// YouTube's in-app full screen (theater mode with the page chrome hidden, never
+// true browser full screen) is the main process's youtubeCommand 'maximize' /
+// 'restore' / 'is_maximized' (electron/browser/youtubeController.ts). The
+// interface sends command names only; it cannot run script in the page.
 
 const isValidYouTubeId = (id?: string) => !!id && /^[A-Za-z0-9_-]{11}$/.test(id);
 // Use the YouTube WATCH URL (not embed). Embed URLs fail with Error 153 for many
 // videos (T-Series, label music, news) because uploaders disable embedding.
 // The watch URL works universally and plays inline (autoplay=1) inside the
-// in-app BrowserView. Fullscreen is intentionally NOT triggered (v17.16
-// safety path) — see YT_MAXIMIZE_SCRIPT above.
+// in-app BrowserView. True browser full screen is never entered (v17.16 safety
+// path); Full Screen is the in-app version (youtubeController 'maximize').
 const resolveYouTubeUrl = (video: any): string => {
     if (video?.url && typeof video.url === 'string') return video.url;
     const query = encodeURIComponent(`${video?.title || 'YouTube video'} ${video?.ch || ''}`.trim());
@@ -1324,7 +1303,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     flexShrink: 0,
                     marginBottom: 'clamp(14px,2vh,22px)',
                 }}>
-                    <div className="browser-toolbar" style={{ ...connectedToolbarStyle, flex: 1 }}>
+                    <div className="browser-toolbar web-bar" style={{ ...connectedToolbarStyle, flex: 1 }}>
                         <GazeButton id="n-close" onClick={() => { setSel(null); setReaderData(null); setReaderUrl(''); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                             style={{ ...toolbarBtnConnected('dismiss', false, nextPos()), fontWeight: 800, letterSpacing: '0.08em' }}>
                             <XIcon size={26} color="currentColor" strokeWidth={2.4} />
@@ -1337,67 +1316,32 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                         </GazeButton>
                         <GazeButton id="n-reader" onClick={openReaderView} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="phraseButton"
                             style={toolbarBtnConnected('primary', false, nextPos())}>
-                            <BookIcon size={26} color="currentColor" strokeWidth={2.2} />
+                            <WI.BookOpenIcon size={26} strokeWidth={2.2} />
                             <span>Read Full Story</span>
                         </GazeButton>
                         <GazeButton id="n-stop" onClick={() => ws.stopSpeaking()} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                             style={toolbarBtnConnected('dismiss', false, nextPos())}>
+                            <WI.StopSquareIcon size={26} strokeWidth={2.2} />
                             <span>Stop</span>
                         </GazeButton>
                         <GazeButton id="n-scroll" onClick={() => scrollRef.current?.scrollBy({ top: 280, behavior: 'smooth' })} gazeEnabled={ige}
                             gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton" style={toolbarBtnConnected('primary', false, nextPos())}>
-                            <ArrowDownIcon size={26} color="currentColor" strokeWidth={2.3} />
+                            <WI.ArrowDownLineIcon size={26} strokeWidth={2.3} />
                             <span>Scroll</span>
                         </GazeButton>
                     </div>
-                    {/* Cached chip — small status pill, sits outside the action toolbar
-                        so it doesn't compete with the active buttons. */}
-                    {ws.newsCached && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            minHeight: 'clamp(56px, 7vh, 80px)',
-                            padding: '0 clamp(16px, 1.6vw, 24px)',
-                            background: isLight ? 'rgba(31, 107, 126, 0.10)'
-                                : isWarm ? 'rgba(79, 115, 136, 0.12)'
-                                : isMix ? 'rgba(94, 156, 168, 0.20)'
-                                : 'rgba(28, 47, 45, 0.55)',
-                            border: `1.5px solid ${isLight ? 'rgba(31, 107, 126, 0.32)'
-                                : isWarm ? 'rgba(79, 115, 136, 0.36)'
-                                : isMix ? 'rgba(94, 156, 168, 0.42)'
-                                : 'rgba(120, 157, 145, 0.36)'}`,
-                            borderRadius: '14px',
-                            color: isLight ? '#1F6B7E' : isWarm ? '#3D5E73' : isMix ? '#B6D7D1' : '#A9CAC7',
-                            fontSize: 'clamp(14px, 1.7vh, 18px)',
-                            fontWeight: 800,
-                            letterSpacing: '0.08em',
-                            fontFamily: FONT_PRIMARY,
-                            flexShrink: 0,
-                        }}>Cached</div>
-                    )}
+                    {ws.newsCached && <span className="web-answer-tag" style={{ alignSelf: 'center', marginLeft: 0 }}>Saved earlier</span>}
                 </div>
 
                 <div style={{ flex: 1, display: 'flex', gap: 'clamp(18px, 2.4vh, 28px)', overflow: 'hidden', minHeight: 0 }}>
                     <div style={{ width: 'clamp(340px, 29vw, 410px)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 'clamp(12px, 1.6vh, 18px)', overflow: 'hidden' }}>
-                        <div style={{
-                            ...cs,
-                            height: 'auto',
-                            minHeight: 'clamp(70px, 8vh, 92px)',
-                            alignItems: 'stretch',
-                            justifyContent: 'center',
-                            padding: 'clamp(12px,1.4vh,16px)',
-                            background: isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : T.cardBg,
-                            border: isLight ? '1.5px solid rgba(168, 120, 56, 0.30)'
-                                : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
-                                : undefined,
-                            boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
-                                : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
-                                : undefined,
-                        }}>
-                            <div style={{ fontSize: 'clamp(12px,1.35vh,14px)', color: isLight ? '#76624A' : isWarm ? '#6A625B' : 'rgba(173,194,214,0.75)', marginBottom: '6px', letterSpacing: '0.02em' }}>
-                                CURRENT CATEGORY
+                        <div className="news-current">
+                            <div className="web-list-icon" style={{ color: WEB_ACCENT[newsCategoryLook(currentCategory?.id || cat).accent] }}>
+                                {newsCategoryLook(currentCategory?.id || cat).icon(34)}
                             </div>
-                            <div style={{ fontSize: 'clamp(18px,2vh,22px)', fontWeight: 700, color: isLight ? '#2E2A24' : isWarm ? '#2F2A26' : T.textMain }}>
-                                {stripLeadingEmoji(currentCategory?.label || 'Top Stories')}
+                            <div className="web-list-text">
+                                <span className="web-list-sub">Category</span>
+                                <span className="web-list-title">{stripLeadingEmoji(currentCategory?.label || 'News')}</span>
                             </div>
                         </div>
 
@@ -1422,45 +1366,22 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                     gazeEnabled={ige}
                                     gazeEnabledTimestamp={ts}
                                     isDarkMode dwellCategory="navigationButton"
+                                    contentFill
                                     style={{
-                                        ...cs,
-                                        alignItems: 'flex-start',
-                                        justifyContent: 'space-between',
-                                        padding: 'clamp(16px,1.9vh,22px) clamp(16px, 1.6vw, 22px)',
-                                        minHeight: 80,
-                                        background: sel.title === it.title
-                                          ? (isLight ? 'rgba(31, 107, 126, 0.12)'
-                                            : isWarm ? 'rgba(63, 105, 104, 0.14)'
-                                            : 'rgba(56, 189, 248, 0.10)')
-                                          : (isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : T.cardBg),
-                                        border: sel.title === it.title
-                                          ? (isLight ? '2px solid #1F6B7E'
-                                            : isWarm ? '2px solid #3F6968'
-                                            : `2px solid ${AC}90`)
-                                          : (isLight ? '1.5px solid rgba(168, 120, 56, 0.22)'
-                                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
-                                            : CB),
-                                        boxShadow: isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
-                                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
-                                            : undefined,
+                                        width: '100%', height: '100%', minHeight: 80,
+                                        display: 'flex', alignItems: 'stretch',
+                                        padding: 0, overflow: 'hidden', textAlign: 'left',
+                                        fontFamily: FONT_PRIMARY,
                                     }}
                                 >
-                                    <div style={{
-                                        fontSize: 'clamp(20px,2.2vh,26px)',
-                                        fontWeight: 700,
-                                        color: isLight ? '#2E2A24' : isWarm ? '#2F2A26' : T.textMain,
-                                        lineHeight: 1.32,
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 3,
-                                        WebkitBoxOrient: 'vertical' as const,
-                                        overflow: 'hidden',
-                                        textAlign: 'left',
-                                        width: '100%',
-                                    }}>
-                                        {it.title}
-                                    </div>
-                                    <div style={{ fontSize: 'clamp(12px,1.25vh,15px)', color: isLight ? '#76624A' : isWarm ? '#8A7C6B' : 'rgba(153,175,198,0.78)', marginTop: 'clamp(8px, 1vh, 12px)', fontWeight: 600 }}>
-                                        {it.source || 'News'} • {it.relative_time || 'Recent'}
+                                    {/* The story list's card, smaller: source and time, then the headline. */}
+                                    <div className="news-side-card">
+                                        <div className="news-card-meta">
+                                            <WI.NewspaperIcon size={20} strokeWidth={2} />
+                                            <span className="news-card-source">{it.source || 'News'}</span>
+                                            {it.relative_time && <span className="news-card-time">{it.relative_time}</span>}
+                                        </div>
+                                        <div className="news-side-title">{it.title}</div>
                                     </div>
                                 </GazeButton>
                             ))}
@@ -1484,10 +1405,16 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                 </div>
                             )}
                         </div>
-                        <div className="browse-page-controls">
-                            <GazeButton id="news-related-prev" disabled={visibleReaderPage === 0} onClick={() => setReaderPage(Math.max(0, visibleReaderPage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton">Previous</GazeButton>
-                            <GazeButton id="news-related-next" disabled={visibleReaderPage >= readerPages - 1} onClick={() => setReaderPage(Math.min(readerPages - 1, visibleReaderPage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton">More</GazeButton>
-                        </div>
+                        {readerPages > 1 && <div className="browse-page-controls">
+                            <GazeButton id="news-related-prev" disabled={visibleReaderPage === 0} onClick={() => setReaderPage(Math.max(0, visibleReaderPage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton">
+                                <WI.ChevronLeftIcon size={26} strokeWidth={2.4} />
+                                <span>Previous</span>
+                            </GazeButton>
+                            <GazeButton id="news-related-next" disabled={visibleReaderPage >= readerPages - 1} onClick={() => setReaderPage(Math.min(readerPages - 1, visibleReaderPage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton">
+                                <span>More</span>
+                                <WI.ChevronRightIcon size={26} strokeWidth={2.4} />
+                            </GazeButton>
+                        </div>}
                     </div>
 
                     {(() => {
@@ -1552,7 +1479,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                                     marginBottom: 'clamp(14px, 1.8vh, 22px)',
                                     fontFamily: FONT_PRIMARY,
                                 }}>
-                                    <NewsIcon size={16} color="currentColor" strokeWidth={2.4} />
+                                    <WI.NewspaperIcon size={18} strokeWidth={2.2} />
                                     <span>{sel.source || 'News'}</span>
                                 </div>
                                 <h2 style={{
@@ -1656,167 +1583,78 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                 boxShadow: T_chromeShadow,
             }}>
                 <div ref={categoryChoices.ref} className="browse-category-choices">
-                {visibleCategories.map((c: any, ci: number) => {
+                {visibleCategories.map((c: any) => {
                     const isSelected = cat === c.id;
-                    // Rotating diversified accent — matches news-card palette pattern.
-                    // 9 colors so even longer category lists stay visually distinct.
-                    const PAPER_CAT_ACCENTS = [
-                        '#7A312E', // maroon
-                        '#4F7388', // sky blue
-                        '#85703D', // gold
-                        '#5F7C58', // sage
-                        '#A56D55', // coral
-                        '#3F6968', // teal
-                        '#7A5638', // brown
-                        '#65543E', // umber
-                        '#6B5F84', // lavender
-                    ];
-                    const catAccent = (isLight || isWarm)
-                        ? PAPER_CAT_ACCENTS[ci % PAPER_CAT_ACCENTS.length]
-                        : '#789D91';
-                    // Each sidebar item now has a full card surface (mirrors news-card
-                    // grammar): cream card bg, tinted icon zone, accent border + lift
-                    // on selection. Gives every item its own clickable identity.
-                    const itemBg = isSelected
-                        ? (isLight ? `${catAccent}14`
-                            : isWarm ? `${catAccent}18`
-                            : isMix ? `${catAccent}26`
-                            : `${catAccent}1F`)
-                        : (isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? 'rgba(60, 48, 32, 0.40)' : 'rgba(213, 216, 188, 0.025)');
-                    const itemBorder = isSelected
-                        ? `2px solid ${catAccent}`
-                        : (isLight ? '1.5px solid rgba(168, 120, 56, 0.22)'
-                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
-                            : isMix ? '1.5px solid rgba(180, 147, 98, 0.18)'
-                            : '1.5px solid rgba(213, 216, 188, 0.08)');
-                    const itemShadow = isSelected
-                        ? (isLight || isWarm
-                            ? `0 0 0 1px ${catAccent}22, 0 4px 14px rgba(82, 65, 48, 0.12)`
-                            : `0 0 0 1px ${catAccent}44, inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 20px rgba(0, 0, 0, 0.30)`)
-                        : (isLight ? '0 1px 3px rgba(82, 66, 45, 0.06)'
-                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.04)'
-                            : 'none');
-                    const iconColor = catAccent;                // Always show category-distinct color (not muted on selected)
-                    const iconZoneBg = (isLight || isWarm)
-                        ? (isSelected ? `${catAccent}26` : `${catAccent}14`)
-                        : (isSelected ? `${catAccent}33` : `${catAccent}1A`);
+                    const look = newsCategoryLook(c.id);
                     return (
-                        <GazeButton key={c.id} id={`nc-${c.id}`} className="browse-category-choice" selected={cat === c.id} onClick={() => { setCat(c.id); disableGaze(); }}
+                        <GazeButton key={c.id} id={`nc-${c.id}`} className="browse-category-choice web-list-choice" selected={isSelected} onClick={() => { setCat(c.id); disableGaze(); }}
                             gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                             contentFill
                             style={{
                                 width: '100%', height: '100%', minHeight: 0,
                                 position: 'relative', overflow: 'hidden',
                                 borderRadius: '18px',
-                                background: itemBg,
-                                border: itemBorder,
-                                boxShadow: itemShadow,
                                 display: 'flex', alignItems: 'stretch', justifyContent: 'flex-start',
-                                gap: 0,
                                 padding: 0,
                                 fontFamily: FONT_PRIMARY,
                                 textAlign: 'left',
-                                transition: 'background 150ms ease, box-shadow 150ms ease',
                             }}>
-                            {/* Icon zone — 30% width, tinted backdrop matches the
-                                news-card pattern. Stronger tint when selected. */}
-                            <div style={{
-                                flex: '0 0 30%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: iconZoneBg,
-                                borderRight: `1px solid ${catAccent}22`,
-                                color: iconColor,
-                            }}>
-                                <NewsIcon size={isSelected ? 46 : 42} color="currentColor" strokeWidth={2.3} />
-                            </div>
-                            {/* Text zone — title + per-state subtitle (active dot when selected) */}
-                            <div style={{
-                                flex: '1 1 0', minWidth: 0,
-                                display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                                padding: 'clamp(8px, 1vh, 14px) clamp(14px, 1.4vw, 20px) clamp(8px, 1vh, 14px) clamp(14px, 1.4vw, 20px)',
-                                gap: 'clamp(4px, 0.6vh, 8px)',
-                            }}>
-                                <span style={{
-                                    fontSize: 'clamp(20px, 2.4vh, 28px)',
-                                    fontWeight: isSelected ? 820 : 720,
-                                    color: isSelected ? catAccent : T_chromeText,
-                                    lineHeight: 1.15,
-                                    letterSpacing: '0.005em',
-                                }}>
-                                    {stripLeadingEmoji(c.label)}
-                                </span>
-                                {/* Subtitle / status line — accent-colored "Active" pip
-                                    when selected, muted "Browse" hint otherwise. Gives
-                                    each row a 2-line hierarchy (matches YouTube cards). */}
-                                <span style={{
-                                    fontSize: 'clamp(13px, 1.45vh, 17px)',
-                                    fontWeight: isSelected ? 700 : 600,
-                                    color: isSelected ? catAccent : (isLight ? '#76624A' : isWarm ? '#8A7C6B' : isMix ? 'rgba(196, 182, 151, 0.65)' : 'rgba(153, 175, 198, 0.65)'),
-                                    fontFamily: FONT_PRIMARY,
-                                    letterSpacing: '0.04em',
-                                    textTransform: 'uppercase' as const,
-                                    opacity: isSelected ? 1 : 0.75,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                }}>
-                                    {isSelected && (
-                                        <span style={{
-                                            display: 'inline-block',
-                                            width: '7px', height: '7px',
-                                            borderRadius: '50%',
-                                            background: catAccent,
-                                            boxShadow: `0 0 6px ${catAccent}88`,
-                                        }} />
-                                    )}
-                                    {isSelected ? 'Active' : 'Browse'}
-                                </span>
+                            <div className="web-list-icon" style={{ color: WEB_ACCENT[look.accent] }}>{look.icon(40)}</div>
+                            <div className="web-list-text">
+                                <span className="web-list-title">{stripLeadingEmoji(c.label)}</span>
+                                <span className="web-list-sub">{look.sub}</span>
                             </div>
                         </GazeButton>
                     );
                 })}
                 </div>
-                <div className="browse-page-controls">
-                    <GazeButton id="news-categories-prev" disabled={visibleCategoryPage === 0} onClick={() => setCategoryPage(Math.max(0, visibleCategoryPage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton">Previous</GazeButton>
-                    <GazeButton id="news-categories-next" disabled={visibleCategoryPage >= categoryPages - 1} onClick={() => setCategoryPage(Math.min(categoryPages - 1, visibleCategoryPage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton">More</GazeButton>
-                </div>
+                {/* Paging only when the categories do not fit; otherwise they take the room. */}
+                {categoryPages > 1 && <div className="browse-page-controls">
+                    <GazeButton id="news-categories-prev" disabled={visibleCategoryPage === 0} onClick={() => setCategoryPage(Math.max(0, visibleCategoryPage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton">
+                        <WI.ChevronLeftIcon size={26} strokeWidth={2.4} />
+                        <span>Previous</span>
+                    </GazeButton>
+                    <GazeButton id="news-categories-next" disabled={visibleCategoryPage >= categoryPages - 1} onClick={() => setCategoryPage(Math.min(categoryPages - 1, visibleCategoryPage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton">
+                        <span>More</span>
+                        <WI.ChevronRightIcon size={26} strokeWidth={2.4} />
+                    </GazeButton>
+                </div>}
             </div>
 
             {/* CONTENT — refresh header + article grid + reader controls strip */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'clamp(12px, 1.4vh, 18px)', overflow: 'hidden', minHeight: 0 }}>
-                {/* Refresh + Cached badge */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 'clamp(12px, 1.2vw, 18px)',
-                    flexShrink: 0,
-                }}>
+                {/* Header: the category being read, then Refresh / Previous / More. */}
+                <div className="news-head" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(12px, 1.2vw, 18px)', flexShrink: 0 }}>
+                    <div className="news-head-title">
+                        <div className="web-list-icon" style={{ color: WEB_ACCENT[newsCategoryLook(currentCategory?.id || cat).accent] }}>
+                            {newsCategoryLook(currentCategory?.id || cat).icon(34)}
+                        </div>
+                        <div className="web-list-text">
+                            <span className="web-list-title">{stripLeadingEmoji(currentCategory?.label || 'News')}</span>
+                            <span className="web-list-sub">
+                                {isLoading ? 'Loading stories…' : `${ws.newsItems.length} ${ws.newsItems.length === 1 ? 'story' : 'stories'} · page ${visibleArticlePage + 1} of ${articlePages}`}
+                                {ws.newsCached ? ' · saved earlier' : ''}
+                            </span>
+                        </div>
+                    </div>
                     <GazeButton id="n-ref" onClick={() => { setIsLoading(true); ws.refreshNews(cat, 9); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                        style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px, 8.5vh, 96px)', minWidth: 'clamp(140px, 12vw, 180px)', fontSize: 'clamp(18px, 2.2vh, 24px)' }}>
-                        <RefreshIcon size={26} color="currentColor" strokeWidth={2.3} />
+                        style={{ ...toolbarBtn('secondary', false), minHeight: 'clamp(80px, 9vh, 104px)', minWidth: 'clamp(140px, 11vw, 190px)', flex: '0 0 auto', fontSize: 'clamp(19px, 2.3vh, 25px)' }}>
+                        <RefreshIcon size={28} color="currentColor" strokeWidth={2.2} />
                         <span>Refresh</span>
                     </GazeButton>
-                    <GazeButton id="news-articles-prev" disabled={visibleArticlePage === 0} onClick={() => setArticlePage(Math.max(0, visibleArticlePage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton" style={toolbarBtn('primary', false)}>Previous</GazeButton>
-                    <GazeButton id="news-articles-next" disabled={visibleArticlePage >= articlePages - 1} onClick={() => setArticlePage(Math.min(articlePages - 1, visibleArticlePage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton" style={toolbarBtn('primary', false)}>More</GazeButton>
-                    {ws.newsCached && (
-                        <div style={{
-                            minHeight: 'clamp(80px, 8.5vh, 96px)',
-                            padding: '0 clamp(18px, 1.8vw, 26px)',
-                            display: 'flex', alignItems: 'center',
-                            color: isLight ? '#1F6B7E' : isWarm ? '#3F6968' : isMix ? '#B6D7D1' : '#A9CAC7',
-                            border: `1px solid ${isLight ? 'rgba(31, 107, 126, 0.28)' : isWarm ? 'rgba(73, 119, 117, 0.28)' : 'rgba(169, 202, 199, 0.28)'}`,
-                            background: isLight ? 'rgba(31, 107, 126, 0.10)' : isWarm ? 'rgba(73, 119, 117, 0.10)' : isMix ? 'rgba(28, 47, 45, 0.55)' : 'rgba(28, 47, 45, 0.42)',
-                            borderRadius: '20px',
-                            fontSize: 'clamp(15px, 1.8vh, 19px)',
-                            fontFamily: FONT_PRIMARY,
-                            fontWeight: 700,
-                            letterSpacing: '0.04em',
-                        }}>Cached</div>
-                    )}
+                    <GazeButton id="news-articles-prev" disabled={visibleArticlePage === 0} onClick={() => setArticlePage(Math.max(0, visibleArticlePage - 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
+                        style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px, 9vh, 104px)', minWidth: 'clamp(140px, 11vw, 190px)', flex: '0 0 auto', fontSize: 'clamp(19px, 2.3vh, 25px)', opacity: visibleArticlePage === 0 ? 0.5 : 1 }}>
+                        <WI.ChevronLeftIcon size={28} strokeWidth={2.4} />
+                        <span>Previous</span>
+                    </GazeButton>
+                    <GazeButton id="news-articles-next" disabled={visibleArticlePage >= articlePages - 1} onClick={() => setArticlePage(Math.min(articlePages - 1, visibleArticlePage + 1))} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
+                        style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px, 9vh, 104px)', minWidth: 'clamp(140px, 11vw, 190px)', flex: '0 0 auto', fontSize: 'clamp(19px, 2.3vh, 25px)', opacity: visibleArticlePage >= articlePages - 1 ? 0.5 : 1 }}>
+                        <span>More</span>
+                        <WI.ChevronRightIcon size={28} strokeWidth={2.4} />
+                    </GazeButton>
                 </div>
 
-                {/* Article grid — restructured to mirror YouTube category card layout:
-                    icon zone (28%) + text zone (72%) so news + YouTube share visual
-                    grammar across the Web Browsing experience. Each card has a
-                    diversified warm-muted accent in paper modes (per Home tile pattern). */}
+                {/* Story cards: source and time, then the headline in large type. */}
                 <div style={{
                     flex: 1,
                     display: 'grid',
@@ -1826,101 +1664,33 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     overflow: 'hidden', minHeight: 0,
                 }}>
                     {(visibleItems.length ? visibleItems : Array(cardCount).fill(null)).map((it: NewsItem | null, i: number) => {
-                        // Rotating diversified accent palette for paper modes (matches Quick Search pattern)
-                        const PAPER_NEWS_ACCENTS = [
-                            '#7A312E', // deeper maroon
-                            '#4F7388', // deeper sky blue
-                            '#85703D', // deeper rich gold
-                            '#5F7C58', // deeper sage
-                            '#A56D55', // deeper coral
-                            '#3F6968', // deeper teal
-                            '#7A5638', // deeper warm brown
-                            '#65543E', // deeper umber
-                            '#6B5F84', // deeper lavender
-                        ];
-                        const cardBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241F18' : '#20221E';
-                        const cardBorder = autoReadOn && (visibleArticlePage * cardCount + i) === activeAutoReadIndex
-                            ? `2px solid ${isLight || isWarm ? '#5F7C58' : '#789D91'}`
-                            : isLight ? '1.5px solid rgba(168, 120, 56, 0.30)'
-                            : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
-                            : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)'
-                            : '1.5px solid rgba(213, 216, 188, 0.14)';
-                        const cardShadow = autoReadOn && (visibleArticlePage * cardCount + i) === activeAutoReadIndex
-                            ? (isLight || isWarm
-                                ? '0 0 0 2px rgba(95, 124, 88, 0.20), 0 4px 12px rgba(82, 65, 48, 0.10)'
-                                : '0 0 0 2px rgba(120, 157, 145, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)')
-                            : isLight ? '0 4px 12px rgba(82, 66, 45, 0.10)'
-                            : isWarm ? '0 1px 2px rgba(82, 65, 48, 0.05)'
-                            : isMix ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
-                            : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
-                        const accentColor = (isLight || isWarm)
-                            ? PAPER_NEWS_ACCENTS[i % PAPER_NEWS_ACCENTS.length]
-                            : '#789D91';
-                        const titleColor = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : T.textMain;
-                        const subtitleColor = isLight ? '#76624A' : isWarm ? '#6A625B' : isMix ? '#C4B697' : T.textSub;
-                        const sourceBadgeBg = (isLight || isWarm) ? `${accentColor}1A` : 'rgba(213, 216, 188, 0.08)';
-                        const sourceBadgeText = (isLight || isWarm) ? accentColor : titleColor;
-                        const dividerColor = (isLight || isWarm) ? 'rgba(122, 99, 71, 0.16)' : 'rgba(213, 216, 188, 0.10)';
+                        const reading = autoReadOn && (visibleArticlePage * cardCount + i) === activeAutoReadIndex;
                         return (
-                            <GazeButton key={it?.title || `ph-${i}`} id={`ni-${i}`} className="browse-news-choice" disabled={!it} onClick={() => { if (it) selectItem(it); }}
+                            <GazeButton key={it?.title || `ph-${i}`} id={`ni-${i}`} className={`browse-news-choice${reading ? ' is-reading' : ''}`} disabled={!it} onClick={() => { if (it) selectItem(it); }}
                                 gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                                 contentFill
                                 style={{
                                     width: '100%', height: '100%', minHeight: 0,
-                                    background: cardBg,
-                                    border: cardBorder,
-                                    borderRadius: '26px',
-                                    boxShadow: cardShadow,
-                                    display: 'flex', flexDirection: 'row',
-                                    alignItems: 'stretch',
+                                    borderRadius: '22px',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'stretch',
                                     padding: 0,
                                     overflow: 'hidden',
-                                    opacity: it ? 1 : 0.35,
+                                    opacity: it ? 1 : 0.45,
                                     textAlign: 'left',
                                 }}>
-                                {/* Icon zone — fixed 28% width, accent-colored news icon
-                                    on a tinted backdrop. Mirrors YouTube category-card pattern. */}
-                                <div style={{
-                                    flex: '0 0 28%',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    background: (isLight || isWarm) ? `${accentColor}12` : 'rgba(15, 18, 16, 0.42)',
-                                    borderRight: `1px solid ${dividerColor}`,
-                                    color: accentColor,
-                                }}>
-                                    <NewsIcon size={56} color="currentColor" strokeWidth={2.2} />
-                                </div>
-                                {/* Content zone — title (3-line clamp) + source badge + relative time */}
-                                <div style={{
-                                    flex: '1 1 0', minWidth: 0,
-                                    display: 'flex', flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                    padding: 'clamp(18px, 2.2vh, 26px) clamp(20px, 1.8vw, 28px)',
-                                    gap: 'clamp(10px, 1.2vh, 14px)',
-                                }}>
-                                    <div style={{
-                                        fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 650,
-                                        color: titleColor,
-                                        fontFamily: FONT_PRIMARY, lineHeight: 1.28,
-                                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
-                                        overflow: 'hidden', width: '100%',
-                                    }}>{it?.title || (isLoading ? 'Loading...' : 'No news available right now')}</div>
+                                <div className="news-card">
                                     {it && (
-                                        <div style={{
-                                            display: 'flex', justifyContent: 'space-between',
-                                            alignItems: 'center', width: '100%',
-                                            fontSize: 'clamp(13px, 1.5vh, 17px)',
-                                            color: subtitleColor,
-                                            fontFamily: FONT_PRIMARY,
-                                        }}>
-                                            <span style={{
-                                                background: sourceBadgeBg,
-                                                color: sourceBadgeText,
-                                                padding: '4px 12px', borderRadius: '10px',
-                                                fontWeight: 700,
-                                                border: (isLight || isWarm) ? `1px solid ${accentColor}33` : 'none',
-                                            }}>{it.source}</span>
-                                            <span>{it.relative_time}</span>
+                                        <div className="news-card-meta">
+                                            <WI.NewspaperIcon size={22} strokeWidth={2} />
+                                            <span className="news-card-source">{it.source || 'News'}</span>
+                                            {it.relative_time && <span className="news-card-time">{it.relative_time}</span>}
                                         </div>
+                                    )}
+                                    <div className="news-card-title">
+                                        {it?.title || (isLoading ? 'Loading stories…' : 'No news here right now. Choose Refresh.')}
+                                    </div>
+                                    {it && (it.summary || it.description) && (
+                                        <div className="news-card-summary">{it.summary || it.description}</div>
                                     )}
                                 </div>
                             </GazeButton>
@@ -1929,7 +1699,7 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                 </div>
 
                 {/* Reader-controls strip — Auto-Read / Pause / Stop */}
-                <div style={{
+                <div className="web-bar" style={{
                     display: 'flex', alignItems: 'stretch', gap: 'clamp(12px, 1.2vw, 18px)',
                     flexShrink: 0,
                 }}>
@@ -1940,10 +1710,14 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
                     </GazeButton>
                     <GazeButton id="n-pause" onClick={pauseAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
                         style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)' }}>
+                        {autoReadPaused
+                            ? <PlayIcon size={28} color="currentColor" strokeWidth={2.3} />
+                            : <PauseIcon size={28} color="currentColor" strokeWidth={2.3} />}
                         <span>{autoReadPaused ? 'Resume' : 'Pause'}</span>
                     </GazeButton>
                     <GazeButton id="n-stop-auto" onClick={stopAutoRead} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
                         style={{ ...toolbarBtn('dismiss', false), minHeight: 'clamp(86px, 10vh, 116px)', fontSize: 'clamp(19px, 2.3vh, 26px)', fontWeight: 800 }}>
+                        <WI.StopSquareIcon size={26} strokeWidth={2.3} />
                         <span>Stop</span>
                     </GazeButton>
                 </div>
@@ -1953,19 +1727,64 @@ const NewsPanel = ({ ige, ts, onSpeak, goBack: _goBack, disableGaze, browser, gp
 };
 
 // ── YOUTUBE PANEL ──
-const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onVideoActive, onNavHiddenToggle }: {
+// Two modes, never both at once (6 Oct 2026, maintainer request "a few selection points"):
+// - Watch: the page takes no gaze at all; the bar below the video drives it (Back,
+//   Pause / Play, Next, Full Screen, More Videos, Search).
+// - Browse: gaze on the page picks a video card. Only cards and dialog buttons answer
+//   there (browserGazeController youtubeStrictTargets): never YouTube's own header,
+//   chips, play, pause or Skip Ad. Up / Down beside the page move it most of a screen
+//   at a time. On Home and results pages, Look Only turns page gaze off (to read
+//   without opening a video) and Choose Videos turns it back on.
+// A video opens in Watch; YouTube Home, results and channels open in Browse. While
+// YouTube's own Skip button can be pressed, Skip Ad takes Next's place on either bar.
+// Browsing a video page keeps Pause / Play and Next, and the dock beside the page has
+// Up, Gaze Scroll, Full Screen and Down -- everything the old Control bar offered.
+type YoutubePageInfo = { skippable: boolean; videoChoices: number | null; title: string };
+const NO_YOUTUBE_PAGE_INFO: YoutubePageInfo = { skippable: false, videoChoices: null, title: '' };
+const isYouTubeVideoUrl = (url: string) => /(?:youtube\.com\/(?:watch|shorts|live)\b|youtu\.be\/)/i.test(url);
+/** The video id of a YouTube watch address (its `v`), or '' for anything else. */
+const youtubeVideoId = (url: string) => {
+    try { return new URL(url).searchParams.get('v') || ''; } catch { return ''; }
+};
+/** The same address, starting the video at `seconds` (YouTube's own `t`). */
+const withStartTime = (url: string, seconds: number) => {
+    try {
+        const next = new URL(url);
+        next.searchParams.set('t', `${Math.max(0, Math.floor(seconds))}s`);
+        return next.toString();
+    } catch {
+        return url;
+    }
+};
+/** What the video is doing, for the calm full-screen rules (calmWatch.ts). */
+const calmPlaybackOf = (state: string): CalmPlayback => {
+    if (state === 'playing' || state === 'paused' || state === 'ended') return state;
+    return state === 'ad_waiting' ? 'ad' : 'loading';
+};
+// YouTube's player error ("Something went wrong. Refresh or try again later."), 8 Oct 2026:
+// wait this long for YouTube to recover by itself, then open the video again where it was;
+// at most this many times for one video in this window, then Browse as before.
+const PLAYER_ERROR_WAIT_MS = 2500;
+const PLAYER_ERROR_RETRIES = 2;
+const PLAYER_ERROR_WINDOW_MS = 5 * 60 * 1000;
+
+const YouTubePanel = ({ ige, ts, browser, gpRef, getGaze, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, isDarkMode, browserInteractionMode, onBrowserInteractionModeChange, onVideoActive, onNavHiddenToggle }: {
     ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>;
     gpRef: React.MutableRefObject<{ x: number; y: number }>;
+    /** The latest fresh gaze point (window px): the calm full-screen strip counts a look with it. */
+    getGaze?: GazePointSource;
     goBack: () => void;
     disableGaze: () => void;
     toggleGaze: () => void;
     isNavHidden?: boolean;
+    isDarkMode: boolean;
     browserInteractionMode: BrowserInteractionMode;
     onBrowserInteractionModeChange: (mode: BrowserInteractionMode) => void;
     onVideoActive?: (active: boolean) => void;
     onNavHiddenToggle?: (hidden: boolean) => void;
 }) => {
     const { isLight, isMix, isWarm } = useTheme();
+    const { data: { settings } } = useCustomization();
     // Theme-aware chrome tokens. The YouTube video card stays dark in all modes.
     const T_pageBg = 'var(--ui-page)';
     const T_chromeBg = 'var(--ui-panel)';
@@ -1973,39 +1792,32 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
     const T_chromeText = 'var(--ui-ink)';
     const T_chromeTextMuted = 'var(--ui-muted)';
     const T_chromeShadow = 'none';
-    // Watch / Control mode toggle: dark teal/maroon work fine on dark, but on
-    // cream/walnut chrome they're too heavy — use tinted-but-transparent variants.
-    const T_watchModeBg = isLight ? 'rgba(122, 54, 58, 0.14)' : isWarm ? warmScreenTokens.web.watchModeBg : isMix ? 'rgba(122, 54, 58, 0.30)' : WATCH_MODE_BG;
-    const T_watchModeText = isLight ? '#8A3B38' : isWarm ? warmScreenTokens.web.watchModeText : isMix ? '#E9B9AE' : WATCH_MODE_TEXT;
-    const T_controlModeBg = isLight ? 'rgba(31, 107, 126, 0.14)' : isWarm ? warmScreenTokens.web.controlModeBg : isMix ? 'rgba(31, 107, 126, 0.30)' : CONTROL_MODE_BG;
-    const T_controlModeText = isLight ? '#1F6B7E' : isWarm ? warmScreenTokens.web.controlModeText : isMix ? '#A9CAC7' : CONTROL_MODE_TEXT;
-    void T_chromeText; void T_chromeTextMuted; void T_watchModeBg; void T_watchModeText; void T_controlModeBg; void T_controlModeText;
+    void T_chromeText; void T_chromeTextMuted;
     const [catId, setCatId] = useState('old_songs');
     const [playing, setPlaying] = useState<any>(null);
     const [youtubeState, setYoutubeState] = useState<string>('idle');
-    // In-app video maximize (theater) toggle state — drives the rail button's
-    // Full Screen / Exit Full label. The page is the source of truth (the
-    // scripts are guarded + idempotent); this state is re-synced from the
-    // document on every navigation via YT_PROBE_MAXIMIZED_SCRIPT.
+    // In-app full screen (the player filling the page, never true browser full
+    // screen). The page is the source of truth: it is read back after every
+    // navigation ('is_maximized') so the button never says the opposite of what it does.
     const [isVideoMaximized, setIsVideoMaximized] = useState(false);
+    const [pageInfo, setPageInfo] = useState<YoutubePageInfo>(NO_YOUTUBE_PAGE_INFO);
+    // The search keyboard replaces the panel; the page is taken off the window meanwhile.
+    const [searchOpen, setSearchOpen] = useState(false);
+    const navHiddenBeforeSearchRef = useRef<boolean | null>(null);
     const viewRef = useRef<HTMLDivElement>(null);
     const autoPlayUrlRef = useRef('');
+    const modeUrlRef = useRef('');
+    // Where the video was last seen playing, to reopen it there after a player error.
+    const lastPlayRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
+    const errorRetriesRef = useRef<Record<string, number[]>>({});
+    const restoreFullScreenRef = useRef(false);
     const cat = YT_CATS.find(c => c.id === catId) || YT_CATS[0];
     const toolbarGazeEnabled = isNavHidden ? true : ige;
     const toolbarGazeTimestamp = isNavHidden ? 0 : ts;
     const toolbarIconSize = isNavHidden ? 38 : browserToolbarIconSize;
     const isWatchMode = browserInteractionMode === 'watch';
     const currentBrowserUrl = browser.currentUrl || '';
-    const isYouTubeWatchPage = /(?:youtube\.com\/(?:watch|shorts)|youtu\.be\/)/i.test(currentBrowserUrl);
-    const isPlayableYouTubePage = isYouTubeWatchPage && ['playing', 'paused', 'ready', 'ad_waiting'].includes(youtubeState);
-    const toggleBrowserInteractionMode = useCallback(() => {
-        // The controls toggle now works on ANY YouTube page (incl. search /
-        // listing pages), not just a playing video — so the Show/Hide Controls
-        // button is never a dead end (patient request 2026-07-07). The
-        // playing-video auto-mode effect below only fires while playing, so a
-        // manual toggle on an idle page sticks.
-        onBrowserInteractionModeChange(isWatchMode ? 'control' : 'watch');
-    }, [isWatchMode, onBrowserInteractionModeChange]);
+    const isYouTubeWatchPage = isYouTubeVideoUrl(currentBrowserUrl);
     const browserStateRef = useRef({ isOpen: false, currentUrl: '' });
 
     useEffect(() => {
@@ -2034,28 +1846,83 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         }
     }, [browser.isOpen, browser.resetBrowserSession, currentBrowserUrl, playing]);
 
+    // Each new page chooses the mode once: a video opens in Watch, anything else in
+    // Browse. More Videos / Back to Video then switch by hand until the next page.
     useEffect(() => {
-        if (!playing) return;
-        onBrowserInteractionModeChange(isPlayableYouTubePage ? 'watch' : 'control');
-    }, [isPlayableYouTubePage, playing, onBrowserInteractionModeChange]);
+        if (!playing || !currentBrowserUrl || modeUrlRef.current === currentBrowserUrl) return;
+        modeUrlRef.current = currentBrowserUrl;
+        onBrowserInteractionModeChange(isYouTubeWatchPage ? 'watch' : 'control');
+    }, [currentBrowserUrl, isYouTubeWatchPage, onBrowserInteractionModeChange, playing]);
 
+    // YouTube's player sometimes gives up mid-video ("Something went wrong. Refresh or try
+    // again later.") and its Refresh cannot be reached by gaze: the same video is opened again
+    // where it was (in full screen if it was), at most twice in five minutes. A video that
+    // still cannot play hands the page back to Browse for another choice.
     useEffect(() => {
-        if (!playing || !browser.isOpen) {
-            setYoutubeState('idle');
+        if (!playing || !isYouTubeWatchPage || youtubeState !== 'error') return;
+        const url = currentBrowserUrl;
+        const id = youtubeVideoId(url) || url;
+        const now = Date.now();
+        const recent = (errorRetriesRef.current[id] || []).filter((at) => now - at < PLAYER_ERROR_WINDOW_MS);
+        if (recent.length >= PLAYER_ERROR_RETRIES) {
+            onBrowserInteractionModeChange('control');
             return;
         }
         let cancelled = false;
-        const poll = async () => {
-            const result = await browser.youtubeCommand('get_state');
-            if (!cancelled) setYoutubeState(result?.youtubeState || result?.detail || 'idle');
-        };
-        poll();
-        const timer = setInterval(poll, 1200);
+        const timer = window.setTimeout(async () => {
+            const check = await browser.youtubeCommand('get_state');
+            if (cancelled || (check?.youtubeState || check?.detail) !== 'error') return;   // it recovered by itself
+            errorRetriesRef.current[id] = [...recent, Date.now()];
+            const at = lastPlayRef.current.id === id ? lastPlayRef.current.time : 0;
+            restoreFullScreenRef.current = isVideoMaximized;
+            void browser.navigateTo(withStartTime(url, at - 2));
+        }, PLAYER_ERROR_WAIT_MS);
         return () => {
             cancelled = true;
-            clearInterval(timer);
+            window.clearTimeout(timer);
         };
-    }, [browser.youtubeCommand, browser.isOpen, playing]);
+    }, [browser.navigateTo, browser.youtubeCommand, currentBrowserUrl, isVideoMaximized, isYouTubeWatchPage,
+        onBrowserInteractionModeChange, playing, youtubeState]);
+
+    // The page's state for the bar: one request at a time -- the next is asked only
+    // once this one has answered (the main process gives up after 5 s), so a slow
+    // page never piles requests up. Paused while the search keyboard is open.
+    useEffect(() => {
+        if (!playing || !browser.isOpen) {
+            setYoutubeState('idle');
+            setPageInfo(NO_YOUTUBE_PAGE_INFO);
+            return;
+        }
+        if (searchOpen) return;
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const poll = async () => {
+            const result = await browser.youtubeCommand('get_state');
+            if (cancelled) return;
+            const state = result?.youtubeState || result?.detail || 'idle';
+            setYoutubeState(state);
+            const id = youtubeVideoId(browserStateRef.current.currentUrl);
+            if (state === 'playing' && id && typeof result?.time === 'number' && result.time > 0) {
+                lastPlayRef.current = { id, time: result.time };
+            }
+            // YouTube's promo popups over the video, and its miniplayer still playing the last
+            // video over a new page, cannot be reached by gaze: answered and closed (8 Oct 2026).
+            if (result?.promo || result?.miniplayer) void browser.youtubeCommand('tidy_page');
+            const next: YoutubePageInfo = {
+                skippable: result?.skippable === true,
+                videoChoices: typeof result?.videoChoices === 'number' ? result.videoChoices : null,
+                title: typeof result?.title === 'string' ? result.title : '',
+            };
+            setPageInfo((previous) => (previous.skippable === next.skippable && previous.videoChoices === next.videoChoices
+                && previous.title === next.title ? previous : next));
+            timer = setTimeout(poll, 1200);
+        };
+        void poll();
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [browser.youtubeCommand, browser.isOpen, playing, searchOpen]);
 
     useEffect(() => {
         if (!playing || !browser.isOpen || !isYouTubeWatchPage || !currentBrowserUrl) return;
@@ -2092,8 +1959,7 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         };
     }, [browser.youtubeCommand, browser.isOpen, currentBrowserUrl, isYouTubeWatchPage, playing]);
 
-    // Open BrowserView AFTER player div renders. Keep the page in control mode
-    // while YouTube loads so the in-page gaze cursor can still recover/choose.
+    // Open BrowserView AFTER player div renders.
     useEffect(() => {
         if (!playing) return;
         let cancelled = false;
@@ -2111,57 +1977,59 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         };
     }, [playing]);
 
-    // Maximizes the YouTube player inside the BrowserView while app controls
-    // remain visible. This deliberately does not enter true browser fullscreen.
-    const maximizeVideo = useCallback(async () => {
-        const r: any = await browser.executeJs(YT_MAXIMIZE_SCRIPT);
-        if (r?.success && r.result === 'in-app-video-theater') {
-            setIsVideoMaximized(true);
-        }
-    }, [browser]);
-
-    // Reverse of maximizeVideo: restore chrome, page scrolling and normal
-    // player size (the patient reported being trapped in the enlarged view
-    // with scrolling dead). State goes false unconditionally — the script is
-    // idempotent and false is the right label even if the page navigated.
-    const minimizeVideo = useCallback(async () => {
-        await browser.executeJs(YT_MINIMIZE_SCRIPT);
-        setIsVideoMaximized(false);
-    }, [browser]);
-
-    // A newly selected video always starts un-maximized (a fresh loadURL is
-    // a fresh document — the maximize class/style don't survive it).
+    // A newly selected video always starts un-maximized (a fresh page is a fresh document).
     useEffect(() => {
         setIsVideoMaximized(false);
     }, [playing]);
 
-    // Re-sync the toggle label with the document's real state after every
-    // navigation: Back swaps documents (class gone), while YouTube SPA
-    // sidebar-navigation keeps the same document (class persists). One cheap
-    // probe per navigation keeps the patient from dwelling a button whose
-    // label lies about what it will do.
+    // After every navigation, read the full screen state back from the page. YouTube
+    // moves between pages without reloading, so the full screen of a video would
+    // otherwise stay on Home or a results page -- with its scrolling locked and its
+    // search bar hidden. Anything that is not a video is restored at once.
     useEffect(() => {
-        if (!playing || !browser.isOpen) return;
+        if (!playing || !browser.isOpen || !currentBrowserUrl) return;
         let cancelled = false;
-        void browser.executeJs(YT_PROBE_MAXIMIZED_SCRIPT).then((r: any) => {
-            if (!cancelled && r?.success) setIsVideoMaximized(r.result === true);
-        }).catch(() => { /* page navigating — next navigation re-probes */ });
+        void browser.youtubeCommand('is_maximized').then(async (result) => {
+            if (cancelled || typeof result?.maximized !== 'boolean') return;
+            if (result.maximized && !isYouTubeWatchPage) {
+                const restored = await browser.youtubeCommand('restore');
+                if (!cancelled) setIsVideoMaximized(restored?.maximized === true);
+                return;
+            }
+            setIsVideoMaximized(result.maximized);
+        });
         return () => { cancelled = true; };
-    }, [browser.executeJs, browser.currentUrl, browser.isOpen, playing]);
+    }, [browser.isOpen, browser.youtubeCommand, currentBrowserUrl, isYouTubeWatchPage, playing]);
 
-    const skipYouTubeAd = useCallback(async () => {
-        // Skip is handled entirely in the main process via youtubeCommand, which
-        // locates the skip button in-page and dispatches a zoom-compensated trusted
-        // click. Do NOT add a renderer-side getBoundingClientRect -> clickAtViewPoint
-        // fallback here: those page-CSS coords would bypass the zoom compensation in
-        // sendTrustedBrowserClick and mis-click under the default 1.35 page zoom
-        // (see Entry 26).
-        await browser.youtubeCommand('skip_ad');
-    }, [browser]);
+    const setFullScreen = useCallback(async (on: boolean) => {
+        const result = await browser.youtubeCommand(on ? 'maximize' : 'restore');
+        setIsVideoMaximized(typeof result?.maximized === 'boolean' ? result.maximized : false);
+    }, [browser.youtubeCommand]);
+
+    const toggleFullScreen = useCallback(() => {
+        void setFullScreen(!isVideoMaximized);
+    }, [isVideoMaximized, setFullScreen]);
+
+    // After Back, YouTube Home or a search from a video, YouTube keeps playing that video in its
+    // miniplayer over the new page, sound and all: closed at once (the state poll catches a late
+    // one too), 8 Oct 2026.
+    useEffect(() => {
+        if (!playing || !browser.isOpen || !currentBrowserUrl || isYouTubeWatchPage) return;
+        const timers = [600, 1600].map((ms) => window.setTimeout(() => { void browser.youtubeCommand('tidy_page'); }, ms));
+        return () => timers.forEach((timer) => window.clearTimeout(timer));
+    }, [browser.isOpen, browser.youtubeCommand, currentBrowserUrl, isYouTubeWatchPage, playing]);
+
+    // A video reopened after a player error goes back to full screen once it plays again.
+    useEffect(() => {
+        if (!restoreFullScreenRef.current || !isYouTubeWatchPage || youtubeState !== 'playing' || isVideoMaximized) return;
+        restoreFullScreenRef.current = false;
+        void setFullScreen(true);
+    }, [isVideoMaximized, isYouTubeWatchPage, setFullScreen, youtubeState]);
 
     const playPauseYouTube = useCallback(async () => {
         const result = await browser.youtubeCommand('play_pause');
         if (!result?.ok) setYoutubeState(result?.youtubeState || result?.detail || 'error');
+        else if (result.youtubeState) setYoutubeState(result.youtubeState);
     }, [browser]);
 
     const nextYouTubeVideo = useCallback(async () => {
@@ -2169,7 +2037,12 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         if (!result?.ok) setYoutubeState(result?.youtubeState || result?.status || 'ready');
     }, [browser]);
 
-    const skipYouTubeAdReliable = useCallback(async () => {
+    // Skip is handled entirely in the main process via youtubeCommand, which locates
+    // YouTube's own Skip button in-page and clicks it. Do NOT add a renderer-side
+    // getBoundingClientRect -> clickAtViewPoint fallback here: page-CSS coordinates
+    // would bypass the zoom compensation in sendTrustedBrowserClick (see Entry 26).
+    const skipYouTubeAd = useCallback(async () => {
+        setPageInfo((info) => ({ ...info, skippable: false }));
         const result = await browser.youtubeCommand('skip_ad');
         setYoutubeState(result?.youtubeState || result?.status || 'idle');
         if (result?.ok) {
@@ -2185,23 +2058,21 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         }
     }, [browser]);
 
-    useBrowserViewBoundsSync(viewRef, browser.updateBounds, !!playing && browser.isOpen);
+    useBrowserViewBoundsSync(viewRef, browser.updateBounds, !!playing && browser.isOpen && !searchOpen);
 
     const stop = useCallback(() => {
         void browser.resetBrowserSession('youtube-stop');
         setPlaying(null);
         setYoutubeState('idle');
+        setPageInfo(NO_YOUTUBE_PAGE_INFO);
         autoPlayUrlRef.current = '';
+        modeUrlRef.current = '';
         onNavHiddenToggle?.(false);
         onBrowserInteractionModeChange('control');
     }, [browser.resetBrowserSession, onBrowserInteractionModeChange, onNavHiddenToggle]);
 
-    // v17: Back button now navigates the BrowserView's history first.
-    // If the patient watched videos A → B → C, "Back" walks back to B,
-    // then A, then finally closes the YouTube panel when there's no
-    // earlier page left. Previously this button immediately closed the
-    // whole YouTube view, dropping the patient at YouTube's landing
-    // screen on every press — confusing during a session.
+    // Back walks the page history (video C -> B -> A); with no earlier page it
+    // closes the player and returns to the YouTube choices.
     const handleYouTubeBack = useCallback(() => {
         if (browser.canGoBack) {
             void browser.goBack();
@@ -2210,124 +2081,264 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
         }
     }, [browser.canGoBack, browser.goBack, stop]);
 
-    const playbackState = browser.videoPlaybackState;
+    // More Videos: the page takes gaze so a card can be chosen; full screen is left
+    // first, so the rest of the page (and its scrolling) comes back.
+    const browseVideos = useCallback(async () => {
+        if (isVideoMaximized) await setFullScreen(false);
+        onBrowserInteractionModeChange('control');
+    }, [isVideoMaximized, onBrowserInteractionModeChange, setFullScreen]);
+
+    const backToVideo = useCallback(() => {
+        onBrowserInteractionModeChange('watch');
+        void browser.scrollToTop();
+    }, [browser.scrollToTop, onBrowserInteractionModeChange]);
+
+    // Home and results pages: Look Only pauses page gaze (read titles without opening
+    // a video); Choose Videos turns it back on. A new page starts with it on.
+    const toggleLookOnly = useCallback(() => {
+        onBrowserInteractionModeChange(isWatchMode ? 'control' : 'watch');
+    }, [isWatchMode, onBrowserInteractionModeChange]);
+
+    // The dock's Full Screen while browsing a video page: back to the video, full screen.
+    const watchFullScreen = useCallback(() => {
+        onBrowserInteractionModeChange('watch');
+        void setFullScreen(true);
+    }, [onBrowserInteractionModeChange, setFullScreen]);
+
+    // Gaze Scroll: looking at the top or bottom edge of the page moves it (main.ts edge
+    // scrolling). Off over a video in Watch, where the page takes no gaze at all.
+    const toggleGazeScroll = useCallback(() => {
+        void browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed');
+    }, [browser.scrollMode, browser.setScrollMode]);
+
+    // YouTube's own Home: its usual suggestions, no playlist or search chosen here.
+    const openYoutubeHome = useCallback(() => {
+        if (playing && browser.isOpen) {
+            void browser.navigateTo(YOUTUBE_HOME_URL);
+            return;
+        }
+        setPlaying({ title: 'YouTube Home', ch: 'Suggestions', url: YOUTUBE_HOME_URL });
+        disableGaze();
+    }, [browser.isOpen, browser.navigateTo, disableGaze, playing]);
+
+    // The navigation bar (Home, emergency) stays on screen while typing.
+    const openSearch = useCallback(() => {
+        navHiddenBeforeSearchRef.current = !!isNavHidden;
+        setSearchOpen(true);
+        onNavHiddenToggle?.(false);
+        if (browser.isOpen) void browser.setPageVisible(false);
+    }, [browser.isOpen, browser.setPageVisible, isNavHidden, onNavHiddenToggle]);
+
+    const closeSearch = useCallback(() => {
+        setSearchOpen(false);
+        if (navHiddenBeforeSearchRef.current !== null) onNavHiddenToggle?.(navHiddenBeforeSearchRef.current);
+        navHiddenBeforeSearchRef.current = null;
+        if (browser.isOpen) void browser.setPageVisible(true);
+    }, [browser.isOpen, browser.setPageVisible, onNavHiddenToggle]);
+
+    const runSearch = useCallback((query: string) => {
+        const url = youtubeSearchUrl(query);
+        closeSearch();
+        if (playing && browser.isOpen) {
+            void browser.navigateTo(url);
+            return;
+        }
+        setPlaying({ title: query, ch: 'YouTube search', url });
+    }, [browser.isOpen, browser.navigateTo, closeSearch, playing]);
+
+    // The video bar is for a video page in Watch; every other page has the page bar.
+    const showVideoBar = isWatchMode && isYouTubeWatchPage;
+    const showSkipAd = isYouTubeWatchPage && pageInfo.skippable;
+    const gazeScrollOn = browser.scrollMode === 'armed';
+    useEffect(() => {
+        if (showVideoBar && browser.scrollMode === 'armed') void browser.setScrollMode('off');
+    }, [browser.scrollMode, browser.setScrollMode, showVideoBar]);
+
+    // Calm full-screen video (7 Oct 2026, components/browser/calmWatch.ts): in full screen the
+    // bar gives way to a black strip, so nothing can be chosen by accident while watching.
+    // Looking at the strip offers Show options, which brings the bar back; it hides again
+    // after a while unused, and comes back by itself when the video ends.
+    const calmBarRef = useRef<HTMLDivElement>(null);
+    const calmStripRef = useRef<HTMLDivElement>(null);
+    const calmEnabled = settings.calmFullScreenVideo !== false;
+    const calm = useCalmWatch({
+        active: calmEnabled && !!playing && browser.isOpen && showVideoBar && isVideoMaximized && !searchOpen,
+        holdMs: normalizeVideoRevealHoldMs(settings.videoRevealHoldMs),
+        getGaze,
+        stripRef: calmStripRef,
+        barRef: calmBarRef,
+        playback: calmPlaybackOf(youtubeState),
+        playbackKey: `${youtubeState}|${youtubeVideoId(currentBrowserUrl)}`,
+        listening: toolbarGazeEnabled,
+    });
+    const calmPhase = calm.phase;
+    // The bar's buttons: right after Show options is chosen by gaze, they wait until the eyes
+    // move off that spot (the mouse always works).
+    const barGazeEnabled = toolbarGazeEnabled && calm.barGazeReady;
+    const statusText = (() => {
+        const title = pageInfo.title || playing?.title || 'YouTube';
+        if (showVideoBar) return `Watching: ${title}${isVideoMaximized ? ' · full screen' : ''}`;
+        if (gazeScrollOn && browser.edgeScrollDirection !== 'none') return `Gaze Scroll: moving ${browser.edgeScrollDirection} · ${title}`;
+        if (gazeScrollOn) return `Gaze Scroll on: look at the top or bottom edge of the page to move it · ${title}`;
+        if (isWatchMode) return `Look only: gaze on the page is paused · ${title}`;
+        if (pageInfo.videoChoices === 0 && /^https:\/\/(www\.|m\.)?youtube\.com\/?$/i.test(currentBrowserUrl)) {
+            return 'YouTube Home shows suggestions after a few videos. Choose Search to find one.';
+        }
+        return `Browsing: look at a video to open it · ${title}`;
+    })();
+
+    // In full screen, Next, Back, Play and Skip Ad put the bar away once the video plays again
+    // (8 Oct 2026, maintainer request); Pause keeps it. Elsewhere these marks do nothing.
+    const playPauseButton = (
+        <GazeButton id="yt-playpause" onClick={() => { if (youtubeState !== 'playing') calm.actionTaken(); void playPauseYouTube(); }}
+            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+            style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+            {youtubeState === 'playing'
+                ? <PauseIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                : <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />}
+            <span>Pause / Play</span>
+        </GazeButton>
+    );
+    const nextOrSkipButton = showSkipAd
+        ? <GazeButton id="yt-skip-ad" onClick={() => { calm.actionTaken(); void skipYouTubeAd(); }} className="browser-attention"
+            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+            style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+            <SkipIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+            <span>Skip Ad</span>
+        </GazeButton>
+        : <GazeButton id="yt-next" onClick={() => { calm.actionTaken(); void nextYouTubeVideo(); }}
+            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+            style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+            <NextIcon size={toolbarIconSize} color="currentColor" strokeWidth={7} />
+            <span>Next</span>
+        </GazeButton>;
+
+    if (searchOpen) return (
+        <div className="web-search-overlay" style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden', background: T_pageBg }}>
+            <SearchKeyboard target="youtube" isDarkMode={isDarkMode}
+                initialText={searchedWordsOf(currentBrowserUrl)}
+                onSearch={runSearch} onBack={closeSearch} />
+        </div>
+    );
 
     if (playing) return (
-        <div className="youtube-player" style={{
+        <div className="youtube-player" data-mode={showVideoBar ? 'watch' : isWatchMode ? 'look' : 'browse'}
+            data-calm={calmPhase || undefined} style={{
             flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(12px,1.5vh,20px)', gap: 'clamp(10px,1.2vh,16px)', overflow: 'hidden',
             marginTop: '0', transition: 'margin-top 0.3s ease',
             marginLeft: 'clamp(10px,1.5vw,20px)', marginRight: 'clamp(10px,1.5vw,20px)',
             paddingBottom: 'clamp(10px, 1.5vh, 20px)',
             background: T_pageBg,
         }}>
-            {/* ── CONNECTED TOOLBAR — bi-modal + nav-aware (no duplicates with global nav) ── */}
-            <div className="browser-toolbar" style={{ ...connectedToolbarStyle, flexShrink: 0 }}>
-                {/* WATCH MODE — playback and navigation */}
-                {isWatchMode && <>
-
-                    <GazeButton id="yt-watch-back" onClick={handleYouTubeBack}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
-                        style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
+            {/* ── CONNECTED TOOLBAR ──
+                Focus/Serene draw it under the video, right below the subtitles, so
+                every control here takes the Video controls time (dwellTimeConfig):
+                longer than other cards, so watching stays self-paced. */}
+            {(!calmPhase || calmPhase === 'controls') && <div className="browser-toolbar" ref={calmBarRef}
+                onClickCapture={calmPhase ? calm.controlUsed : undefined} style={{ ...connectedToolbarStyle, flexShrink: 0 }}>
+                {/* WATCH (a video page) — the page takes no gaze; these drive the video. */}
+                {showVideoBar && <>
+                    <GazeButton id="yt-watch-back" onClick={() => { calm.actionTaken(); handleYouTubeBack(); }}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, 'first')}>
                         <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                         <span>Back</span>
                     </GazeButton>
-                    <GazeButton id="yt-playpause" onClick={playPauseYouTube}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
+                    {playPauseButton}
+                    {nextOrSkipButton}
+                    <GazeButton id="yt-fullscreen" onClick={toggleFullScreen} selected={isVideoMaximized}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
                         style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
-                        <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>Pause / Play</span>
+                        {isVideoMaximized
+                            ? <MinimizeIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                            : <FullscreenIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />}
+                        <span>{isVideoMaximized ? 'Exit Full' : 'Full Screen'}</span>
                     </GazeButton>
-                    <GazeButton id="yt-next" onClick={nextYouTubeVideo}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
-                        <NextIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>Next</span>
+                    <GazeButton id="yt-more-videos" onClick={() => { void browseVideos(); }}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, 'middle')}>
+                        <GridIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                        <span>More Videos</span>
                     </GazeButton>
-                    <GazeButton id="yt-show-controls" onClick={toggleBrowserInteractionMode}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                        style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
-                        <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                        <span>Show Controls</span>
+                    <GazeButton id="yt-search" onClick={openSearch}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, calmPhase === 'controls' ? 'middle' : 'last')}>
+                        <SearchIcon size={toolbarIconSize} color="currentColor" strokeWidth={7} />
+                        <span>Search</span>
                     </GazeButton>
+                    {/* Full screen only: the partner of Show options, putting the bar away at once. */}
+                    {calmPhase === 'controls' && (
+                        <GazeButton id="yt-hide-options" onClick={calm.hide}
+                            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                            style={toolbarBtnConnected('secondary', !!isNavHidden, 'last')}>
+                            <EyeOffIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                            <span>Hide options</span>
+                        </GazeButton>
+                    )}
                 </>}
 
-                {/* CONTROL MODE — large AAC controls for reliable video use */}
-                {!isWatchMode && <>
-
-                    <GazeButton id="yt-back" onClick={isNavHidden ? handleYouTubeBack : stop}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
-                        style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
+                {/* PAGE BAR — Home, results, channels, or a video page in Browse. Gaze picks a
+                    video card on the page unless Look Only is on; Up / Down beside it. On a
+                    video page it keeps the video's own controls (Pause / Play, Next / Skip Ad). */}
+                {!showVideoBar && <>
+                    <GazeButton id="yt-back" onClick={handleYouTubeBack}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, 'first')}>
                         <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>{isNavHidden ? 'Back' : 'Close'}</span>
+                        <span>Back</span>
                     </GazeButton>
-                    <GazeButton id="yt-playpause-c" onClick={playPauseYouTube}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
-                        <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>Pause / Play</span>
+                    {isYouTubeWatchPage && playPauseButton}
+                    {isYouTubeWatchPage && nextOrSkipButton}
+                    <GazeButton id="yt-home" onClick={openYoutubeHome}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, 'middle')}>
+                        <HomeIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                        <span>YouTube Home</span>
                     </GazeButton>
-                    {/* Next is available in BOTH toolbars (watch + control) so the
-                        patient can advance videos from any panel, including while
-                        the video is maximized. Mirrors the watch-mode yt-next. */}
-                    <GazeButton id="yt-next-c" onClick={nextYouTubeVideo}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
-                        <NextIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
-                        <span>Next</span>
+                    <GazeButton id="yt-search-browse" onClick={openSearch}
+                        gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                        style={toolbarBtnConnected('primary', !!isNavHidden, 'middle')}>
+                        <SearchIcon size={toolbarIconSize} color="currentColor" strokeWidth={7} />
+                        <span>Search</span>
                     </GazeButton>
-                    <GazeButton id="yt-skip-ad" onClick={skipYouTubeAdReliable}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                        style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
-                        <span>Skip Ad</span>
-                    </GazeButton>
-                    {/* Controls toggle — ALWAYS shown in control mode (patient
-                        request 2026-07-07); previously gated to a playing video
-                        so it vanished on search/listing pages. */}
-                    <GazeButton id="yt-hide-controls" onClick={toggleBrowserInteractionMode}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
-                        style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
-                        <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                        <span>Hide Controls</span>
-                    </GazeButton>
-                    {isNavHidden && <GazeButton id="yt-toggle-nav" onClick={() => onNavHiddenToggle?.(!isNavHidden)}
-                        gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                        style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
-                        <WebLayoutIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
-                        <span>Show Nav</span>
-                    </GazeButton>}
+                    {isYouTubeWatchPage
+                        ? <GazeButton id="yt-back-to-video" onClick={backToVideo}
+                            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                            style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+                            <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                            <span>Back to Video</span>
+                        </GazeButton>
+                        : <GazeButton id="yt-look-only" onClick={toggleLookOnly} selected={isWatchMode}
+                            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                            style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+                            {isWatchMode
+                                ? <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={5} />
+                                : <EyeIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />}
+                            <span>{isWatchMode ? 'Choose Videos' : 'Look Only'}</span>
+                        </GazeButton>}
+                    {/* With the navigation bar hidden: Show Nav. With it shown: Close, back to
+                        the YouTube choices in one step (as the old Control bar did). */}
+                    {isNavHidden
+                        ? <GazeButton id="yt-toggle-nav" onClick={() => onNavHiddenToggle?.(!isNavHidden)}
+                            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                            style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
+                            <WebLayoutIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                            <span>Show Nav</span>
+                        </GazeButton>
+                        : <GazeButton id="yt-close" onClick={stop}
+                            gazeEnabled={barGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="videoControl"
+                            style={toolbarBtnConnected('dismiss', !!isNavHidden, 'last')}>
+                            <XIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
+                            <span>Close</span>
+                        </GazeButton>}
                 </>}
-            </div>
-
-            {/* Now-playing label */}
-            {!isNavHidden && <div style={{ color: T_chromeTextMuted, fontSize: 'clamp(15px,1.85vh,19px)', padding: '0 8px', flexShrink: 0, fontWeight: 600, fontFamily: FONT_PRIMARY, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <YoutubeIcon size={18} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.2} />
-                <b style={{ color: T_chromeText }}>{playing.title}</b>
-                <span style={{ opacity: 0.7 }}>— {playing.ch}</span>
             </div>}
 
-            {/* Content area: BrowserView (left) + ContentScrollDock (right gutter) */}
+            {!calmPhase && <BrowserStatusLine text={statusText} notice={browser.notice} />}
+
+            {/* Content area: BrowserView (left) + Up / Down (right gutter, every page but a video in Watch) */}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', gap: 0 }}>
                 <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                    {isWatchMode && <div style={watchModeBadgeStyle}>WATCH MODE · page gaze paused</div>}
-                    {playbackState.fullscreen && (
-                        <div style={{
-                            ...watchModeBadgeStyle,
-                            left: '50%',
-                            right: 'auto',
-                            transform: 'translateX(-50%)',
-                            background: 'rgba(16, 32, 31, 0.94)',
-                            color: CONTROL_MODE_TEXT,
-                            border: '1px solid rgba(169, 202, 199, 0.32)',
-                        }}>
-                            Exiting full screen / फुल स्क्रीन बंद हो रही है
-                        </div>
-                    )}
-                    {!isWatchMode && browser.edgeScrollDirection === 'up' && (
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to bottom, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `${CR} ${CR} 0 0` }} />
-                    )}
-                    {!isWatchMode && browser.edgeScrollDirection === 'down' && (
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to top, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none', borderRadius: `0 0 ${CR} ${CR}` }} />
-                    )}
                     <div className="browser-content-frame" ref={viewRef} style={{
                         width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden',
                         background: isWarm ? '#F5EEDF' : T.bg,
@@ -2341,33 +2352,55 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze
                         </div>
                     </div>
                 </div>
-                {/* Up / Max Video / Down dock — only in Control mode. The middle
-                    button maximizes the video inside the BrowserView, without
-                    entering true browser fullscreen. */}
-                {!isWatchMode && (
+                {!showVideoBar && (
                     <ContentScrollDock
-                        onUp={() => browser.scrollUp()}
-                        onToggleAutoScroll={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
-                        autoScrollEnabled={browser.scrollMode === 'armed'}
-                        onMaximize={isYouTubeWatchPage ? (isVideoMaximized ? minimizeVideo : maximizeVideo) : undefined}
-                        maximized={isVideoMaximized}
-                        onDown={() => browser.scrollDown()}
+                        onUp={() => { void browser.scrollUp(); }}
+                        onDown={() => { void browser.scrollDown(); }}
+                        atTop={browser.pageScroll.atTop}
+                        atBottom={browser.pageScroll.atBottom}
+                        gazeScrollOn={gazeScrollOn}
+                        onToggleGazeScroll={toggleGazeScroll}
+                        onFullScreen={isYouTubeWatchPage ? watchFullScreen : undefined}
                         gazeEnabled={toolbarGazeEnabled}
                         gazeTimestamp={toolbarGazeTimestamp}
                     />
                 )}
             </div>
+
+            {calmPhase && calmPhase !== 'controls' && (
+                <CalmWatchStrip phase={calmPhase} hint={calm.hint} progressRef={calm.progressRef}
+                    stripRef={calmStripRef} onReveal={calm.reveal}
+                    gazeEnabled={toolbarGazeEnabled} gazeTimestamp={toolbarGazeTimestamp} />
+            )}
         </div>
     );
 
-    // Four categories and four videos retain their original actions.
+    // Four categories and four videos retain their original actions. Above them,
+    // YouTube itself: type any song, singer or video, or open its own Home.
     return (
         <div className="youtube-library" style={{
-            flex: 1, display: 'flex', flexDirection: 'row', gap: 'clamp(18px, 2vw, 28px)',
+            flex: 1, display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 'clamp(18px, 2vw, 28px)',
             padding: 'clamp(14px, 1.6vh, 22px) clamp(18px, 2vw, 28px)', overflow: 'hidden',
             paddingBottom: 'clamp(20px, 2.4vh, 32px)',
             background: T_pageBg,
         }}>
+            <div className="youtube-actions" style={{
+                flex: '0 0 auto', width: '100%', height: 'clamp(92px, 11.5vh, 124px)', minHeight: 0,
+                display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'clamp(18px, 2.4vh, 26px)',
+            }}>
+                <GazeButton id="yl-search" className="youtube-action" onClick={openSearch}
+                    gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
+                    style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                    <SearchIcon size={46} color="currentColor" strokeWidth={7} />
+                    <span>Search YouTube</span>
+                </GazeButton>
+                <GazeButton id="yl-home" className="youtube-action" onClick={openYoutubeHome}
+                    gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
+                    style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                    <HomeIcon size={42} color="currentColor" strokeWidth={2.2} />
+                    <span>YouTube Home</span>
+                </GazeButton>
+            </div>
             {/* SIDEBAR — 4 large category buttons. Each card uses a distinct
                 category icon (no more identical YouTube glyph everywhere) and
                 a small subtitle for context. Phrases/Activities sidebar grammar:
@@ -2694,12 +2727,13 @@ const KnowledgePanel = ({ ige, ts, onSpeak, isNavHidden }: { ige: boolean; ts: n
 };
 
 // ── QUICK SEARCH PANEL (with gaze cursor forwarding) ──
-const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onSpeak }: {
+const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disableGaze, toggleGaze, isNavHidden, isDarkMode, browserInteractionMode, onBrowserInteractionModeChange, onTopicActive, onNavHiddenToggle, onSpeak }: {
     ige: boolean; ts: number; browser: ReturnType<typeof useGazeBrowser>; gpRef: React.MutableRefObject<{ x: number; y: number }>;
     goBack: () => void;
     disableGaze: () => void;
     toggleGaze: () => void;
     isNavHidden?: boolean;
+    isDarkMode: boolean;
     browserInteractionMode: BrowserInteractionMode;
     onBrowserInteractionModeChange: (mode: BrowserInteractionMode) => void;
     onTopicActive?: (active: boolean) => void;
@@ -2723,6 +2757,9 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     const [largeLinkTargets, setLargeLinkTargets] = useState(true);
     const linkChoices = useGazePageCapacity(largeLinkTargets ? 104 : 80, largeLinkTargets ? 4 : 6);
     const [linkPage, setLinkPage] = useState(0);
+    // The search keyboard replaces the panel; an open page is taken off the window meanwhile.
+    const [searchOpen, setSearchOpen] = useState(false);
+    const navHiddenBeforeSearchRef = useRef<boolean | null>(null);
     const viewRef = useRef<HTMLDivElement>(null);
     const hasInitRef = useRef(false);
     const toolbarGazeEnabled = isNavHidden ? true : ige;
@@ -2754,25 +2791,33 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         if (isWebTopic) onBrowserInteractionModeChange('watch');
     }, [isWebTopic, topic?.id, onBrowserInteractionModeChange]);
 
+    // The page opens once per topic, as soon as its frame has a size. Showing or hiding
+    // the navigation bar only moves the page (bounds sync below): it used to reopen the
+    // topic's first page, losing the patient's place, and loaded every topic twice.
     useEffect(() => {
         if (!topic || topic.mode !== 'web') return;
         let cancelled = false;
-        const raf = requestAnimationFrame(() => {
-            if (cancelled || !viewRef.current) return;
-            const r = viewRef.current.getBoundingClientRect();
-            if (r.width > 50 && r.height > 50) {
-                browser.openPage(topic.url, {
-                    x: Math.round(r.left),
-                    y: Math.round(r.top),
-                    width: Math.round(r.width),
-                    height: Math.round(r.height),
-                });
+        let raf = 0;
+        let tries = 0;
+        const open = () => {
+            if (cancelled) return;
+            const r = viewRef.current?.getBoundingClientRect();
+            if (!r || r.width <= 50 || r.height <= 50) {
+                if (++tries < 30) raf = requestAnimationFrame(open);
+                return;
             }
-        });
+            void browser.openPage(topic.url, {
+                x: Math.round(r.left),
+                y: Math.round(r.top),
+                width: Math.round(r.width),
+                height: Math.round(r.height),
+            });
+        };
+        raf = requestAnimationFrame(open);
         return () => { cancelled = true; cancelAnimationFrame(raf); };
-    }, [topic?.id, topic?.mode, topic?.url, isNavHidden]);
+    }, [topic?.id, topic?.mode, topic?.url]);
 
-    useBrowserViewBoundsSync(viewRef, browser.updateBounds, isWebTopic && browser.isOpen);
+    useBrowserViewBoundsSync(viewRef, browser.updateBounds, isWebTopic && browser.isOpen && !searchOpen);
 
     // Removed per-topic quick snapshot fetch
 
@@ -2811,6 +2856,35 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         disableGaze();
     }, [topic, disableGaze]);
 
+    const searchTarget: SearchTarget = isWebTopic && isYoutubeHost(browser.currentUrl) ? 'youtube' : 'google';
+
+    // The navigation bar (Home, emergency) stays on screen while typing.
+    const openSearch = useCallback(() => {
+        navHiddenBeforeSearchRef.current = !!isNavHidden;
+        setSearchOpen(true);
+        onNavHiddenToggle?.(false);
+        if (browser.isOpen) void browser.setPageVisible(false);
+    }, [browser.isOpen, browser.setPageVisible, isNavHidden, onNavHiddenToggle]);
+
+    const closeSearch = useCallback(() => {
+        setSearchOpen(false);
+        if (navHiddenBeforeSearchRef.current !== null) onNavHiddenToggle?.(navHiddenBeforeSearchRef.current);
+        navHiddenBeforeSearchRef.current = null;
+        if (browser.isOpen) void browser.setPageVisible(true);
+    }, [browser.isOpen, browser.setPageVisible, onNavHiddenToggle]);
+
+    const runSearch = useCallback((query: string) => {
+        const target = searchTarget;
+        closeSearch();
+        if (isWebTopic && browser.isOpen) {
+            void browser.navigateTo(target === 'youtube' ? youtubeSearchUrl(query) : googleSearchUrl(query));
+            return;
+        }
+        setTopic({ id: 'typed_search', label: query, url: googleSearchUrl(query), mode: 'web' });
+        setShowLinksSidebar(true);
+        disableGaze();
+    }, [browser.isOpen, browser.navigateTo, closeSearch, disableGaze, isWebTopic, searchTarget]);
+
     const speakCardSummary = useCallback(() => {
         if (!topic || !ws.quickSnapshot) return;
         // v17.18: routed through App.handleSpeak (was a raw ws.speak that
@@ -2838,64 +2912,88 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
     const canPageLinksBack = currentLinkPage > 0;
     const canPageLinksForward = currentLinkPage < totalLinkPages - 1;
 
+    if (searchOpen) return (
+        <div className="web-search-overlay" style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden', background: T_pageBg }}>
+            <SearchKeyboard target={searchTarget} isDarkMode={isDarkMode}
+                initialText={isWebTopic ? searchedWordsOf(browser.currentUrl) : ''}
+                backLabel={isWebTopic ? undefined : 'Back to Quick Search'}
+                onSearch={runSearch} onBack={closeSearch} />
+        </div>
+    );
+
     if (isWebTopic && topic) {
+        const pageIsYoutube = isYoutubeHost(browser.currentUrl);
+        const gazeScrollOn = browser.scrollMode === 'armed';
+        const statusText = gazeScrollOn && browser.edgeScrollDirection !== 'none'
+            ? `Gaze Scroll: moving ${browser.edgeScrollDirection} · ${stripLeadingEmoji(topic.label)}`
+            : gazeScrollOn
+                ? `Gaze Scroll on: look at the top or bottom edge of the page to move it · ${stripLeadingEmoji(topic.label)}`
+                : `${stripLeadingEmoji(topic.label)} · ${isWatchMode ? 'Reading: gaze on the page is paused' : 'Look at a link on the page to open it'} · Zoom ${browser.zoomFactor.toFixed(2)}x`;
         return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg, paddingBottom: 'clamp(10px, 1.5vh, 20px)' }}>
-                {/* TOP REGION: Connected toolbar + status line */}
-                <div style={{
+            <div className="web-page-view" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg, paddingBottom: 'clamp(10px, 1.5vh, 20px)' }}>
+                {/* TOP REGION: Connected toolbar + status line. Focus and Serene lay the page
+                    out as the YouTube player does (web-design.css): status line, the page with
+                    its Up / Down dock, then the bar of large buttons under it. */}
+                <div className="web-page-top" style={{
                     flex: '0 0 auto', width: '100%',
                     display: 'flex', flexDirection: 'column',
                     padding: 'clamp(10px,1.2vh,16px) clamp(16px,2vw,24px) clamp(6px,0.8vh,10px)',
                     boxSizing: 'border-box', gap: '6px',
                 }}>
                     <div className="browser-toolbar" style={connectedToolbarStyle}>
-                        {/* READ MODE — minimal, nav-aware */}
+                        {/* READ MODE — the page takes no gaze; Up / Down move it. */}
                         {isWatchMode && <>
-
-                            {/* 'k' is the YOUTUBE play/pause hotkey; on Google/News
-                                pages typeText('k') just typed the letter k into
-                                whatever had focus. Show the button only on YouTube. */}
-                            {/(?:youtube\.com|youtu\.be)/i.test(browser.currentUrl || '') && <GazeButton id="bv-playpause-r" onClick={() => browser.typeText('k')}
+                            <GazeButton id="bv-back-r" onClick={handleBrowserBack}
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
+                                style={toolbarBtnConnected('primary', !!isNavHidden, 'first')}>
+                                <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                                <span>Back</span>
+                            </GazeButton>
+                            {pageIsYoutube && <GazeButton id="bv-playpause-r" onClick={() => { void browser.youtubeCommand('play_pause'); }}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                                style={toolbarBtnConnected('secondary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
+                                style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
                                 <PlayIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>Pause / Play</span>
                             </GazeButton>}
-                            <GazeButton id="bv-scroll-r" onClick={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
+                            <GazeButton id="bv-search-r" onClick={openSearch}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                                style={toolbarBtnConnected(browser.scrollMode === 'armed' ? 'secondary' : 'primary', !!isNavHidden,
-                                    (!isNavHidden && !/(?:youtube\.com|youtu\.be)/i.test(browser.currentUrl || '')) ? 'first' : 'middle')}>
-                                <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
-                                <span>{browser.scrollMode === 'armed' ? 'Scroll On' : 'Scroll'}</span>
+                                style={toolbarBtnConnected('primary', !!isNavHidden, 'middle')}>
+                                <SearchIcon size={toolbarIconSize} color="currentColor" strokeWidth={7} />
+                                <span>Search</span>
                             </GazeButton>
                             <GazeButton id="bv-show-controls" onClick={toggleBrowserInteractionMode}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, 'last')}>
-                                <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} />
+                                <PointerIcon size={toolbarIconSize} color="currentColor" strokeWidth={5} />
                                 <span>Show Controls</span>
                             </GazeButton>
                         </>}
 
-                        {/* CONTROL MODE — full toolset, no duplicates with global nav */}
+                        {/* CONTROL MODE — gaze on the page opens links; no duplicates with the global nav */}
                         {!isWatchMode && <>
-
                             <GazeButton id="bv-back" onClick={isNavHidden ? handleBrowserBack : closeWebTopic}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
-                                style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'first')}>
+                                style={toolbarBtnConnected('primary', !!isNavHidden, 'first')}>
                                 <BackIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.4} />
                                 <span>{isNavHidden ? 'Back' : 'Close'}</span>
                             </GazeButton>
                             <GazeButton id="bv-hide-controls" onClick={toggleBrowserInteractionMode}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="backSkipButton"
                                 style={toolbarBtnConnected('primary', !!isNavHidden, 'middle')}>
-                                <BookIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                                <WI.BookOpenIcon size={toolbarIconSize} strokeWidth={2.2} />
                                 <span>Hide Controls</span>
                             </GazeButton>
                             <GazeButton id="bv-links-toggle" onClick={() => setShowLinksSidebar((s) => !s)}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
-                                style={toolbarBtnConnected('secondary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
-                                {showLinksSidebar ? <XIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} /> : <WebLayoutIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.1} />}
+                                style={toolbarBtnConnected('secondary', !!isNavHidden, 'middle')}>
+                                {showLinksSidebar ? <XIcon size={toolbarIconSize} color="currentColor" strokeWidth={2.3} /> : <WI.ListIcon size={toolbarIconSize} strokeWidth={2.2} />}
                                 <span>{showLinksSidebar ? 'Hide Links' : 'Links'}</span>
+                            </GazeButton>
+                            <GazeButton id="bv-search" onClick={openSearch}
+                                gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
+                                style={toolbarBtnConnected('primary', !!isNavHidden, isNavHidden ? 'middle' : 'last')}>
+                                <SearchIcon size={toolbarIconSize} color="currentColor" strokeWidth={7} />
+                                <span>Search</span>
                             </GazeButton>
                             {isNavHidden && <GazeButton id="bv-toggle-nav" onClick={() => { setShowLinksSidebar(false); onNavHiddenToggle?.(!isNavHidden); }}
                                 gazeEnabled={toolbarGazeEnabled} gazeEnabledTimestamp={toolbarGazeTimestamp} isDarkMode dwellCategory="navigationButton"
@@ -2905,19 +3003,11 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                             </GazeButton>}
                         </>}
                     </div>
-                    {/* Status line — small, low-noise */}
-                    {!isNavHidden && <div style={{
-                        fontSize: 'clamp(13px,1.5vh,16px)', color: T_chromeTextMuted,
-                        padding: 'clamp(4px,0.5vh,6px) clamp(8px,1vw,12px)',
-                        fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        width: '100%', boxSizing: 'border-box', fontFamily: FONT_PRIMARY,
-                    }}>
-                        {stripLeadingEmoji(topic.label)} · Zoom {browser.zoomFactor.toFixed(2)}x · {browser.pageLinks.length} links
-                    </div>}
+                    <BrowserStatusLine text={statusText} notice={browser.notice} />
                 </div>
 
                 {/* BOTTOM REGION: optional Links sidebar + BrowserView + ContentScrollDock (right gutter) */}
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%', padding: 'clamp(8px,1vh,14px) clamp(16px,2vw,24px) 0', boxSizing: 'border-box', gap: 'clamp(12px,1.5vw,20px)' }}>
+                <div className="web-page-body" style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%', padding: 'clamp(8px,1vh,14px) clamp(16px,2vw,24px) 0', boxSizing: 'border-box', gap: 'clamp(12px,1.5vw,20px)' }}>
                     {showLinksSidebar && (
                         <div style={{
                             flex: '0 0 clamp(330px, 28vw, 460px)',
@@ -2933,7 +3023,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         }}>
                             <div style={{ fontSize: 'clamp(16px,2vh,21px)', fontWeight: 800, color: T_chromeText, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <WebLayoutIcon size={24} color={isLight ? '#76624A' : '#789D91'} strokeWidth={2.1} />
+                                    <WI.ListIcon size={24} strokeWidth={2.2} style={{ color: isLight ? '#76624A' : '#789D91' }} />
                                     <span>{largeLinkTargets ? 'Large Links' : 'Page Links'}</span>
                                 </span>
                                 <span style={{ fontSize: 'clamp(13px,1.5vh,16px)', color: T_chromeTextMuted, fontWeight: 700 }}>
@@ -3017,7 +3107,7 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                                     disabled={!canPageLinksForward}
                                     style={{ ...toolbarBtn('primary', false), minHeight: 'clamp(80px,8.8vh,98px)', width: '100%', minWidth: 0, opacity: canPageLinksForward ? 1 : 0.45 }}
                                 >
-                                    <NextIcon size={24} color="currentColor" strokeWidth={2.3} />
+                                    <WI.ChevronRightIcon size={24} strokeWidth={2.3} />
                                     <span>Next</span>
                                 </GazeButton>
                             </div>
@@ -3036,13 +3126,6 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                        {isWatchMode && <div style={watchModeBadgeStyle}>READ MODE · page gaze paused</div>}
-                        {!isWatchMode && browser.edgeScrollDirection === 'up' && (
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to bottom, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none' }} />
-                        )}
-                        {!isWatchMode && browser.edgeScrollDirection === 'down' && (
-                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 'clamp(20px,2.6vh,32px)', background: 'linear-gradient(to top, rgba(45,212,191,0.35), rgba(45,212,191,0))', zIndex: 5, pointerEvents: 'none' }} />
-                        )}
                         <div className="browser-content-frame" ref={viewRef} style={{
                             width: '100%', height: '100%', borderRadius: CR, overflow: 'hidden', background: '#fff',
                             border: WEB_SURFACE.borderSoft, boxShadow: WEB_SURFACE.panelShadow,
@@ -3054,10 +3137,12 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
                         </div>
                     </div>
                     <ContentScrollDock
-                        onUp={() => browser.scrollUp()}
-                        onToggleAutoScroll={() => browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed')}
-                        autoScrollEnabled={browser.scrollMode === 'armed'}
-                        onDown={() => browser.scrollDown()}
+                        onUp={() => { void browser.scrollUp(); }}
+                        onDown={() => { void browser.scrollDown(); }}
+                        atTop={browser.pageScroll.atTop}
+                        atBottom={browser.pageScroll.atBottom}
+                        gazeScrollOn={browser.scrollMode === 'armed'}
+                        onToggleGazeScroll={() => { void browser.setScrollMode(browser.scrollMode === 'armed' ? 'off' : 'armed'); }}
                         gazeEnabled={toolbarGazeEnabled}
                         gazeTimestamp={toolbarGazeTimestamp}
                     />
@@ -3071,83 +3156,104 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         const isCached = !!snapshot?.cached;
         const weather = snapshot?.weather;
         const cricket = snapshot?.cricket;
-
-        const cardBody = (() => {
-            if (topic.id === 'local_weather') {
-                if (!weather?.ok) return 'Weather data unavailable right now.';
-                return [
-                    `Temperature: ${weather.temp_c ?? '-'} C`,
-                    `Feels Like: ${weather.feels_like_c ?? '-'} C`,
-                    `Condition: ${weather.condition || 'Unknown'}`,
-                    `Humidity: ${weather.humidity ?? '-'}%`,
-                    `Wind: ${weather.wind_kph ?? '-'} km/h`,
-                ].join('\n');
-            }
-            if (topic.id === 'cricket_score') {
-                if (!cricket?.ok) return 'Cricket update unavailable right now.';
-                return [
-                    cricket.match || 'Cricket Match',
-                    cricket.summary || '',
-                    `Status: ${cricket.status || 'Update available'}`,
-                    cricket.venue ? `Venue: ${cricket.venue}` : '',
-                ].filter(Boolean).join('\n');
-            }
-            return 'No quick data available.';
-        })();
+        const isWeather = topic.id === 'local_weather';
+        const look = QUICK_TOPIC_LOOK[topic.id] || { icon: <WI.SearchLineIcon size={44} strokeWidth={2} />, accent: 'accent' as WebAccent };
+        const ready = isWeather ? !!weather?.ok : !!cricket?.ok;
+        const degrees = (value: unknown) => (typeof value === 'number' || typeof value === 'string') && String(value) !== '' ? `${value}°` : '–';
+        const answerSub = isWeather
+            ? (weather?.ok && weather.city ? weather.city : 'Weather near you')
+            : (cricket?.ok && cricket.match ? cricket.match : 'Live match');
 
         return (
             <div style={{
-                flex: 1, display: 'flex', flexDirection: 'column', padding: GAP, gap: GAP, overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)',
+                flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                padding: 'clamp(14px, 1.8vh, 24px) clamp(28px, 3vw, 56px) clamp(22px, 3vh, 40px)',
+                gap: 'clamp(14px, 2vh, 24px)',
                 background: T_pageBg,
             }}>
-                <div style={{ display: 'flex', gap: 'clamp(14px,2vw,24px)', flexWrap: 'wrap' }}>
+                {/* One bar of four equal choices, like the YouTube bar. Close returns to the
+                    Quick Search topics, as Close does on a news story and a YouTube page;
+                    the navigation bar's Back still leaves Quick Search. */}
+                <div className="browser-toolbar web-bar" style={{ ...connectedToolbarStyle, flexShrink: 0 }}>
                     <GazeButton id="qs-card-back" onClick={() => { setTopic(null); disableGaze(); }} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="backSkipButton"
-                        style={actionButton(DANGER, 'rgba(60, 34, 32, 0.72)', DANGER_BORDER)}>
-                        <BackIcon size={26} color="currentColor" strokeWidth={2.4} />
-                        <span>Back</span>
+                        style={toolbarBtnConnected('dismiss', false, 'first')}>
+                        <XIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.4} />
+                        <span>Close</span>
                     </GazeButton>
                     <GazeButton id="qs-card-refresh" onClick={() => ws.getQuickSnapshot(true)} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                        style={actionButton(INFO)}>
-                        <RefreshIcon size={24} color="currentColor" strokeWidth={2.3} />
-                        <span>Refresh Data</span>
+                        style={toolbarBtnConnected('primary', false, 'middle')}>
+                        <RefreshIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                        <span>Refresh</span>
                     </GazeButton>
-                    <div style={{ flexBasis: 'clamp(60px, 8vw, 100px)', flexShrink: 0 }} /> {/* Safe Zone for Gaze Toggle */}
                     <GazeButton id="qs-card-open-web" onClick={openLiveWebFromCard} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                        style={actionButton(SUCCESS, 'rgba(36, 48, 32, 0.70)', SUCCESS_BORDER)}>
-                        <ExternalIcon size={26} color="currentColor" strokeWidth={2.3} />
+                        style={toolbarBtnConnected('primary', false, 'middle')}>
+                        <WI.ExternalLinkIcon size={browserToolbarIconSize} strokeWidth={2.2} />
                         <span>Open Live Web</span>
                     </GazeButton>
                     <GazeButton id="qs-card-read" onClick={speakCardSummary} gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="phraseButton"
-                        style={actionButton(TL, 'rgba(28, 47, 45, 0.72)', SOFT_INFO_BORDER)}>
-                        <SpeakIcon size={26} color="currentColor" strokeWidth={2.3} />
-                        <span>Read Answer Aloud</span>
+                        style={toolbarBtnConnected('secondary', false, 'last')}>
+                        <SpeakIcon size={browserToolbarIconSize} color="currentColor" strokeWidth={2.2} />
+                        <span>Read Aloud</span>
                     </GazeButton>
-                    {isCached && (
-                        <div style={{ ...cb, color: STATUS, borderColor: STATUS_BORDER, background: 'rgba(16, 67, 93, 0.22)' }}>
-                            Cached
-                        </div>
-                    )}
                 </div>
 
-                <div className="browse-snapshot" style={{
-                    ...cs,
-                    flex: 1,
-                    alignItems: 'flex-start',
-                    justifyContent: 'flex-start',
-                    padding: 'clamp(34px, 4.5vh, 58px)',
-                    overflow: 'auto',
-                    whiteSpace: 'pre-line' as const,
-                }}>
-                    <div style={{ fontSize: 'clamp(30px,4.2vh,46px)', fontWeight: 700, color: isWarm ? '#2F2A26' : T.textMain, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {renderQuickTopicIcon(topic.id, 52, WEB_ACCENTS.tealText)}
-                        <span>{stripLeadingEmoji(topic.label)}</span>
+                <div className="web-answer" aria-live="polite">
+                    <div className="web-answer-head">
+                        <div className="web-answer-badge" style={{ color: WEB_ACCENT[look.accent] }}>{look.icon}</div>
+                        <div style={{ minWidth: 0 }}>
+                            <div className="web-answer-title">{stripLeadingEmoji(topic.label)}</div>
+                            <div className="web-answer-sub">{answerSub}</div>
+                        </div>
+                        {isCached && <span className="web-answer-tag">Saved earlier</span>}
                     </div>
-                    <div style={{ fontSize: 'clamp(22px,3vh,34px)', color: 'var(--ui-ink)', lineHeight: 1.8 }}>
-                        {cardBody}
-                    </div>
-                    {!snapshot && (
-                        <div style={{ marginTop: '30px', fontSize: 'clamp(18px,2.4vh,26px)', color: 'var(--ui-muted)' }}>
-                            Loading data...
+
+                    {ready && isWeather && (
+                        <div className="web-answer-main">
+                            <div className="web-answer-hero">
+                                <div className="web-answer-big">{degrees(weather.temp_c)}<span style={{ fontSize: '0.42em', marginLeft: '0.08em' }}>C</span></div>
+                                <div className="web-answer-lead">{weather.condition || 'Current weather'}</div>
+                            </div>
+                            <div className="web-answer-facts" style={{ gridTemplateRows: 'repeat(3, minmax(0, 1fr))' }}>
+                                <div className="web-answer-fact">
+                                    <WI.ThermometerIcon size={34} strokeWidth={2} style={{ color: WEB_ACCENT.rose }} />
+                                    <span className="web-answer-fact-label">Feels like</span>
+                                    <span className="web-answer-fact-value">{degrees(weather.feels_like_c)}</span>
+                                </div>
+                                <div className="web-answer-fact">
+                                    <WI.DropletIcon size={34} strokeWidth={2} style={{ color: WEB_ACCENT.blue }} />
+                                    <span className="web-answer-fact-label">Humidity</span>
+                                    <span className="web-answer-fact-value">{weather.humidity ?? '–'}%</span>
+                                </div>
+                                <div className="web-answer-fact">
+                                    <WI.WindIcon size={34} strokeWidth={2} style={{ color: WEB_ACCENT.green }} />
+                                    <span className="web-answer-fact-label">Wind</span>
+                                    <span className="web-answer-fact-value">{weather.wind_kph ?? '–'} km/h</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {ready && !isWeather && (
+                        <div className="web-answer-main" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+                            <div className="web-answer-hero">
+                                <div className="web-answer-score">{cricket.summary || 'Score update'}</div>
+                                <div className="web-answer-lead" style={{ color: WEB_ACCENT.green }}>{cricket.status || 'Update available'}</div>
+                                {cricket.venue && (
+                                    <div className="web-answer-note" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <WI.MapPinIcon size={26} strokeWidth={2} />
+                                        <span>{cricket.venue}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {!ready && (
+                        <div className="web-answer-empty">
+                            <div className="web-answer-lead">
+                                {!snapshot ? 'Getting the latest…' : isWeather ? 'Weather is not available right now.' : 'No live match update right now.'}
+                            </div>
+                            <div className="web-answer-note">Choose Refresh to try again, or Open Live Web to see it on Google.</div>
                         </div>
                     )}
                 </div>
@@ -3155,115 +3261,46 @@ const QuickSearchPanel = ({ ige, ts, browser, gpRef, goBack: goGridBack, disable
         );
     }
 
-    // ── LANDING: 2-col × 4-row grid of large icon-left cards (Web Browsing landing pattern) ──
+    // ── LANDING: a search field for anything, then six ready topics ──
     return (
-        <div style={{
-            flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-            padding: 'clamp(14px, 1.6vh, 22px) clamp(28px, 3vw, 56px)',
-            paddingBottom: 'clamp(28px, 3.5vh, 42px)',
-            gap: 'clamp(14px, 1.8vh, 24px)',
-            background: T_pageBg,
-        }}>
-            <div style={{
-                color: T_chromeText, fontSize: 'clamp(30px, 3.8vh, 42px)', fontWeight: 650,
-                flexShrink: 0, fontFamily: FONT_PRIMARY, letterSpacing: '0.02em',
-                display: 'flex', alignItems: 'center', gap: 'clamp(14px, 1.4vw, 20px)',
-                paddingBottom: 'clamp(6px, 0.8vh, 12px)',
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T_pageBg }}>
+            <div className="patient-stage web-stage web-search-stage" data-view="categories" style={{
+                flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0,
+                padding: '0 clamp(44px, 5vw, 86px) clamp(86px, 10vh, 124px)',
+                marginTop: 'clamp(18px, 2.2vh, 30px)',
             }}>
-                <SearchIcon size={44} color={isLight ? '#4F7388' : isWarm ? '#4F7388' : '#789D91'} strokeWidth={2.4} />
-                <span>Quick Search</span>
-            </div>
-            <div style={{
-                flex: 1,
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gridAutoRows: 'minmax(clamp(140px, 17vh, 200px), 1fr)',
-                gap: 'clamp(18px, 2.2vh, 28px) clamp(22px, 2.6vw, 40px)',
-                overflow: 'hidden', minHeight: 0,
-            }}>
-                {QUICK_TOPICS.map((t, ti) => {
-                    const tileBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMix ? '#241F18' : '#20221E';
-                    const tileBorder = isLight
-                        ? '1.5px solid rgba(168, 120, 56, 0.30)'
-                        : isWarm ? '1px solid rgba(122, 99, 71, 0.16)'
-                        : isMix ? '1.5px solid rgba(180, 147, 98, 0.28)'
-                        : '1.5px solid rgba(213, 216, 188, 0.14)';
-                    const tileShadow = isLight
-                        ? '0 4px 12px rgba(82, 66, 45, 0.10)'
-                        : isWarm
-                            ? '0 1px 2px rgba(82, 65, 48, 0.05)'
-                            : isMix
-                                ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 22px rgba(0, 0, 0, 0.36)'
-                                : 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.30)';
-                    // Each Quick Search topic gets a distinct warm-muted accent — diversifies
-                    // colors across the grid for visual variety (matches Home tile pattern).
-                    const PAPER_TOPIC_ACCENTS = [
-                        '#7A312E', // deeper maroon
-                        '#4F7388', // deeper sky blue
-                        '#85703D', // deeper rich gold
-                        '#5F7C58', // deeper sage
-                        '#A56D55', // deeper coral
-                        '#3F6968', // deeper teal
-                        '#7A5638', // deeper warm brown
-                        '#65543E', // deeper umber
-                    ];
-                    const iconColor = (isLight || isWarm)
-                        ? PAPER_TOPIC_ACCENTS[ti % PAPER_TOPIC_ACCENTS.length]
-                        : '#789D91';
-                    const labelColor = isLight ? '#2E2A24' : isWarm ? '#2F2A26' : isMix ? '#FFFCF1' : '#ECEDE3';
-                    // Icon zone gets a subtle tinted backdrop in paper modes so the
-                    // colorful icon reads as a "category badge" (YouTube card grammar).
-                    const iconZoneBg = (isLight || isWarm) ? `${iconColor}12` : 'transparent';
-                    const iconZoneDivider = (isLight || isWarm) ? `1px solid ${iconColor}22` : 'none';
-                    return (
-                        <GazeButton key={t.id} id={`qs-${t.id}`} onClick={() => openTopic(t)}
-                            gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
-                            contentFill
-                            style={{
-                                width: '100%', height: '100%', minHeight: 0,
-                                background: tileBg,
-                                border: tileBorder,
-                                borderRadius: '28px',
-                                boxShadow: tileShadow,
-                                display: 'flex', flexDirection: 'row', alignItems: 'stretch',
-                                position: 'relative',
-                                padding: 0, overflow: 'hidden',
-                            }}>
-                            {/* Icon zone — 28% width, tinted backdrop in paper modes,
-                                large 88px icon for clear scanning at distance
-                                (YouTube category-card grammar). */}
-                            <div style={{
-                                flex: '0 0 28%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: iconZoneBg,
-                                borderRight: iconZoneDivider,
-                                color: iconColor,
-                            }}>
-                                {renderQuickTopicIcon(t.id, 88, iconColor)}
-                            </div>
-                            <div style={{
-                                flex: '1 1 0', minWidth: 0,
-                                display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start',
-                                padding: 'clamp(18px,2.2vh,28px) clamp(24px,2.8vw,42px) clamp(18px,2.2vh,28px) clamp(20px,2vw,30px)',
-                                gap: 'clamp(4px, 0.6vh, 8px)',
-                            }}>
-                                <span style={{
-                                    fontSize: 'clamp(28px, 3.4vh, 40px)', fontWeight: 650, color: labelColor,
-                                    fontFamily: FONT_PRIMARY, lineHeight: 1.08, letterSpacing: '0.005em',
-                                }}>{stripLeadingEmoji(t.label)}</span>
-                                {/* Subtitle — per-topic caption (mirrors YT card subtitle). */}
-                                <span style={{
-                                    fontSize: 'clamp(15px, 1.75vh, 20px)',
-                                    fontWeight: 600,
-                                    color: (isLight || isWarm) ? iconColor : (isMix ? '#C4B697' : '#789D91'),
-                                    fontFamily: FONT_PRIMARY,
-                                    letterSpacing: '0.02em',
-                                    opacity: 0.9,
-                                }}>{QUICK_TOPIC_SUBTITLES[t.id] || ''}</span>
-                            </div>
-                        </GazeButton>
-                    );
-                })}
+                <div className="web-stage-head" style={{ marginBottom: 'clamp(16px, 2.2vh, 26px)' }}>
+                    <h2 style={{ margin: 0, fontSize: 'clamp(32px, 4vh, 48px)', fontWeight: 820, color: T_chromeText, lineHeight: 1 }}>
+                        Quick Search
+                    </h2>
+                </div>
+                <div className="web-search-body">
+                    {/* Anything else, typed on the keyboard: Google's results open here. */}
+                    <GazeButton id="qs-type-search" className="web-search-field" onClick={openSearch}
+                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="navigationButton"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+                        <span className="web-search-field-icon"><WI.SearchLineIcon size={38} strokeWidth={2.2} /></span>
+                        <span className="web-search-field-text">Type anything to search Google</span>
+                        <span className="web-search-field-hint"><KeyboardIcon size={26} color="currentColor" strokeWidth={2} />Keyboard</span>
+                    </GazeButton>
+                    <div className="web-stage-grid" style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                        gridTemplateRows: 'repeat(2, minmax(0, 1fr))',
+                    }}>
+                        {QUICK_TOPICS.map((t) => {
+                            const look = QUICK_TOPIC_LOOK[t.id] || { icon: <WI.SearchLineIcon size={64} strokeWidth={1.8} />, accent: 'accent' as WebAccent };
+                            return (
+                                <WebChoiceCard key={t.id} id={`qs-${t.id}`}
+                                    title={stripLeadingEmoji(t.label)}
+                                    subtitle={QUICK_TOPIC_SUBTITLES[t.id]}
+                                    icon={look.icon} accent={look.accent}
+                                    onClick={() => openTopic(t)}
+                                    ige={ige} ts={ts} />
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -3279,6 +3316,12 @@ const SOCIAL_SERVICES = [
 ] as const;
 type SocialServiceId = typeof SOCIAL_SERVICES[number]['id'];
 
+const SOCIAL_LOOK: Record<SocialServiceId, { icon: (size: number) => React.ReactNode; accent: WebAccent; sub: string }> = {
+    linkedin: { icon: (s) => <WI.BriefcaseIcon size={s} strokeWidth={1.8} />, accent: 'blue', sub: 'Work and contacts' },
+    gmail: { icon: (s) => <WI.MailIcon size={s} strokeWidth={1.8} />, accent: 'rose', sub: 'Email' },
+    whatsapp: { icon: (s) => <WhatsAppIcon size={s} strokeWidth={1.8} />, accent: 'green', sub: 'Messages and calls' },
+};
+
 const SocialPanel = ({ ige, ts, selectedService, onSelect, onBack }: {
     ige: boolean;
     ts: number;
@@ -3289,13 +3332,14 @@ const SocialPanel = ({ ige, ts, selectedService, onSelect, onBack }: {
     const service = SOCIAL_SERVICES.find(item => item.id === selectedService);
 
     if (service) {
-        const Icon = service.Icon;
+        const look = SOCIAL_LOOK[service.id];
         return (
             <section className="browse-social-panel" aria-labelledby="social-service-name">
                 <div className="browse-coming-soon">
-                    <Icon size={64} color="var(--ui-accent-ink)" strokeWidth={1.8} />
+                    <div className="web-soon-badge" style={{ color: WEB_ACCENT[look.accent] }}>{look.icon(72)}</div>
                     <h2 id="social-service-name">{service.label}</h2>
                     <p role="status">Coming soon</p>
+                    <div className="web-answer-note">{service.label} will open here, ready for eye gaze, in a later update.</div>
                     <GazeButton id="soc-back" onClick={onBack}
                         gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
                         dwellCategory="backSkipButton" className="browse-social-back">
@@ -3308,19 +3352,32 @@ const SocialPanel = ({ ige, ts, selectedService, onSelect, onBack }: {
     }
 
     return (
-        <section className="browse-social-panel" aria-labelledby="social-heading">
-            <h2 id="social-heading">Social Media</h2>
-            <div className="browse-social-grid">
-                {SOCIAL_SERVICES.map(({ id, label, Icon }) => (
-                    <GazeButton key={id} id={`soc-${id}`} onClick={() => onSelect(id)}
-                        gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode
-                        dwellCategory="navigationButton" className="browse-social-card">
-                        <Icon size={54} color="var(--ui-accent-ink)" strokeWidth={1.9} />
-                        <span>{label}</span>
-                    </GazeButton>
-                ))}
-            </div>
-        </section>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--ui-page)' }}>
+            <section className="patient-stage web-stage web-social-stage" data-view="categories" aria-labelledby="social-heading" style={{
+                flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0,
+                padding: '0 clamp(44px, 5vw, 86px) clamp(86px, 10vh, 124px)',
+                marginTop: 'clamp(18px, 2.2vh, 30px)',
+            }}>
+                <div className="web-stage-head" style={{ marginBottom: 'clamp(18px, 2.4vh, 28px)' }}>
+                    <h2 id="social-heading" style={{ margin: 0, fontSize: 'clamp(32px, 4vh, 48px)', fontWeight: 820, color: 'var(--ui-ink)', lineHeight: 1 }}>
+                        Social & Connect
+                    </h2>
+                    <span className="web-stage-pill" role="note">Coming soon</span>
+                </div>
+                {/* Three cards fill the stage, as the four do on the Web Browsing page. */}
+                <div className="web-stage-grid" style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gridTemplateRows: 'minmax(0, 1fr)',
+                }}>
+                    {SOCIAL_SERVICES.map(({ id, label }) => (
+                        <WebChoiceCard key={id} id={`soc-${id}`} title={label} subtitle={SOCIAL_LOOK[id].sub}
+                            icon={SOCIAL_LOOK[id].icon(64)} accent={SOCIAL_LOOK[id].accent}
+                            onClick={() => onSelect(id)} ige={ige} ts={ts} />
+                    ))}
+                </div>
+            </section>
+        </div>
     );
 };
 
@@ -3330,11 +3387,22 @@ const SocialPanel = ({ ige, ts, selectedService, onSelect, onBack }: {
 // covered by ALS Research inside Quick Search. The KnowledgePanel
 // component + 'knowledge' ViewState are kept for any deep-link routing.
 const HUB_CARDS = [
-    { id: 'news', label: 'News Feed', labelHindi: 'समाचार', accent: WEB_ACCENTS.maroon, bg: 'rgba(45, 27, 24, 0.94)' },
-    { id: 'youtube', label: 'YouTube', labelHindi: 'यूट्यूब', accent: WEB_ACCENTS.gold, bg: 'rgba(42, 33, 19, 0.94)' },
-    { id: 'search', label: 'Quick Search', labelHindi: 'खोज', accent: WEB_ACCENTS.teal, bg: 'rgba(22, 40, 38, 0.94)' },
-    { id: 'social', label: 'Social & Connect', labelHindi: 'संपर्क', accent: WEB_ACCENTS.blue, bg: 'rgba(25, 35, 42, 0.94)' },
+    { id: 'news', label: 'News Feed', labelHindi: 'समाचार', accent: WEB_ACCENTS.maroon, bg: 'rgba(45, 27, 24, 0.94)',
+        subtitle: 'Good news, India, cricket and science', tone: 'blue' as WebAccent },
+    { id: 'youtube', label: 'YouTube', labelHindi: 'यूट्यूब', accent: WEB_ACCENTS.gold, bg: 'rgba(42, 33, 19, 0.94)',
+        subtitle: 'Songs, bhajans and any video', tone: 'rose' as WebAccent },
+    { id: 'search', label: 'Quick Search', labelHindi: 'खोज', accent: WEB_ACCENTS.teal, bg: 'rgba(22, 40, 38, 0.94)',
+        subtitle: 'Weather, cricket and Google', tone: 'green' as WebAccent },
+    { id: 'social', label: 'Social & Connect', labelHindi: 'संपर्क', accent: WEB_ACCENTS.blue, bg: 'rgba(25, 35, 42, 0.94)',
+        subtitle: 'WhatsApp, Gmail and LinkedIn', tone: 'violet' as WebAccent },
 ];
+
+const hubIcon = (id: string) => {
+    if (id === 'news') return <WI.NewspaperIcon size={72} strokeWidth={1.8} />;
+    if (id === 'youtube') return <WI.PlayBoxIcon size={72} strokeWidth={1.8} />;
+    if (id === 'search') return <WI.SearchLineIcon size={72} strokeWidth={1.8} />;
+    return <WI.ChatsIcon size={72} strokeWidth={1.8} />;
+};
 
 type HubCardVisual = {
     accent: string;
@@ -3581,6 +3649,16 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
     const wmaPrev2Ref = useRef<{ x: number; y: number } | null>(null);
     const hasRealGazeRef = useRef(hasRealGaze);
     useEffect(() => { hasRealGazeRef.current = hasRealGaze; }, [hasRealGaze]);
+    // The latest gaze point in window px while it is fresh (the tracker's estimate, or the
+    // mouse in UI-only simulation): the calm full-screen strip counts a look with it.
+    const getFreshGaze = useCallback((): { x: number; y: number } | null => {
+        if (hasRealGazeRef.current) {
+            const sample = browserSampleRef.current;
+            if (!sample.valid || performance.now() - sample.receivedAt > GAZE_STALE_MS) return null;
+        }
+        const point = gpRef.current;
+        return Number.isFinite(point.x) && Number.isFinite(point.y) ? { x: point.x, y: point.y } : null;
+    }, []);
     // v17.18: hide/show bookkeeping that must SURVIVE effect re-runs — the
     // earlier hide-once guard keyed on smoothedGazeRef, which the effect body
     // resets, so a dep-change re-run while the page cursor was visible left a
@@ -3628,7 +3706,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
                 hidePageCursor();
                 return;
             }
-            const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed' && view !== 'youtube';
+            const allowWatchScroll = isBrowserWatchMode && browser.scrollMode === 'armed';
             if (!ige || (isBrowserWatchMode && !allowWatchScroll)) {
                 hidePageCursor();
                 return;
@@ -3660,7 +3738,10 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             const activeBounds = browser.boundsRef.current;
 
             if (view === 'youtube' && isYtVideoActive && activeBounds && gazeNow.y < activeBounds.y + 96) {
-                hidePageCursor();
+                // YouTube's own header is never a dwell target. Gaze Scroll still gets
+                // the frames here (cursor-less): scrolling up starts at the top edge.
+                if (browser.scrollMode === 'armed') showPageCursor(gazeNow.x, gazeNow.y, { cursor: false });
+                else hidePageCursor();
                 return;
             }
 
@@ -3760,7 +3841,7 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
         }, 33);
         // Entering a hidden state (gaze off / watch mode) must hide even
         // if no further frames arrive.
-        if (!ige || (isBrowserWatchMode && !(browser.scrollMode === 'armed' && view !== 'youtube'))) {
+        if (!ige || (isBrowserWatchMode && browser.scrollMode !== 'armed')) {
             hidePageCursor();
         }
         return () => {
@@ -3808,156 +3889,44 @@ const WebBrowsingScreen: React.FC<{ onNavigate: (s: string) => void; onSpeak: (t
             </div>}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {view === 'news' && <NewsPanel ige={ige} ts={ts} onSpeak={onSpeak} goBack={goBack} disableGaze={disableGaze} browser={browser} gpRef={gpRef} isNavHidden={isNavHidden} />}
-                {view === 'youtube' && <YouTubePanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onVideoActive={setIsYtVideoActive} onNavHiddenToggle={setIsNavHidden}  />}
+                {view === 'youtube' && <YouTubePanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} getGaze={getFreshGaze} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} isDarkMode={isDarkMode} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onVideoActive={setIsYtVideoActive} onNavHiddenToggle={setIsNavHidden}  />}
                 {view === 'knowledge' && <KnowledgePanel ige={ige} ts={ts} onSpeak={onSpeak} isNavHidden={isNavHidden} />}
-                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden}  onSpeak={onSpeak} />}
+                {view === 'search' && <QuickSearchPanel ige={ige} ts={ts} browser={browser} gpRef={gpRef} goBack={goBack} disableGaze={disableGaze} toggleGaze={toggleGaze} isNavHidden={isNavHidden} isDarkMode={isDarkMode} browserInteractionMode={browserInteractionMode} onBrowserInteractionModeChange={setBrowserInteractionMode} onTopicActive={setIsQsTopicActive} onNavHiddenToggle={setIsNavHidden}  onSpeak={onSpeak} />}
                 {view === 'social' && <SocialPanel ige={ige} ts={ts} selectedService={socialService} onSelect={setSocialService} onBack={goBack} />}
             </div>
         </div>
     );
 
-    const renderHubCard = (card: typeof HUB_CARDS[number]) => {
-        const visual = HUB_CARD_VISUALS[card.id] || {
-            accent: card.accent,
-            bg: card.bg,
-            iconSize: 112,
-            iconOpacity: 0.76,
-            dividerOpacity: 0.42,
-        };
-        // Light/Warm: cream paper cards. Mix: tan paper-on-dark-desk cards (matches
-        // home tile surfaces). Default dark mode: dark navy with cream text.
-        const isPaperMode = isLight || isWarm;
-        const isMixMode = isMix;
-        const cardBg = isLight ? '#FAF5E8' : isWarm ? '#FBF5E5' : isMixMode ? '#B6A17A' : visual.bg;
-        const cardBorder = isPaperMode
-          ? '1px solid rgba(122, 99, 71, 0.16)'
-          : isMixMode ? '1.5px solid rgba(70, 52, 32, 0.56)' : HUB_UNIFIED_CARD_BORDER;
-        const cardShadow = isPaperMode
-          ? '0 1px 2px rgba(82, 65, 48, 0.05)'
-          : isMixMode ? 'inset 0 1px 0 rgba(255,255,255,0.07), 0 7px 16px rgba(0,0,0,0.22)' : HUB_UNIFIED_CARD_SHADOW;
-        // Paper-mode hub icons use the diversified warm-muted palette so each
-        // card has its own visual identity (matches Home tile colors).
-        // Mix-mode keeps unified teal for tan-card cohesion.
-        const PAPER_HUB_ACCENTS: Record<string, string> = {
-            news:       '#7A312E', // deeper maroon
-            youtube:    '#A56D55', // deeper coral
-            knowledge:  '#5F7C58', // deeper sage
-            search:     '#4F7388', // deeper sky blue
-            social:     '#85703D', // deeper rich gold
-        };
-        const iconAccent = isPaperMode
-            ? (PAPER_HUB_ACCENTS[card.id] ?? '#3F6968')
-            : isMixMode ? '#3F6968' : visual.accent;
-        const labelColor = isPaperMode ? '#2F2A26' : isMixMode ? '#180F08' : '#ECEDE3';
-        const labelTextShadow = isPaperMode || isMixMode ? 'none' : '0 1px 1px rgba(0,0,0,0.10)';
-        const hindiColor = isPaperMode ? '#5C4F44' : isMixMode ? '#4E3D29' : '#B0BFB6';
-
-        return (
-            <GazeButton key={card.id} id={`hub-${card.id}`} onClick={() => setView(card.id as ViewState)}
-                gazeEnabled={ige} gazeEnabledTimestamp={ts} isDarkMode dwellCategory="homeScreenTile"
-                contentFill={true}
-                style={{
-                    width: '100%', height: '100%',
-                    minHeight: 0,
-                    borderRadius: '26px', overflow: 'hidden', cursor: 'pointer',
-                    border: cardBorder,
-                    background: cardBg,
-                    boxShadow: cardShadow,
-                    transition: 'background 150ms ease, filter 150ms ease',
-                    padding: 0
-                }}
-                onMouseEnter={(e) => {
-                    if (!isPaperMode && !isMixMode) {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.filter = 'brightness(1.025)';
-                    }
-                }}
-                onMouseLeave={(e) => {
-                    if (!isPaperMode && !isMixMode) {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.filter = 'brightness(1)';
-                    }
-                }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'row', width: '100%', height: '100%', alignItems: 'center', position: 'relative' }}>
-                    <div style={{
-                        flex: '0 0 36%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingLeft: 'clamp(34px, 3.6vw, 60px)',
-                        color: iconAccent,
-                        opacity: visual.iconOpacity,
-                    }}>
-                        {renderHubIcon(card.id, visual.iconSize, iconAccent)}
-                    </div>
-                    <div style={{
-                        flex: '1 1 0',
-                        minWidth: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'flex-start',
-                        padding: 'clamp(20px,2.4vh,30px) clamp(24px,3vw,46px) clamp(20px,2.4vh,30px) clamp(14px,1.5vw,26px)',
-                        boxSizing: 'border-box',
-                        gap: '6px',
-                    }}>
-                        <span style={{
-                            fontFamily: FONT_PRIMARY, fontWeight: 650,
-                            fontSize: 'clamp(30px, 3.4vh, 43px)', color: labelColor,
-                            textAlign: 'left', lineHeight: 1.08, letterSpacing: 0,
-                            textShadow: labelTextShadow,
-                        }}>
-                            {card.label}
-                        </span>
-
-                    </div>
-                </div>
-            </GazeButton>
-        );
-    };
-
-    // Balanced 2×2 grid for 4 hub cards. Each card is slightly larger than
-    // the prior 3-column layout to use the extra space — gives the hub a
-    // more confident, premium feel while keeping eye-gaze targets generous.
-    const HUB_GRID_ROW: React.CSSProperties = {
-        display: 'grid',
-        gridAutoRows: 'minmax(clamp(240px, 28vh, 320px), 1fr)',
-        gap: 'clamp(26px, 3.2vw, 48px)',
-        justifyContent: 'center',
-        width: '100%',
-    };
-
+    // Web Browsing landing: the Activities stage -- a heading, then four cards.
     return (
-        <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'clamp(20px, 2.5vh, 40px)' }}>
+        <div className={`web-hub-screen${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{ position: 'absolute', inset: 0, background: isWarm ? '#F5EEDF' : T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ zIndex: 10 }}>
                 <GlobalNavBar currentPage="web" onNavigate={onNavigate} isDarkMode={isDarkMode} />
             </div>
 
-            <div className="web-hub-stage" style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                marginTop: 'clamp(-32px, -4vh, -16px)',
-                gap: 'clamp(26px, 3.4vh, 44px)',
-                padding: '0 clamp(40px, 4.5vw, 80px)',
-                boxSizing: 'border-box',
+            <div className="patient-stage web-stage" data-view="categories" style={{
+                flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0,
+                padding: '0 clamp(44px, 5vw, 86px) clamp(86px, 10vh, 124px)',
+                marginTop: 'clamp(18px, 2.2vh, 30px)',
             }}>
-                {/* Row 1: News Feed + YouTube */}
-                <div style={{
-                    ...HUB_GRID_ROW,
-                    gridTemplateColumns: 'repeat(2, minmax(0, clamp(420px, 36vw, 620px)))',
-                }}>
-                    {HUB_CARDS.slice(0, 2).map(renderHubCard)}
+                <div className="web-stage-head" style={{ marginBottom: 'clamp(18px, 2.4vh, 28px)' }}>
+                    <h2 style={{ margin: 0, fontSize: 'clamp(32px, 4vh, 48px)', fontWeight: 820, color: 'var(--ui-ink)', lineHeight: 1 }}>
+                        Web Browsing
+                    </h2>
                 </div>
-                {/* Row 2: Quick Search + Social & Connect */}
-                <div style={{
-                    ...HUB_GRID_ROW,
-                    gridTemplateColumns: 'repeat(2, minmax(0, clamp(420px, 36vw, 620px)))',
+                <div className="web-stage-grid" style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    gridTemplateRows: 'repeat(2, minmax(0, 1fr))',
                 }}>
-                    {HUB_CARDS.slice(2).map(renderHubCard)}
+                    {HUB_CARDS.map((card) => (
+                        <WebChoiceCard key={card.id} id={`hub-${card.id}`}
+                            title={card.label}
+                            subtitle={showHindi ? card.labelHindi : card.subtitle}
+                            icon={hubIcon(card.id)} accent={card.tone}
+                            onClick={() => setView(card.id as ViewState)}
+                            ige={ige} ts={ts} dwellCategory="homeScreenTile" />
+                    ))}
                 </div>
             </div>
         </div>

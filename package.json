@@ -25,10 +25,15 @@
     "check:home-layout": "node scripts/check-home-layout.cjs",
     "check:settings": "node scripts/check-settings.cjs",
     "check:look": "node scripts/check-look.cjs",
-    "check:design-layout": "node scripts/check-design-layout.cjs && node scripts/check-design-keyboard.cjs && node scripts/check-design-actions.cjs",
+    "check:design-layout": "node scripts/check-design-layout.cjs && node scripts/check-design-keyboard.cjs && node scripts/check-design-actions.cjs && node scripts/check-design-calm-video.cjs",
     "check:gaze-safety": "node scripts/check-gaze-safety.cjs",
     "check:gaze-colours": "node scripts/check-gaze-colours.cjs",
     "check:browser-gaze-safety": "node scripts/check-browser-gaze-safety.cjs",
+    "check:browser-safety": "node scripts/check-browser-safety.cjs",
+    "check:page-scroll": "node scripts/check-page-scroll.cjs",
+    "check:youtube-page": "node scripts/check-youtube-page.cjs",
+    "check:search-keyboard": "node scripts/check-search-keyboard.cjs && node scripts/check-search-suggestions.cjs",
+    "check:calm-video": "node scripts/check-calm-video.cjs",
     "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs"
   },
   "dependencies": {

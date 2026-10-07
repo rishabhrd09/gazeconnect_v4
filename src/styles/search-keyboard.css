@@ -1,0 +1,231 @@
+/* Search keyboard for the web screens (6 Oct 2026, SearchKeyboard.tsx).
+   The keys are the main keyboard's (KeyboardKeys.tsx) and take its Focus/Serene
+   colours from keyboard-design-colors.css through the
+   `#root .keyboard-screen[data-keyboard-feel]` hook. Every target is at least
+   80 CSS px tall at 1366x768 and 1920x1080; nothing scrolls. */
+.search-keyboard {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.1vh, 14px);
+  padding: clamp(10px, 1.4vh, 18px) clamp(14px, 1.6vw, 26px) clamp(12px, 1.6vh, 22px);
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--ui-page, #0d1117);
+}
+
+/* The top row (8 Oct 2026, maintainer request): what is typed on the left, three search
+   suggestions on the right, where the eyes check the typing. A search is short, so the
+   typed text takes the smaller share; its end always stays in sight (SearchKeyboard.tsx). */
+.search-keyboard-top {
+  flex: 0 0 clamp(104px, 14.5vh, 160px);
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: clamp(12px, 1.2vw, 20px);
+}
+
+.search-keyboard-display {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 clamp(16px, 1.6vw, 28px);
+  border-radius: 18px;
+  background: var(--ui-panel, #1a222c);
+  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.12));
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.search-keyboard-suggestions {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1vw, 16px);
+}
+
+.search-keyboard-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ui-muted, #a9b4c0);
+  font-size: clamp(16px, 1.9vh, 21px);
+  font-weight: 650;
+}
+
+.search-keyboard-text {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--kb-ink, var(--ui-ink, #f5f7fa));
+  font-size: clamp(28px, 4.4vh, 50px);
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.search-keyboard-typed {
+  flex: 0 0 auto;
+}
+
+/* A long search: its start slides out on the left, faded. */
+.search-keyboard-text.is-overflowing {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 clamp(24px, 2.6vw, 44px));
+  mask-image: linear-gradient(to right, transparent 0, #000 clamp(24px, 2.6vw, 44px));
+}
+
+.search-keyboard-placeholder {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--ui-muted, #a9b4c0);
+  font-size: clamp(22px, 3vh, 34px);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.search-keyboard-caret {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 4px;
+  height: 0.9em;
+  margin-left: 6px;
+  border-radius: 2px;
+  background: var(--ui-accent-ink, #2dd4bf);
+  animation: search-keyboard-caret 1.1s steps(1) infinite;
+}
+
+@keyframes search-keyboard-caret {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-keyboard-caret { animation: none; }
+}
+
+.search-keyboard-keys {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.9vh, 12px);
+}
+
+.search-keyboard-row {
+  flex: 1 1 0;
+  min-height: 80px;
+  display: flex;
+  gap: clamp(6px, 0.6vw, 12px);
+}
+
+.search-keyboard-row.search-keyboard-action-row {
+  flex: 0 0 clamp(88px, 11vh, 120px);
+}
+
+/* The last row: Back and Search, two large buttons (8 Oct 2026; the suggestions moved up
+   beside the typed text). Search, the step that finishes the screen, is the wider. */
+.search-keyboard-commands {
+  flex: 0 0 clamp(100px, 13vh, 140px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: clamp(12px, 1.2vw, 20px);
+}
+
+:root[data-theme] .search-keyboard .search-keyboard-commands .search-keyboard-command {
+  font-size: clamp(26px, 3.4vh, 38px) !important;
+}
+
+.search-keyboard-commands .search-keyboard-command svg {
+  width: clamp(34px, 4.4vh, 46px);
+  height: clamp(34px, 4.4vh, 46px);
+}
+
+.search-keyboard .search-keyboard-command > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+:root[data-theme] .search-keyboard .search-keyboard-command {
+  min-height: 80px;
+  font-size: clamp(24px, 3vh, 34px) !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+}
+
+/* A suggestion: where it comes from (star: the person's list, clock: searched before,
+   sparkle: popular), then its words, the typed beginnings in bold, at most two lines. */
+:root[data-theme] .search-keyboard .search-keyboard-command.search-keyboard-suggestion {
+  padding: 10px clamp(12px, 1.1vw, 18px) !important;
+  font-size: clamp(20px, 2.5vh, 27px) !important;
+  font-weight: 560 !important;
+  line-height: 1.2 !important;
+  text-align: left !important;
+}
+.search-keyboard .search-keyboard-command.search-keyboard-suggestion > div:last-child {
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.search-keyboard-suggestion-icon {
+  flex: 0 0 auto;
+  display: flex;
+  color: var(--design-accent, var(--ui-accent-ink, #2dd4bf));
+}
+.search-keyboard-suggestion.source-personal .search-keyboard-suggestion-icon { color: var(--design-gold, #e7cd9f); }
+.search-keyboard-suggestion.source-history .search-keyboard-suggestion-icon { color: var(--design-blue, #b6d9ef); }
+.search-keyboard-suggestion.source-popular .search-keyboard-suggestion-icon { color: var(--design-green, #b4dfcf); }
+.search-keyboard-suggestion-text {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.search-keyboard-suggestion-text strong {
+  font-weight: 800;
+}
+/* Nothing to offer here: the place stays, empty and not a target. */
+.search-keyboard-suggestion-empty {
+  border: 1px dashed var(--ui-border, rgba(255, 255, 255, 0.12));
+  border-radius: 14px;
+  opacity: 0.5;
+}
+
+:root[data-theme] .search-keyboard .search-keyboard-go:not(:disabled) {
+  background: var(--ui-selected, #214a46) !important;
+  border-color: var(--ui-accent-ink, #2dd4bf) !important;
+}
+
+:root[data-theme] .search-keyboard .search-keyboard-go:disabled {
+  opacity: 0.5 !important;
+}
+
+/* The keys keep the main keyboard's shape and lettering inside the design
+   surface, whose card rules would otherwise round and lighten them. */
+:root[data-design][data-theme][data-look] #root .search-keyboard .keyboard-key {
+  border-radius: 10px !important;
+  letter-spacing: 0.5px !important;
+}
+
+:root[data-design][data-theme][data-look] #root .search-keyboard[data-keyboard-feel='standard'] .keyboard-key[data-action='letter'] {
+  font-weight: 800 !important;
+}
+
+:root[data-design][data-theme][data-look] #root .search-keyboard .keyboard-key:not([data-action='letter']) {
+  font-weight: 780 !important;
+}

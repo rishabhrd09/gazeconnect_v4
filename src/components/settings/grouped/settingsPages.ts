@@ -4,7 +4,7 @@
  */
 export type GroupedPageId =
   | 'gaze' | 'voice' | 'display'
-  | 'home' | 'quickwords' | 'phrases' | 'medical' | 'alertmode' | 'people' | 'activities' | 'dictionary'
+  | 'home' | 'quickwords' | 'phrases' | 'medical' | 'alertmode' | 'people' | 'activities' | 'websearch' | 'dictionary'
   | 'backup' | 'reset' | 'about';
 
 export interface GroupedPage {
@@ -26,6 +26,7 @@ export const ICON = {
   shield: 'M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6z M12 9v6 M9 12h6',
   people: 'M9 11a3.5 3.5 0 1 0 0-7a3.5 3.5 0 1 0 0 7z M2.5 20a6.5 6.5 0 0 1 13 0 M16 4.5a3.5 3.5 0 0 1 0 6.5 M18 14.5a6.5 6.5 0 0 1 3.5 5.5',
   tv: 'M3.5 7h17v11h-17z M9 3l3 4 3-4 M8 21h8',
+  search: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-4-4',
   book: 'M4 4h6a2 2 0 0 1 2 2v14a1.5 1.5 0 0 0-1.5-1.5H4z M20 4h-6a2 2 0 0 0-2 2v14a1.5 1.5 0 0 1 1.5-1.5H20z',
   download: 'M12 4v11 M7.5 10.5L12 15l4.5-4.5 M4 17v3h16v-3',
   upload: 'M12 15V4 M7.5 8.5L12 4l4.5 4.5 M4 17v3h16v-3',
@@ -60,6 +61,7 @@ export const PAGE_GROUPS: Array<{ title: string; pages: GroupedPage[] }> = [
       page('alertmode', 'Urgent Needs', 'The cards on the Urgent Needs screen.', ICON.shield),
       page('people', 'People', 'Who Papa can call for or talk about.', ICON.people),
       page('activities', 'Activities', 'TV channels, YouTube and Alexa commands.', ICON.tv),
+      page('websearch', 'Web Search', 'Suggestions on the YouTube and Google search keyboards.', ICON.search),
       page('dictionary', 'Word Prediction', 'Words, shortcuts and sentences the keyboard suggests.', ICON.book),
     ],
   },

@@ -6,6 +6,9 @@
  * and all screens that display configurable content.
  */
 
+import type { WebSearchData } from '../config/searchSuggestions';
+export type { WebSearchData, WebSearchTarget, WebSearchHistoryEntry } from '../config/searchSuggestions';
+
 // ============================================
 // SHARED
 // ============================================
@@ -189,7 +192,7 @@ export interface AppSettings {
   showHindi: boolean; // Legacy storage field; normalized to false for this English-only release.
   dwellTime: number;
   filterPreset: string;
-  dwellTimingSet: 'quick' | 'balanced' | 'relaxed' | 'extra_time'; // One complete set of the five selection durations
+  dwellTimingSet: 'quick' | 'balanced' | 'measured' | 'calm' | 'relaxed' | 'extra_time'; // One complete set of the six selection durations (config/dwellTimeConfig)
   keyboardFeel: 'standard' | 'familiar'; // Optional keyboard-only timing and Dark key appearance
   gazeColors: 'standard' | 'high_contrast' | 'soft'; // Cursor ring, dwell fill and highlight palette (config/gazeColors)
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';
@@ -205,6 +208,11 @@ export interface AppSettings {
   gazeOffsetX: number;             // Legacy storage field; normalized to 0 (see CustomizationService).
   gazeOffsetY: number;             // Legacy storage field; normalized to 0.
   gazeDebugOverlay: boolean;       // Show gaze debug overlay (default false)
+  // Calm full-screen video (7 Oct 2026): no controls on screen while a video plays in full
+  // screen; looking at the black strip under it for videoRevealHoldMs (3000 | 4000 | 5000,
+  // default 4000) offers Show options. On by default.
+  calmFullScreenVideo: boolean;
+  videoRevealHoldMs: number;
   // Home left panel: 'quick' = Quick Phrases only (the default), 'alert' = the Urgent
   // Needs card above Quick Phrases, only when chosen in Settings > Home Layout
   // (maintainer's decision, 28 Sep 2026). Anything else, including the four emergency
@@ -242,6 +250,10 @@ export interface CustomizationData {
 
   /** 5 customizable alert-mode cards (card 0 = SOS Emergency, always fixed) */
   alertModeCards: AlertModeCard[];
+
+  /** Search suggestions on the web search keyboard: the person's lists, remembered
+   *  searches and two switches (Settings > Web Search; config/searchSuggestions.ts). */
+  webSearch: WebSearchData;
 
   // Settings
   settings: AppSettings;

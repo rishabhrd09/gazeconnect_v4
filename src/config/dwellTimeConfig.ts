@@ -1,52 +1,90 @@
 /** Selection durations shared by every gaze surface.
  *
- * Five action groups, and four complete timing sets that fix all five at
- * once. There are no per-button sliders, multipliers or repeat acceleration:
- * a person chooses one named set. Onset, cooldown and tracking stability are
- * separate internal safeguards.
+ * Six action groups, and six complete timing sets that fix all six at once.
+ * There are no per-button sliders or repeat acceleration: a person chooses one
+ * named set. Onset, cooldown and tracking stability are separate internal
+ * safeguards.
  *
- * Balanced is the standard, and every set keeps its proportions (maintainer
- * request, 29 Sep 2026: word suggestions had fallen to 0.73 of a key's time in
- * Extra Time, yet took 1.25 of it in Quick). Each set is Balanced scaled by its
- * typing time, to the nearest 50 ms, and no selection takes longer than 4 s.
- * The typing times follow patient feedback: raised on 26 Sep 2026, then on
- * 29 Sep Relaxed went from 2.2 to 2.4 s (it felt quick) and Extra Time from
- * 3.0 to 2.8 s (it felt long). Deliberate actions reach the 4 s ceiling in both
- * (4286 and 5000 would be proportional), so there Extra Time equals Relaxed;
- * everything else is slower than in the mode before. Word suggestions on the
- * keyboard take the key time itself (maintainer request, 29 Sep 2026, for
- * muscle memory). check:dwell-groups recomputes the four sets from Balanced.
+ * 5 Oct 2026 (maintainer request after patient feedback): Balanced felt quick,
+ * Relaxed and Extra Time slow, and the +71 % step from Balanced to Relaxed was
+ * drastic; cards and controls also felt far slower than keys (Extra Time:
+ * 3.8 s for a card, 2.8 s for a key). So:
+ * - Six sets. Keys fill in 0.8 s (Quick), then 1.4, 1.7, 2.0, 2.4 and 2.8 s:
+ *   from Balanced on, each set is about a fifth slower than the one before,
+ *   one gentle step at a time up to Extra Time, still the slowest. The step is
+ *   a constant ratio because a difference in duration is judged relative to
+ *   its length.
+ * - One rule for every set: a group takes the key time times its entry in
+ *   GROUP_RATIOS, to the nearest 50 ms, within GROUP_LIMITS; no selection takes
+ *   longer than 4 s. Cards and controls are only a little slower than keys
+ *   (navigation 1.2x, deliberate 1.35x, where they had been 1.36x and 1.79x):
+ *   one to two just-noticeable steps, about what OptiKey gives its modifier,
+ *   suggestion and Sleep keys (1.2x, 1.4x).
+ * - Keys, word suggestions, the phrase cell (29 Sep 2026) and now the words on
+ *   the Quick Words board share the key time, for muscle memory.
+ * - Urgent Needs keeps its deliberately long time (1.8x: Quick 1.45 s,
+ *   Balanced 2.5 s, 4 s from Relaxed), unchanged from the four-set table.
+ * - Video controls: the bar under a playing YouTube video takes 1.6x the key
+ *   time, never under 2 s, so a person can watch (and read the subtitles just
+ *   above the bar) at their own pace.
+ * check:dwell-groups recomputes every set from GROUP_RATIOS and GROUP_LIMITS.
  */
 const GROUP_INFO = {
-  typing: { label: 'Typing', description: 'Letters, keyboard keys and word suggestions' },
+  typing: { label: 'Typing', description: 'Letters, keyboard keys, word suggestions and Quick Words' },
   words: { label: 'Alphabet groups', description: 'Letter groups on the Zone Board' },
-  communication: { label: 'Communication', description: 'Phrases, care requests and quick replies' },
-  navigation: { label: 'Navigation & choices', description: 'Pages, survey answers, map cells and browsing' },
-  deliberate: { label: 'Deliberate actions', description: 'Gaze on/off, clearing text and confirmations' },
+  communication: { label: 'Communication', description: 'Phrases, care requests, quick replies and Speak' },
+  navigation: { label: 'Navigation & choices', description: 'Pages, navigation, survey answers, map cells and browsing' },
+  deliberate: { label: 'Deliberate actions', description: 'Gaze on/off, Delete Word and confirmations' },
+  emergency: { label: 'Urgent Needs', description: 'The Urgent Needs launcher, deliberately long' },
+  video: { label: 'Video controls', description: 'The bar under a playing YouTube video' },
 } as const;
 export type DwellGroup = keyof typeof GROUP_INFO;
 
+/** Each group's time as a share of the key time: the same in every set. */
+export const GROUP_RATIOS: Readonly<Record<DwellGroup, number>> = {
+  typing: 1, words: 0.93, communication: 1.1, navigation: 1.2, deliberate: 1.35, emergency: 1.8, video: 1.6,
+};
+/** [shortest, longest] after the ratio, in ms; every other group is at most 4 s. */
+export const GROUP_LIMITS: Readonly<Partial<Record<DwellGroup, readonly [number, number]>>> = {
+  video: [2000, 4000],
+};
+export const MAX_DWELL_MS = 4000;
+
 export const DWELL_TIMING_SETS = {
   quick: {
-    label: 'Quick', description: 'For a practised user who prefers shorter selections',
-    ms: { typing: 800, words: 750, communication: 900, navigation: 1100, deliberate: 1450 },
+    label: 'Quick', description: 'The shortest selections, for a practised user',
+    ms: { typing: 800, words: 750, communication: 900, navigation: 950, deliberate: 1100, emergency: 1450, video: 2000 },
   },
   balanced: {
-    label: 'Balanced (default)', description: 'A comfortable pace for most people, with calmer typing',
-    ms: { typing: 1400, words: 1300, communication: 1600, navigation: 1900, deliberate: 2500 },
+    label: 'Balanced (default)', description: 'The standard pace',
+    ms: { typing: 1400, words: 1300, communication: 1550, navigation: 1700, deliberate: 1900, emergency: 2500, video: 2250 },
+  },
+  measured: {
+    label: 'Measured', description: 'A little more time than Balanced',
+    ms: { typing: 1700, words: 1600, communication: 1850, navigation: 2050, deliberate: 2300, emergency: 3050, video: 2700 },
+  },
+  calm: {
+    label: 'Calm', description: 'A little more time than Measured',
+    ms: { typing: 2000, words: 1850, communication: 2200, navigation: 2400, deliberate: 2700, emergency: 3600, video: 3200 },
   },
   relaxed: {
-    label: 'Relaxed', description: 'More time to find a key and look away from a wrong choice',
-    ms: { typing: 2400, words: 2250, communication: 2750, navigation: 3250, deliberate: 4000 },
+    label: 'Relaxed', description: 'A little more time than Calm',
+    ms: { typing: 2400, words: 2250, communication: 2650, navigation: 2900, deliberate: 3250, emergency: 4000, video: 3850 },
   },
   extra_time: {
-    label: 'Extra Time', description: 'The slowest pace, with generous time to settle on each key',
-    ms: { typing: 2800, words: 2600, communication: 3200, navigation: 3800, deliberate: 4000 },
+    label: 'Extra Time', description: 'The slowest pace, with the most time',
+    ms: { typing: 2800, words: 2600, communication: 3100, navigation: 3350, deliberate: 3800, emergency: 4000, video: 4000 },
   },
 } as const satisfies Record<string, { label: string; description: string; ms: Record<DwellGroup, number> }>;
 export type DwellTimingSet = keyof typeof DWELL_TIMING_SETS;
 export const DEFAULT_DWELL_TIMING_SET: DwellTimingSet = 'balanced';
-/** An optional keyboard-only feel. The four app-wide speed sets remain intact. */
+/** "Keys 1.7 s · cards 2.05 s": how long the ring takes to fill, for Settings. */
+export function describeTimingSet(set: DwellTimingSet): string {
+  const seconds = (ms: number) => `${String(ms / 1000)} s`;
+  const { typing, navigation } = DWELL_TIMING_SETS[set].ms;
+  return `Keys ${seconds(typing)} · cards ${seconds(navigation)}`;
+}
+/** An optional keyboard-only feel. The six app-wide speed sets remain intact. */
 export type KeyboardFeel = 'standard' | 'familiar';
 export const DEFAULT_KEYBOARD_FEEL: KeyboardFeel = 'standard';
 /** Initial OptiKey-inspired targets, not a claim of equal end-to-end latency. */
@@ -80,7 +118,7 @@ export function normalizeDwellTimingSet(value: unknown): DwellTimingSet {
 
 let activeTimingSet: DwellTimingSet = DEFAULT_DWELL_TIMING_SET;
 let activeAllowedDurations = ALLOWED_DURATIONS_BY_SET[DEFAULT_DWELL_TIMING_SET];
-/** The five durations of the active timing set. `ms` follows setDwellTimingSet. */
+/** The seven durations of the active timing set. `ms` follows setDwellTimingSet. */
 export const DWELL_GROUPS = Object.fromEntries((Object.keys(GROUP_INFO) as DwellGroup[]).map(group => [
   group, { ms: DWELL_TIMING_SETS[DEFAULT_DWELL_TIMING_SET].ms[group] as number, ...GROUP_INFO[group] },
 ])) as Record<DwellGroup, { ms: number; label: string; description: string }>;
@@ -98,11 +136,16 @@ export function setDwellTimingSet(value: unknown): DwellTimingSet {
 
 export const DWELL_ACTION_GROUPS = {
   standardButton: 'navigation', navigationButton: 'navigation',
-  emergencyButton: 'deliberate', quickWord: 'communication', gazeToggle: 'deliberate',
+  emergencyButton: 'emergency', quickWord: 'communication', gazeToggle: 'deliberate',
   backSkipButton: 'navigation', homeScreenTile: 'navigation', keyboardKey: 'typing',
   predictionButton: 'typing', phraseButton: 'communication', surveyOption: 'navigation', compassMapAction: 'navigation',
   quickfire: 'communication', spatialZone: 'words', settingsButton: 'navigation',
   medicalUrgent: 'communication', deliberateAction: 'deliberate',
+  // A word on the Quick Words board: the key time (5 Oct 2026). `quickWord`
+  // remains Speak and the Urgent Needs board.
+  quickWordChoice: 'typing',
+  // The bar under a playing YouTube video.
+  videoControl: 'video',
 } as const satisfies Record<string, DwellGroup>;
 export type DwellAction = keyof typeof DWELL_ACTION_GROUPS;
 export type DwellContext = DwellAction | 'keyboard' | 'prediction' | 'navigation' | 'phrases' | 'settings' | 'emergency' | 'calibration' | 'spatial';
@@ -186,4 +229,45 @@ export function loadDwellPreferences(storage: Pick<Storage, 'getItem'>, timingSe
     progressStyle: saved.progressStyle === 'shrink' ? 'shrink' : 'ring',
   };
   return { settings, currentStage };
+}
+
+// ============================================
+// CALM FULL-SCREEN VIDEO (7 Oct 2026, maintainer request)
+// ============================================
+// While a YouTube video plays in full screen, no control is on screen; a plain black
+// strip runs under the video (src/components/browser/calmWatch.ts). Looking at the
+// strip for one of these times offers a single Show options button, which takes the
+// Video controls time like the rest of the bar. This is a look, not a selection, so it
+// is not one of the seven groups above and does not follow the Selection speed set.
+export const VIDEO_REVEAL_HOLD_CHOICES_MS = [3000, 4000, 5000] as const;
+export const DEFAULT_VIDEO_REVEAL_HOLD_MS = 4000;
+export const VIDEO_REVEAL_TIMING = {
+  /** A glance shorter than this shows nothing at all. */
+  quietMs: 1000,
+  /** Blinks and the tracker's drop-outs pause the count, never reset it. Looking down at the
+   *  screen's bottom edge, a tracker often loses the eyes for up to a second (the maintainer's
+   *  tracker log, 7 Oct 2026); 0.6 s threw the look away. */
+  gapGraceMs: 1500,
+  /** The eyes back on the video this long start the count again. */
+  resetAwayMs: 700,
+  /** Show options goes away if it is not chosen within this time... */
+  offerTimeoutMs: 8000,
+  /** ...or once the eyes have been back on the video this long. */
+  offerAwayMs: 2000,
+  /** The bar hides again after this long without the eyes on it (never while a video has ended
+   *  or is paused). */
+  controlsIdleMs: 8000,
+  /** After Next, Back, Play or Skip Ad on the bar, it hides once the video (not an ad) has played
+   *  this long (8 Oct 2026, maintainer request). Pause keeps it. */
+  hideAfterActionMs: 1000,
+  /** A video paused this long while the bar is away brings the bar back; it stays while paused. */
+  pausedShowMs: 2000,
+  /** The strip counts from this far above its top edge: a tracker reports a look at the
+   *  screen's bottom edge a little too high (was 16 px below it, 8 Oct 2026). YouTube's
+   *  captions sit 60-100 px above the strip, outside this band. */
+  stripEdgePx: 32,
+} as const;
+export function normalizeVideoRevealHoldMs(value: unknown): number {
+  const ms = typeof value === 'number' ? value : Number(value);
+  return (VIDEO_REVEAL_HOLD_CHOICES_MS as readonly number[]).includes(ms) ? ms : DEFAULT_VIDEO_REVEAL_HOLD_MS;
 }

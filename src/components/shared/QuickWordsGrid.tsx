@@ -545,7 +545,8 @@ const QuickWordsGrid: React.FC<QuickWordsGridProps> = ({
                     isDarkMode={isDarkMode}
                     gazeEnabled={gazeEnabled}
                     gazeEnabledTimestamp={gazeEnabledTimestamp}
-                    dwellCategory={category.id === 'emergency' ? 'medicalUrgent' : 'quickWord'}
+                    // Words take the key time, like keys and suggestions; urgent words a little longer.
+                    dwellCategory={category.id === 'emergency' ? 'medicalUrgent' : 'quickWordChoice'}
                     style={{
                       width: '100%',
                       height: '100%',

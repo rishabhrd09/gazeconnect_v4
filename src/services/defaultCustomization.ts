@@ -21,6 +21,7 @@
  */
 
 import type { CustomizationData, Phrase } from '../types/customization';
+import { DEFAULT_WEB_SEARCH } from '../config/searchSuggestions';
 
 /** Generate default phrases for a new person */
 export function generateDefaultPhrases(name: string, nameHi: string): Phrase[] {
@@ -579,6 +580,9 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     { en: 'Itching', hi: 'खुजली हो रही है' },
   ],
 
+  // Search suggestions: empty lists, popular searches and remembering on (Settings > Web Search).
+  webSearch: structuredClone(DEFAULT_WEB_SEARCH),
+
   // ============================================
   // SETTINGS
   // ============================================
@@ -603,6 +607,8 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     gazeOffsetX: 0,
     gazeOffsetY: 0,
     gazeDebugOverlay: false,
+    calmFullScreenVideo: true,
+    videoRevealHoldMs: 4000,
     // Home's left panel is Quick Phrases only (maintainer's choice, 24 Sep 2026, and on
     // 28 Sep 2026 for existing saves too). The Urgent Needs card is added in Settings >
     // Home Layout (CustomizationService.applyHomeLayoutVersion).

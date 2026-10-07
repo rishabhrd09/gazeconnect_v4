@@ -19,7 +19,13 @@ interface BrowserViewBounds {
 type PageLink = { text: string; href: string };
 type EdgeScrollDirection = 'up' | 'down' | 'none';
 type ScrollMode = 'off' | 'armed';
-type YoutubeCommand = 'play' | 'play_pause' | 'next' | 'skip_ad' | 'show_controls' | 'hide_controls' | 'volume_up' | 'volume_down' | 'get_state';
+type YoutubeCommand = 'play' | 'play_pause' | 'next' | 'skip_ad' | 'show_controls' | 'hide_controls' | 'volume_up' | 'volume_down' | 'get_state'
+    | 'maximize' | 'restore' | 'is_maximized' | 'tidy_page';
+type PageScrollDirection = 'up' | 'down' | 'top';
+/** Where the page stands after the last Up/Down (atTop/atBottom), and whether a scroll is under way. */
+export type PageScrollState = { atTop: boolean; atBottom: boolean; pending: boolean };
+/** A short message from the browser: something refused (a download, a link), or the page refreshed or restarted. */
+export type BrowserNotice = { kind: 'blocked' | 'refreshed' | 'recovered'; what?: string; at: number };
 type VideoPlaybackState = {
     playing: boolean;
     hasVideo: boolean;
@@ -32,6 +38,20 @@ type YoutubeCommandResult = {
     detail?: string;
     youtubeState?: string;
     blockDwellMs?: number;
+    /** get_state: YouTube's own Skip Ad button can be pressed now. */
+    skippable?: boolean;
+    /** maximize / restore / is_maximized: the in-app full screen is applied. */
+    maximized?: boolean;
+    /** get_state: video choices on the page (0 on an empty YouTube Home). */
+    videoChoices?: number;
+    /** get_state: the page's title without " - YouTube". */
+    title?: string;
+    /** get_state: a YouTube promo popup is over the page (tidy_page answers it with No thanks). */
+    promo?: boolean;
+    /** get_state: YouTube's miniplayer is playing the last video over this page (tidy_page closes it). */
+    miniplayer?: boolean;
+    /** get_state: where the video is, in whole seconds. */
+    time?: number | null;
 };
 type BrowserDiagnostics = {
     url: string;
@@ -74,6 +94,15 @@ type BrowserGazeConfig = {
 };
 
 const getElectronAPI = () => (window as any).electronAPI;
+const initialScrollState = (): PageScrollState => ({ atTop: true, atBottom: false, pending: false });
+
+/** YouTube's results page for what was typed on the search keyboard. */
+export const youtubeSearchUrl = (query: string) =>
+    `https://www.youtube.com/results?search_query=${encodeURIComponent(query.trim())}`;
+/** Google's results page for what was typed on the search keyboard. */
+export const googleSearchUrl = (query: string) =>
+    `https://www.google.com/search?q=${encodeURIComponent(query.trim())}`;
+export const YOUTUBE_HOME_URL = 'https://www.youtube.com/';
 const defaultVideoPlaybackState = (): VideoPlaybackState => ({
     playing: false,
     hasVideo: false,
@@ -93,8 +122,13 @@ export function useGazeBrowser() {
     const [edgeScrollDirection, setEdgeScrollDirection] = useState<EdgeScrollDirection>('none');
     const [scrollMode, setScrollModeState] = useState<ScrollMode>('off');
     const [videoPlaybackState, setVideoPlaybackState] = useState<VideoPlaybackState>(() => defaultVideoPlaybackState());
+    const [pageScroll, setPageScroll] = useState<PageScrollState>(() => initialScrollState());
+    const [notice, setNotice] = useState<BrowserNotice | null>(null);
+    const [pageVisible, setPageVisibleState] = useState(true);
     const boundsRef = useRef<BrowserViewBounds | null>(null);
     const cursorInsideRef = useRef(false);
+    // While an app screen covers the page (the search keyboard) no gaze is sent to it.
+    const pageHiddenRef = useRef(false);
     // Bumped by every close. An open that resolves after a close was issued
     // belongs to a page the user has already left and is not shown as open.
     const openGenerationRef = useRef(0);
@@ -117,7 +151,12 @@ export function useGazeBrowser() {
         const handler = (state: { canGoBack: boolean; canGoForward: boolean; url?: string }) => {
             setCanGoBack(state.canGoBack);
             setCanGoForward(state.canGoForward);
-            if (typeof state.url === 'string') setCurrentUrl(state.url);
+            if (typeof state.url === 'string') {
+                setCurrentUrl((previous) => {
+                    if (previous !== state.url) setPageScroll(initialScrollState());
+                    return state.url as string;
+                });
+            }
         };
         api.on('webview:navigation-state', handler);
         return () => api.off('webview:navigation-state', handler);
@@ -164,6 +203,25 @@ export function useGazeBrowser() {
         return () => api.off('webview:playbackState', handler);
     }, []);
 
+    // Short notices from the browser: a refused download or link, an automatic refresh.
+    useEffect(() => {
+        const api = getElectronAPI();
+        if (!api?.on) return;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const handler = (payload: { kind?: string; what?: string }) => {
+            const kind = payload?.kind;
+            if (kind !== 'blocked' && kind !== 'refreshed' && kind !== 'recovered') return;
+            setNotice({ kind, what: typeof payload?.what === 'string' ? payload.what : undefined, at: Date.now() });
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => setNotice(null), 5000);
+        };
+        api.on('webview:notice', handler);
+        return () => {
+            api.off('webview:notice', handler);
+            if (timer) clearTimeout(timer);
+        };
+    }, []);
+
     // Native BrowserView can be closed by Electron-side safety paths
     // (reset, unresponsive renderer, render-process-gone). Mirror that state
     // immediately so React never leaves a stale page floating over the app.
@@ -181,6 +239,9 @@ export function useGazeBrowser() {
             setScrollModeState('off');
             setHighContrast(false);
             setVideoPlaybackState(defaultVideoPlaybackState());
+            setPageScroll(initialScrollState());
+            setPageVisibleState(true);
+            pageHiddenRef.current = false;
             boundsRef.current = null;
             cursorInsideRef.current = false;
         };
@@ -213,6 +274,9 @@ export function useGazeBrowser() {
                 setHighContrast(false);
                 setZoomFactor(1.35);
                 setVideoPlaybackState(defaultVideoPlaybackState());
+                setPageScroll(initialScrollState());
+                setPageVisibleState(true);
+                pageHiddenRef.current = false;
                 setLoading(false);
                 return true;
             }
@@ -237,35 +301,57 @@ export function useGazeBrowser() {
         setScrollModeState('off');
         setHighContrast(false);
         setVideoPlaybackState(defaultVideoPlaybackState());
+        setPageScroll(initialScrollState());
+        setPageVisibleState(true);
+        pageHiddenRef.current = false;
         boundsRef.current = null;
         cursorInsideRef.current = false;
     }, []);
 
-    const clickAtGaze = useCallback(async (clientX: number, clientY: number) => {
+    // Up / Down by most of a screen, chosen by the page itself (main.ts 'webview:scrollPage'):
+    // the document, or the panel that actually scrolls, never just whatever is under the
+    // middle of the view. The result says whether the top or the end has been reached.
+    const scrollPage = useCallback(async (direction: PageScrollDirection) => {
         const api = getElectronAPI();
-        if (!api?.webview || !boundsRef.current) return;
-        // Convert page coordinates to BrowserView-local coordinates
-        const b = boundsRef.current;
-        const localX = Math.round(clientX - b.x);
-        const localY = Math.round(clientY - b.y);
-        if (localX < 0 || localY < 0 || localX > b.width || localY > b.height) return;
+        if (!api?.webview) return null;
+        if (!api.webview.scrollPage) {
+            await api.webview.scroll(direction === 'down' ? -300 : 300);
+            return null;
+        }
+        setPageScroll((state) => ({ ...state, pending: true }));
         try {
-            await api.webview.click(localX, localY);
-        } catch (err) {
-            console.error('clickAtGaze error:', err);
+            const result = await api.webview.scrollPage(direction);
+            setPageScroll((state) => (result && typeof result.atTop === 'boolean'
+                ? { atTop: !!result.atTop, atBottom: !!result.atBottom, pending: false }
+                : { ...state, pending: false }));
+            return result;
+        } catch {
+            setPageScroll((state) => ({ ...state, pending: false }));
+            return null;
         }
     }, []);
 
-    const scrollDown = useCallback(async () => {
-        const api = getElectronAPI();
-        if (!api?.webview) return;
-        await api.webview.scroll(-300); // negative = scroll down in Chromium
-    }, []);
+    const scrollDown = useCallback(() => scrollPage('down'), [scrollPage]);
+    const scrollUp = useCallback(() => scrollPage('up'), [scrollPage]);
+    const scrollToTop = useCallback(() => scrollPage('top'), [scrollPage]);
 
-    const scrollUp = useCallback(async () => {
+    // The page is a native layer above the whole interface. To show an app screen over it
+    // (the search keyboard), it is taken off the window -- kept alive, exactly as it was --
+    // and gaze stops reaching it until it is shown again.
+    const setPageVisible = useCallback(async (visible: boolean) => {
         const api = getElectronAPI();
-        if (!api?.webview) return;
-        await api.webview.scroll(300); // positive = scroll up
+        pageHiddenRef.current = !visible;
+        setPageVisibleState(visible);
+        if (!visible && cursorInsideRef.current) {
+            cursorInsideRef.current = false;
+            try { await api?.webview?.updateGaze?.(-1, -1, { emittedAtWallMs: Date.now() }); } catch { /* ignore */ }
+        }
+        if (!api?.webview?.setVisible) return;
+        try {
+            await api.webview.setVisible(visible);
+        } catch (err) {
+            console.error('setPageVisible error:', err);
+        }
     }, []);
 
     const goBack = useCallback(async () => {
@@ -286,7 +372,10 @@ export function useGazeBrowser() {
         try {
             const result = await api.webview.navigate(url);
             if (result?.success) {
+                // A new page starts at its top (the navigation event that follows
+                // carries this same address, so it would not reset it again).
                 setCurrentUrl(url);
+                setPageScroll(initialScrollState());
                 return true;
             }
         } catch (err) {
@@ -328,27 +417,6 @@ export function useGazeBrowser() {
             return highContrast;
         }
     }, [highContrast]);
-
-    const typeText = useCallback(async (text: string) => {
-        const api = getElectronAPI();
-        if (!api?.webview) return;
-        await api.webview.type(text);
-    }, []);
-
-    // Execute JS in the BrowserView with user-gesture context. Used by the
-    // AAC toolbar to reliably click YouTube's fullscreen / skip-ad buttons —
-    // keyboard shortcuts ('f', 'l') don't work without focus + user gesture,
-    // but executeJavaScript with userGesture=true does.
-    const executeJs = useCallback(async (code: string) => {
-        const api = getElectronAPI();
-        if (!api?.webview?.executeJs) return { success: false };
-        try {
-            return await api.webview.executeJs(code);
-        } catch (err: any) {
-            console.error('executeJs error:', err?.message || err);
-            return { success: false, error: err?.message || String(err) };
-        }
-    }, []);
 
     const youtubeCommand = useCallback(async (command: YoutubeCommand): Promise<YoutubeCommandResult> => {
         const api = getElectronAPI();
@@ -414,6 +482,9 @@ export function useGazeBrowser() {
         setScrollModeState('off');
         setHighContrast(false);
         setVideoPlaybackState(defaultVideoPlaybackState());
+        setPageScroll(initialScrollState());
+        setPageVisibleState(true);
+        pageHiddenRef.current = false;
         boundsRef.current = null;
         cursorInsideRef.current = false;
     }, [closePage]);
@@ -437,7 +508,7 @@ export function useGazeBrowser() {
     // Send gaze position to BrowserView to show a visible cursor inside web content
     const updateGazeCursor = useCallback(async (clientX: number, clientY: number, options?: BrowserGazeOptions) => {
         const api = getElectronAPI();
-        if (!api?.webview?.updateGaze || !boundsRef.current) return;
+        if (!api?.webview?.updateGaze || !boundsRef.current || pageHiddenRef.current) return;
         const b = boundsRef.current;
         const localX = Math.round(clientX - b.x);
         const localY = Math.round(clientY - b.y);
@@ -464,17 +535,17 @@ export function useGazeBrowser() {
         boundsRef,
         openPage,
         closePage,
-        clickAtGaze,
+        scrollPage,
         scrollDown,
         scrollUp,
+        scrollToTop,
+        setPageVisible,
         goBack,
         goForward,
         navigateTo,
         refreshLinks,
         adjustZoom,
         toggleHighContrast,
-        typeText,
-        executeJs,
         youtubeCommand,
         setGazeConfig,
         setScrollMode,
@@ -491,5 +562,8 @@ export function useGazeBrowser() {
         edgeScrollDirection,
         scrollMode,
         videoPlaybackState,
+        pageScroll,
+        pageVisible,
+        notice,
     };
 }

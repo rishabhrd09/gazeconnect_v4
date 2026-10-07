@@ -173,11 +173,34 @@ export function buildBrowserCursorInjectionScript(): string {
         lastCandN: -1,
         // v17.27 — where the ring's centre was last drawn (drawCursorAt).
         drawnX: NaN,
-        drawnY: NaN
+        drawnY: NaN,
+        // 7 Oct 2026 — focus hysteresis (arbitrateFocus): the tracked element and its
+        // resolution kind, and a challenger's identity, first sample and samples in a row.
+        targetEl: null,
+        targetKind: '',
+        challengerId: '',
+        challengerSince: 0,
+        challengerCount: 0,
+        // The first sample of a challenger that has just taken the focus: its dwell
+        // counts from there, so no selection is made slower by the confirmation.
+        pendingStartAt: 0,
+        // 7 Oct 2026 — the ring away from targets (placeRingFree): when a shift of the
+        // eyes began, and when the focus was last released.
+        freeShiftSince: 0,
+        releasedAt: 0,
+        // The transition last written on the ring (setRingTransition).
+        lastTransition: '',
+        // 7 Oct 2026 — the last scroll of the page or a large panel (scroll settle).
+        lastScrollAt: 0,
+        // 7 Oct 2026 — steadiness counters for the rig: focus hand-offs between two
+        // targets, frames a challenger was held off, and ring moves over 40 px.
+        focusSwitches: 0,
+        focusHolds: 0,
+        ringJumps: 0
       };
 
       window.gcConfig = Object.assign({
-        dwellMs: 1900,                       // Navigation group, Balanced timing set
+        dwellMs: 1700,                       // Navigation group, Balanced timing set
         onsetMs: 280,                        // v17: 300 → 280
         stabilityRadiusPx: 60,               // v17: 50 → 60 — base tolerates more ALS noise
         postClickCooldownMs: 900,
@@ -244,7 +267,8 @@ export function buildBrowserCursorInjectionScript(): string {
         probeSnapEnabled: true,
         probeSnapRadiusPx: 36,
         // v17.23 — see probeSnapTarget; 0 = legacy strict-nearest winner.
-        probeSnapHysteresisPx: 0,
+        // 7 Oct 2026: 12 by default, so near-equal small links stop flipping.
+        probeSnapHysteresisPx: 12,
         // v17.19 — dwell progress arc on the in-page ring (visual only).
         // Rollback: window.gcConfig.progressArcEnabled = false
         progressArcEnabled: true,
@@ -281,7 +305,33 @@ export function buildBrowserCursorInjectionScript(): string {
         // per candidate-epoch with this TTL backstop; rects/visibility are
         // still evaluated fresh every frame. 0 disables caching (legacy
         // full scan every frame).
-        cardScanCacheMs: 250
+        cardScanCacheMs: 250,
+        // 6 Oct 2026 — on www/m.youtube.com only cards, Skip Ad and buttons
+        // in dialogs are targets (see strictYoutubeTargets). false restores
+        // every link and button on YouTube.
+        youtubeStrictTargets: true,
+        // 7 Oct 2026 — the app's focus rules for page targets (src/utils/gazeFocus.ts;
+        // scripts/check-browser-gaze-safety.cjs keeps the numbers equal). See
+        // arbitrateFocus. Rollback: window.gcConfig.focusHysteresisEnabled = false
+        focusHysteresisEnabled: true,
+        focusExitMarginPx: 30,          // EXIT_MARGIN_PX
+        focusSmallMarginRatio: 0.35,    // small links: 35 % of their shorter side...
+        focusSmallMarginMinPx: 8,       // ...at least 8 px
+        focusConfirmSamples: 2,         // FOCUS_CONFIRM_MS: the second sample
+        focusCommitFrom: 0.4,           // COMMIT_FROM
+        focusCommitExitMarginPx: 70,    // COMMIT_EXIT_MARGIN_PX
+        focusCommitConfirmMs: 120,      // COMMIT_CONFIRM_MS
+        focusReleaseMs: 180,            // RELEASE_MS
+        // 7 Oct 2026 — ring motion. A move to another target is one gentle glide
+        // (ease-out over ringGlideMs, about the app's spring); away from targets the
+        // ring rests and follows only a shift of ringFreeHoldPx lasting ringFreeMoveMs
+        // (FREE_HOLD_PX / FREE_MOVE_MS). Rollback: ringGlideMs 0, ringFreeHoldPx 0.
+        ringGlideMs: 140,
+        ringFreeHoldPx: 24,
+        ringFreeMoveMs: 90,
+        // 7 Oct 2026 — while the page (or a large panel) scrolls, and this long after,
+        // nothing is acquired and the ring just rests or follows the eyes. 0 = off.
+        scrollSettleMs: 300
       }, window.gcConfig || {});
 
       let cursor = document.getElementById('gazeconnect-cursor');
@@ -307,6 +357,62 @@ export function buildBrowserCursorInjectionScript(): string {
         cursor.style.translate = x + 'px ' + y + 'px';
       };
 
+      // The ring's transition, written only when it changes.
+      const RING_PAINT_TRANSITION = 'border-color 120ms, background-color 120ms, scale 120ms';
+      const setRingTransition = (value) => {
+        if (state.lastTransition === value) return;
+        state.lastTransition = value;
+        cursor.style.transition = value;
+      };
+
+      // 7 Oct 2026 — a move to another target is one gentle glide (ease-out over
+      // gcConfig.ringGlideMs, about the app's spring, src/utils/gazeFocus.ts); small
+      // moves keep the short linear inter-frame glide (cursorSmoothingMs). The drawn
+      // position is the destination, the compositor animates the way there.
+      const RING_GLIDE_FROM_PX = 40;
+      const moveRingTo = (x, y) => {
+        const cfg = window.gcConfig || {};
+        const glideMs = Math.max(0, Math.min(400, Number(cfg.ringGlideMs ?? 140)));
+        const smoothMs = Math.max(0, Math.min(200, Number(cfg.cursorSmoothingMs || 0)));
+        const far = Number.isFinite(state.drawnX) && Number.isFinite(state.drawnY) &&
+          Math.hypot(x - state.drawnX, y - state.drawnY) > RING_GLIDE_FROM_PX / radiusScale();
+        if (state.lastTransition !== 'none') {
+          const ms = far && glideMs > 0 ? glideMs : smoothMs;
+          const easing = far && glideMs > 0 ? 'cubic-bezier(0.22, 0.61, 0.36, 1)' : 'linear';
+          setRingTransition(RING_PAINT_TRANSITION + (ms > 0 ? (', translate ' + ms + 'ms ' + easing) : ''));
+        }
+        if (far) state.ringJumps += 1;
+        drawCursorAt(x, y);
+      };
+
+      // 7 Oct 2026 — away from targets the ring behaves like the app's bubble
+      // (gazeFocus.ts FREE_HOLD_PX / FREE_MOVE_MS): it rests where it is and follows
+      // only a shift of ringFreeHoldPx that lasts ringFreeMoveMs, and right after the
+      // focus is released it first waits focusReleaseMs. So a glance away and back
+      // does not send it to the gaze and back.
+      const placeRingFree = (x, y, now) => {
+        const cfg = window.gcConfig || {};
+        const holdPx = Math.max(0, Number(cfg.ringFreeHoldPx ?? 24)) / radiusScale();
+        const moveMs = Math.max(0, Number(cfg.ringFreeMoveMs ?? 90));
+        const releaseMs = Math.max(0, Number(cfg.focusReleaseMs ?? 180));
+        if (holdPx <= 0 || !Number.isFinite(state.drawnX) || !Number.isFinite(state.drawnY)) {
+          state.freeShiftSince = 0;
+          moveRingTo(x, y);
+          return;
+        }
+        if (Math.hypot(x - state.drawnX, y - state.drawnY) <= holdPx) {
+          state.freeShiftSince = 0;
+          return;
+        }
+        if (!state.freeShiftSince) state.freeShiftSince = now;
+        const shifted = now - state.freeShiftSince >= moveMs;
+        const released = !state.releasedAt || now - state.releasedAt >= releaseMs || now < state.releasedAt;
+        if (shifted && released) {
+          state.freeShiftSince = 0;
+          moveRingTo(x, y);
+        }
+      };
+
       // v17.19 — YouTube-machinery host gate (transparent perf change).
       // The skip-ad scan, Bayesian card posterior and nearest-card snap
       // can only ever match YouTube DOM, yet their document-wide
@@ -322,6 +428,47 @@ export function buildBrowserCursorInjectionScript(): string {
         } catch (_) { return false; }
       };
       let isYoutubeHost = computeIsYoutubeHost();
+      // 6 Oct 2026 — few selection points on YouTube itself: only video,
+      // playlist and mix cards and YouTube's own Skip Ad button can be
+      // selected by gaze. The masthead (menu, logo, search box, voice search,
+      // Sign in), filter chips, channel buttons and menus are not: the app's
+      // own buttons do Search, Home, Back, play/pause and full screen. Buttons
+      // inside a dialog stay selectable so no prompt can trap the patient, and
+      // other YouTube hosts (consent.youtube.com) behave like ordinary pages.
+      // Rollback: window.gcConfig.youtubeStrictTargets = false
+      const computeIsStrictYoutubeHost = () => {
+        try {
+          return /^(www\.|m\.)?youtube\.com$/.test(location.hostname);
+        } catch (_) { return false; }
+      };
+      let isStrictYoutubeHost = computeIsStrictYoutubeHost();
+      const youtubeDialogSelector = [
+        'tp-yt-paper-dialog',
+        'ytd-consent-bump-v2-lightbox',
+        'ytd-popup-container [role="dialog"]',
+        'yt-confirm-dialog-renderer',
+        'ytd-modal-with-title-and-button-renderer',
+        '[role="dialog"]',
+        '[role="alertdialog"]'
+      ].join(',');
+      const strictYoutubeTargets = () =>
+        isStrictYoutubeHost && !(window.gcConfig && window.gcConfig.youtubeStrictTargets === false);
+      // YouTube's own header, side guide and filter chips. With strict targets they
+      // are not targets, and a card beside them must not answer for them either:
+      // measured on the live page (6 Oct 2026), resting the eyes on the search box,
+      // Sign in or the chips opened the nearest video once the dwell ran out.
+      const youtubeChromeSelector = [
+        '#masthead-container',
+        'ytd-masthead',
+        '#guide',
+        'tp-yt-app-drawer',
+        'ytd-mini-guide-renderer',
+        'ytd-feed-filter-chip-bar-renderer',
+        '#chips-wrapper',
+        'yt-chip-cloud-renderer',
+        'ytd-search-header-renderer',
+        'ytd-search-sub-menu-renderer'
+      ].join(',');
 
       // v17.19 — skip-ad button scan cache. The full findYoutubeSkipButton
       // sweep (3 document-wide querySelectorAll passes incl. case-
@@ -418,13 +565,20 @@ export function buildBrowserCursorInjectionScript(): string {
         '[onclick]'
       ].join(',');
 
+      // 6 Oct 2026: YouTube now lists related videos, mixes and playlists as
+      // yt-lockup-view-model (26 on a watch page, 11 in search results); without
+      // it those were only reachable as plain links. Shorts (ytd-reel-item-
+      // renderer, /shorts/ links) are no longer cards: their swipe-driven player
+      // cannot be controlled by gaze, and their shelves are hidden on YouTube.
       const videoCardSelector = [
         'ytd-video-renderer',
         'ytd-compact-video-renderer',
         'ytd-rich-item-renderer',
         'ytd-grid-video-renderer',
         'ytd-playlist-panel-video-renderer',
-        'ytd-reel-item-renderer'
+        'yt-lockup-view-model',
+        'ytd-playlist-renderer',
+        'ytd-radio-renderer'
       ].join(',');
 
       // v17.15 DoD-2: compact / sidebar card classes whose snap target
@@ -441,9 +595,7 @@ export function buildBrowserCursorInjectionScript(): string {
 
       const videoAnchorSelector = [
         'a#thumbnail[href*="/watch"]',
-        'a#thumbnail[href*="/shorts"]',
-        'a[href*="/watch?v="]',
-        'a[href*="/shorts/"]'
+        'a[href*="/watch?v="]'
       ].join(',');
 
       const skipButtonSelector = [
@@ -850,7 +1002,7 @@ export function buildBrowserCursorInjectionScript(): string {
       // intent guard and must never shorten the selected action duration.
       const selectionDurationMs = () => {
         const requested = Number((window.gcConfig || {}).dwellMs);
-        return [750, 800, 900, 1100, 1300, 1400, 1450, 1600, 1900, 2250, 2400, 2500, 2600, 2750, 2800, 3200, 3250, 3800, 4000].includes(requested) ? requested : 1900;
+        return [750, 800, 900, 950, 1100, 1300, 1400, 1450, 1550, 1600, 1700, 1850, 1900, 2000, 2050, 2200, 2250, 2300, 2400, 2500, 2600, 2650, 2700, 2800, 2900, 3050, 3100, 3200, 3250, 3350, 3600, 3800, 3850, 4000].includes(requested) ? requested : 1700;
       };
 
       // Saved progress expires in wall time, including tracking gaps.
@@ -890,7 +1042,7 @@ export function buildBrowserCursorInjectionScript(): string {
         if (window.gcConfig?.focusOnResolve === true) {
           try { target.focus?.({ preventScroll: true }); } catch (_) {}
         }
-        return {
+        const request = {
           x: point.x,
           y: point.y,
           kind,
@@ -899,6 +1051,10 @@ export function buildBrowserCursorInjectionScript(): string {
           label,
           rect
         };
+        // 7 Oct 2026 — the element, for the focus hold (arbitrateFocus). Not
+        // enumerable: never serialized into the click sent to the main process.
+        try { Object.defineProperty(request, 'el', { value: target, enumerable: false }); } catch (_) {}
+        return request;
       };
 
       // Skip-ad-aware helpers (mirror of youtubeController.ts so the
@@ -1016,7 +1172,9 @@ export function buildBrowserCursorInjectionScript(): string {
         [1, 0], [-1, 0], [0, 1], [0, -1],
         [0.707, 0.707], [-0.707, 0.707], [0.707, -0.707], [-0.707, -0.707]
       ];
-      const probeSnapTarget = (x, y) => {
+      // within: when set, only targets inside that element count (a dialog's
+      // own buttons, never something on the page behind it).
+      const probeSnapTarget = (x, y, within) => {
         const cfg = window.gcConfig || {};
         if (cfg.probeSnapEnabled === false) return null;
         const radius = Math.max(8, Math.min(80, Number(cfg.probeSnapRadiusPx || 36))) / radiusScale();
@@ -1034,6 +1192,7 @@ export function buildBrowserCursorInjectionScript(): string {
             const target = el && el.closest ? el.closest(interactiveSelector) : null;
             if (!target || seen.has(target)) continue;
             seen.add(target);
+            if (within && !(within === target || (within.contains && within.contains(target)))) continue;
             if (!isVisible(target)) continue;
             const rect = safeRect(target);
             const d = distanceToRect(x, y, rect);
@@ -1417,17 +1576,23 @@ export function buildBrowserCursorInjectionScript(): string {
 
       const resolveClickRequest = (x, y) => {
         const el = document.elementFromPoint(x, y);
+        // A dialog over the page: its own buttons are the targets, never a card behind it.
+        const youtubeDialog = isYoutubeHost ? (el?.closest?.(youtubeDialogSelector) || null) : null;
+        const inYoutubeDialog = !!youtubeDialog;
 
         // v17.19 — the whole YouTube resolution ladder is gated on the
         // host: off-YouTube these selectors are a guaranteed no-match,
         // so skipping them is behavior-neutral and saves the per-frame
         // document sweeps.
-        if (isYoutubeHost) {
+        if (isYoutubeHost && !inYoutubeDialog) {
           // Skip-ad button gets priority. Asymmetric hysteresis: snap in
           // at skipSnapInRadius, hold at the wider skipUnsnapRadius once
           // the dwell has locked. Both prevents flicker at the boundary
           // and prevents a click from landing on the video underneath.
-          const skipButton = findYoutubeSkipButtonCached();
+          // With strict targets (the default) YouTube's own Skip Ad is not a page target
+          // either: the app's bar offers Skip Ad whenever it can be pressed (maintainer
+          // request, 6 Oct 2026: few selection points, not the page's play/skip/pause).
+          const skipButton = strictYoutubeTargets() ? null : findYoutubeSkipButtonCached();
           if (skipButton) {
             const snapIn = skipSnapInRadius();
             const unsnap = skipUnsnapRadius();
@@ -1442,6 +1607,9 @@ export function buildBrowserCursorInjectionScript(): string {
             // pause playback.
             if (el && isYoutubeVideoSurface(el)) return null;
           }
+
+          // The page's own header, guide and chips answer nothing, not even for a card nearby.
+          if (strictYoutubeTargets() && el?.closest?.(youtubeChromeSelector)) return null;
 
           const ytAtPoint = youtubeTargetFromElement(el, x, y);
           if (ytAtPoint) return ytAtPoint;
@@ -1462,6 +1630,9 @@ export function buildBrowserCursorInjectionScript(): string {
           if (ytNearby) return ytNearby;
         }
 
+        // On YouTube itself, nothing else is a target unless it sits in a dialog.
+        if (strictYoutubeTargets() && !inYoutubeDialog) return null;
+
         const standard = el?.closest?.(interactiveSelector);
         if (standard && isVisible(standard)) {
           return clickRequestFor(standard, x, y, 'interactive', false);
@@ -1479,10 +1650,130 @@ export function buildBrowserCursorInjectionScript(): string {
         // neighbourhood for a small interactive target (see
         // probeSnapTarget). Runs last so it can never override a direct
         // hit, and only when the frame would otherwise resolve nothing.
-        const probed = probeSnapTarget(x, y);
+        const probed = probeSnapTarget(x, y, strictYoutubeTargets() ? youtubeDialog : null);
         if (probed) return probed;
 
         return null;
+      };
+
+      // === 7 Oct 2026: FOCUS HYSTERESIS =======================================
+      // The app's rules for which target has the focus (src/utils/gazeFocus.ts), now
+      // for every page target: YouTube cards (a card directly under the gaze used to
+      // win at once, bypassing the Bayesian stickiness), Google links, dialog buttons.
+      //  - The focused target keeps the focus while the gaze stays within its box grown
+      //    by focusExitMarginPx (35 % of a small link's shorter side, at least 8 px) when
+      //    another target competes, so jitter at a border never flips the ring between
+      //    neighbours. With nothing else there, the older 80 px sticky hold applies.
+      //  - A challenger outside that zone takes the focus on its second sample; its
+      //    dwell counts from its first (pendingStartAt), so no selection gets slower.
+      //  - Past focusCommitFrom of the dwell the zone grows towards
+      //    focusCommitExitMarginPx and the challenger must also hold for up to
+      //    focusCommitConfirmMs, so a wobble near the end no longer loses the selection.
+      const resetChallenger = () => {
+        state.challengerId = '';
+        state.challengerSince = 0;
+        state.challengerCount = 0;
+      };
+      const STICKY_HOLD_PX = 80;
+      // Is a candidate under the gaze point itself, or only offered by a snap (the nearest card,
+      // the probe) while the eyes rest in a gap? Under it: the point is inside its box, or the
+      // element there is inside it or inside the video card that holds it (a card's title, not
+      // only its thumbnail link).
+      const isUnderGaze = (req, x, y) => {
+        if (!req || !req.el || !req.rect) return true;
+        if (pointInsideRect(x, y, req.rect, 0)) return true;
+        let hit = null;
+        try { hit = document.elementFromPoint(x, y); } catch (_) { return true; }
+        if (!hit) return false;
+        if (req.el === hit || (req.el.contains && req.el.contains(hit))) return true;
+        const card = req.el.closest ? req.el.closest(videoCardSelector) : null;
+        return !!(card && card.contains && card.contains(hit));
+      };
+      const arbitrateFocus = (x, y, raw, now, onsetMs, dwellMs) => {
+        const cfg = window.gcConfig || {};
+        const rs = radiusScale();
+        state.pendingStartAt = 0;
+        if (!state.targetKey) { resetChallenger(); return raw; }
+        const incumbentId = identityKeyOf(state.targetKey);
+        if (raw && identityKeyOf(raw.key) === incumbentId) { resetChallenger(); return raw; }
+        // The incumbent, measured now: it may have moved with the page.
+        let incRect = null;
+        const incEl = state.targetEl;
+        if (incEl && incEl.isConnected !== false) {
+          const r = safeRect(incEl);
+          if (r && r.width > 0 && r.height > 0) incRect = r;
+        }
+        if (!incRect && !incEl) incRect = state.targetRect;
+        if (!incRect) { resetChallenger(); return raw; }
+        // Its zone is drawn around the whole video card that holds it (thumbnail, title, details:
+        // the card is what competes for the gaze), or around its own box. The ring and the click
+        // stay on the target itself. (Around a thumbnail link alone, the zones of two results
+        // 43 px apart met in the middle of the gap: live YouTube results, 7 Oct 2026.)
+        let zone = incRect;
+        const incCard = incEl && incEl.closest ? incEl.closest(videoCardSelector) : null;
+        if (incCard && incCard !== incEl) {
+          const r = safeRect(incCard);
+          if (r && r.width > 0 && r.height > 0) zone = r;
+        }
+        const ghost = () => ({
+          x: Math.round((incRect.left + incRect.right) / 2),
+          y: Math.round((incRect.top + incRect.bottom) / 2),
+          kind: 'sticky_resume',
+          key: state.targetKey,
+          href: '',
+          label: '',
+          rect: incRect
+        });
+        if (!raw) {
+          // Nothing else under the gaze: the sticky hold (unchanged tolerance).
+          resetChallenger();
+          return pointInsideRect(x, y, zone, STICKY_HOLD_PX / rs) ? ghost() : null;
+        }
+        const progress = state.start > 0 && dwellMs > 0
+          ? Math.max(0, Math.min(1, ((now - state.start) - onsetMs) / dwellMs)) : 0;
+        const commitFrom = Number(cfg.focusCommitFrom ?? 0.4);
+        const commit = progress > commitFrom ? Math.min(1, (progress - commitFrom) / Math.max(0.01, 1 - commitFrom)) : 0;
+        const shorter = Math.min(zone.width, zone.height);
+        let margin = Math.min(Number(cfg.focusExitMarginPx ?? 30) / rs,
+          Math.max(Number(cfg.focusSmallMarginMinPx ?? 8) / rs, shorter * Number(cfg.focusSmallMarginRatio ?? 0.35)));
+        if (commit > 0) margin += (Number(cfg.focusCommitExitMarginPx ?? 70) / rs - margin) * commit;
+        const held = () => (incEl ? clickRequestFor(incEl, x, y, state.targetKind || 'interactive', true) : null) || ghost();
+        if (!isUnderGaze(raw, x, y) && pointInsideRect(x, y, zone, STICKY_HOLD_PX / rs)) {
+          // The eyes rest in a gap and a snap offers a neighbour: that is no evidence against the
+          // focused target. As with nothing under the gaze (the app's rule, gazeFocus.ts), the
+          // focus is held within the sticky distance. (Live YouTube results, 7 Oct 2026: a video
+          // above a Mix, 43 px apart, traded the focus 12 times in 7.5 s on such snaps.)
+          resetChallenger();
+          state.focusHolds += 1;
+          return held();
+        }
+        if (pointInsideRect(x, y, zone, margin)) {
+          // As in the app (gazeFocus.ts): evidence for the neighbour counts only from samples
+          // outside the zone, and a sample back inside starts it over. (Counting the samples
+          // inside it too let one stray sample past the zone hand the focus over after the eyes
+          // had hovered near the border: the live YouTube results of 7 Oct 2026.)
+          resetChallenger();
+          state.focusHolds += 1;
+          return held();
+        }
+        const challengerId = identityKeyOf(raw.key);
+        if (state.challengerId !== challengerId) {
+          state.challengerId = challengerId;
+          state.challengerSince = now;
+          state.challengerCount = 0;
+        }
+        state.challengerCount += 1;
+        const needSamples = Math.max(1, Math.round(Number(cfg.focusConfirmSamples ?? 2)));
+        const needMs = commit > 0 ? Number(cfg.focusCommitConfirmMs ?? 120) * commit : 0;
+        if (state.challengerCount >= needSamples && now - state.challengerSince >= needMs) {
+          state.pendingStartAt = state.challengerSince;
+          state.focusSwitches += 1;
+          gcEmit('focusSwitch', { fromId: String(state.targetKey).slice(0, 80), toId: String(raw.key).slice(0, 80) });
+          resetChallenger();
+          return raw;
+        }
+        state.focusHolds += 1;
+        return held();
       };
 
       // v17.16 DoD-1 — playback snapshot for the main process poll.
@@ -1513,6 +1804,15 @@ export function buildBrowserCursorInjectionScript(): string {
         cursor.style.display = 'none';
         cursor.classList.remove('dwelling');
         cursor.classList.remove('clicking');
+        // 7 Oct 2026 — the focus and the resting ring start over when gaze returns.
+        state.targetEl = null;
+        state.targetKind = '';
+        state.pendingStartAt = 0;
+        state.freeShiftSince = 0;
+        state.releasedAt = 0;
+        state.drawnX = NaN;
+        state.drawnY = NaN;
+        resetChallenger();
         state.dwellState = 'idle'; // v17.20 — main reads this for edge-scroll pause
         state.x = 0;
         state.y = 0;
@@ -1550,6 +1850,10 @@ export function buildBrowserCursorInjectionScript(): string {
         state.lastClickKey = '';
         state.targetKey = '';
         state.targetRect = null;
+        state.targetEl = null;
+        state.targetKind = '';
+        state.pendingStartAt = 0;
+        resetChallenger();
         state.dwellingExpiryAt = 0;
         // v17.17 — explicit reset discards saved progress.
         state.savedProgress = 0;
@@ -1579,6 +1883,10 @@ export function buildBrowserCursorInjectionScript(): string {
         state.clicked = false;
         state.targetKey = '';
         state.targetRect = null;
+        state.targetEl = null;
+        state.targetKind = '';
+        state.pendingStartAt = 0;
+        resetChallenger();
         // v17.17 — toolbar commands discard saved progress.
         state.savedProgress = 0;
         state.savedProgressKey = '';
@@ -1621,7 +1929,7 @@ export function buildBrowserCursorInjectionScript(): string {
         const smoothMs = Math.max(0, Math.min(200, Number(cfg.cursorSmoothingMs || 0)));
         const wasHidden = cursor.style.display !== 'block';
         if (wasHidden && smoothMs > 0) {
-          cursor.style.transition = 'none';
+          setRingTransition('none');
           cursor.style.display = 'block';
           drawCursorAt(x, y);
           void cursor.offsetWidth; // commit the jump before re-enabling
@@ -1629,9 +1937,7 @@ export function buildBrowserCursorInjectionScript(): string {
         }
         if (smoothMs !== state.lastSmoothMs) {
           state.lastSmoothMs = smoothMs;
-          cursor.style.transition =
-            'border-color 120ms, background-color 120ms, scale 120ms' +
-            (smoothMs > 0 ? (', translate ' + smoothMs + 'ms linear') : '');
+          setRingTransition(RING_PAINT_TRANSITION + (smoothMs > 0 ? (', translate ' + smoothMs + 'ms linear') : ''));
         }
 
         // v17.22 — the per-frame cursor position write now happens AFTER
@@ -1674,7 +1980,7 @@ export function buildBrowserCursorInjectionScript(): string {
             try {
               // v17.19 — host-gated + cached (was a full document sweep
               // per frame whenever gaze rested on any playing video).
-              const sb = isYoutubeHost ? findYoutubeSkipButtonCached() : null;
+              const sb = isYoutubeHost && !strictYoutubeTargets() ? findYoutubeSkipButtonCached() : null;
               if (sb) {
                 const sr = safeRect(sb);
                 if (sr && distanceToRect(x, y, sr) <= skipUnsnapRadius()) skipExempt = true;
@@ -1691,8 +1997,11 @@ export function buildBrowserCursorInjectionScript(): string {
               state.onsetStartGaze = null;
               state.onsetEmitted = false;
               state.dwellingExpiryAt = 0;
+              state.targetEl = null;
+              state.targetKind = '';
+              resetChallenger();
               cursor.style.display = 'block';
-              drawCursorAt(x, y);
+              placeRingFree(x, y, now);
               cursor.classList.remove('dwelling');
               cursor.classList.remove('clicking');
               if ((now - state.lastSuppressedEmitTs) >= 1000) {
@@ -1712,9 +2021,12 @@ export function buildBrowserCursorInjectionScript(): string {
           cursor.style.display = 'block';
           const heldOnSelected = state.targetRect &&
             pointInsideRect(x, y, state.targetRect, targetRegionSlackPx);
-          const rx = heldOnSelected ? (state.targetRect.left + state.targetRect.right) / 2 : x;
-          const ry = heldOnSelected ? (state.targetRect.top + state.targetRect.bottom) / 2 : y;
-          drawCursorAt(rx, ry);
+          if (heldOnSelected) {
+            moveRingTo((state.targetRect.left + state.targetRect.right) / 2,
+              (state.targetRect.top + state.targetRect.bottom) / 2);
+          } else {
+            placeRingFree(x, y, now);
+          }
           cursor.classList.remove('dwelling');
           state.dwellingExpiryAt = 0;
           return null;
@@ -1725,6 +2037,34 @@ export function buildBrowserCursorInjectionScript(): string {
         if (state.dwellingExpiryAt > 0 && now > state.dwellingExpiryAt) {
           state.dwellingExpiryAt = 0;
           cursor.classList.remove('dwelling');
+        }
+
+        // === 7 Oct 2026: SCROLL SETTLE ========================================
+        // While the page (or a large panel) moves -- Gaze Scroll, Up / Down, the page's
+        // own scrolling -- cards slide under the eyes, and acquiring them made the ring
+        // chase card after card. Until it has been still for scrollSettleMs nothing is
+        // acquired (dwellState idle, so edge scrolling is never paused by it) and the
+        // ring rests or follows the eyes.
+        const settleMs = Math.max(0, Math.min(1000, Number(cfg.scrollSettleMs ?? 300)));
+        if (settleMs > 0 && state.lastScrollAt > 0 && now >= state.lastScrollAt && now - state.lastScrollAt < settleMs) {
+          if (state.targetKey || state.start > 0) {
+            state.start = 0;
+            state.clicked = false;
+            state.targetKey = '';
+            state.targetRect = null;
+            state.targetEl = null;
+            state.targetKind = '';
+            state.onsetTargetRect = null;
+            state.onsetStartGaze = null;
+            state.onsetEmitted = false;
+            state.dwellingExpiryAt = 0;
+            state.releasedAt = now;
+          }
+          resetChallenger();
+          cursor.style.display = 'block';
+          cursor.classList.remove('dwelling');
+          placeRingFree(x, y, now);
+          return null;
         }
 
         // v17.22 — hit-test FIRST (on clean layout), write styles after.
@@ -1745,10 +2085,10 @@ export function buildBrowserCursorInjectionScript(): string {
         // move one glide. Where the click lands is unchanged (clickReq).
         const placeRing = (tracked) => {
           if (tracked && state.targetRect) {
-            drawCursorAt((state.targetRect.left + state.targetRect.right) / 2,
+            moveRingTo((state.targetRect.left + state.targetRect.right) / 2,
               (state.targetRect.top + state.targetRect.bottom) / 2);
           } else if (!clickReq) {
-            drawCursorAt(x, y);
+            placeRingFree(x, y, now);
           }
         };
         cursor.style.display = 'block';
@@ -1763,7 +2103,14 @@ export function buildBrowserCursorInjectionScript(): string {
         // YouTube card briefly leaves the snap zone, dwell resets, then
         // gaze returns. Without this, the dwell loop is stuck at the
         // restart point.
-        if (!clickReq && state.targetKey && state.targetRect) {
+        // 7 Oct 2026 — the focus rules (arbitrateFocus) include this sticky hold; the
+        // block below is what runs when they are rolled back.
+        const focusRules = cfg.focusHysteresisEnabled !== false;
+        let switchedByFocus = false;
+        if (focusRules) {
+          clickReq = arbitrateFocus(x, y, clickReq, now, onsetMs, dwellMs);
+          switchedByFocus = state.pendingStartAt > 0;
+        } else if (!clickReq && state.targetKey && state.targetRect) {
           const sRect = state.targetRect;
           const STICKY_TOLERANCE_BROWSER = 80 / radiusScale(); // px beyond rect (zoom-scaled)
           if (
@@ -1901,10 +2248,21 @@ export function buildBrowserCursorInjectionScript(): string {
           // click on whatever the gaze later drifts onto (and so the
           // wrapper reports dwellState 'idle', keeping armed edge-scroll
           // alive while the patient reads).
-          state.start = (clickReq || !emptyGuardOn) ? now : 0;
+          // A challenger that took the focus counts from its first sample.
+          const startAt = clickReq && state.pendingStartAt > 0 && state.pendingStartAt <= now ? state.pendingStartAt : now;
+          state.pendingStartAt = 0;
+          state.start = (clickReq || !emptyGuardOn) ? startAt : 0;
           state.clicked = false;
           state.targetKey = newTargetKey;
           state.targetRect = clickReq?.rect || null;
+          if (!clickReq) {
+            if (state.targetEl) state.releasedAt = now;
+            state.targetEl = null;
+            state.targetKind = '';
+          } else if (clickReq.kind !== 'sticky_resume') {
+            state.targetEl = clickReq.el || null;
+            state.targetKind = clickReq.kind || '';
+          }
           // v17.18 — the on-target clock starts only if this acquisition is
           // a REAL resolution; a sticky-ghost acquisition contributes zero
           // saveable progress.
@@ -1938,8 +2296,10 @@ export function buildBrowserCursorInjectionScript(): string {
           if (sameTarget) {
             placeRing(true);        // Still the same target: stay at its centre.
           } else if (!clickReq) {
-            placeRing(false);       // Nothing to select: show the gaze.
-          }                         // A new target: decided next frame; the ring waits.
+            placeRing(false);       // Nothing to select: the ring rests or follows the eyes.
+          } else if (switchedByFocus) {
+            placeRing(true);        // Handed over after its confirmation: glide there now.
+          }                         // A first target: decided next frame; the ring waits.
           return null;
         }
 
@@ -2202,6 +2562,7 @@ export function buildBrowserCursorInjectionScript(): string {
           state.lastRouteUrl = location.href;
           // v17.19 — keep the YouTube host gate fresh across SPA routes.
           isYoutubeHost = computeIsYoutubeHost();
+          isStrictYoutubeHost = computeIsStrictYoutubeHost();
           // v17.18 — navigation invalidates saved dwell progress: the page
           // identity changed, so a key collision must never resume.
           state.savedProgress = 0;
@@ -2319,6 +2680,11 @@ export function buildBrowserCursorInjectionScript(): string {
       //   __gcTelemetry.clear()     → wipe buffers
       window.__gcTelemetry = {
         events: function () { return state.telemetry.slice(); },
+        // 7 Oct 2026 — how steady the ring was: focus hand-offs between two targets,
+        // frames a challenger was held off, ring moves over 40 px.
+        steadiness: function () {
+          return { focusSwitches: state.focusSwitches, focusHolds: state.focusHolds, ringJumps: state.ringJumps };
+        },
         clear: function () {
           state.telemetry.length = 0;
           state.clickSeq = 0;
@@ -2429,7 +2795,17 @@ export function buildBrowserCursorInjectionScript(): string {
       try {
         let scrollLastFire = 0;
         let scrollTrailingTimer = null;
-        const scrollEpoch = () => {
+        const scrollEpoch = (event) => {
+          // 7 Oct 2026 — scroll settle: the page, or a panel at least 40 % of the view
+          // each way (a ticker or a chip row scrolling on its own does not count).
+          try {
+            const el = event && event.target;
+            const page = !el || el === document || el === document.documentElement || el === document.body ||
+              el === document.scrollingElement;
+            if (page || (el.clientHeight >= window.innerHeight * 0.4 && el.clientWidth >= window.innerWidth * 0.4)) {
+              state.lastScrollAt = Date.now();
+            }
+          } catch (_) { /* scroll settle is best-effort */ }
           const t = performance.now();
           if (t - scrollLastFire >= 100) {
             scrollLastFire = t;
@@ -2465,6 +2841,12 @@ export function buildBrowserCursorInjectionScript(): string {
             state.lastRouteUrl = location.href;
           }
         });
+        // 8 Oct 2026 — YouTube's own navigations, for Up / Down (pageScroll.ts): about 0.6 s
+        // after a new page's data arrives, YouTube's code puts the page back to its top once
+        // more, which undid a scroll made in that time.
+        const pageNav = window.__gcPageNav = window.__gcPageNav || { startedAt: 0, dataAt: 0 };
+        document.addEventListener('yt-navigate-start', () => { pageNav.startedAt = performance.now(); }, true);
+        document.addEventListener('yt-page-data-updated', () => { pageNav.dataAt = performance.now(); }, true);
       } catch (_) { /* listeners best-effort */ }
 
       // v17.15 DoD-1 — MutationObserver, batched per animation frame.

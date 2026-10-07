@@ -117,4 +117,58 @@ test('Focus is the default design; Serene persists, imports normalize and reset 
     assert.equal(restored.getData().settings.designMode, 'focus');
   }
 });
+test('calm full-screen video: on with 4 s for new and older profiles, a choice persists, bad values fall back', () => {
+  assert.equal(DEFAULT_CUSTOMIZATION.settings.calmFullScreenVideo, true);
+  assert.equal(DEFAULT_CUSTOMIZATION.settings.videoRevealHoldMs, 4000);
+  const older = new CustomizationService();
+  older.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'calm' } }));
+  assert.equal(older.getData().settings.calmFullScreenVideo, true);
+  assert.equal(older.getData().settings.videoRevealHoldMs, 4000);
+  const chosen = new CustomizationService();
+  chosen.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { calmFullScreenVideo: false, videoRevealHoldMs: 3000 } }));
+  const again = new CustomizationService();
+  again.importJSON(chosen.exportJSON());
+  assert.equal(again.getData().settings.calmFullScreenVideo, false);
+  assert.equal(again.getData().settings.videoRevealHoldMs, 3000);
+  for (const bad of [2500, 10000, 'four', null, -1]) {
+    const service = new CustomizationService();
+    service.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { calmFullScreenVideo: 'yes', videoRevealHoldMs: bad } }));
+    assert.equal(service.getData().settings.videoRevealHoldMs, 4000, String(bad));
+    assert.equal(service.getData().settings.calmFullScreenVideo, true, 'only false switches it off');
+  }
+});
+
+test('web search lists: empty for new and older profiles, kept through export and import, cleaned on load, cleared by reset', () => {
+  const empty = { personal: { youtube: [], google: [] }, history: { youtube: [], google: [] }, showPopular: true, rememberSearches: true };
+  assert.deepEqual(DEFAULT_CUSTOMIZATION.webSearch, empty);
+  const older = new CustomizationService();
+  older.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: {} }));
+  assert.deepEqual(older.getData().webSearch, empty);
+  const service = new CustomizationService();
+  service.importJSON(JSON.stringify({
+    version: DEFAULT_CUSTOMIZATION.version,
+    webSearch: {
+      personal: { youtube: [' Mukesh  songs ', 'mukesh songs', ...Array.from({ length: 30 }, (_, i) => `song ${i}`)], google: 'bad' },
+      history: { youtube: [{ q: 'rafi', n: 2, t: 5 }] },
+      showPopular: false,
+    },
+  }));
+  const loaded = service.getData().webSearch;
+  assert.equal(loaded.personal.youtube[0], 'Mukesh songs');
+  assert.equal(loaded.personal.youtube.length, 25);
+  assert.deepEqual(loaded.personal.google, []);
+  assert.equal(loaded.showPopular, false);
+  assert.equal(loaded.rememberSearches, true);
+  service.recordWebSearch('google', 'weather pune');
+  assert.equal(service.getData().webSearch.history.google[0].q, 'weather pune');
+  const again = new CustomizationService();
+  again.importJSON(service.exportJSON());
+  assert.deepEqual(again.getData().webSearch, service.getData().webSearch);
+  service.updateWebSearch({ ...service.getData().webSearch, rememberSearches: false });
+  service.recordWebSearch('google', 'not kept');
+  assert.equal(service.getData().webSearch.history.google.length, 1, 'remembering off keeps nothing new');
+  service.resetToDefaults();
+  assert.deepEqual(service.getData().webSearch, empty);
+});
+
 console.log(`${passed} settings checks passed.`);

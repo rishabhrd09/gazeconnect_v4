@@ -30,6 +30,18 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
         window.electronAPI = { on: () => () => {}, off: () => {}, settings: { load: async () => JSON.parse(sessionStorage.getItem('qa-profile') || 'null'), save: async d => { sessionStorage.setItem('qa-profile', JSON.stringify(d)); return { success: true }; } } };
     });
     // Geometry checks must never send speech/automation to the patient's backend.
+    const QA_NEWS_CATEGORIES = [['positive_india', 'Good News'], ['india_official', 'India Today'], ['health_als', 'ALS Research'], ['cricket', 'Cricket'], ['science', 'Science']]
+        .map(([id, label]) => ({ id, label, icon: '' }));
+    const QA_NEWS = Array.from({ length: 9 }, (_, i) => ({
+        title: ['New wheelchair-friendly coaches added on the Delhi Metro Pink Line', 'Kerala volunteers restore forty village ponds before summer', 'Young chess champion from Chennai wins an international title'][i % 3],
+        source: ['Indian Express', 'Down To Earth', 'The Hindu'][i % 3], relative_time: `${i + 2}h ago`, link: `https://example.com/news/${i}`,
+        summary: 'A short summary of the story appears here, written in plain words so it can be read aloud clearly by the app.',
+    }));
+    const QA_ARTICLE = { title: QA_NEWS[0].title, text: Array(6).fill('Students at a government school now attend lessons in a rooftop classroom powered entirely by the sun, and nearby schools have asked to copy the design.').join('\n\n') };
+    const QA_SNAPSHOT = {
+        weather: { ok: true, city: 'New Delhi', temp_c: 31, feels_like_c: 34, condition: 'Hazy sunshine', humidity: 48, wind_kph: 9 },
+        cricket: { ok: true, match: 'India vs Australia, 2nd ODI', summary: 'India 287/6 (48.2 ov)', status: 'India need 12 runs from 10 balls', venue: 'Wankhede Stadium, Mumbai' },
+    };
     let registrations=[];
     await p.routeWebSocket('ws://127.0.0.1:8765', ws => {
         registrations=[];
@@ -38,6 +50,11 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
             if(m.type==='register_targets') registrations.push(m.targets);
             if(m.type==='set_screen') ws.send(JSON.stringify({type:'screen_changed',screen:m.screen}));
             if(m.type==='set_gaze_enabled') ws.send(JSON.stringify({type:'gaze_enabled',enabled:m.enabled}));
+            // Sample content, so the web pages are measured full rather than empty.
+            if(m.type==='get_news_categories') ws.send(JSON.stringify({type:'news_categories',categories:QA_NEWS_CATEGORIES}));
+            if(m.type==='get_news'||m.type==='refresh_news') ws.send(JSON.stringify({type:'news_data',items:QA_NEWS,cached:false}));
+            if(m.type==='fetch_article') ws.send(JSON.stringify({type:'article_data',article:{...QA_ARTICLE,url:m.url},url:m.url}));
+            if(m.type==='get_quick_snapshot') ws.send(JSON.stringify({type:'quick_snapshot',snapshot:QA_SNAPSHOT}));
         });
     });
     const rows = [];
@@ -81,8 +98,14 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                         continue;
                     const ra = document.createRange();
                     ra.selectNodeContents(n);
+                    // Lines after a -webkit-line-clamp (ended with an ellipsis) are laid out
+                    // but never drawn; the drawn lines are still checked against the button.
+                    let clamp = null;
+                    for (let a = p; a && a !== e && !clamp; a = a.parentElement)
+                        if ((getComputedStyle(a).webkitLineClamp || 'none') !== 'none')
+                            clamp = a.getBoundingClientRect();
                     for (const rr of ra.getClientRects())
-                        if (rr.width > 0)
+                        if (rr.width > 0 && !(clamp && rr.y >= clamp.bottom - 1))
                             ranges.push({ t: n.textContent.trim(), x: rr.x, y: rr.y, w: rr.width, h: rr.height });
                 }
                 return { id: e.id, text: e.textContent.trim().replace(/\s+/g, ' '), gaze: e.hasAttribute('data-gaze'), attrs: Object.fromEntries([...e.attributes].filter(a => a.name.startsWith('data-gaze') || a.name === 'data-action').map(a => [a.name,a.value])), disabled: e.disabled, x: r.x, y: r.y, w: r.width, h: r.height, textInset: ranges.length ? Math.min(...ranges.flatMap(q => [q.x-r.x,r.right-q.x-q.w])) : null, small: e.hasAttribute('data-gaze') && !e.disabled && (r.width < 79.5 || r.height < 79.5), outside: r.x < -.5 || r.y < -.5 || r.right > innerWidth + .5 || r.bottom > innerHeight + .5, clipped: ranges.filter(q => q.x < r.x - 1 || q.y < r.y - 1 || q.x + q.w > r.right + 1 || q.y + q.h > r.bottom + 1).map(q => q.t), bg: s.backgroundColor, color: s.color, font: s.fontFamily };
@@ -154,6 +177,19 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 for (const [id, name] of [['youtube', 'youtube'], ['news', 'news'], ['search', 'search'], ['social', 'social']])
                     await run(name, async () => { await route('web'); await p.click('#hub-' + id); });
                 await run('video-controls', async () => { await route('web'); await p.click('#hub-youtube'); await p.click('#yv-0'); });
+                // The search keyboard opened from YouTube and from Quick Search (6 Oct 2026).
+                await run('youtube-search', async () => { await route('web'); await p.click('#hub-youtube'); await p.click('#yl-search'); });
+                await run('search-keyboard', async () => { await route('web'); await p.click('#hub-search'); await p.click('#qs-type-search'); });
+                // Suggestions beside the typed text while typing (7 Oct 2026; moved up 8 Oct 2026).
+                await run('youtube-search-typed', async () => { await route('web'); await p.click('#hub-youtube'); await p.click('#yl-search');
+                    for (const letter of ['L', 'A', 'T']) await p.locator('.search-keyboard .keyboard-key[data-action="letter"]').filter({ hasText: new RegExp('^' + letter + '$') }).first().click();
+                    await p.locator('.search-keyboard-suggestion').first().waitFor(); });
+                // The redesigned story, answer and Social pages (6 Oct 2026).
+                await run('news-article', async () => { await route('web'); await p.click('#hub-news'); await p.click('#ni-0'); });
+                await run('news-reader', async () => { await route('web'); await p.click('#hub-news'); await p.click('#ni-0'); await p.click('#n-reader'); });
+                await run('weather', async () => { await route('web'); await p.click('#hub-search'); await p.click('#qs-local_weather'); });
+                await run('cricket', async () => { await route('web'); await p.click('#hub-search'); await p.click('#qs-cricket_score'); });
+                await run('social-service', async () => { await route('web'); await p.click('#hub-social'); await p.click('#soc-linkedin'); });
                 await run('music-playlists', async () => { await route('music'); await p.click('#music-landing-indian'); });
                 await run('music-more', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-more'); });
                 await run('music-songs', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); });
@@ -170,7 +206,7 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 await run('urgent-needs', async () => { await p.click('#dock-0'); });
                 // Restore the default Home for the independent Settings checks.
                 await p.evaluate(() => { const d = JSON.parse(sessionStorage.getItem('qa-profile')); d.settings.homeEmergencyLaunchMode = 'quick'; sessionStorage.setItem('qa-profile', JSON.stringify(d)); });
-                for (const id of ['gaze', 'voice', 'display', 'home', 'quickwords', 'phrases', 'medical', 'alertmode', 'people', 'activities', 'dictionary', 'backup', 'reset', 'about'])
+                for (const id of ['gaze', 'voice', 'display', 'home', 'quickwords', 'phrases', 'medical', 'alertmode', 'people', 'activities', 'websearch', 'dictionary', 'backup', 'reset', 'about'])
                     await run('settings-' + id, async () => { await route('settings'); await p.click('#sidebar-' + id); });
                 console.log(prefix, 'done');
                 fs.writeFileSync(OUT + '/audit.json', JSON.stringify({ rows, failures, errors }, null, 2));

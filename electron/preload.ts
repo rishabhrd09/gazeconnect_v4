@@ -18,6 +18,7 @@ const validEventChannels = [
   'webview:edge-scroll',
   'webview:closed',
   'webview:playbackState',
+  'webview:notice',
   'ui-lock-toggled',
 ] as const;
 
@@ -102,12 +103,13 @@ const api = {
     open: (url: string, bounds: { x: number; y: number; width: number; height: number }) =>
       ipcRenderer.invoke('webview:open', url, bounds),
     close: () => ipcRenderer.invoke('webview:close'),
-    click: (x: number, y: number) => ipcRenderer.invoke('webview:click', x, y),
     scroll: (deltaY: number) => ipcRenderer.invoke('webview:scroll', deltaY),
+    // Up / Down / Top chosen by the page (main.ts 'webview:scrollPage').
+    scrollPage: (direction: 'up' | 'down' | 'top') => ipcRenderer.invoke('webview:scrollPage', direction),
+    // Take the page off the window while an app screen (the search keyboard) is shown.
+    setVisible: (visible: boolean) => ipcRenderer.invoke('webview:setVisible', visible),
     back: () => ipcRenderer.invoke('webview:back'),
     forward: () => ipcRenderer.invoke('webview:forward'),
-    type: (text: string) => ipcRenderer.invoke('webview:type', text),
-    executeJs: (code: string) => ipcRenderer.invoke('webview:executeJs', code),
     youtubeCommand: (command: string) => ipcRenderer.invoke('webview:youtubeCommand', command),
     setGazeConfig: (config: Record<string, number | boolean>) =>
       ipcRenderer.invoke('webview:setGazeConfig', config),

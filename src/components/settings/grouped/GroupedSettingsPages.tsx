@@ -8,7 +8,8 @@ import { useTheme, type Theme } from '../../../contexts/ThemeContext';
 import type { AppSettings } from '../../../types/customization';
 import {
   DEFAULT_DWELL_TIMING_SET, DWELL_TIMING_SETS, FAMILIAR_KEYBOARD_TIMING, KEYBOARD_CADENCE_BY_STAGE,
-  normalizeDwellTimingSet, normalizeKeyboardFeel, type DwellTimingSet, type KeyboardFeel,
+  VIDEO_REVEAL_HOLD_CHOICES_MS, describeTimingSet, normalizeDwellTimingSet, normalizeKeyboardFeel,
+  normalizeVideoRevealHoldMs, type DwellTimingSet, type KeyboardFeel,
 } from '../../../config/dwellTimeConfig';
 import { GAZE_FILTER_MODES, normalizeFilterPreset } from '../../../config/gazeFilterConfig';
 import {
@@ -171,10 +172,11 @@ function useInstantSetting(onSaved: () => void) {
 // EYE GAZE
 // ============================================
 
+// Fastest first. The ring times show each step; settling and tracking add a little.
 const SPEED_OPTIONS: Option<DwellTimingSet>[] = (Object.keys(DWELL_TIMING_SETS) as DwellTimingSet[]).map(key => ({
   value: key,
   label: DWELL_TIMING_SETS[key].label.replace(' (default)', ''),
-  sub: DWELL_TIMING_SETS[key].description,
+  sub: `${DWELL_TIMING_SETS[key].description} · ${describeTimingSet(key)}`,
   tag: key === DEFAULT_DWELL_TIMING_SET ? 'Default' : undefined,
 }));
 const KEYBOARD_FEEL_OPTIONS: Option<KeyboardFeel>[] = [
@@ -196,6 +198,9 @@ const CURSOR_SIZES: Option<string>[] = [
 ];
 
 const SMOOTHING_OPTIONS: Option<string>[] = GAZE_FILTER_MODES.map(mode => ({ value: mode.value, label: mode.label.replace(' (default)', '') }));
+
+// Calm full-screen video: how long to look at the strip under the video before Show options.
+const REVEAL_HOLD_OPTIONS: Option<string>[] = VIDEO_REVEAL_HOLD_CHOICES_MS.map(ms => ({ value: String(ms), label: `${ms / 1000} s` }));
 
 /** Preview the active keyboard onset followed by its chosen Typing dwell. */
 const TryTile: React.FC<{ ms: number; onsetMs: number }> = ({ ms, onsetMs }) => {
@@ -244,12 +249,14 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     : gazeFlags.keyboardCadence ? KEYBOARD_CADENCE_BY_STAGE[currentStage].onset : 250;
   const keyboardFillMs = keyboardFeel === 'familiar' ? FAMILIAR_KEYBOARD_TIMING.key : DWELL_TIMING_SETS[timingSet].ms.typing;
   const cursorOn = settings.showGazeCursor !== false;
+  const calmVideoOn = settings.calmFullScreenVideo !== false;
+  const revealHoldMs = normalizeVideoRevealHoldMs(settings.videoRevealHoldMs);
   const { isWarm, isLight } = useTheme();
 
   return (
     <div className="gss-columns">
       <div className="gss-column">
-        <Card title="Selection speed" note="Choose a pace for general choices. Standard keyboard follows this speed.">
+        <Card title="Selection speed" note="Six paces, each a little slower than the one above. Keys, suggestions and Quick Words share one time; other choices take a little longer. Standard keyboard follows this speed.">
           <RadioCards label="Selection speed" options={SPEED_OPTIONS} value={timingSet}
             onChange={value => save('dwellTimingSet', value)} />
         </Card>
@@ -279,6 +286,15 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
             <span className="gss-row-label">Cursor size</span>
             <Segmented label="Cursor size" options={CURSOR_SIZES} value={settings.gazeCursorSize || 'medium'}
               onChange={value => save('gazeCursorSize', value)} />
+          </div>
+        </Card>
+        <Card title="Calm full-screen video"
+          note="While a video plays in full screen, no buttons are on screen, so nothing is chosen by accident. Looking at the black strip under the video for a few seconds brings up Show options; the bar also comes back when the video ends."
+          aside={<Switch label="Calm full-screen video" on={calmVideoOn} onChange={on => save('calmFullScreenVideo', on)} />}>
+          <div className="gss-row">
+            <span className="gss-row-label">Look at the strip for</span>
+            <Segmented label="Look at the strip for" options={REVEAL_HOLD_OPTIONS} value={String(revealHoldMs)}
+              onChange={value => save('videoRevealHoldMs', normalizeVideoRevealHoldMs(Number(value)))} />
           </div>
         </Card>
         <section className="gss-card">

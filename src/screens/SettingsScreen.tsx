@@ -29,6 +29,7 @@ import AppSettingsPanel from '../components/settings/panels/AppSettingsPanel';
 import DictionaryPanel from '../components/settings/panels/DictionaryPanel';
 import QuickWordsPanel from '../components/settings/panels/QuickWordsPanel';
 import AlertModePanel from '../components/settings/panels/AlertModePanel';
+import WebSearchPanel from '../components/settings/panels/WebSearchPanel';
 import { SettingsDirtyContext } from '../components/settings/shared/unsavedChanges';
 import { isGazeSpellLook } from '../config/look';
 import GroupedSettingsLayout from '../components/settings/grouped/GroupedSettingsLayout';
@@ -46,13 +47,22 @@ interface SettingsScreenProps {
 }
 
 // The grouped Settings (GazeSpell look) adds its own pages to the classic sections.
-type SectionId = 'appsettings' | 'dictionary' | 'people' | 'phrases' | 'medical' | 'home' | 'quickwords' | 'activities' | 'alertmode' | GroupedPageId;
+type SectionId = 'appsettings' | 'dictionary' | 'people' | 'phrases' | 'medical' | 'home' | 'quickwords' | 'activities' | 'websearch' | 'alertmode' | GroupedPageId;
 
 interface SidebarSection {
   id: SectionId;
   label: string;
   icon: React.FC<{ size?: number; color?: string }>;
 }
+
+// The classic sidebar's icon for Web Search (the shared icon set has no magnifier).
+const WebSearchIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-4-4" />
+  </svg>
+);
 
 const SECTIONS: SidebarSection[] = [
   { id: 'appsettings', label: 'App Settings', icon: SettingsIcon },
@@ -64,6 +74,7 @@ const SECTIONS: SidebarSection[] = [
   { id: 'quickwords', label: 'Quick Words', icon: ChatBubblesIcon },
   { id: 'alertmode', label: 'Urgent Needs', icon: SettingsIcon },
   { id: 'activities', label: 'Activities', icon: TVIcon },
+  { id: 'websearch', label: 'Web Search', icon: WebSearchIcon },
 ];
 
 // Theme from design.ts
@@ -289,6 +300,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       case 'quickwords': return <QuickWordsPanel isDarkMode={isDarkMode} />;
       case 'alertmode': return <AlertModePanel isDarkMode={isDarkMode} />;
       case 'activities': return <ActivitiesPanel isDarkMode={isDarkMode} />;
+      case 'websearch': return <WebSearchPanel isDarkMode={isDarkMode} />;
       case 'appsettings': return <AppSettingsPanel isDarkMode={isDarkMode} />;
       case 'dictionary': return <DictionaryPanel isDarkMode={isDarkMode} />;
       default: return null;

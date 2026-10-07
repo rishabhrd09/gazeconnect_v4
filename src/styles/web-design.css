@@ -1,0 +1,654 @@
+/* Web Browsing screens, Focus / Serene (6 Oct 2026 redesign, maintainer request:
+   make every web screen as clear and consistent as the YouTube screen).
+   Paint and layout only, from the design tokens, so Dark, Warm and Midnight Navy
+   all follow. Every target keeps >= 80 CSS px at 1366x768 and 1920x1080 and no
+   page scrolls (check:design-layout). Gaze timing lives elsewhere, never here. */
+
+/* ── Page stage: heading + content, the Activities rhythm ───────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-stage > .web-stage-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 18px);
+  min-height: 0;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-stage h2 {
+  margin: 0 !important;
+  line-height: 1.1 !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-stage-grid {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  gap: clamp(18px, 2.4vh, 26px) !important;
+}
+
+/* ── Choice card: accent icon, title, one short line ────────────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen :is(.web-card, .youtube-action) {
+  border: 1px solid var(--design-border) !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-card {
+  min-height: 80px !important;
+  padding: clamp(16px, 2.4vh, 30px) clamp(18px, 2vw, 34px) !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-card > div:last-child {
+  display: flex !important;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-card .web-card-icon {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-card .web-card-text {
+  flex: 0 1 auto !important;
+  min-width: 0;
+  display: flex !important;
+  flex-direction: column;
+  gap: clamp(4px, 0.7vh, 8px);
+  padding: 0 !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-card .web-card-title {
+  font-size: clamp(26px, 2.2vw, 42px) !important;
+  font-weight: 600 !important;
+  line-height: 1.15 !important;
+  color: var(--design-ink) !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-card .web-card-sub {
+  font-size: clamp(16px, 1.9vh, 22px) !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0 !important;
+  color: var(--design-muted) !important;
+}
+
+/* Focus: icon above the words, centred (Home and Activities). */
+:root[data-design='focus'][data-theme][data-look] .web-hub-screen .web-card > div:last-child {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: clamp(10px, 1.7vh, 22px) !important;
+}
+:root[data-design='focus'][data-theme][data-look] .web-hub-screen .web-card .web-card-text {
+  align-items: center;
+  text-align: center;
+}
+:root[data-design='focus'][data-theme][data-look] .web-hub-screen .web-card .web-card-title,
+:root[data-design='focus'][data-theme][data-look] .web-hub-screen .web-card .web-card-sub {
+  text-align: center !important;
+}
+:root[data-design='focus'][data-theme][data-look] .web-hub-screen .web-card .web-card-icon svg {
+  width: clamp(48px, 7vh, 80px) !important;
+  height: clamp(48px, 7vh, 80px) !important;
+}
+
+/* Serene: the icon in a soft badge beside the words (Serene Home tiles). */
+:root[data-design='serene'][data-theme][data-look] .web-hub-screen .web-card > div:last-child {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: clamp(16px, 1.8vw, 30px) !important;
+}
+:root[data-design='serene'][data-theme][data-look] .web-hub-screen .web-card .web-card-icon {
+  width: clamp(64px, 8.4vh, 104px);
+  height: clamp(64px, 8.4vh, 104px);
+  border-radius: clamp(16px, 2vh, 24px);
+  background: var(--design-panel);
+}
+:root[data-design='serene'][data-theme][data-look] .web-hub-screen .web-card .web-card-icon svg {
+  width: 56% !important;
+  height: 56% !important;
+}
+:root[data-design='serene'][data-theme][data-look] .web-hub-screen .web-card .web-card-text {
+  flex: 1 1 0 !important;
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* ── Quick Search: a search field, then the topics ──────────────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-search-field {
+  flex: 0 0 auto;
+  width: 100% !important;
+  height: clamp(92px, 12vh, 132px) !important;
+  min-height: 80px !important;
+  padding: 0 clamp(22px, 2.4vw, 40px) !important;
+  background: var(--design-panel) !important;
+  border: 2px solid var(--design-border) !important;
+  border-radius: 999px !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-search-field > div:last-child {
+  display: flex !important;
+  align-items: center;
+  gap: clamp(14px, 1.4vw, 24px);
+  width: 100%;
+  height: 100%;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-search-field .web-search-field-icon {
+  display: flex;
+  color: var(--design-accent);
+  flex: 0 0 auto;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-search-field .web-search-field-text {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: left;
+  font-size: clamp(22px, 2.9vh, 32px) !important;
+  font-weight: 500 !important;
+  color: var(--design-muted) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-search-field .web-search-field-hint {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: clamp(8px, 1.1vh, 14px) clamp(16px, 1.4vw, 24px);
+  border-radius: 999px;
+  background: var(--design-selected);
+  color: var(--design-ink) !important;
+  font-size: clamp(18px, 2.2vh, 24px) !important;
+  font-weight: 600 !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-search-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.2vh, 26px);
+}
+
+/* ── Toolbars: separate rounded buttons, as on the YouTube screen ───────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-bar {
+  gap: clamp(12px, 1vw, 20px) !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-bar > .gaze-button {
+  border: 1px solid var(--design-border) !important;
+  border-radius: clamp(18px, 2.6vh, var(--design-radius)) !important;
+}
+
+/* ── Answer card (weather, cricket) ──────────────────────────────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vh, 24px);
+  padding: clamp(22px, 3.2vh, 44px) clamp(24px, 3vw, 52px);
+  border-radius: clamp(20px, 2.8vh, var(--design-radius));
+  background: var(--design-card);
+  border: 1px solid var(--design-border);
+  color: var(--design-ink);
+  overflow: hidden;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 1.4vw, 22px);
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-badge {
+  flex: 0 0 auto;
+  width: clamp(56px, 7.4vh, 84px);
+  height: clamp(56px, 7.4vh, 84px);
+  border-radius: clamp(14px, 1.9vh, 22px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--design-panel);
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-title {
+  font-size: clamp(28px, 3.8vh, 44px);
+  font-weight: 650;
+  line-height: 1.1;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-sub {
+  margin-top: 4px;
+  font-size: clamp(17px, 2.1vh, 23px);
+  color: var(--design-muted);
+  font-weight: 500;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-tag {
+  margin-left: auto;
+  align-self: flex-start;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--design-panel);
+  color: var(--design-muted);
+  font-size: clamp(14px, 1.6vh, 17px);
+  font-weight: 600;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-main {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 32px);
+  align-items: stretch;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(6px, 1vh, 12px);
+  min-width: 0;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-big {
+  font-size: clamp(64px, 11vh, 132px);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-score {
+  font-size: clamp(36px, 6.2vh, 72px);
+  font-weight: 650;
+  line-height: 1.1;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-lead {
+  font-size: clamp(22px, 3vh, 34px);
+  font-weight: 600;
+  line-height: 1.3;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-note {
+  font-size: clamp(18px, 2.3vh, 26px);
+  color: var(--design-muted);
+  font-weight: 500;
+  line-height: 1.35;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-facts {
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: clamp(10px, 1.4vh, 16px);
+  min-height: 0;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-fact {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 18px);
+  min-height: 0;
+  padding: clamp(10px, 1.4vh, 18px) clamp(16px, 1.6vw, 24px);
+  border-radius: clamp(14px, 1.9vh, 22px);
+  background: var(--design-panel);
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-fact svg {
+  flex: 0 0 auto;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-fact-label {
+  font-size: clamp(16px, 2vh, 21px);
+  color: var(--design-muted);
+  font-weight: 500;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-fact-value {
+  margin-left: auto;
+  font-size: clamp(22px, 2.9vh, 32px);
+  font-weight: 650;
+  white-space: nowrap;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-empty {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+/* ── Social & Connect: the "coming soon" page ────────────────────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-coming-soon .web-soon-badge {
+  width: clamp(96px, 13vh, 150px);
+  height: clamp(96px, 13vh, 150px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--design-panel);
+}
+
+/* ── List choice: icon badge, title, one short line (News categories) ───────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-list-choice > div:last-child {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: clamp(12px, 1.2vw, 18px);
+  padding: 0 clamp(14px, 1.4vw, 22px);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-list-icon {
+  flex: 0 0 auto !important;
+  width: clamp(48px, 6.4vh, 68px);
+  height: clamp(48px, 6.4vh, 68px);
+  border-radius: clamp(12px, 1.6vh, 18px);
+  background: var(--design-panel) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-list-icon svg {
+  width: 58% !important;
+  height: 58% !important;
+  max-width: none !important;
+  max-height: none !important;
+  color: inherit !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-list-text {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-list-text .web-list-title {
+  font-size: clamp(20px, 2.5vh, 28px) !important;
+  font-weight: 650 !important;
+  line-height: 1.2 !important;
+  color: var(--design-ink) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-list-text .web-list-sub {
+  font-size: clamp(15px, 1.75vh, 19px) !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  color: var(--design-muted) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── News: header, story cards, the article's category label ─────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .news-head-title {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 18px);
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-head .web-list-title {
+  font-size: clamp(24px, 3vh, 34px) !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen :is(#n-pause, #n-stop-auto, #news-articles-prev, #news-articles-next) > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+/* The story card fills its button: older rules sized the previous icon strip
+   layout (flex-basis 18%) and must not reach the new content. */
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-news-choice > div:last-child {
+  flex: 1 1 auto !important;
+  width: 100%;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card {
+  flex: 1 1 auto !important;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: clamp(10px, 1.4vh, 16px);
+  padding: clamp(16px, 2.2vh, 26px) clamp(18px, 1.7vw, 28px);
+  text-align: left;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--design-muted);
+  font-size: clamp(15px, 1.75vh, 19px);
+  font-weight: 600;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card-meta svg {
+  flex: 0 0 auto;
+  color: var(--design-accent);
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card-time {
+  margin-left: auto;
+  padding-left: 10px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card-title {
+  font-size: clamp(21px, 2.6vh, 30px);
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--design-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* The summary shows only where the card has room for it below a long headline. */
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card {
+  container-type: size;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-card-summary {
+  font-size: clamp(16px, 1.9vh, 21px);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--design-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@container (max-height: 230px) {
+  :root[data-design][data-theme][data-look] .web-hub-screen .news-card-summary { display: none; }
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-news-choice.is-reading {
+  border-color: var(--design-accent) !important;
+  box-shadow: inset 0 0 0 2px var(--design-accent) !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-current {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 18px);
+  min-height: clamp(70px, 8vh, 92px);
+  padding: clamp(10px, 1.3vh, 16px) clamp(14px, 1.4vw, 20px);
+  border-radius: clamp(16px, 2.2vh, 22px);
+  background: var(--design-panel);
+  border: 1px solid var(--design-border);
+}
+
+/* ── Quick Search web pages: the YouTube player's layout ────────────────────────
+   The status line, then the page with its Up / Down dock, then the bar of large
+   buttons under the page (the bar rules are shared in design-modes.css). The
+   frame keeps its ref, so its measured bounds still place the native page. */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-page-view {
+  padding: 2vh calc(2vw + clamp(10px, 1.5vw, 20px)) 3vh !important;
+  gap: 2vh !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-page-view > .web-page-top {
+  display: contents !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .web-page-view > .web-page-body {
+  padding: 0 !important;
+}
+
+/* ── Answer card: the reading sits in the middle of its space ─────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-answer-hero {
+  align-items: center;
+  text-align: center;
+}
+
+/* ── Stage heading label (Social & Connect: "Coming soon") ─────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .web-stage-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: clamp(6px, 0.9vh, 10px) clamp(14px, 1.3vw, 20px);
+  border-radius: 999px;
+  background: var(--design-panel);
+  border: 1px solid var(--design-border);
+  color: var(--design-muted);
+  font-size: clamp(16px, 1.9vh, 21px);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* ── Previous / More under a list: arrows, and the same quiet look when unavailable
+   as the story pager in the News heading. ───────────────────────────────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-page-controls button > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-page-controls button:disabled {
+  border-style: solid !important;
+  background: var(--design-panel) !important;
+  opacity: 0.5 !important;
+}
+
+/* ── News story beside an open article: the story card, smaller ───────────── */
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-reader-choices > button {
+  padding: 0 !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .browse-reader-choices > button > div:last-child {
+  flex: 1 1 auto !important;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  display: flex !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .news-side-card {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(6px, 0.9vh, 10px);
+  padding: clamp(12px, 1.6vh, 20px) clamp(14px, 1.3vw, 20px);
+  text-align: left;
+}
+/* Two lines, then an ellipsis: a side card has room for no more at any size, and
+   the open article shows the full headline. */
+:root[data-design][data-theme][data-look] .web-hub-screen .news-side-title {
+  font-size: clamp(19px, 2.3vh, 25px);
+  font-weight: 650;
+  line-height: 1.28;
+  color: var(--design-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Links beside a Quick Search page: Prev / Refresh / Next stack the icon above
+   the word at every size; the wide Compact / Large Links choice keeps one row. ── */
+:root[data-design][data-theme][data-look] .web-hub-screen :is(#bv-links-prev, #bv-links-refresh, #bv-links-next) > div:last-child {
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen #bv-links-size-toggle > div:last-child {
+  flex-direction: row !important;
+  gap: 10px !important;
+}
+
+/* ── Calm full-screen video (7 Oct 2026, calmWatch.ts) ───────────────────────
+   In full screen the video takes the whole width and everything above a plain
+   black strip; no status line, no margins, no buttons. The strip is 10 % of the
+   screen but never under 96 px, so Show options can be 80 px tall in it. Black
+   in every theme: the video's own edges are black, so it reads as one screen.
+   The frame keeps its ref, so the native page follows the new size. */
+:root[data-design][data-theme][data-look] .web-hub-screen .youtube-player[data-calm] {
+  padding: 0 !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  background: #000 !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .youtube-player[data-calm] .browser-content-frame {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+  box-shadow: none !important;
+}
+:root[data-design][data-theme][data-look] .web-hub-screen .youtube-player[data-calm='controls'] .browser-toolbar {
+  box-sizing: border-box !important;
+  height: calc(clamp(108px, 14vh, 152px) + 2 * clamp(8px, 1.1vh, 14px)) !important;
+  padding: clamp(8px, 1.1vh, 14px) clamp(16px, 2vw, 32px) !important;
+  background: #000 !important;
+}
+.web-hub-screen .calm-strip {
+  order: 3;
+  flex: 0 0 clamp(96px, 10vh, 144px);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  cursor: pointer;
+  user-select: none;
+}
+.web-hub-screen .calm-strip-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(226, 232, 240, 0.74);
+  font: 600 clamp(16px, 2vh, 22px)/1.2 var(--ui-font, system-ui, sans-serif);
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+.web-hub-screen .calm-strip-track {
+  width: clamp(220px, 26vw, 420px);
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(226, 232, 240, 0.16);
+  overflow: hidden;
+}
+.web-hub-screen .calm-strip-fill {
+  width: 100%;
+  height: 100%;
+  background: var(--ui-accent, #2dd4bf);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 90ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .web-hub-screen .calm-strip-fill { transition: none; }
+}
+:root[data-theme] .web-hub-screen .calm-strip .calm-strip-offer {
+  width: clamp(300px, 26vw, 460px) !important;
+  height: clamp(80px, 8.4vh, 112px) !important;
+  min-height: 80px !important;
+  padding: 0 clamp(20px, 2vw, 32px) !important;
+  border-radius: clamp(18px, 2.6vh, 26px) !important;
+  background: var(--design-card, var(--ui-surface, #1b2430)) !important;
+  border: 1px solid var(--design-accent, var(--ui-accent, #2dd4bf)) !important;
+  color: var(--design-ink, var(--ui-ink, #f5f7fa)) !important;
+  font-size: clamp(22px, 2.7vh, 29px) !important;
+  font-weight: 650 !important;
+  box-shadow: none !important;
+}
+.web-hub-screen .calm-strip .calm-strip-offer > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}

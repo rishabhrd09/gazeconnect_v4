@@ -10,7 +10,7 @@
  * - IPC handlers
  */
 
-import { app, BrowserWindow, BrowserView, ipcMain, Tray, Menu, screen, nativeImage, dialog } from 'electron';
+import { app, BrowserWindow, BrowserView, ipcMain, Tray, Menu, screen, nativeImage, dialog, session } from 'electron';
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -30,6 +30,19 @@ import {
   isYoutubeCommand,
   type YoutubeCommandResult,
 } from './browser/youtubeController';
+import {
+  BROWSER_PARTITION,
+  RecoveryBudget,
+  browserMemoryBudgetMb,
+  capBrowserCache,
+  hardenBrowserSession,
+  isAllowedPageUrl,
+  pruneNavigationHistory,
+  rendererMemoryMb,
+  withPageTimeout,
+  type BlockedKind,
+} from './browser/browserSafety';
+import { buildPageScrollScript, isPageScrollDirection, type PageScrollResult } from './browser/pageScroll';
 import { installStdioGuard } from './stdioGuard';
 
 // First, before anything logs: a launching console that goes away must cost
@@ -91,6 +104,17 @@ let activeBrowserViewSessionId = 0;
 // screen that the interface has already asked to remove.
 let browserViewRequestSeq = 0;
 const browserGazeGates = new WeakMap<BrowserView, BrowserGazeGate>();
+// The page is taken off the window (not closed) while an app screen such as the
+// search keyboard is shown over it; gaze is never forwarded to it meanwhile.
+let browserViewHidden = false;
+let lastBrowserViewBounds: { x: number; y: number; width: number; height: number } | null = null;
+// Memory watch and automatic recovery for the page (see browserSafety.ts).
+let browserMemoryTimer: NodeJS.Timeout | null = null;
+let browserRecyclePending = false;
+let browserUnresponsiveTimer: NodeJS.Timeout | null = null;
+const browserRecoveryBudget = new RecoveryBudget();
+let pageScrollInFlight = false;
+const blockedNoticeAt = new Map<string, number>();
 let lastBrowserGazeFrameAt = 0;
 // The page's dwell loop is built for about 33 gaze frames a second (browserGazeController.ts);
 // the Eye Tracker 5 delivers about 66. Every page request hit-tests the page (4-8 ms on a
@@ -186,6 +210,23 @@ type BrowserGazeConfig = {
   // v17.23 — links-sidebar extraction v2 (visible labels, visibility +
   // viewport checks, ranked before cap). false = legacy v1 extraction.
   linksExtractionV2: boolean;
+  // 7 Oct 2026 — a steadier page cursor (browserGazeController arbitrateFocus,
+  // moveRingTo, placeRingFree, scroll settle): the app's focus rules
+  // (src/utils/gazeFocus.ts), a glide between targets, a resting ring away from
+  // targets and no selection while the page scrolls. Each can be rolled back here.
+  focusHysteresisEnabled: boolean;
+  focusExitMarginPx: number;
+  focusSmallMarginRatio: number;
+  focusSmallMarginMinPx: number;
+  focusConfirmSamples: number;
+  focusCommitFrom: number;
+  focusCommitExitMarginPx: number;
+  focusCommitConfirmMs: number;
+  focusReleaseMs: number;
+  ringGlideMs: number;
+  ringFreeHoldPx: number;
+  ringFreeMoveMs: number;
+  scrollSettleMs: number;
 };
 
 let browserGazeConfig: BrowserGazeConfig = {
@@ -193,7 +234,7 @@ let browserGazeConfig: BrowserGazeConfig = {
   // stop on a video card; widening these defaults gives a larger lock
   // zone once a target is acquired without making fresh acquisition
   // looser. Mirror gcConfig defaults in browserGazeController.ts.
-  dwellMs: 1900,   // Navigation group of the default (Balanced) timing set.
+  dwellMs: 1700,   // Navigation group of the default (Balanced) timing set.
   onsetMs: 280,
   stabilityRadiusPx: 60,
   postClickCooldownMs: 900,
@@ -224,7 +265,8 @@ let browserGazeConfig: BrowserGazeConfig = {
   gapPauseEnabled: true,
   gapPauseMs: 150,
   progressBankEnabled: false,
-  probeSnapHysteresisPx: 0,
+  // 7 Oct 2026: 12 px, so near-equal small links stop flipping (0 = legacy).
+  probeSnapHysteresisPx: 12,
   // v17.19 — see browserGazeController.ts gcConfig defaults for rationale.
   probeSnapEnabled: true,
   probeSnapRadiusPx: 36,
@@ -242,7 +284,40 @@ let browserGazeConfig: BrowserGazeConfig = {
   emptyDwellGuardEnabled: true,
   cardScanCacheMs: 250,
   linksExtractionV2: true,
+  // 7 Oct 2026 — mirror the gcConfig defaults in browserGazeController.ts.
+  focusHysteresisEnabled: true,
+  focusExitMarginPx: 30,
+  focusSmallMarginRatio: 0.35,
+  focusSmallMarginMinPx: 8,
+  focusConfirmSamples: 2,
+  focusCommitFrom: 0.4,
+  focusCommitExitMarginPx: 70,
+  focusCommitConfirmMs: 120,
+  focusReleaseMs: 180,
+  ringGlideMs: 140,
+  ringFreeHoldPx: 24,
+  ringFreeMoveMs: 90,
+  scrollSettleMs: 300,
 };
+
+// The page cursor's steadiness settings, as sent to every page (seed and live updates).
+function pageSteadinessConfig() {
+  return {
+    focusHysteresisEnabled: browserGazeConfig.focusHysteresisEnabled,
+    focusExitMarginPx: browserGazeConfig.focusExitMarginPx,
+    focusSmallMarginRatio: browserGazeConfig.focusSmallMarginRatio,
+    focusSmallMarginMinPx: browserGazeConfig.focusSmallMarginMinPx,
+    focusConfirmSamples: browserGazeConfig.focusConfirmSamples,
+    focusCommitFrom: browserGazeConfig.focusCommitFrom,
+    focusCommitExitMarginPx: browserGazeConfig.focusCommitExitMarginPx,
+    focusCommitConfirmMs: browserGazeConfig.focusCommitConfirmMs,
+    focusReleaseMs: browserGazeConfig.focusReleaseMs,
+    ringGlideMs: browserGazeConfig.ringGlideMs,
+    ringFreeHoldPx: browserGazeConfig.ringFreeHoldPx,
+    ringFreeMoveMs: browserGazeConfig.ringFreeMoveMs,
+    scrollSettleMs: browserGazeConfig.scrollSettleMs,
+  };
+}
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
   const n = Number(value);
@@ -339,6 +414,17 @@ function sendTrustedBrowserClick(x: number, y: number, expectedSessionId = activ
       // even if pause/navigation changed the gaze generation in the meantime.
       if (view.webContents.isDestroyed()) return;
       view.webContents.sendInputEvent({ type: 'mouseUp', x: cx, y: cy, button: 'left', clickCount: 1 } as any);
+      // On YouTube the mouse then leaves the page, as a hand would (8 Oct 2026): YouTube plays a
+      // preview of whatever video a resting mouse is over, and the page cursor will not dwell
+      // inside a playing video, so after a gaze click and Back the video under that point could
+      // not be chosen. Elsewhere the mouse stays, so a menu opened by hovering stays open.
+      let leavePage = false;
+      try { leavePage = isYoutubeUrl(view.webContents.getURL() || ''); } catch { leavePage = false; }
+      if (leavePage) {
+        setTimeout(() => {
+          if (!view.webContents.isDestroyed()) view.webContents.sendInputEvent({ type: 'mouseLeave', x: cx, y: cy } as any);
+        }, 150);
+      }
       setTimeout(() => sendBrowserNavState(true), 350);
     }, 60);
   }, 30);
@@ -363,6 +449,9 @@ function startBrowserDiagnosticsSampling(): void {
 
 async function closeActiveBrowserView(reason: string): Promise<void> {
   const view = activeBrowserView;
+  stopBrowserMemoryWatch();
+  browserViewHidden = false;
+  lastBrowserViewBounds = null;
   if (!view && strayBrowserViews(mainWindow, null).length === 0) return;  // Nothing on screen.
   if (view) gazeGateFor(view).invalidate();
   lastBrowserGazeFrameAt = 0;
@@ -390,6 +479,89 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
   mainWindow?.webContents.send('webview:closed', { reason });
   highContrastEnabled = false;
   browserDiagnostics.markClose();
+}
+
+// ── Embedded page safety and resources (6 Oct 2026, see browser/browserSafety.ts) ──
+
+/** Something a page tried and was refused: logged, and downloads/links told to the interface once a minute. */
+function reportBlockedBrowserAction(kind: BlockedKind, detail: string): void {
+  browserDiagnostics.warn(`browser-blocked-${kind}`, `[BrowserView] blocked ${kind}: ${detail}`, 5000);
+  if (kind !== 'download' && kind !== 'navigation' && kind !== 'popup') return;
+  const now = Date.now();
+  if (now - (blockedNoticeAt.get(kind) || 0) < 60000) return;
+  blockedNoticeAt.set(kind, now);
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('webview:notice', { kind: 'blocked', what: kind });
+}
+
+/** The session every embedded page uses: separate from the interface's, with the safety rules applied. */
+function getBrowserSession(): Electron.Session {
+  const ses = session.fromPartition(BROWSER_PARTITION);
+  hardenBrowserSession(ses, reportBlockedBrowserAction);
+  return ses;
+}
+
+function isYoutubeUrl(url: string): boolean {
+  return /(^|\.)(youtube\.com|youtu\.be)$/i.test(getDomainFromUrl(url));
+}
+
+function stopBrowserMemoryWatch(): void {
+  if (browserMemoryTimer) clearInterval(browserMemoryTimer);
+  browserMemoryTimer = null;
+  if (browserUnresponsiveTimer) clearTimeout(browserUnresponsiveTimer);
+  browserUnresponsiveTimer = null;
+  browserRecyclePending = false;
+}
+
+/**
+ * Refreshes the page as a new document: YouTube plays video after video in one
+ * document, which keeps growing. A video being watched resumes where it was.
+ */
+async function recycleBrowserPage(view: BrowserView, sessionId: number, reason: string): Promise<void> {
+  if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
+  browserRecyclePending = false;
+  const url = view.webContents.getURL();
+  let resumeAt = 0;
+  if (isYoutubeUrl(url) && /\/watch/.test(url)) {
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 800));
+    const seconds = await Promise.race([
+      view.webContents.executeJavaScript(
+        `(function(){var v=document.querySelector('#movie_player video, video');return v&&!v.paused?Math.floor(v.currentTime):0;})()`
+      ).catch(() => 0),
+      timeout,
+    ]);
+    resumeAt = Number(seconds) || 0;
+  }
+  if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
+  browserDiagnostics.info('browser-recycle', `[BrowserView] refreshing page (${reason}) resume=${resumeAt}s`, 1000);
+  invalidateBrowserGaze(view);
+  if (resumeAt > 5 && isAllowedPageUrl(url)) {
+    const next = new URL(url);
+    next.searchParams.set('t', `${resumeAt}s`);
+    view.webContents.loadURL(next.toString()).catch(() => undefined);
+  } else {
+    view.webContents.reload();
+  }
+  mainWindow?.webContents.send('webview:notice', { kind: 'refreshed', reason });
+}
+
+/** Every 15 s: past the soft budget the page is refreshed at the next change of video, past the hard one at once. */
+function startBrowserMemoryWatch(view: BrowserView, sessionId: number): void {
+  stopBrowserMemoryWatch();
+  browserMemoryTimer = setInterval(() => {
+    if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) {
+      stopBrowserMemoryWatch();
+      return;
+    }
+    const usedMb = rendererMemoryMb(view.webContents);
+    if (usedMb === null) return;
+    const budget = browserMemoryBudgetMb();
+    if (usedMb >= budget.hard) {
+      void recycleBrowserPage(view, sessionId, `memory ${usedMb} MB`);
+    } else if (usedMb >= budget.soft && !browserRecyclePending) {
+      browserRecyclePending = true;
+      browserDiagnostics.info('browser-memory-soft', `[BrowserView] ${usedMb} MB: refresh at the next page change`, 60000);
+    }
+  }, 15000);
 }
 
 function getDomainFromUrl(url: string): string {
@@ -498,6 +670,12 @@ const LINKS_EXTRACT_V2_SCRIPT = `
 
 async function extractAndSendPageLinks(): Promise<void> {
   if (!activeBrowserView || !mainWindow) return;
+  // The links list is for reading pages. On YouTube it was never shown, and the
+  // scan (up to 400 links, a computed style each) ran on YouTube's busy main thread.
+  if (isYoutubeUrl(activeBrowserView.webContents.getURL() || '')) {
+    mainWindow.webContents.send('webview:links', { links: [] });
+    return;
+  }
   const useV2 = browserGazeConfig.linksExtractionV2;
   try {
     const raw = await activeBrowserView.webContents.executeJavaScript(
@@ -655,57 +833,64 @@ async function sendBrowserPlaybackState(): Promise<void> {
   }
 }
 
-function applyAacBrowsingMode(): void {
-  if (!activeBrowserView) return;
+// Page styling (6 Oct 2026). The former stylesheet enlarged every link and button
+// and hid anything whose id or class merely contained "ad-", "cookie" or
+// "popup". On YouTube that matched `masthead-container` ("mastHEAD-"), so the
+// search bar sat at 5 % opacity and could not be pressed, and the forced
+// padding made titles overlap their channel and view-count lines. Hiding
+// consent banners and ads is also not ours to do. YouTube now keeps its own
+// layout (page zoom alone enlarges it) with only the Shorts shelves hidden:
+// Shorts are a different, swipe-driven player that gaze cannot control, and
+// they are not selectable here. Its hover preview (`ytd-video-preview`, 8 Oct 2026)
+// is hidden too: it plays over the picture of the video under a resting mouse (the
+// laptop's own pointer can rest there), gaze cannot use it, and the page cursor will
+// not dwell inside a playing video, so that video could not be chosen. Other sites
+// get a visible hover outline only.
+const YOUTUBE_PAGE_CSS = [
+  'ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytm-shorts-lockup-view-model,',
+  'ytm-shorts-lockup-view-model-v2, grid-shelf-view-model:has(ytm-shorts-lockup-view-model),',
+  'grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2), ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model),',
+  'ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model-v2), ytd-guide-entry-renderer:has(a[href^="/shorts"]),',
+  'ytd-mini-guide-entry-renderer:has(a[href^="/shorts"]), ytd-video-preview {',
+  '  display: none !important;',
+  '}',
+].join('\n');
+const READING_PAGE_CSS = [
+  'a:hover, button:hover, [role="button"]:hover {',
+  '  outline: 3px solid #2DD4BF !important;',
+  '  outline-offset: 2px !important;',
+  '}',
+].join('\n');
 
+function applyAacBrowsingMode(): void {
+  const view = activeBrowserView;
+  if (!view || view.webContents.isDestroyed()) return;
+  const url = view.webContents.getURL() || '';
   try {
     // Baseline zoom significantly reduces precision demand for eye gaze users.
-    const url = activeBrowserView.webContents.getURL() || '';
-    const preferredZoom = getPreferredZoomForUrl(url);
-    activeBrowserView.webContents.setZoomFactor(preferredZoom);
+    view.webContents.setZoomFactor(getPreferredZoomForUrl(url));
   } catch {
     // Ignore transient navigation timing issues.
   }
-
-  const injectScript = `
-    (function () {
-      try {
-        if (!document || !document.head) return;
-        if (document.getElementById('gazeconnect-aac-style')) return;
-        var style = document.createElement('style');
-        style.id = 'gazeconnect-aac-style';
-        style.textContent = [
-          'html { scroll-behavior: smooth !important; }',
-          'body { font-size: 18px !important; line-height: 1.6 !important; }',
-          'a, button, input, select, textarea, [role="button"], [onclick], [tabindex="0"] {',
-          '  min-height: 48px !important;',
-          '  min-width: 48px !important;',
-          '  padding: 10px 14px !important;',
-          '  font-size: 18px !important;',
-          '  border-radius: 10px !important;',
-          '  line-height: 1.4 !important;',
-          '}',
-          'a:hover, button:hover, [role="button"]:hover, [onclick]:hover {',
-          '  outline: 2px solid #2DD4BF !important;',
-          '  outline-offset: 2px !important;',
-          '  background-color: rgba(45,212,191,0.08) !important;',
-          '}',
-          '.ad, [id*="ad-"], [class*="ad-container"], [class*="advertisement"], [class*="promo-banner"],',
-          '[class*="cookie"], [id*="cookie"], [class*="popup"], [class*="modal-overlay"], [class*="social-share"] {',
-          '  max-height: 0 !important;',
-          '  opacity: 0.05 !important;',
-          '  pointer-events: none !important;',
-          '}',
-          'img { max-width: 100% !important; height: auto !important; }'
-        ].join('\\n');
-        document.head.appendChild(style);
-      } catch (_) { /* noop */ }
-    })();
-  `;
-
-  activeBrowserView.webContents.executeJavaScript(injectScript)
-    .then(() => applyHighContrastIfNeeded())
-    .catch(() => { /* ignore */ });
+  // insertCSS needs no page script and survives YouTube's in-place navigation, so
+  // it is added once per document and replaced only when the kind of page changes.
+  const kind = isYoutubeUrl(url) ? 'youtube' : 'reading';
+  const holder = view as BrowserView & { _pageCssKey?: string; _pageCssKind?: string };
+  if (holder._pageCssKey && holder._pageCssKind === kind) {
+    void applyHighContrastIfNeeded();
+    return;
+  }
+  const previousKey = holder._pageCssKey;
+  holder._pageCssKind = kind;
+  view.webContents.insertCSS(kind === 'youtube' ? YOUTUBE_PAGE_CSS : READING_PAGE_CSS)
+    .then((key) => {
+      holder._pageCssKey = key;
+      if (previousKey && previousKey !== key && !view.webContents.isDestroyed()) {
+        view.webContents.removeInsertedCSS(previousKey).catch(() => { });
+      }
+    })
+    .catch(() => { holder._pageCssKind = undefined; });
+  void applyHighContrastIfNeeded();
 }
 
 function setMouseOnlyMode(enabled: boolean): void {
@@ -1176,6 +1361,23 @@ function enterStartupFullScreen(): void {
   }, START_FULL_SCREEN_SETTLE_MS);
 }
 
+/** The interface's own document: the built index.html, or the development server it was loaded from. */
+function isInterfaceUrl(url: string): boolean {
+  try {
+    const target = new URL(url);
+    if (target.protocol === 'file:') return /\/dist\/index\.html$/i.test(decodeURIComponent(target.pathname));
+    const current = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : '';
+    if (current) {
+      const origin = new URL(current).origin;
+      if (origin !== 'null' && target.origin === origin) return true;
+    }
+    const vitePort = String(Number(process.env.GAZECONNECT_VITE_PORT) || 5173);
+    return !app.isPackaged && (target.hostname === 'localhost' || target.hostname === '127.0.0.1') && target.port === vitePort;
+  } catch {
+    return false;
+  }
+}
+
 function createWindow(): void {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
@@ -1194,6 +1396,16 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  // The interface never opens windows and never leaves itself: a stray link can
+  // neither replace the app with a web page nor open one beside it (6 Oct 2026).
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (details: Electron.Event<Electron.WebContentsWillNavigateEventParams>) => {
+    if (!isInterfaceUrl(details.url)) {
+      details.preventDefault();
+      browserDiagnostics.warn('interface-navigation', `[Main] blocked interface navigation to ${details.url.slice(0, 120)}`, 5000);
+    }
   });
 
   // Build application menu (includes Mouse Only Mode toggle)
@@ -1631,6 +1843,11 @@ function setupIpcHandlers(): void {
         bounds.width <= 0 || bounds.height <= 0) {
       return { success: false, error: 'invalid bounds' };
     }
+    // Public http(s) pages only (no local files, app-launching links or local network).
+    if (!isAllowedPageUrl(url)) {
+      reportBlockedBrowserAction('navigation', String(url).slice(0, 120));
+      return { success: false, error: 'blocked url' };
+    }
     try {
       await closeActiveBrowserView('replace');
       // A close or a newer open arrived while the previous page was closing.
@@ -1649,6 +1866,14 @@ function setupIpcHandlers(): void {
           contextIsolation: true, // Must be true for security
           nodeIntegration: false,
           sandbox: true,          // Sandbox for safety
+          // Its own session (permissions, downloads, local network: browserSafety.ts),
+          // never the interface's.
+          session: getBrowserSession(),
+          // Stops alert/confirm/prompt, print, file and passkey dialogs (pagePreload.ts).
+          preload: path.join(__dirname, 'browser', 'pagePreload.js'),
+          spellcheck: false,
+          safeDialogs: true,
+          navigateOnDragDrop: false,
         },
       });
       // Framework navigation/scripts add temporary listeners. This is a
@@ -1740,6 +1965,7 @@ function setupIpcHandlers(): void {
           cardScanCacheMs: browserGazeConfig.cardScanCacheMs,
           progressBankEnabled: browserGazeConfig.progressBankEnabled,
           probeSnapHysteresisPx: browserGazeConfig.probeSnapHysteresisPx,
+          ...pageSteadinessConfig(),
         });
         view.webContents.executeJavaScript(
           `window.gcConfig = Object.assign(window.gcConfig || {}, ${seedConfig});`
@@ -1760,11 +1986,31 @@ function setupIpcHandlers(): void {
 
       view.webContents.setWindowOpenHandler(({ url }) => {
         browserDiagnostics.debug('window-open', `[BrowserView] Intercepted new window: ${url}`, 1000);
-        view.webContents.loadURL(url).finally(() => {
-          void injectBrowserPageHelpers();
-        });
+        // New windows open in this same page, and only for pages the browser may show.
+        if (isAllowedPageUrl(url)) {
+          view.webContents.loadURL(url).finally(() => {
+            void injectBrowserPageHelpers();
+          });
+        } else {
+          reportBlockedBrowserAction('popup', url.slice(0, 120));
+        }
         return { action: 'deny' };
       });
+      // A link or redirect to anything but a public http(s) page is refused.
+      onBrowserViewEvent('will-navigate', (details: Electron.Event<Electron.WebContentsWillNavigateEventParams>) => {
+        if (!isAllowedPageUrl(details.url)) {
+          details.preventDefault();
+          reportBlockedBrowserAction('navigation', details.url.slice(0, 120));
+        }
+      });
+      onBrowserViewEvent('will-redirect', (details: Electron.Event<Electron.WebContentsWillRedirectEventParams>) => {
+        if (details.isMainFrame && !isAllowedPageUrl(details.url)) {
+          details.preventDefault();
+          reportBlockedBrowserAction('navigation', details.url.slice(0, 120));
+        }
+      });
+      // A page can never keep the patient with "Leave site?": leaving always works.
+      onBrowserViewEvent('will-prevent-unload', (event: Electron.Event) => event.preventDefault());
 
       onBrowserViewEvent('did-start-navigation', (_e: any, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
         // Close the poll gate for cross-document main-frame navigations:
@@ -1784,12 +2030,25 @@ function setupIpcHandlers(): void {
       });
       onBrowserViewEvent('did-navigate', (_e, nextUrl) => {
         browserDiagnostics.debug('did-navigate', `[Main] did-navigate: ${nextUrl}`, 1000);
+        // A new document: its page stylesheet has to be inserted again.
+        (view as any)._pageCssKey = undefined;
+        (view as any)._pageCssKind = undefined;
+        browserRecyclePending = false;
         invalidateBrowserGaze(view);
+        pruneNavigationHistory(view.webContents);
         void injectBrowserPageHelpers();
       });
-      onBrowserViewEvent('did-navigate-in-page', (_e, nextUrl) => {
+      onBrowserViewEvent('did-navigate-in-page', (_e, nextUrl, isMainFrame) => {
         browserDiagnostics.debug('did-navigate-in-page', `[Main] did-navigate-in-page: ${nextUrl}`, 1000);
         invalidateBrowserGaze(view);
+        if (isMainFrame !== false) {
+          pruneNavigationHistory(view.webContents);
+          // A page over its memory budget is refreshed now, as the next video starts anyway.
+          if (browserRecyclePending) {
+            void recycleBrowserPage(view, sessionId, 'memory');
+            return;
+          }
+        }
         void injectBrowserPageHelpers();
       });
       onBrowserViewEvent('did-stop-loading', () => {
@@ -1807,16 +2066,42 @@ function setupIpcHandlers(): void {
           }
         }, 1500);
       });
+      // YouTube's own work can keep its page busy for several seconds (up to 8 s
+      // measured while a new video starts), which Chromium reports as unresponsive.
+      // The page is given 8 s more; one that is still hung is restarted, and the
+      // restart (like a crash) reloads the same page instead of closing it.
       onBrowserViewEvent('unresponsive', () => {
         browserDiagnostics.warn('browser-unresponsive', '[BrowserView] renderer became unresponsive');
-        void closeActiveBrowserView('unresponsive');
+        if (browserUnresponsiveTimer) return;
+        browserUnresponsiveTimer = setTimeout(() => {
+          browserUnresponsiveTimer = null;
+          if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
+          browserDiagnostics.warn('browser-hung', '[BrowserView] still unresponsive after 8 s: restarting the page');
+          try { view.webContents.forcefullyCrashRenderer(); } catch { void closeActiveBrowserView('unresponsive'); }
+        }, 8000);
       });
       onBrowserViewEvent('responsive', () => {
         browserDiagnostics.debug('browser-responsive', '[BrowserView] renderer responsive again', 1000);
+        if (browserUnresponsiveTimer) clearTimeout(browserUnresponsiveTimer);
+        browserUnresponsiveTimer = null;
       });
       onBrowserViewEvent('render-process-gone', (_event, details) => {
-        browserDiagnostics.warn('browser-render-gone', `[BrowserView] render process gone: ${details?.reason || 'unknown'}`);
-        void closeActiveBrowserView(`render-process-gone:${details?.reason || 'unknown'}`);
+        const reason = details?.reason || 'unknown';
+        browserDiagnostics.warn('browser-render-gone', `[BrowserView] render process gone: ${reason}`);
+        if (browserUnresponsiveTimer) clearTimeout(browserUnresponsiveTimer);
+        browserUnresponsiveTimer = null;
+        (view as any)._pageScriptReady = false;
+        // Restart the page in a new process, at most three times in ten minutes.
+        if (reason !== 'clean-exit' && browserRecoveryBudget.take()) {
+          setTimeout(() => {
+            if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
+            invalidateBrowserGaze(view);
+            view.webContents.reload();
+            mainWindow?.webContents.send('webview:notice', { kind: 'recovered', reason });
+          }, 400);
+          return;
+        }
+        void closeActiveBrowserView(`render-process-gone:${reason}`);
       });
       onBrowserViewEvent('destroyed', () => {
         browserDiagnostics.markClose();
@@ -1835,15 +2120,23 @@ function setupIpcHandlers(): void {
       // v17.16 — playback-state poll. Faster than the 1 s nav poll so the
       // Watch Mode rail appears promptly on play; also drives the injected
       // video re-scan + fullscreen auto-exit even when gaze is paused.
+      // 2.5 a second is prompt enough for the controls to follow play/pause, and
+      // halves the page work of the former 200 ms poll on YouTube's main thread.
       const playbackPoll = setInterval(() => {
         if (activeBrowserView !== view || !mainWindow || view.webContents.isDestroyed()) {
           clearInterval(playbackPoll);
           return;
         }
         void sendBrowserPlaybackState();
-      }, 200);
+      }, 400);
 
       (view as any)._playbackPoll = playbackPoll;
+      startBrowserMemoryWatch(view, sessionId);
+      lastBrowserViewBounds = {
+        x: Math.round(bounds.x), y: Math.round(bounds.y),
+        width: Math.round(bounds.width), height: Math.round(bounds.height),
+      };
+      browserViewHidden = false;
 
       await view.webContents.loadURL(url);
       // Closed or replaced while it loaded: the page is already gone.
@@ -1876,33 +2169,6 @@ function setupIpcHandlers(): void {
     browserViewRequestSeq += 1;
     await closeActiveBrowserView('close');
     return { success: true };
-  });
-
-  // DIP-SPACE handler: x,y are passed straight to sendInputEvent with NO zoom
-  // compensation, so callers MUST supply view-local DIP coordinates. The only
-  // live caller (clickAtGaze) derives them from window CSS px, which equals
-  // DIPs because the main window zoom is never changed. Do NOT feed page-CSS
-  // coordinates (e.g. from getBoundingClientRect) here — under the default 1.35
-  // page zoom they would mis-click. Page-CSS clicks must go through
-  // sendTrustedBrowserClick instead, which multiplies by the page zoom factor
-  // (see Entry 26).
-  ipcMain.handle('webview:click', (_event: any, x: number, y: number) => {
-    if (!activeBrowserView) return;
-    try {
-      // First move the mouse to the target position — this updates Chromium's
-      // hover state so the correct element receives the click event
-      activeBrowserView.webContents.sendInputEvent({ type: 'mouseMove', x, y } as any);
-      // Then dispatch mouseDown + mouseUp for a full click
-      setTimeout(() => {
-        activeBrowserView?.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 } as any);
-        setTimeout(() => {
-          activeBrowserView?.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 } as any);
-          setTimeout(() => sendBrowserNavState(true), 350);
-        }, 60);
-      }, 30);
-    } catch (err) {
-      console.error('webview:click error:', err);
-    }
   });
 
   ipcMain.handle('webview:scroll', (_event: any, deltaY: number) => {
@@ -1939,32 +2205,60 @@ function setupIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('webview:type', (_event: any, text: string) => {
-    if (!activeBrowserView) return;
+  // Page commands arrive by name only (youtubeCommand, scrollPage). The former
+  // 'webview:type', 'webview:click' and 'webview:executeJs' channels, which let
+  // the interface send keystrokes, clicks or any script to the web page, were
+  // removed on 6 Oct 2026; nothing used them except the full-screen scripts,
+  // which are now the youtubeCommand 'maximize' / 'restore' / 'is_maximized'.
+
+  // Up / Down for the page (see browser/pageScroll.ts). One request at a time:
+  // a press while YouTube is busy is answered when the page is free, never queued twice.
+  // Top (Back to Video) always runs: an Up / Down still waiting for YouTube's reset after a
+  // navigation (8 Oct 2026) must not scroll the page after the person has gone back to the video.
+  ipcMain.handle('webview:scrollPage', async (_event: any, direction: unknown): Promise<PageScrollResult | { ok: false; reason: string }> => {
+    const view = activeBrowserView;
+    const sessionId = activeBrowserViewSessionId;
+    if (!view || view.webContents.isDestroyed() || browserViewHidden) return { ok: false, reason: 'no-page' };
+    if (!isPageScrollDirection(direction)) return { ok: false, reason: 'bad-direction' };
+    if ((view as any)._pageScriptReady === false) return { ok: false, reason: 'loading' };
+    if (pageScrollInFlight && direction !== 'top') return { ok: false, reason: 'busy' };
+    pageScrollInFlight = true;
     try {
-      for (const char of text) {
-        activeBrowserView.webContents.sendInputEvent({ type: 'keyDown', keyCode: char } as any);
-        activeBrowserView.webContents.sendInputEvent({ type: 'char', keyCode: char } as any);
-        activeBrowserView.webContents.sendInputEvent({ type: 'keyUp', keyCode: char } as any);
-      }
-    } catch (err) {
-      console.error('webview:type error:', err);
+      // The page's own smooth scroll must not be paused by a dwell that has just started on it.
+      invalidateBrowserGaze(view);
+      const result = await withPageTimeout(
+        view.webContents.executeJavaScript(buildPageScrollScript(direction)) as Promise<PageScrollResult | null>);
+      if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId) return { ok: false, reason: 'stale' };
+      return result || { ok: false, reason: 'no-result' };
+    } catch (err: any) {
+      return { ok: false, reason: err?.message || 'failed' };
+    } finally {
+      pageScrollInFlight = false;
     }
   });
 
-  // Execute JavaScript in the active BrowserView with user-gesture context.
-  // The user-gesture flag is critical for browser APIs that require it (e.g.
-  // Element.requestFullscreen, autoplay-with-sound, popups). Used by the AAC
-  // toolbar to reliably click YouTube's fullscreen / skip-ad buttons.
-  ipcMain.handle('webview:executeJs', async (_event: any, code: string) => {
-    if (!activeBrowserView || !code || typeof code !== 'string') return { success: false };
-    try {
-      const result = await activeBrowserView.webContents.executeJavaScript(code, true);
-      return { success: true, result };
-    } catch (err: any) {
-      console.error('webview:executeJs error:', err?.message || err);
-      return { success: false, error: err?.message || String(err) };
+  // The search keyboard (and any other app screen) is drawn by the interface,
+  // under the native page. The page is taken off the window meanwhile -- kept
+  // alive, so coming back finds it exactly as it was -- and gaze never reaches it.
+  ipcMain.handle('webview:setVisible', (_event: any, visible: unknown) => {
+    const view = activeBrowserView;
+    if (!view || view.webContents.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) return { visible: false };
+    if (visible === false) {
+      if (!browserViewHidden) {
+        browserViewHidden = true;
+        invalidateBrowserGaze(view);
+        try { mainWindow.removeBrowserView(view); } catch { /* not attached */ }
+      }
+      return { visible: false };
     }
+    if (browserViewHidden) {
+      browserViewHidden = false;
+      try {
+        mainWindow.addBrowserView(view);
+        if (lastBrowserViewBounds) view.setBounds(lastBrowserViewBounds);
+      } catch { /* window closing */ }
+    }
+    return { visible: true };
   });
 
   ipcMain.handle('webview:youtubeCommand', async (_event: any, command: string) => {
@@ -1979,10 +2273,12 @@ function setupIpcHandlers(): void {
     }
 
     try {
-      const result = await view.webContents.executeJavaScript(
+      // A page that has stopped responding gives up the command after 5 s instead of
+      // holding it (and the toolbar polling it) until the page is recovered.
+      const result = await withPageTimeout(view.webContents.executeJavaScript(
         buildYoutubeCommandScript(command),
         true
-      ) as YoutubeCommandResult | null;
+      ) as Promise<YoutubeCommandResult | null>);
       if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId) {
         return { ok: false, status: 'failed', detail: 'stale_browser_view' };
       }
@@ -2205,7 +2501,7 @@ function setupIpcHandlers(): void {
     */
   ipcMain.handle('webview:setGazeConfig', async (_event: any, config: Partial<BrowserGazeConfig>) => {
     browserGazeConfig = {
-      dwellMs: typeof config?.dwellMs === 'number' && [750, 800, 900, 1100, 1300, 1400, 1450, 1600, 1900, 2250, 2400, 2500, 2600, 2750, 2800, 3200, 3250, 3800, 4000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
+      dwellMs: typeof config?.dwellMs === 'number' && [750, 800, 900, 950, 1100, 1300, 1400, 1450, 1550, 1600, 1700, 1850, 1900, 2000, 2050, 2200, 2250, 2300, 2400, 2500, 2600, 2650, 2700, 2800, 2900, 3050, 3100, 3200, 3250, 3350, 3600, 3800, 3850, 4000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
       onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
       stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),
@@ -2254,6 +2550,20 @@ function setupIpcHandlers(): void {
       cardScanCacheMs: clampNumber(config?.cardScanCacheMs, browserGazeConfig.cardScanCacheMs, 0, 2000),
       linksExtractionV2: typeof config?.linksExtractionV2 === 'boolean'
         ? config.linksExtractionV2 : browserGazeConfig.linksExtractionV2,
+      focusHysteresisEnabled: typeof config?.focusHysteresisEnabled === 'boolean'
+        ? config.focusHysteresisEnabled : browserGazeConfig.focusHysteresisEnabled,
+      focusExitMarginPx: clampNumber(config?.focusExitMarginPx, browserGazeConfig.focusExitMarginPx, 0, 80),
+      focusSmallMarginRatio: clampNumber(config?.focusSmallMarginRatio, browserGazeConfig.focusSmallMarginRatio, 0, 1),
+      focusSmallMarginMinPx: clampNumber(config?.focusSmallMarginMinPx, browserGazeConfig.focusSmallMarginMinPx, 0, 30),
+      focusConfirmSamples: clampNumber(config?.focusConfirmSamples, browserGazeConfig.focusConfirmSamples, 1, 5),
+      focusCommitFrom: clampNumber(config?.focusCommitFrom, browserGazeConfig.focusCommitFrom, 0, 1),
+      focusCommitExitMarginPx: clampNumber(config?.focusCommitExitMarginPx, browserGazeConfig.focusCommitExitMarginPx, 0, 150),
+      focusCommitConfirmMs: clampNumber(config?.focusCommitConfirmMs, browserGazeConfig.focusCommitConfirmMs, 0, 400),
+      focusReleaseMs: clampNumber(config?.focusReleaseMs, browserGazeConfig.focusReleaseMs, 0, 600),
+      ringGlideMs: clampNumber(config?.ringGlideMs, browserGazeConfig.ringGlideMs, 0, 400),
+      ringFreeHoldPx: clampNumber(config?.ringFreeHoldPx, browserGazeConfig.ringFreeHoldPx, 0, 80),
+      ringFreeMoveMs: clampNumber(config?.ringFreeMoveMs, browserGazeConfig.ringFreeMoveMs, 0, 400),
+      scrollSettleMs: clampNumber(config?.scrollSettleMs, browserGazeConfig.scrollSettleMs, 0, 1000),
     };
 
     if (activeBrowserView) {
@@ -2285,6 +2595,7 @@ function setupIpcHandlers(): void {
         cardScanCacheMs: browserGazeConfig.cardScanCacheMs,
         progressBankEnabled: browserGazeConfig.progressBankEnabled,
         probeSnapHysteresisPx: browserGazeConfig.probeSnapHysteresisPx,
+        ...pageSteadinessConfig(),
       });
       try {
         await activeBrowserView.webContents.executeJavaScript(
@@ -2319,6 +2630,7 @@ function setupIpcHandlers(): void {
         x: Math.round(bounds.x), y: Math.round(bounds.y),
         width: Math.round(bounds.width), height: Math.round(bounds.height),
       };
+      lastBrowserViewBounds = next;
       const previous = activeBrowserView.getBounds();
       if (previous.x !== next.x || previous.y !== next.y || previous.width !== next.width || previous.height !== next.height) {
         invalidateBrowserGaze(activeBrowserView);
@@ -2329,6 +2641,10 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('webview:navigate', async (_event: any, url: string) => {
     if (!activeBrowserView || !url) return { success: false };
+    if (!isAllowedPageUrl(url)) {
+      reportBlockedBrowserAction('navigation', String(url).slice(0, 120));
+      return { success: false, error: 'blocked url' };
+    }
     try {
       await activeBrowserView.webContents.loadURL(url);
       applyAacBrowsingMode();
@@ -2380,7 +2696,7 @@ function setupIpcHandlers(): void {
   const handleWebviewGazeFrame = (x: number, y: number, options?: BrowserGazeOptions) => {
     const view = activeBrowserView;
     const sessionId = activeBrowserViewSessionId;
-    if (!view || view.webContents.isDestroyed()) return;
+    if (!view || view.webContents.isDestroyed() || browserViewHidden) return;
     const gate = gazeGateFor(view);
     const cursorEnabled = options?.cursor !== false;
     const emittedAt = options?.emittedAtWallMs ?? Date.now();
@@ -2623,6 +2939,10 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     console.log('GazeConnect Pro starting...');
 
+    // 0. The embedded browser's own session: safety rules first, and a disk cache
+    //    that cannot grow without bound on the patient's laptop.
+    void capBrowserCache(getBrowserSession());
+
     // 1. Start Tobii Helper first (needs time to init TCP server)
     startTobiiHelper();
 
@@ -2636,6 +2956,11 @@ if (!gotTheLock) {
     try { createTray(); } catch (err) { console.warn('Tray creation failed:', err); }
   });
 }
+
+// No window, interface or page may embed a <webview>; the app uses its own BrowserView only.
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-attach-webview', (event) => event.preventDefault());
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
