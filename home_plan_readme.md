@@ -1,5 +1,7 @@
 # Home Plan Module README
 
+> **Current Compass viewer (5 Oct 2026):** the generated-plan studio (`src/components/CompassPlanStudio.tsx`) uses `POST /api/floorplan/compass/options` and `/compass/render` in `tools/floorplan_server.py`, which call `tools/compass_presentation.py` (model, render, DXF) with `compass_architecture.py`, `compass_furniture.py`, `compass_standards.py`, `compass_drawing.py` and `compass_exterior.py`. See AGENTS.md (Compass bullets). The path below is the legacy survey/fusion viewer, kept for saved plans.
+
 This file gives a compact technical map of Survey + Compass + Floor Plan generation.
 
 ## What the app uses in production

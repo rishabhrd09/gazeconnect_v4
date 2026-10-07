@@ -88,7 +88,13 @@ class CompassPresentationTests(unittest.TestCase):
         for angle in range(4): self.assertTrue(render(p,view='3d',angle=angle).startswith(b'\x89PNG'))
         doc=ezdxf.read(io.StringIO(render(p,fmt='dxf').decode()))
         self.assertEqual(doc.units,4)
-        ms=doc.modelspace(); self.assertEqual(len(ms.query('DIMENSION')),10)
+        # One dimension per grid span on each chain, plus the two overall plot dimensions.
+        m=model(p,'ground')
+        xs={0.,float(m['width'])}|{round(x,4) for r in m['rooms'] for poly in r['polygons'] for x,_ in poly.exterior.coords}
+        ys={0.,float(m['depth'])}|{round(y,4) for r in m['rooms'] for poly in r['polygons'] for _,y in poly.exterior.coords}
+        ms=doc.modelspace(); self.assertEqual(len(ms.query('DIMENSION')),len(xs)-1+len(ys)-1+2)
+        self.assertTrue(all("'-" in d.dxf.text for d in ms.query('DIMENSION')))  # Feet and inches.
+        auditor=doc.audit(); self.assertEqual(len(auditor.errors),0)
         self.assertEqual(len(ms.query('LINE[layer=="A-DOOR"]')),4)
         polygons=list(ms.query('LWPOLYLINE[layer=="A-ROOM"]'))
         expected=model(p,'ground')['rooms']
