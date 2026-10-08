@@ -591,17 +591,20 @@ export const DEFAULT_CUSTOMIZATION: CustomizationData = {
     designMode: 'focus',
     showHindi: false,
     dwellTime: 900,
-    filterPreset: 'balanced',
-    dwellTimingSet: 'balanced',
-    keyboardFeel: 'standard',
-    gazeColors: 'standard',
+    // The maintainer's setup for Papa (8 Oct 2026), what a new profile and Reset start with:
+    // Steady smoothing, the Calm speed, the Familiar keyboard, Soft blue gaze colours and no gaze
+    // cursor. Invalid saved values still fall back to Balanced / Standard (the normalizers).
+    filterPreset: 'stable',
+    dwellTimingSet: 'calm',
+    keyboardFeel: 'familiar',
+    gazeColors: 'soft',
     gazeOnNavigate: 'smart-pause',
     ttsRate: 150,  // words per minute (the Voice stepper: 80-250); 150 is the normal pace
     ttsVolume: 0.25,
     breakReminderInterval: 20,
     ttsLanguage: 'english',
     gazeCursorSize: 'medium',
-    showGazeCursor: true,
+    showGazeCursor: false,
     soundEffects: true,
     userName: 'Papa',
     gazeOffsetX: 0,

@@ -6,7 +6,7 @@
  * DOM, classes, sizes and timings are unchanged.
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { FAMILIAR_KEYBOARD_TIMING } from '../../config/dwellTimeConfig';
+import { FAMILIAR_KEYBOARD_TIMING, familiarKeyboardFillMs } from '../../config/dwellTimeConfig';
 import { darkColors, lightColors, screenThemes } from '../../utils/design';
 import { GAZE_ENABLE_COOLDOWN_MS } from '../core/GazeControlToggle';
 
@@ -174,13 +174,12 @@ export const KeyBtn: React.FC<{
   const colors = isDarkMode ? darkColors : lightColors;
   const keyboardTheme = getKeyboardTheme(isDarkMode);
   const keyboardAccent = getKeyboardAccent(isDarkMode);
-  // Familiar changes only keyboard typing and Shift. Keep the existing longer
-  // deliberate/communication/navigation timings for the other action keys.
+  // Familiar changes only keyboard typing and Shift: a longer settle, then the selected
+  // speed's key time. Keep the longer deliberate/communication/navigation timings for the
+  // other action keys.
   const familiarTypingKey = familiarFeel && config.action !== 'deleteWord'
     && config.action !== 'speak' && config.action !== 'quickWords';
-  const fillMs = familiarTypingKey
-    ? (config.action === 'shift' ? FAMILIAR_KEYBOARD_TIMING.modifier : FAMILIAR_KEYBOARD_TIMING.key)
-    : dwellMs;
+  const fillMs = familiarTypingKey ? familiarKeyboardFillMs() : dwellMs;
   const onsetMs = familiarTypingKey ? FAMILIAR_KEYBOARD_TIMING.onset : 0;
 
   const clearAll = useCallback(() => {

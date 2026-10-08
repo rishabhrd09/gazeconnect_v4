@@ -192,7 +192,7 @@ export interface AppSettings {
   showHindi: boolean; // Legacy storage field; normalized to false for this English-only release.
   dwellTime: number;
   filterPreset: string;
-  dwellTimingSet: 'quick' | 'balanced' | 'measured' | 'calm' | 'relaxed' | 'extra_time'; // One complete set of the six selection durations (config/dwellTimeConfig)
+  dwellTimingSet: 'quick' | 'brisk' | 'balanced' | 'moderate' | 'calm' | 'restful' | 'relaxed' | 'leisurely' | 'unhurried' | 'extra_time'; // One complete set of the eight selection durations (config/dwellTimeConfig); a saved Measured loads as Calm
   keyboardFeel: 'standard' | 'familiar'; // Optional keyboard-only timing and Dark key appearance
   gazeColors: 'standard' | 'high_contrast' | 'soft'; // Cursor ring, dwell fill and highlight palette (config/gazeColors)
   gazeOnNavigate: 'smart-pause' | 'full-pause' | 'always-active';

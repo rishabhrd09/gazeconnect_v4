@@ -34,7 +34,7 @@ import { GazeFreshness, GAZE_RECOVERY_MS, GAZE_STALE_MS } from '../../utils/gaze
 import { TrackerStatusNotice } from './TrackerStatusNotice';
 import {
   FAMILIAR_KEYBOARD_TIMING, KEYBOARD_CADENCE_BY_STAGE, KEYBOARD_CADENCE_DEFAULT,
-  dwellForContext, fixedDwell, normalizeKeyboardFeel, type KeyboardCadence,
+  dwellForContext, familiarKeyboardFillMs, fixedDwell, keyboardNextKeyWaitMs, normalizeKeyboardFeel, type KeyboardCadence,
 } from '../../config/dwellTimeConfig';
 
 type FamiliarKeyboardTarget = 'key' | 'modifier' | 'suggestion';
@@ -379,6 +379,9 @@ export const GazeCursor: React.FC = () => {
   // B1 keyboardCadence: whether the previous click was a keyboard-context
   // target — gates the keyboard cooldown base for the next click's cooldown.
   const lastClickWasKeyboardRef = useRef<boolean>(false);
+  // The keyboard key gaze last selected: a different key may begin sooner after it
+  // (keyboardNextKeyWaitMs), the same one waits the stage's full keyboard cooldown.
+  const lastClickedKeyRef = useRef<HTMLElement | null>(null);
 
   // === KEYBOARD HIT ZONE REFS ===
   const keyboardKeysRef = useRef<KeyRect[]>([]);
@@ -581,7 +584,7 @@ export const GazeCursor: React.FC = () => {
   ): number => {
     if (keyboardFeelRef.current === 'familiar') {
       const familiarTarget = familiarKeyboardTarget(el, isKeyboard);
-      if (familiarTarget) return FAMILIAR_KEYBOARD_TIMING[familiarTarget];
+      if (familiarTarget) return familiarKeyboardFillMs(familiarTarget);
     }
     const explicitDwellRaw = getAttr(el, 'data-gaze-dwell-ms') || getAttr(el, 'data-gaze-dwell');
     const explicitDwell = explicitDwellRaw ? Number(explicitDwellRaw) : NaN;
@@ -917,7 +920,7 @@ export const GazeCursor: React.FC = () => {
     const effectiveCooldown = (cadenceForCooldown && lastClickWasKeyboardRef.current)
       ? cadenceForCooldown.cooldown
       : s.cooldownAfterActivation + 1000; // base 1000ms + configurable
-    const inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
+    let inClickCooldown = now - lastClickTimeRef.current < effectiveCooldown;
 
     // === v18: THE DWELL TARGET IS THE FOCUSED TARGET (utils/gazeFocus) ====
     // handleGaze decides which target the eyes are on from the gaze estimate,
@@ -984,6 +987,18 @@ export const GazeCursor: React.FC = () => {
       setDwellProgress(0);
       setTargetName('');
       setHighlightRect(null);
+    }
+
+    // 8 Oct 2026: after a key, a DIFFERENT key may begin sooner, in step with the selected
+    // speed (0.4 of the key time, 250 ms at Quick, never past the stage's cooldown); the same
+    // key keeps the stage's full wait, so a look that stays on it does not repeat it sooner.
+    if (inClickCooldown && cadenceForCooldown && lastClickWasKeyboardRef.current
+        && clickable && lastClickedKeyRef.current && clickable !== lastClickedKeyRef.current) {
+      const nextContext = (getTargetAttr(clickable, 'data-gaze-context') || '').trim().toLowerCase();
+      if (nextContext === 'keyboard' || nextContext === 'keyboardkey' || nextContext === 'prediction') {
+        inClickCooldown = now - lastClickTimeRef.current
+          < keyboardNextKeyWaitMs(dwellForContext('keyboard'), cadenceForCooldown.cooldown);
+      }
     }
 
     // Only dwell if:
@@ -1240,6 +1255,7 @@ export const GazeCursor: React.FC = () => {
       // B1 keyboardCadence: remember whether this click was a keyboard-context
       // target so the NEXT click's cooldown can use the keyboard cooldown base.
       lastClickWasKeyboardRef.current = contextKey === 'keyboard' || contextKey === 'keyboardkey' || contextKey === 'prediction';
+      lastClickedKeyRef.current = lastClickWasKeyboardRef.current ? dwellTargetRef.current : null;
 
       // === R1: TELEMETRY ===========================================
       // Record this click's residual (raw gaze vs target center),

@@ -10,7 +10,7 @@ import { DWELL_TIMING_SETS, VIDEO_REVEAL_HOLD_CHOICES_MS, describeTimingSet, nor
 import { GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors } from '../../../config/gazeColors';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
 
-// Six complete timing sets. The ring times shown are the dwell fill only:
+// Ten complete timing sets. The ring times shown are the dwell fill only:
 // gaze acquisition and onset precede the ring, so no total time is promised.
 const DwellTimeSection: React.FC = () => {
   const { timingSet } = useDwellTime();
@@ -20,7 +20,7 @@ const DwellTimeSection: React.FC = () => {
     <div className="settings-section dwell-guide">
       <h3>{DWELL_TIMING_SETS[timingSet].label.replace(' (default)', '')}</h3>
       <p>{DWELL_TIMING_SETS[timingSet].description} ({describeTimingSet(timingSet)}). {familiar
-        ? 'Familiar keyboard sets its own pace for keys and suggestions; this speed still controls other choices.'
+        ? 'Familiar keyboard waits a little longer before each key; its keys still fill at this speed.'
         : 'A short settling phase comes before the dwell ring fills, and a pause follows each selection.'}</p>
     </div>
   );
@@ -132,7 +132,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
           />
           <SelectSetting
             label="Selection Speed"
-            description="Six paces, fastest first, each a little slower than the one before. Standard keyboard follows this speed; Familiar keyboard has its own key and suggestion pace."
+            description="Ten paces, fastest first, each slower than the one before. The keyboard follows this speed with either keyboard feel."
             value={normalizeDwellTimingSet(settings.dwellTimingSet)}
             options={(Object.keys(DWELL_TIMING_SETS) as DwellTimingSet[]).map(key => ({
               value: key, label: `${DWELL_TIMING_SETS[key].label} · ${describeTimingSet(key)}`,
@@ -142,7 +142,7 @@ const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({ isDarkMode }) => {
           />
           <SelectSetting
             label="Keyboard Feel"
-            description="Standard follows Selection Speed. Familiar is inspired by the supplied eye-typing setup: a longer key settling phase and steady fill, with no change to gaze smoothing or other screens."
+            description="Both follow Selection Speed. Familiar waits a little longer before each key's ring starts, with no change to gaze smoothing or other screens."
             value={normalizeKeyboardFeel(settings.keyboardFeel)}
             options={[
               { value: 'standard', label: 'Standard' },

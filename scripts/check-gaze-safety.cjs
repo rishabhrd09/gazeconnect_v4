@@ -227,26 +227,65 @@ test('a key shows nothing while it is acquired, then its square and ring begin t
   timed.run(240);
   assert.equal(timed.target.getAttribute('data-keyboard-confirmed'), null, 'confirmation expires without input delay');
 });
-test('Familiar acquires for 350 ms then fills ordinary keys, Shift and suggestions at their own fixed pace', () => {
-  const cases = [
-    ['key', dwell.FAMILIAR_KEYBOARD_TIMING.key],
-    ['modifier', dwell.FAMILIAR_KEYBOARD_TIMING.modifier],
-    ['suggestion', dwell.FAMILIAR_KEYBOARD_TIMING.suggestion],
-  ];
-  for (const [targetKind, fillMs] of cases) {
-    // Familiar is explicit and must work even if legacy keyboardCadence is off.
-    const h = cursorHarness(768, {keyboardFeel:'familiar'}, {keyboardCadence:false}, null, {screen:'keyboard',targetKind});
-    const start = h.now;
-    h.run(336);
-    assert.equal(h.ringProgress, 0, `${targetKind} began fill before Familiar acquisition`);
-    h.run(48);
-    assert(h.ringProgress > 0, `${targetKind} did not begin fill after Familiar acquisition`);
-    while (h.clicks===0 && h.now < start+5000) h.frame();
-    assert.equal(h.clicks, 1, `${targetKind} did not select`);
-    const selectionMs = h.now-start;
-    assert(selectionMs >= 350+fillMs-32 && selectionMs <= 350+fillMs+64,
-      `${targetKind} selected in ${selectionMs} ms, expected about ${350+fillMs}`);
-  }
+test('Familiar settles for 250 ms, then fills keys and Shift in the selected speed\'s key time, suggestions in its suggestion time', () => {
+  // 8 Oct 2026: Familiar filled in a fixed 1.75 s (Shift 1.5 s) after 350 ms whatever the speed,
+  // so the keyboard ignored Selection speed and was the slowest screen.
+  const settle = dwell.FAMILIAR_KEYBOARD_TIMING.onset;
+  assert.equal(settle, 250);
+  try {
+    for (const set of Object.keys(dwell.DWELL_TIMING_SETS)) {
+      dwell.setDwellTimingSet(set);
+      for (const targetKind of ['key', 'modifier', 'suggestion']) {
+        const fillMs = dwell.DWELL_TIMING_SETS[set].ms[targetKind === 'suggestion' ? 'suggestions' : 'typing'];
+        // Familiar is explicit and must work even if legacy keyboardCadence is off.
+        const h = cursorHarness(768, {keyboardFeel:'familiar'}, {keyboardCadence:false}, null, {screen:'keyboard',targetKind});
+        const start = h.now;
+        h.run(240);
+        assert.equal(h.ringProgress, 0, `${set}/${targetKind} began fill before Familiar acquisition`);
+        h.run(48);
+        assert(h.ringProgress > 0, `${set}/${targetKind} did not begin fill after Familiar acquisition`);
+        while (h.clicks===0 && h.now < start+5000) h.frame();
+        assert.equal(h.clicks, 1, `${set}/${targetKind} did not select`);
+        const selectionMs = h.now-start;
+        assert(selectionMs >= settle+fillMs-32 && selectionMs <= settle+fillMs+64,
+          `${set}/${targetKind} selected in ${selectionMs} ms, expected about ${settle+fillMs}`);
+      }
+    }
+  } finally { dwell.setDwellTimingSet('balanced'); }
+});
+test('typing: the next key may begin sooner as the speed quickens; the same key keeps the full wait', () => {
+  // 8 Oct 2026: every letter waited a fixed 0.7 s after the one before, longer than a key at Quick.
+  const on = {x:.5,y:.5,intent_x:.5,intent_y:.5};
+  const next = {x:.63,y:.5,intent_x:.63,intent_y:.5};
+  const stage = dwell.KEYBOARD_CADENCE_BY_STAGE.mid_als;
+  const gaps = {};
+  try {
+    for (const set of Object.keys(dwell.DWELL_TIMING_SETS)) {
+      dwell.setDwellTimingSet(set);
+      const typing = dwell.DWELL_TIMING_SETS[set].ms.typing;
+      const wait = dwell.keyboardNextKeyWaitMs(typing, stage.cooldown);
+      // A different key, looked at as soon as the first is chosen.
+      const h = cursorHarness(768, {}, {keyboardCadence:true}, null, {screen:'keyboard', others:[{left:1110,top:284,width:200,height:200}]});
+      const t0 = h.now;
+      while (h.clicks===0 && h.now < t0+8000) h.frame(16, true, on);
+      const first = h.now;
+      while (h.clicks<2 && h.now < first+8000) h.frame(16, true, next);
+      assert.deepEqual(h.clickLog, ['test-button', 'other-0'], set);
+      const gap = h.now-first, expected = wait+stage.onset+typing;
+      gaps[set] = gap;
+      assert(gap >= expected-48 && gap <= expected+96, `${set}: the next key after ${gap} ms, expected about ${expected}`);
+      // The same key, the eyes staying on it: never sooner than the stage's full wait allows.
+      const s = cursorHarness(768, {}, {keyboardCadence:true}, null, {screen:'keyboard'});
+      const s0 = s.now;
+      while (s.clicks===0 && s.now < s0+8000) s.frame(16, true, on);
+      const again = s.now;
+      while (s.clicks<2 && s.now < again+8000) s.frame(16, true, on);
+      assert.equal(s.clicks, 2, set);
+      assert(s.now-again >= stage.cooldown+typing-48, `${set}: the same key repeated after ${s.now-again} ms`);
+    }
+  } finally { dwell.setDwellTimingSet('balanced'); }
+  const order = Object.keys(dwell.DWELL_TIMING_SETS).map(set => gaps[set]);
+  assert(order.every((gap, i) => i === 0 || gap > order[i-1]), `letter to letter must slow with each speed: ${order}`);
 });
 test('Familiar leaves Delete Word and non-keyboard navigation at Standard timing', () => {
   for (const [screen,targetKind] of [['keyboard','special'],['home','key']]) {
@@ -260,9 +299,10 @@ test('Familiar leaves Delete Word and non-keyboard navigation at Standard timing
     assert.equal(elapsed('familiar'),elapsed('standard'), `${screen}/${targetKind} timing changed`);
   }
 });
-test('in every speed a word suggestion takes exactly a key\'s time, measured end to end', () => {
-  // 29 Sep 2026: a suggestion completed in 0.75 of a key's time in Extra Time, but 1.21 in Quick.
-  // The maintainer asked for the key time itself, for muscle memory.
+test('in every speed a word suggestion takes a little longer than a key, measured end to end', () => {
+  // 29 Sep 2026: a suggestion completed in 0.75 of a key's time in Extra Time, but 1.21 in Quick,
+  // and the maintainer asked for the key time itself. 8 Oct 2026 (second request): a little
+  // longer than a key in every speed, the same share in each (1.1x, to 50 ms).
   const selectionMs = targetKind => {
     const h=cursorHarness(768,{},{keyboardCadence:true},null,{screen:'keyboard',targetKind});
     const start=h.now;
@@ -274,7 +314,8 @@ test('in every speed a word suggestion takes exactly a key\'s time, measured end
     for (const set of Object.keys(dwell.DWELL_TIMING_SETS)) {
       dwell.setDwellTimingSet(set);
       const key=selectionMs('key'), word=selectionMs('suggestion');
-      assert.equal(word, key, `${set}: key ${key} ms, suggestion ${word} ms`);
+      const extra=dwell.DWELL_TIMING_SETS[set].ms.suggestions-dwell.DWELL_TIMING_SETS[set].ms.typing;
+      assert(extra>0 && Math.abs((word-key)-extra)<=32, `${set}: key ${key} ms, suggestion ${word} ms, expected ${extra} ms more`);
       const expected=dwell.KEYBOARD_CADENCE_BY_STAGE.mid_als.onset+dwell.DWELL_TIMING_SETS[set].ms.typing;
       assert(key>=expected-32 && key<=expected+64, `${set}: key ${key} ms, expected onset plus the typing time, about ${expected} ms`);
     }
@@ -283,8 +324,9 @@ test('in every speed a word suggestion takes exactly a key\'s time, measured end
 test('Familiar resumes a recent keyboard dwell but starts fresh after its 750 ms window', () => {
   const on = {x:.5,y:.5,intent_x:.5,intent_y:.5};
   const away = {x:.1,y:.1,intent_x:.1,intent_y:.1};
+  // Half a Balanced key after Familiar's settle (250 + 1000 ms in all).
   const recent = cursorHarness(768,{keyboardFeel:'familiar'},{keyboardCadence:true},null,{screen:'keyboard'});
-  recent.run(350+900,true,on);
+  recent.run(250+500,true,on);
   assert(recent.ringProgress>0.4);
   recent.run(400,true,away);
   assert.equal(recent.clicks,0);
@@ -293,7 +335,7 @@ test('Familiar resumes a recent keyboard dwell but starts fresh after its 750 ms
   assert(recent.ringProgress>0.4);
 
   const expired = cursorHarness(768,{keyboardFeel:'familiar'},{keyboardCadence:true},null,{screen:'keyboard'});
-  expired.run(350+900,true,on);
+  expired.run(250+500,true,on);
   assert(expired.ringProgress>0.4);
   expired.run(960,true,away); // Long enough after either target-loss or lock-break save.
   assert.equal(expired.clicks,0);
@@ -303,7 +345,7 @@ test('Familiar resumes a recent keyboard dwell but starts fresh after its 750 ms
   assert.equal(expired.ringProgress,0,'expired keyboard progress bypassed acquisition');
   while(expired.clicks===0&&expired.now<returnAt+5000)expired.frame(16,true,on);
   assert.equal(expired.clicks,1);
-  assert(expired.now-returnAt>=350+1750-32,'expired progress shortened the new selection');
+  assert(expired.now-returnAt>=250+1000-32,'expired progress shortened the new selection');
 });
 // The target the eyes are on (utils/gazeFocus): decided on the gaze estimate
 // with hysteresis, so tracker noise at a border never moves the bubble.

@@ -16,7 +16,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - Dark mode is primary (reduces eye strain for ALS patients)
 - Three themes: Dark (default), Warm, and the optional Midnight Navy (`src/styles/midnight-navy.css`, a removable layer scoped to `data-theme='midnight-navy'`; details in AGENTS.md). Add no others
 - Bilingual: English + Hindi
-- Emergency buttons must ALWAYS be accessible (always-active: they respond even with gaze toggled off and during navigation cooldowns; shipped dwell is 2500ms (Balanced) — deliberately long to prevent accidental activation, 1450–4000ms across the six Selection Speed sets in `src/config/dwellTimeConfig.ts`, the single authoritative dwell table)
+- Emergency buttons must ALWAYS be accessible (always-active: they respond even with gaze toggled off and during navigation cooldowns; dwell is 2000ms at Balanced and 3400ms at Calm, the speed a new profile starts on — deliberately the longest selection in every set, to prevent accidental activation: twice the key time, 1450–4000ms across the ten Selection Speed sets in `src/config/dwellTimeConfig.ts`, the single authoritative dwell table)
 - Embedded web pages (YouTube, Quick Search) run in their own hardened session (`electron/browser/browserSafety.ts`: no downloads, device or permission grants, or local-network access). The interface sends pages named commands only; never add an IPC channel that runs arbitrary script, keystrokes or clicks in a page
 - No scrolling on main screens (everything must fit within viewport)
 - overflow:hidden is intentional — content must fit, not scroll

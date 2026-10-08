@@ -187,7 +187,6 @@ const WordSlotButton: React.FC<{
       ariaLabel={`Insert ${word}`}
       dwellCategory="predictionButton"
       mouseDwellOnsetMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.onset : undefined}
-      mouseDwellDurationMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.suggestion : undefined}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       disabled={!selectable}
@@ -240,7 +239,6 @@ const PhraseSuggestionButton: React.FC<{
       ariaLabel={`Insert phrase ${suggestion.text}`}
       dwellCategory="predictionButton"
       mouseDwellOnsetMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.onset : undefined}
-      mouseDwellDurationMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.suggestion : undefined}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       disabled={!selectable}

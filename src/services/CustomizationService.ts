@@ -17,7 +17,7 @@ import type {
 } from '../types/customization';
 import { MAX_ACTIVE_PEOPLE } from '../types/customization';
 import { DEFAULT_CUSTOMIZATION } from './defaultCustomization';
-import { normalizeKeyboardFeel, normalizeVideoRevealHoldMs } from '../config/dwellTimeConfig';
+import { normalizeDwellTimingSet, normalizeKeyboardFeel, normalizeVideoRevealHoldMs } from '../config/dwellTimeConfig';
 import { normalizeGazeColors } from '../config/gazeColors';
 import { normalizeDesignMode } from '../config/designMode';
 import { normalizeWebSearch, recordSearch } from '../components/browser/searchSuggestions';
@@ -43,6 +43,9 @@ const DEBOUNCE_MS = 500;
 const englishOnlySettings = (settings: AppSettings): AppSettings => ({
   ...settings, showHindi: false, ttsLanguage: 'english', gazeOffsetX: 0, gazeOffsetY: 0,
   keyboardFeel: normalizeKeyboardFeel(settings.keyboardFeel),
+  // A set retired on 8 Oct 2026 loads as the one with its times (Measured -> Calm); an
+  // unknown name as Balanced.
+  dwellTimingSet: normalizeDwellTimingSet(settings.dwellTimingSet),
   gazeColors: normalizeGazeColors(settings.gazeColors),
   designMode: normalizeDesignMode(settings.designMode),
   // Calm full-screen video: on unless switched off; the look time is one of 3, 4 or 5 s.

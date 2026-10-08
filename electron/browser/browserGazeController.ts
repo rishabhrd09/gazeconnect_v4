@@ -200,7 +200,7 @@ export function buildBrowserCursorInjectionScript(): string {
       };
 
       window.gcConfig = Object.assign({
-        dwellMs: 1700,                       // Navigation group, Balanced timing set
+        dwellMs: 1150,                       // Navigation group, Balanced timing set
         onsetMs: 280,                        // v17: 300 → 280
         stabilityRadiusPx: 60,               // v17: 50 → 60 — base tolerates more ALS noise
         postClickCooldownMs: 900,
@@ -1002,7 +1002,7 @@ export function buildBrowserCursorInjectionScript(): string {
       // intent guard and must never shorten the selected action duration.
       const selectionDurationMs = () => {
         const requested = Number((window.gcConfig || {}).dwellMs);
-        return [750, 800, 900, 950, 1100, 1300, 1400, 1450, 1550, 1600, 1700, 1850, 1900, 2000, 2050, 2200, 2250, 2300, 2400, 2500, 2600, 2650, 2700, 2800, 2900, 3050, 3100, 3200, 3250, 3350, 3600, 3800, 3850, 4000].includes(requested) ? requested : 1700;
+        return [550, 600, 650, 700, 750, 800, 850, 950, 1000, 1050, 1100, 1150, 1200, 1300, 1350, 1450, 1500, 1600, 1700, 1800, 1850, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2400, 2500, 2550, 2600, 2650, 2700, 2750, 2800, 2850, 2950, 3100, 3200, 3400, 3500, 3650, 3700, 3850, 3900, 4000].includes(requested) ? requested : 1150;
       };
 
       // Saved progress expires in wall time, including tracking gaps.

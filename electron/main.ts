@@ -234,7 +234,7 @@ let browserGazeConfig: BrowserGazeConfig = {
   // stop on a video card; widening these defaults gives a larger lock
   // zone once a target is acquired without making fresh acquisition
   // looser. Mirror gcConfig defaults in browserGazeController.ts.
-  dwellMs: 1700,   // Navigation group of the default (Balanced) timing set.
+  dwellMs: 1150,   // Navigation group of the default (Balanced) timing set.
   onsetMs: 280,
   stabilityRadiusPx: 60,
   postClickCooldownMs: 900,
@@ -2501,7 +2501,7 @@ function setupIpcHandlers(): void {
     */
   ipcMain.handle('webview:setGazeConfig', async (_event: any, config: Partial<BrowserGazeConfig>) => {
     browserGazeConfig = {
-      dwellMs: typeof config?.dwellMs === 'number' && [750, 800, 900, 950, 1100, 1300, 1400, 1450, 1550, 1600, 1700, 1850, 1900, 2000, 2050, 2200, 2250, 2300, 2400, 2500, 2600, 2650, 2700, 2800, 2900, 3050, 3100, 3200, 3250, 3350, 3600, 3800, 3850, 4000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
+      dwellMs: typeof config?.dwellMs === 'number' && [550, 600, 650, 700, 750, 800, 850, 950, 1000, 1050, 1100, 1150, 1200, 1300, 1350, 1450, 1500, 1600, 1700, 1800, 1850, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2400, 2500, 2550, 2600, 2650, 2700, 2750, 2800, 2850, 2950, 3100, 3200, 3400, 3500, 3650, 3700, 3850, 3900, 4000].includes(config.dwellMs) ? config.dwellMs : browserGazeConfig.dwellMs,
       onsetMs: clampNumber(config?.onsetMs, browserGazeConfig.onsetMs, 100, 900),
       stabilityRadiusPx: clampNumber(config?.stabilityRadiusPx, browserGazeConfig.stabilityRadiusPx, 30, 90),
       postClickCooldownMs: clampNumber(config?.postClickCooldownMs, browserGazeConfig.postClickCooldownMs, 600, 1800),

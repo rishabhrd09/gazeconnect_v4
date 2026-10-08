@@ -7,13 +7,14 @@ import { useCustomization } from '../../../contexts/CustomizationContext';
 import { useTheme, type Theme } from '../../../contexts/ThemeContext';
 import type { AppSettings } from '../../../types/customization';
 import {
-  DEFAULT_DWELL_TIMING_SET, DWELL_TIMING_SETS, FAMILIAR_KEYBOARD_TIMING, KEYBOARD_CADENCE_BY_STAGE,
+  DWELL_TIMING_SETS, FAMILIAR_KEYBOARD_TIMING, KEYBOARD_CADENCE_BY_STAGE,
   VIDEO_REVEAL_HOLD_CHOICES_MS, describeTimingSet, normalizeDwellTimingSet, normalizeKeyboardFeel,
   normalizeVideoRevealHoldMs, type DwellTimingSet, type KeyboardFeel,
 } from '../../../config/dwellTimeConfig';
 import { GAZE_FILTER_MODES, normalizeFilterPreset } from '../../../config/gazeFilterConfig';
+import { DEFAULT_CUSTOMIZATION } from '../../../services/defaultCustomization';
 import {
-  DEFAULT_GAZE_COLORS, GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors, type GazePalette,
+  GAZE_COLOR_PALETTES, normalizeGazeColors, type GazeColors, type GazePalette,
 } from '../../../config/gazeColors';
 import { MIDNIGHT_NAVY, MIDNIGHT_NAVY_PAGE_GRADIENT } from '../../../config/midnightNavy';
 import { useDwellTime } from '../../../contexts/DwellTimeContext';
@@ -121,7 +122,7 @@ const GazeColourCards: React.FC<{ value: GazeColors; warm: boolean; onChange: (v
             <span className="gss-option-label">{option.label}</span>
             <span className="gss-option-sub">{option.description}</span>
           </span>
-          {key === DEFAULT_GAZE_COLORS && <span className="gss-tag">Default</span>}
+          {key === DEFAULT_CUSTOMIZATION.settings.gazeColors && <span className="gss-tag">Default</span>}
           {key === 'high_contrast' && <span className="gss-tag">Clearest</span>}
           {checked && <LineIcon d={ICON.check} className="gss-option-check" />}
         </button>
@@ -177,11 +178,11 @@ const SPEED_OPTIONS: Option<DwellTimingSet>[] = (Object.keys(DWELL_TIMING_SETS) 
   value: key,
   label: DWELL_TIMING_SETS[key].label.replace(' (default)', ''),
   sub: `${DWELL_TIMING_SETS[key].description} · ${describeTimingSet(key)}`,
-  tag: key === DEFAULT_DWELL_TIMING_SET ? 'Default' : undefined,
+  tag: key === DEFAULT_CUSTOMIZATION.settings.dwellTimingSet ? 'Default' : undefined,
 }));
 const KEYBOARD_FEEL_OPTIONS: Option<KeyboardFeel>[] = [
   { value: 'standard', label: 'Standard', sub: 'Keys and suggestions follow Selection speed.' },
-  { value: 'familiar', label: 'Familiar keyboard', sub: 'A longer settling phase and steady fill, inspired by the supplied eye-typing setup.' },
+  { value: 'familiar', label: 'Familiar keyboard', sub: 'A slightly longer settle before each key. Keys still follow Selection speed.' },
 ];
 
 const SCREEN_CHANGE_OPTIONS: Option<AppSettings['gazeOnNavigate']>[] = [
@@ -247,7 +248,8 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   // standard 250 ms onset if the rollback flag is off.
   const keyboardOnsetMs = keyboardFeel === 'familiar' ? FAMILIAR_KEYBOARD_TIMING.onset
     : gazeFlags.keyboardCadence ? KEYBOARD_CADENCE_BY_STAGE[currentStage].onset : 250;
-  const keyboardFillMs = keyboardFeel === 'familiar' ? FAMILIAR_KEYBOARD_TIMING.key : DWELL_TIMING_SETS[timingSet].ms.typing;
+  // Both feels fill keys in the selected speed's key time (8 Oct 2026).
+  const keyboardFillMs = DWELL_TIMING_SETS[timingSet].ms.typing;
   const cursorOn = settings.showGazeCursor !== false;
   const calmVideoOn = settings.calmFullScreenVideo !== false;
   const revealHoldMs = normalizeVideoRevealHoldMs(settings.videoRevealHoldMs);
@@ -256,7 +258,7 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   return (
     <div className="gss-columns">
       <div className="gss-column">
-        <Card title="Selection speed" note="Six paces, each a little slower than the one above. Keys, suggestions and Quick Words share one time; other choices take a little longer. Standard keyboard follows this speed.">
+        <Card title="Selection speed" note="Ten paces, each slower than the one above. Keys and Quick Words share one time, the quickest; word suggestions take a little longer, other choices a little longer still. The keyboard follows this speed.">
           <RadioCards label="Selection speed" options={SPEED_OPTIONS} value={timingSet}
             onChange={value => save('dwellTimingSet', value)} />
         </Card>
@@ -271,7 +273,7 @@ export const EyeGazePage: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         </Card>
       </div>
       <div className="gss-column">
-        <Card title="Keyboard feel" note="Familiar is based on the supplied eye-typing setup. It changes only keys and suggestions; gaze smoothing and other screens keep their settings.">
+        <Card title="Keyboard feel" note="Both feels type at the Selection speed. Familiar only waits a little longer before each key's ring starts; gaze smoothing and other screens keep their settings.">
           <RadioCards label="Keyboard feel" options={KEYBOARD_FEEL_OPTIONS} value={keyboardFeel}
             onChange={value => save('keyboardFeel', value)} />
         </Card>

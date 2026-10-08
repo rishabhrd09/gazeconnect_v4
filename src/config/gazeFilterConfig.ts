@@ -1,8 +1,8 @@
 /** Smoothing changes movement response, never the selection timing set. */
 export const GAZE_FILTER_MODES = [
-  { value: 'balanced', label: 'Balanced (default)' },
+  { value: 'balanced', label: 'Balanced' },
   { value: 'responsive', label: 'Responsive' },
-  { value: 'stable', label: 'Steady' },
+  { value: 'stable', label: 'Steady (default)' },
   { value: 'gentle', label: 'Gentle' },
 ] as const;
 export type GazeFilterMode = typeof GAZE_FILTER_MODES[number]['value'];

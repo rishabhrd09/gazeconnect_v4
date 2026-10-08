@@ -51,37 +51,47 @@ test('a damaged saved rate falls back to the normal pace', () => {
   assert.equal(normalizeSpeechRateWpm(Number.NaN), 150);
 });
 
-test('new and older profiles keep the Standard keyboard feel', () => {
-  assert.equal(DEFAULT_CUSTOMIZATION.settings.keyboardFeel, 'standard');
+test('a new profile starts with the maintainer\'s setup for Papa (8 Oct 2026); a saved choice is kept', () => {
+  const s = DEFAULT_CUSTOMIZATION.settings;
+  assert.deepEqual([s.dwellTimingSet, s.keyboardFeel, s.gazeColors, s.filterPreset, s.showGazeCursor, s.gazeCursorSize, s.gazeOnNavigate, s.calmFullScreenVideo, s.videoRevealHoldMs],
+    ['calm', 'familiar', 'soft', 'stable', false, 'medium', 'smart-pause', true, 4000]);
   const service = new CustomizationService();
-  service.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'relaxed' } }));
+  service.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'relaxed', keyboardFeel: 'standard' } }));
   assert.equal(service.getData().settings.keyboardFeel, 'standard');
   assert.equal(service.getData().settings.dwellTimingSet, 'relaxed');
 });
 
 test('Familiar keyboard feel persists through export and import without changing speed', () => {
   const service = new CustomizationService();
-  service.updateSetting('dwellTimingSet', 'extra_time');
+  service.updateSetting('dwellTimingSet', 'relaxed');
   service.updateSetting('keyboardFeel', 'familiar');
   const restored = new CustomizationService();
   restored.importJSON(service.exportJSON());
   assert.equal(restored.getData().settings.keyboardFeel, 'familiar');
-  assert.equal(restored.getData().settings.dwellTimingSet, 'extra_time');
+  assert.equal(restored.getData().settings.dwellTimingSet, 'relaxed');
 });
 
-test('invalid saved keyboard feel falls back to Standard', () => {
+test('a speed retired on 8 Oct 2026 loads as the one with its times; an unknown one as Balanced', () => {
+  for (const [saved, expected] of [['measured', 'calm'], ['extra_time', 'extra_time'], ['unhurried', 'unhurried'], ['moderate', 'moderate'],
+    ['restful', 'restful'], ['leisurely', 'leisurely'], ['brisk', 'brisk'], ['warp', 'balanced']]) {
+    const service = new CustomizationService();
+    service.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: saved } }));
+    assert.equal(service.getData().settings.dwellTimingSet, expected, saved);
+  }
+});
+
+test('invalid saved keyboard feel falls back to Standard; reset restores the default Familiar', () => {
   const service = new CustomizationService();
   service.importJSON(JSON.stringify({ settings: { keyboardFeel: 'unknown' } }));
   assert.equal(service.getData().settings.keyboardFeel, 'standard');
-  service.updateSetting('keyboardFeel', 'familiar');
   service.resetToDefaults();
-  assert.equal(service.getData().settings.keyboardFeel, 'standard');
+  assert.equal(service.getData().settings.keyboardFeel, 'familiar');
 });
 
-test('gaze colours: Standard for new and older profiles, a choice persists, bad values fall back', () => {
-  assert.equal(DEFAULT_CUSTOMIZATION.settings.gazeColors, 'standard');
+test('gaze colours: Soft blue for new profiles, a choice persists, bad values fall back to Standard', () => {
+  assert.equal(DEFAULT_CUSTOMIZATION.settings.gazeColors, 'soft');
   const older = new CustomizationService();
-  older.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'relaxed' } }));
+  older.importJSON(JSON.stringify({ version: DEFAULT_CUSTOMIZATION.version, settings: { dwellTimingSet: 'relaxed', gazeColors: 'standard' } }));
   assert.equal(older.getData().settings.gazeColors, 'standard');
   for (const choice of ['high_contrast', 'soft']) {
     const service = new CustomizationService();
@@ -93,9 +103,9 @@ test('gaze colours: Standard for new and older profiles, a choice persists, bad 
   const bad = new CustomizationService();
   bad.importJSON(JSON.stringify({ settings: { gazeColors: 'purple' } }));
   assert.equal(bad.getData().settings.gazeColors, 'standard');
-  bad.updateSetting('gazeColors', 'soft');
+  bad.updateSetting('gazeColors', 'high_contrast');
   bad.resetToDefaults();
-  assert.equal(bad.getData().settings.gazeColors, 'standard');
+  assert.equal(bad.getData().settings.gazeColors, 'soft');
 });
 
 test('Focus is the default design; Serene persists, imports normalize and reset restores Focus', () => {
