@@ -1,4 +1,4 @@
-import { BrowserView, BrowserWindow } from 'electron';
+import { app, BrowserView, BrowserWindow } from 'electron';
 
 // The page's own cleanup (pause and unload its videos) is a courtesy before the
 // page is destroyed; it must never keep the page on screen. executeJavaScript
@@ -34,10 +34,21 @@ export function strayBrowserViews(mainWindow: BrowserWindow | null, keep: Browse
   }
 }
 
+/**
+ * `endProcess` (10 Oct 2026) is for a page being built again (main.ts rebuildBrowserPage):
+ * its renderer process is ended at once instead of being asked to close. A page stuck in its
+ * own script never answers that request, and its process went on holding its memory (seen
+ * in a fault-injection test: alive 2 s after its replacement, still running the stuck script).
+ * The page's listeners are removed first, so ending it is not taken for a crash to recover from.
+ * This returns only once the process has gone (at most END_PROCESS_WAIT_MS): a new page loaded
+ * in the same session while it was still going waited for its first response for good (1 of 2
+ * trials), and none did once it had gone.
+ */
 export async function disposeBrowserView(
   mainWindow: BrowserWindow | null,
   view: BrowserView | null,
-  reason: string
+  reason: string,
+  options: { endProcess?: boolean } = {}
 ): Promise<void> {
   if (!view) return;
 
@@ -72,8 +83,20 @@ export async function disposeBrowserView(
   }
   detachBrowserView(mainWindow, view);
 
+  let endedPid = 0;
+  if (options.endProcess) {
+    try {
+      if (!view.webContents.isDestroyed()) {
+        endedPid = view.webContents.getOSProcessId();
+        view.webContents.forcefullyCrashRenderer();
+      }
+    } catch {
+      // Already gone.
+    }
+  }
+
   try {
-    if (!view.webContents.isDestroyed()) {
+    if (!options.endProcess && !view.webContents.isDestroyed()) {
       let timer: ReturnType<typeof setTimeout> | null = null;
       const timeout = new Promise<boolean>((resolve) => {
         timer = setTimeout(() => resolve(false), PAGE_CLEANUP_TIMEOUT_MS);
@@ -108,5 +131,21 @@ export async function disposeBrowserView(
     // Ignore final destroy races.
   }
 
+  if (endedPid > 0) await processGone(endedPid);
+
   void reason;
+}
+
+const END_PROCESS_WAIT_MS = 5000;
+
+/** Waits until the process has left the app's process list (at most END_PROCESS_WAIT_MS), and a moment more. */
+async function processGone(pid: number): Promise<void> {
+  const started = Date.now();
+  const alive = () => {
+    try { return app.getAppMetrics().some((metric) => metric.pid === pid); } catch { return false; }
+  };
+  while (alive() && Date.now() - started < END_PROCESS_WAIT_MS) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 300));
 }

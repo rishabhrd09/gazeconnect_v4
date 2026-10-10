@@ -38,6 +38,24 @@ const PRIVATE_IPV4 = [
   /^172\.(1[6-9]|2\d|3[01])\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./,
 ];
 
+/**
+ * The IPv4 address an IPv6 address carries (IPv4-mapped ::ffff:a.b.c.d, translated
+ * ::ffff:0:a.b.c.d, the old compatible ::a.b.c.d, NAT64 64:ff9b::a.b.c.d), or null.
+ * The URL parser writes the last 32 bits in hex (`[::ffff:127.0.0.1]` becomes
+ * `::ffff:7f00:1`), and until 10 Oct 2026 only the dotted form was recognised, so
+ * `http://[::ffff:7f00:1]:8765/` reached this computer.
+ */
+function embeddedIpv4(host: string): string | null {
+  const prefix = '(?:::ffff:(?:0:)?|::|64:ff9b::)';
+  const dotted = host.match(new RegExp(`^${prefix}(\\d+\\.\\d+\\.\\d+\\.\\d+)$`));
+  if (dotted) return dotted[1];
+  const hex = host.match(new RegExp(`^${prefix}([0-9a-f]{1,4}):([0-9a-f]{1,4})$`));
+  if (!hex) return null;
+  const high = parseInt(hex[1], 16);
+  const low = parseInt(hex[2], 16);
+  return [high >> 8, high & 255, low >> 8, low & 255].join('.');
+}
+
 /** True for this computer and the local network: loopback, private and link-local addresses. */
 export function isLocalNetworkHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
@@ -45,11 +63,12 @@ export function isLocalNetworkHost(hostname: string): boolean {
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return true;
   if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return PRIVATE_IPV4.some((range) => range.test(host));
   if (host.includes(':')) {
-    // IPv6: loopback, unspecified, unique-local (fc00::/7), link-local (fe80::/10), IPv4-mapped private.
+    // IPv6: loopback, unspecified, unique-local (fc00::/7), link-local (fe80::/10), and an
+    // embedded IPv4 address that is private.
     if (host === '::1' || host === '::') return true;
     if (/^f[cd][0-9a-f]{2}:/.test(host) || /^fe[89ab][0-9a-f]:/.test(host)) return true;
-    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return PRIVATE_IPV4.some((range) => range.test(mapped[1]));
+    const embedded = embeddedIpv4(host);
+    if (embedded) return PRIVATE_IPV4.some((range) => range.test(embedded));
   }
   // A bare single-label name (no dot) can only be a local machine name.
   return !host.includes('.') && !host.includes(':');
@@ -157,16 +176,65 @@ export function rendererMemoryMb(contents: WebContents): number | null {
   }
 }
 
+const clampMb = (value: number, low: number, high: number) => Math.round(Math.max(low, Math.min(high, value)));
+
 /**
  * How much memory one page may use before it is refreshed. A YouTube page uses
- * about 350-500 MB (measured 6 Oct 2026 over six videos); `soft` refreshes it
- * at the next change of video, `hard` at once. Scaled to the computer so a
- * 4 GB laptop keeps headroom and a large one is not refreshed needlessly.
+ * about 230-535 MB (measured 6 and 10 Oct 2026); `soft` refreshes it at the next
+ * change of video, `hard` at once. Scaled to the computer. Until 10 Oct 2026 the
+ * floors were 750 / 1100 MB, more than a YouTube page ever uses, so on a 4 GB laptop,
+ * the one that needs it, the page was never refreshed at all.
  */
 export function browserMemoryBudgetMb(totalBytes = os.totalmem()): { soft: number; hard: number } {
   const totalMb = totalBytes / (1024 * 1024);
-  const clamp = (value: number, low: number, high: number) => Math.round(Math.max(low, Math.min(high, value)));
-  return { soft: clamp(totalMb * 0.12, 750, 1400), hard: clamp(totalMb * 0.2, 1100, 2400) };
+  return { soft: clampMb(totalMb * 0.09, 450, 1400), hard: clampMb(totalMb * 0.15, 750, 2400) };
+}
+
+/**
+ * The computer's available memory (Windows "Available": free and standby pages) below
+ * which it is short (`low`) or about to page the app's own processes to disk (`critical`).
+ * On the maintainer's 8 GB laptop a whole-app freeze while watching YouTube came with
+ * 160-540 MB available and up to 8,000 pages a second read back from disk (10 Oct 2026).
+ */
+export function systemMemoryLimitsMb(totalBytes = os.totalmem()): { low: number; critical: number } {
+  const totalMb = totalBytes / (1024 * 1024);
+  return { low: clampMb(totalMb * 0.07, 400, 800), critical: clampMb(totalMb * 0.035, 250, 400) };
+}
+
+/**
+ * A freshly built YouTube page playing a video measured 350-550 MB (10 Oct 2026), so a new
+ * page frees little unless the old one is larger. On a computer short of memory the page is
+ * built again at the next change of video from this size (in a 15-minute soak on the 8 GB
+ * laptop at 400 MB this came once in four minutes; each is a full page load).
+ */
+export const MIN_NEXT_VIDEO_REBUILD_MB = 450;
+/** And during a video (an interruption) only from this size, or 80 % of its budget if more. */
+export const MIN_NOW_REBUILD_MB = 450;
+
+export type BrowserMemoryAction = 'none' | 'next-video' | 'now';
+
+/**
+ * What to do about memory, from the page's own use and the whole computer's. A refresh
+ * builds the page again in a new process (main.ts rebuildBrowserPage), which returns all
+ * of the old page's memory; `next-video` waits for the next change of video, when a new
+ * page costs the person nothing, `now` is for a large page on a computer about to stall.
+ */
+export function browserMemoryAction(
+  pageMb: number | null, availableMb: number | null, totalBytes = os.totalmem(),
+): { action: BrowserMemoryAction; reason: string } {
+  if (pageMb === null) return { action: 'none', reason: '' };
+  const budget = browserMemoryBudgetMb(totalBytes);
+  const system = systemMemoryLimitsMb(totalBytes);
+  if (pageMb >= budget.hard) return { action: 'now', reason: `page ${pageMb} MB` };
+  if (availableMb !== null && availableMb < system.critical &&
+      pageMb >= Math.max(MIN_NOW_REBUILD_MB, Math.round(budget.soft * 0.8))) {
+    return { action: 'now', reason: `computer ${availableMb} MB available` };
+  }
+  if (pageMb >= budget.soft) return { action: 'next-video', reason: `page ${pageMb} MB` };
+  if (availableMb !== null && availableMb < system.low && pageMb >= MIN_NEXT_VIDEO_REBUILD_MB) {
+    return { action: 'next-video', reason: `computer ${availableMb} MB available` };
+  }
+  return { action: 'none', reason: '' };
 }
 
 /** Records recent automatic recoveries so a page that keeps failing is closed instead of restarted forever. */

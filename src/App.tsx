@@ -201,6 +201,35 @@ const InnerApp: React.FC = () => {
     }
   }, []);
 
+  // The interface's heartbeat for the health log (electron/healthRecorder.ts, 10 Oct 2026):
+  // every 2 s, with the longest gap between painted frames since the last beat. Frames stop
+  // when this renderer or the GPU process stands still, so a gap of seconds is a frozen screen.
+  useEffect(() => {
+    const health = (window as any).electronAPI?.health;
+    if (!health?.beat) return;
+    let worst = 0;
+    let last = performance.now();
+    let frame = 0;
+    const onFrame = (now: number) => {
+      if (document.visibilityState === 'visible') worst = Math.max(worst, now - last);
+      last = now;
+      frame = requestAnimationFrame(onFrame);
+    };
+    // A hidden window paints nothing: that is not a stall.
+    const onVisibility = () => { last = performance.now(); };
+    frame = requestAnimationFrame(onFrame);
+    document.addEventListener('visibilitychange', onVisibility);
+    const timer = window.setInterval(() => {
+      try { health.beat(Math.round(worst)); } catch { /* ignore */ }
+      worst = 0;
+    }, 2000);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   // The first screen is on the glass; bring in the others now, one after the
   // other so they never compete with what is being looked at.
   useEffect(() => {

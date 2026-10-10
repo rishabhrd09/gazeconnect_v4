@@ -18,6 +18,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - Bilingual: English + Hindi
 - Emergency buttons must ALWAYS be accessible (always-active: they respond even with gaze toggled off and during navigation cooldowns; dwell is 2000ms at Balanced and 3400ms at Calm, the speed a new profile starts on — deliberately the longest selection in every set, to prevent accidental activation: twice the key time, 1450–4000ms across the ten Selection Speed sets in `src/config/dwellTimeConfig.ts`, the single authoritative dwell table)
 - Embedded web pages (YouTube, Quick Search) run in their own hardened session (`electron/browser/browserSafety.ts`: no downloads, device or permission grants, or local-network access). The interface sends pages named commands only; never add an IPC channel that runs arbitrary script, keystrokes or clicks in a page
+- Scripts sent to an embedded page cannot be cancelled: every one goes through the per-kind limits of `electron/browser/pageWork.ts`, so a stuck page never collects work, and a stuck page is rebuilt in a new process. Spawned Python workers end with the backend (`python/services/process_lifetime.py`). The health log `<profile>/logs/health/health.jsonl` records what stopped first in a freeze (details in AGENTS.md)
 - No scrolling on main screens (everything must fit within viewport)
 - overflow:hidden is intentional — content must fit, not scroll
 

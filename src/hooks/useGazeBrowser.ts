@@ -24,8 +24,12 @@ type YoutubeCommand = 'play' | 'play_pause' | 'next' | 'skip_ad' | 'show_control
 type PageScrollDirection = 'up' | 'down' | 'top';
 /** Where the page stands after the last Up/Down (atTop/atBottom), and whether a scroll is under way. */
 export type PageScrollState = { atTop: boolean; atBottom: boolean; pending: boolean };
-/** A short message from the browser: something refused (a download, a link), or the page refreshed or restarted. */
-export type BrowserNotice = { kind: 'blocked' | 'refreshed' | 'recovered'; what?: string; at: number };
+/**
+ * A short message from the browser: something refused (a download, a link), the page
+ * refreshed or restarted, or (`slow`, 10 Oct 2026) the page has stopped answering for a
+ * few seconds, which brings the bar with Back even in calm full screen.
+ */
+export type BrowserNotice = { kind: 'blocked' | 'refreshed' | 'recovered' | 'slow'; what?: string; at: number };
 type VideoPlaybackState = {
     playing: boolean;
     hasVideo: boolean;
@@ -210,7 +214,7 @@ export function useGazeBrowser() {
         let timer: ReturnType<typeof setTimeout> | null = null;
         const handler = (payload: { kind?: string; what?: string }) => {
             const kind = payload?.kind;
-            if (kind !== 'blocked' && kind !== 'refreshed' && kind !== 'recovered') return;
+            if (kind !== 'blocked' && kind !== 'refreshed' && kind !== 'recovered' && kind !== 'slow') return;
             setNotice({ kind, what: typeof payload?.what === 'string' ? payload.what : undefined, at: Date.now() });
             if (timer) clearTimeout(timer);
             timer = setTimeout(() => setNotice(null), 5000);

@@ -1782,7 +1782,13 @@ export function buildBrowserCursorInjectionScript(): string {
       // frames are not arriving (e.g. while Pause Gaze is active). Shape
       // matches the webview:playbackState IPC payload the React rail
       // consumes: { playing, hasVideo, rect:{l,t,w,h}|null, fullscreen }.
-      window.gcGetPlaybackState = () => {
+      // 10 Oct 2026: quiet (true while the page cursor is off) rests the change watcher
+      // (gcSetQuiet, below); time is where the video is, so a page the main process has to
+      // build again resumes there (never an ad's time).
+      window.gcGetPlaybackState = (quiet) => {
+        try {
+          if (typeof quiet === 'boolean' && window.gcSetQuiet) window.gcSetQuiet(quiet);
+        } catch (_) {}
         try {
           const nowMs = Date.now();
           maintainVideoState(nowMs);
@@ -1791,12 +1797,18 @@ export function buildBrowserCursorInjectionScript(): string {
         const vr = state.videoRect;
         let fs = false;
         try { fs = !!document.fullscreenElement; } catch (_) {}
+        let time = null;
+        try {
+          const ad = !!document.querySelector('.html5-video-player.ad-showing, .html5-video-player.ad-interrupting');
+          if (state.activeVideo && !ad) time = Math.floor(state.activeVideo.currentTime || 0);
+        } catch (_) {}
         return {
           playing: !!state.videoPlaying,
           hasVideo: !!state.activeVideo,
           rect: vr ? { l: vr.l, t: vr.t, w: vr.w, h: vr.h } : null,
           fullscreen: fs,
-          src: (state.videoSrc || '').slice(0, 200)
+          src: (state.videoSrc || '').slice(0, 200),
+          time: time
         };
       };
 
@@ -2887,12 +2899,34 @@ export function buildBrowserCursorInjectionScript(): string {
         // exist yet; observing <html> covers the body subtree once the
         // parser creates it (previously this threw and the page ran
         // with NO mutation-epoch detection at all).
-        mo.observe(document.body || document.documentElement, {
+        const observerOptions = {
           childList: true,
           subtree: true,
           attributes: true,
           attributeFilter: ['style', 'class', 'hidden', 'aria-hidden']
-        });
+        };
+        mo.observe(document.body || document.documentElement, observerOptions);
+        // 10 Oct 2026 — quiet page. The watcher serves only gaze selection on the page, and a
+        // playing YouTube player changes style and class many times a second, each change
+        // checked against the card selectors. While the page cursor is off (watching a video,
+        // gaze paused) the main process asks for quiet and the watcher is disconnected; the
+        // next gaze request wakes it, with a hard epoch since the page may have changed meanwhile.
+        window.gcSetQuiet = (on) => {
+          const quiet = !!on;
+          if (quiet === !!state.quiet) return;
+          state.quiet = quiet;
+          try {
+            if (quiet) {
+              mo.disconnect();
+              if (state.pendingMutationFrame) cancelAnimationFrame(state.pendingMutationFrame);
+              state.pendingMutationFrame = 0;
+              state.pendingMutationCount = 0;
+            } else {
+              mo.observe(document.body || document.documentElement, observerOptions);
+              bumpEpoch('hard');
+            }
+          } catch (_) {}
+        };
       } catch (_) { /* observer best-effort */ }
 
       return 'injected';
@@ -2926,6 +2960,8 @@ export function buildGazeUpdateAndPollScript(
         if (window.gcHide) window.gcHide();
         return null;
       }
+      // A gaze request: the page's change watcher is needed again (gcSetQuiet).
+      if (window.gcSetQuiet) window.gcSetQuiet(false);
       var r = window.gcUpdateAndPoll(${Math.round(x)}, ${Math.round(y)}, ${cursorEnabled ? 'true' : 'false'}, ${z});
       var s = (window.gcState && window.gcState.dwellState) || 'idle';
       return JSON.stringify({ c: r || null, s: s });

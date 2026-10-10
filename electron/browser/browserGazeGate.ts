@@ -7,9 +7,19 @@ export interface BrowserGazeRequest {
   readonly generation: number;
   readonly emittedAtWallMs: number;
   readonly kind: 'sample' | 'reset';
+  /** When the request was sent to the page (main-process clock). */
+  readonly startedAt: number;
 }
 
-/** One outstanding page request; invalidation never frees an unsettled slot. */
+/**
+ * How long the page may take to answer one gaze request before its slot is given back
+ * (10 Oct 2026). Answers normally take 2-9 ms; a page busy starting a video can take a
+ * few hundred. Before this, a request the page never answered held the slot for good and
+ * gaze selection on the page stopped until the page was closed.
+ */
+export const BROWSER_GAZE_REQUEST_DEADLINE_MS = 1500;
+
+/** One outstanding page request; invalidation never frees an unsettled slot, only `expire` does. */
 export class BrowserGazeGate {
   private generation = 0;
   private pending: BrowserGazeRequest | null = null;
@@ -38,20 +48,33 @@ export class BrowserGazeGate {
     if (this.pending || this.resetNeeded || !this.selectionEnabled ||
         !BrowserGazeGate.isFresh(emittedAtWallMs, now)) return null;
     const request: BrowserGazeRequest = {
-      generation: this.generation, emittedAtWallMs, kind: 'sample',
+      generation: this.generation, emittedAtWallMs, kind: 'sample', startedAt: now,
     };
     this.pending = request;
     return request;
   }
 
-  beginReset(): BrowserGazeRequest | null {
+  beginReset(now = Date.now()): BrowserGazeRequest | null {
     if (this.pending || !this.resetNeeded) return null;
     const request: BrowserGazeRequest = {
-      generation: this.generation, emittedAtWallMs: 0, kind: 'reset',
+      generation: this.generation, emittedAtWallMs: 0, kind: 'reset', startedAt: now,
     };
     this.pending = request;
     this.resetNeeded = false;
     return request;
+  }
+
+  /**
+   * A request the page has not answered within `maxAgeMs` gives its slot back. Like
+   * `invalidate`, the generation moves on (its late answer can select nothing) and the
+   * page is reset before the next sample. The page still runs the given-up script when
+   * it is free: the caller limits how many of those may wait (pageWork.ts).
+   */
+  expire(now: number, maxAgeMs = BROWSER_GAZE_REQUEST_DEADLINE_MS): boolean {
+    if (!this.pending || now - this.pending.startedAt < maxAgeMs) return false;
+    this.pending = null;
+    this.invalidate();
+    return true;
   }
 
   finish(request: BrowserGazeRequest): void {

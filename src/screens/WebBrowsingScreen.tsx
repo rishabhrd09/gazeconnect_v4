@@ -732,10 +732,11 @@ const useBrowserViewBoundsSync = (
 };
 
 // Short messages from the browser (useGazeBrowser notice): something refused for
-// safety, or the page refreshed or restarted on its own.
+// safety, the page refreshed or restarted on its own, or the page is slow to answer.
 const describeBrowserNotice = (notice: BrowserNotice): string => {
     if (notice.kind === 'refreshed') return 'The page was refreshed to free memory.';
     if (notice.kind === 'recovered') return 'The page stopped responding and was restarted.';
+    if (notice.kind === 'slow') return 'The page is slow to answer. Back and Close still work.';
     if (notice.what === 'download') return 'Downloads are turned off here, for safety.';
     if (notice.what === 'popup') return 'A pop-up window was blocked.';
     return 'That link cannot be opened here, for safety.';
@@ -1765,6 +1766,11 @@ const calmPlaybackOf = (state: string): CalmPlayback => {
 // wait this long for YouTube to recover by itself, then open the video again where it was;
 // at most this many times for one video in this window, then Browse as before.
 const PLAYER_ERROR_WAIT_MS = 2500;
+// After Next, how long until the page is checked for still showing the same video.
+const NEXT_CHECK_MS = 7000;
+// A page rebuilt by the main process in full screen: how long the screen waits for its video
+// to play before reading back whether the page is in full screen after all.
+const REAPPLY_FULL_SCREEN_MS = 20000;
 const PLAYER_ERROR_RETRIES = 2;
 const PLAYER_ERROR_WINDOW_MS = 5 * 60 * 1000;
 
@@ -1811,6 +1817,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, getGaze, goBack: goGridBack, di
     const lastPlayRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
     const errorRetriesRef = useRef<Record<string, number[]>>({});
     const restoreFullScreenRef = useRef(false);
+    // Counts pages the main process replaced (refreshed or restarted); see the notice effect.
+    const replacedPageRef = useRef(0);
+    // When a page replaced in full screen began waiting to have full screen applied again (0: none).
+    const reapplyFullScreenRef = useRef(0);
     const cat = YT_CATS.find(c => c.id === catId) || YT_CATS[0];
     const toolbarGazeEnabled = isNavHidden ? true : ige;
     const toolbarGazeTimestamp = isNavHidden ? 0 : ts;
@@ -1897,8 +1907,15 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, getGaze, goBack: goGridBack, di
         let cancelled = false;
         let timer: ReturnType<typeof setTimeout> | null = null;
         const poll = async () => {
+            const asked = replacedPageRef.current;
             const result = await browser.youtubeCommand('get_state');
             if (cancelled) return;
+            // Asked of a page that has since been replaced, or of a page still busy with the
+            // previous request (main.ts: one waits in the page at a time): nothing new to show.
+            if (asked !== replacedPageRef.current || result?.detail === 'page_busy') {
+                timer = setTimeout(poll, 1200);
+                return;
+            }
             const state = result?.youtubeState || result?.detail || 'idle';
             setYoutubeState(state);
             const id = youtubeVideoId(browserStateRef.current.currentUrl);
@@ -1991,6 +2008,10 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, getGaze, goBack: goGridBack, di
         let cancelled = false;
         void browser.youtubeCommand('is_maximized').then(async (result) => {
             if (cancelled || typeof result?.maximized !== 'boolean') return;
+            // A page the main process has just built again is not in full screen yet: the screen
+            // keeps it, and it is applied once the video plays (REAPPLY_FULL_SCREEN_MS at most).
+            if (!result.maximized && isYouTubeWatchPage && reapplyFullScreenRef.current &&
+                Date.now() - reapplyFullScreenRef.current < REAPPLY_FULL_SCREEN_MS) return;
             if (result.maximized && !isYouTubeWatchPage) {
                 const restored = await browser.youtubeCommand('restore');
                 if (!cancelled) setIsVideoMaximized(restored?.maximized === true);
@@ -2026,15 +2047,52 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, getGaze, goBack: goGridBack, di
         void setFullScreen(true);
     }, [isVideoMaximized, isYouTubeWatchPage, setFullScreen, youtubeState]);
 
+    // A page the main process built again while in full screen (10 Oct 2026): the screen stayed in
+    // full screen, and the new page gets it as soon as its video plays. One that never plays within
+    // REAPPLY_FULL_SCREEN_MS is read back as it is, so the screen never claims what the page is not.
+    useEffect(() => {
+        if (!reapplyFullScreenRef.current) return;
+        if (isYouTubeWatchPage && youtubeState === 'playing') {
+            reapplyFullScreenRef.current = 0;
+            void setFullScreen(true);
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            if (!reapplyFullScreenRef.current) return;
+            reapplyFullScreenRef.current = 0;
+            void browser.youtubeCommand('is_maximized').then((result) => {
+                if (typeof result?.maximized === 'boolean') setIsVideoMaximized(result.maximized);
+            });
+        }, Math.max(0, REAPPLY_FULL_SCREEN_MS - (Date.now() - reapplyFullScreenRef.current)));
+        return () => window.clearTimeout(timer);
+    }, [browser.youtubeCommand, isYouTubeWatchPage, setFullScreen, youtubeState]);
+
     const playPauseYouTube = useCallback(async () => {
         const result = await browser.youtubeCommand('play_pause');
         if (!result?.ok) setYoutubeState(result?.youtubeState || result?.detail || 'error');
         else if (result.youtubeState) setYoutubeState(result.youtubeState);
     }, [browser]);
 
+    // Next that leaves the same video on screen (10 Oct 2026, measured in a soak: inside a Mix
+    // YouTube sometimes reloads the whole page and starts the same video again, and a busy page
+    // can drop the press): if NEXT_CHECK_MS later the page is still on that video, with no page
+    // change at all in between (so not after a Back), Next is pressed once more.
+    const nextAttemptRef = useRef(0);
+    const pageChangesRef = useRef(0);
+    useEffect(() => { pageChangesRef.current += 1; }, [currentBrowserUrl]);
     const nextYouTubeVideo = useCallback(async () => {
+        const before = youtubeVideoId(browserStateRef.current.currentUrl);
+        const attempt = ++nextAttemptRef.current;
+        const changes = pageChangesRef.current;
         const result = await browser.youtubeCommand('next');
         if (!result?.ok) setYoutubeState(result?.youtubeState || result?.status || 'ready');
+        if (!before) return;
+        window.setTimeout(() => {
+            if (attempt !== nextAttemptRef.current || changes !== pageChangesRef.current) return;
+            if (!browserStateRef.current.isOpen || youtubeVideoId(browserStateRef.current.currentUrl) !== before) return;
+            nextAttemptRef.current += 1;
+            void browser.youtubeCommand('next');
+        }, NEXT_CHECK_MS);
     }, [browser]);
 
     // Skip is handled entirely in the main process via youtubeCommand, which locates
@@ -2172,6 +2230,29 @@ const YouTubePanel = ({ ige, ts, browser, gpRef, getGaze, goBack: goGridBack, di
         listening: toolbarGazeEnabled,
     });
     const calmPhase = calm.phase;
+    // The page's own news, each notice once (10 Oct 2026). Stopped answering for a few seconds
+    // (the main process repeats it every 15 s while it lasts): the bar comes back with Back, also
+    // in calm full screen, so nobody is left looking at a frozen video with no way out. Refreshed
+    // or restarted (a new page, no longer in full screen): full screen comes back once the video
+    // plays again, as after a player error.
+    const browserNotice = browser.notice;
+    const calmReveal = calm.reveal;
+    const handledNoticeAtRef = useRef(0);
+    useEffect(() => {
+        if (!browserNotice || browserNotice.at === handledNoticeAtRef.current) return;
+        handledNoticeAtRef.current = browserNotice.at;
+        if (browserNotice.kind === 'slow') {
+            if (calmPhase === 'watching' || calmPhase === 'offer') calmReveal();
+            return;
+        }
+        if (browserNotice.kind !== 'refreshed' && browserNotice.kind !== 'recovered') return;
+        // What the page said before is about the page being replaced (the state poll drops
+        // answers asked of it). The screen stays in full screen (no bar flashing up for a page
+        // the person did not change) and full screen is applied to the new page once it plays.
+        replacedPageRef.current += 1;
+        setYoutubeState('loading');
+        if (isVideoMaximized) reapplyFullScreenRef.current = Date.now();
+    }, [browserNotice, calmPhase, calmReveal, isVideoMaximized]);
     // The bar's buttons: right after Show options is chosen by gaze, they wait until the eyes
     // move off that spot (the mouse always works).
     const barGazeEnabled = toolbarGazeEnabled && calm.barGazeReady;

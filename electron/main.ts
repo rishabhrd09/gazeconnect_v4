@@ -24,7 +24,7 @@ import {
   buildGazeUpdateAndPollScript,
 } from './browser/browserGazeController';
 import { disposeBrowserView, strayBrowserViews } from './browser/browserViewController';
-import { BrowserGazeGate, type BrowserGazeOptions } from './browser/browserGazeGate';
+import { BROWSER_GAZE_REQUEST_DEADLINE_MS, BrowserGazeGate, type BrowserGazeOptions } from './browser/browserGazeGate';
 import {
   buildYoutubeCommandScript,
   isYoutubeCommand,
@@ -33,7 +33,7 @@ import {
 import {
   BROWSER_PARTITION,
   RecoveryBudget,
-  browserMemoryBudgetMb,
+  browserMemoryAction,
   capBrowserCache,
   hardenBrowserSession,
   isAllowedPageUrl,
@@ -42,7 +42,9 @@ import {
   withPageTimeout,
   type BlockedKind,
 } from './browser/browserSafety';
+import { PageWorkTracker } from './browser/pageWork';
 import { buildPageScrollScript, isPageScrollDirection, type PageScrollResult } from './browser/pageScroll';
+import { HealthRecorder, type PageHealth } from './healthRecorder';
 import { installStdioGuard } from './stdioGuard';
 
 // First, before anything logs: a launching console that goes away must cost
@@ -113,6 +115,69 @@ let browserMemoryTimer: NodeJS.Timeout | null = null;
 let browserRecyclePending = false;
 let browserUnresponsiveTimer: NodeJS.Timeout | null = null;
 const browserRecoveryBudget = new RecoveryBudget();
+// Pages rebuilt in a new process, each cause with its own budget so that rebuilds for memory
+// at changes of video can never use up the one a stuck page needs: for memory at most four in
+// ten minutes and one a minute, for a page that stopped answering at most three in ten minutes.
+const browserRebuildBudgets = {
+  memory: new RecoveryBudget(4, 10 * 60 * 1000),
+  stuck: new RecoveryBudget(3, 10 * 60 * 1000),
+};
+let lastMemoryRebuildAt = 0;
+const MEMORY_REBUILD_MIN_GAP_MS = 60000;
+// The page's scripts that have not answered yet (pageWork.ts), one tracker per page.
+const pageWorkTrackers = new WeakMap<BrowserView, PageWorkTracker>();
+// A page that has not answered a probe for this long is slow: the interface shows the bar
+// (with Back) even in calm full screen. This long, it is rebuilt in a new process. The probe
+// goes 3 s after an unanswered script (checkPageResponding), so these are about 6 s and 23 s
+// of no answer; YouTube keeps its own page busy for up to about 8 s while a new video starts.
+const PAGE_SLOW_MS = 3000;
+const PAGE_STUCK_REBUILD_MS = 20000;
+const PAGE_SLOW_NOTICE_REPEAT_MS = 15000;
+let pageSlowSince = 0;
+let lastPageSlowNoticeAt = 0;
+let pageLoadingSince = 0;
+// Quiet page (10 Oct 2026): while the page cursor is off (watching a video, gaze paused) the
+// page's own change watcher, which only serves gaze selection on the page, is switched off.
+let lastBrowserCursorFrameAt = 0;
+const PAGE_QUIET_AFTER_MS = 2000;
+// Where the video was, from the playback poll, so a rebuilt page resumes there.
+let lastPlaybackPosition: { url: string; seconds: number } | null = null;
+
+type OpenPageBounds = { x: number; y: number; width: number; height: number };
+type OpenPageResult = { success: boolean; url?: string; error?: string; cancelled?: boolean };
+/**
+ * `quiet`: a rebuild of the page on screen (rebuildBrowserPage), not a new page for the
+ * interface; the old page's process is then ended at once (browserViewController.ts).
+ */
+type OpenPageOptions = { quiet?: boolean; highContrast?: boolean };
+/** Opens a page in place of the current one: 'webview:open', and rebuilds (set in setupIpcHandlers). */
+let openBrowserPage: (url: string, bounds: OpenPageBounds, options?: OpenPageOptions) => Promise<OpenPageResult> =
+  async () => ({ success: false });
+
+// The health log (healthRecorder.ts): which process is which, and the page's state, by kind only.
+const health = new HealthRecorder(
+  () => ({
+    uiPid: mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getOSProcessId() : -1,
+    pagePid: activeBrowserView && !activeBrowserView.webContents.isDestroyed() ? activeBrowserView.webContents.getOSProcessId() : -1,
+    uiVisible: !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && !mainWindow.isMinimized(),
+  }),
+  (): PageHealth => {
+    const view = activeBrowserView;
+    if (!view || view.webContents.isDestroyed()) return { open: false };
+    const now = Date.now();
+    const work = pageWorkFor(view);
+    return {
+      open: true,
+      kind: pageKindOf(view.webContents.getURL() || ''),
+      loading: (view as any)._pageScriptReady === false,
+      hidden: browserViewHidden,
+      quiet: now - lastBrowserCursorFrameAt > PAGE_QUIET_AFTER_MS,
+      waiting: work.count(now),
+      oldestMs: work.oldestAgeMs(now),
+      oldestKind: work.oldestKind(now) || undefined,
+    };
+  },
+);
 let pageScrollInFlight = false;
 const blockedNoticeAt = new Map<string, number>();
 let lastBrowserGazeFrameAt = 0;
@@ -129,7 +194,6 @@ let lastNavState: { canGoBack: boolean; canGoForward: boolean; url: string } | n
 // v17.16 — last playback state sent to React, for change-detection so we
 // only emit webview:playbackState on transitions, not every poll.
 let lastPlaybackState: { playing: boolean; hasVideo: boolean; fullscreen: boolean } | null = null;
-let playbackPollInFlight = false;
 const domainZoomPrefs = new Map<string, number>();
 const DEFAULT_WEB_ZOOM = 1.35;
 let lastEdgeScrollAt = 0;
@@ -343,20 +407,41 @@ function gazeGateFor(view: BrowserView): BrowserGazeGate {
   return gate;
 }
 
+function pageWorkFor(view: BrowserView): PageWorkTracker {
+  let work = pageWorkTrackers.get(view);
+  if (!work) {
+    work = new PageWorkTracker();
+    pageWorkTrackers.set(view, work);
+  }
+  return work;
+}
+
+// Gaze scripts (samples and resets) that may wait in the page at once: the current one, and
+// one given up on by the gate's deadline. A page that answers neither gets no more until it does.
+const PAGE_GAZE_SCRIPT_LIMIT = 2;
+// YouTube commands that may wait in the page at once, one of each kind.
+const YOUTUBE_SCRIPT_LIMIT = 4;
+
 function flushBrowserGazeReset(view: BrowserView): void {
   if (activeBrowserView !== view || view.webContents.isDestroyed() ||
       (view as any)._pageScriptReady === false) return;
   const gate = gazeGateFor(view);
-  const request = gate.beginReset();
+  const work = pageWorkFor(view);
+  const now = Date.now();
+  if (work.count(now, 'gaze') >= PAGE_GAZE_SCRIPT_LIMIT) return;
+  const request = gate.beginReset(now);
   if (!request) return;
+  const token = work.begin('gaze', now, PAGE_GAZE_SCRIPT_LIMIT);
   // Reset shares the one-request slot with gaze polling. Repeated loss events
   // can request one further reset, never one queued script per gaze frame.
   try {
     view.webContents.executeJavaScript(BROWSER_CURSOR_HIDE_SCRIPT).catch(() => { }).finally(() => {
+      work.end(token);
       gate.finish(request);
       flushBrowserGazeReset(view);
     });
   } catch {
+    work.end(token);
     gate.finish(request);
   }
 }
@@ -447,7 +532,12 @@ function startBrowserDiagnosticsSampling(): void {
   }, 60000);
 }
 
-async function closeActiveBrowserView(reason: string): Promise<void> {
+/**
+ * Takes the page off the window and destroys it. `quiet` is for a page about to be built
+ * again (rebuildBrowserPage): the interface is not told it closed, because for it the
+ * same page goes on.
+ */
+async function closeActiveBrowserView(reason: string, options: { quiet?: boolean; endProcess?: boolean } = {}): Promise<void> {
   const view = activeBrowserView;
   stopBrowserMemoryWatch();
   browserViewHidden = false;
@@ -463,7 +553,7 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
     browserDiagnosticsInterval = null;
   }
 
-  await disposeBrowserView(mainWindow, view, reason);
+  await disposeBrowserView(mainWindow, view, reason, { endProcess: options.endProcess });
   // No page may outlive a close. A page no longer tracked as active (left by an
   // interrupted open or teardown) is removed too; a page opened while this
   // close was finishing is the active one and stays.
@@ -474,9 +564,15 @@ async function closeActiveBrowserView(reason: string): Promise<void> {
   lastNavState = null;
   lastPlaybackState = null;
   lastBrowserDwellState = 'idle';
+  lastBrowserCursorFrameAt = 0;
+  pageSlowSince = 0;
+  pageLoadingSince = 0;
   resetEdgeScrollState();
   mainWindow?.webContents.send('webview:links', { links: [] });
-  mainWindow?.webContents.send('webview:closed', { reason });
+  if (!options.quiet) {
+    mainWindow?.webContents.send('webview:closed', { reason });
+    lastPlaybackPosition = null;
+  }
   highContrastEnabled = false;
   browserDiagnostics.markClose();
 }
@@ -510,58 +606,197 @@ function stopBrowserMemoryWatch(): void {
   if (browserUnresponsiveTimer) clearTimeout(browserUnresponsiveTimer);
   browserUnresponsiveTimer = null;
   browserRecyclePending = false;
+  pageSlowSince = 0;
+}
+
+/** What kind of page, for the health log: never its address. */
+function pageKindOf(url: string): string {
+  if (!url) return 'none';
+  if (!isYoutubeUrl(url)) return 'web';
+  return /\/watch/.test(url) ? 'youtube-video' : 'youtube';
+}
+
+const youtubeVideoIdOf = (url: string): string => {
+  try { return new URL(url).searchParams.get('v') || ''; } catch { return ''; }
+};
+
+/**
+ * The same page and the same video, whatever else the address says. YouTube rewrites the
+ * address of the video being watched (seen 10 Oct 2026 while More Videos was browsed): that
+ * is an in-page navigation, but no change of video, and a memory rebuild there restarted
+ * the page under the person's eyes.
+ */
+function samePageAndVideo(a: string, b: string): boolean {
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    return x.origin === y.origin && x.pathname === y.pathname && youtubeVideoIdOf(a) === youtubeVideoIdOf(b);
+  } catch {
+    return false;
+  }
+}
+
+/** Where the video in `url` was last seen playing (playback poll), 0 for anything else. */
+function resumeSecondsFor(url: string): number {
+  if (!lastPlaybackPosition || !isYoutubeUrl(url) || !/\/watch/.test(url)) return 0;
+  const id = youtubeVideoIdOf(url);
+  return id && id === youtubeVideoIdOf(lastPlaybackPosition.url) ? lastPlaybackPosition.seconds : 0;
 }
 
 /**
- * Refreshes the page as a new document: YouTube plays video after video in one
- * document, which keeps growing. A video being watched resumes where it was.
+ * Builds the page again in a new renderer process, the video resuming where it was
+ * (10 Oct 2026). Used when the page holds memory the computer needs, and when the page
+ * stopped answering. The page's process ends, so all its memory goes back to Windows;
+ * the refresh before this reloaded inside the same process, which did not reliably
+ * return it. The interface keeps its page: it is told first (it then keeps full screen
+ * across the new page), and is never told the page closed.
  */
-async function recycleBrowserPage(view: BrowserView, sessionId: number, reason: string): Promise<void> {
-  if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
-  browserRecyclePending = false;
+async function rebuildBrowserPage(view: BrowserView, sessionId: number, cause: 'memory' | 'stuck', detail: string): Promise<boolean> {
+  if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return false;
+  if (browserViewHidden || !lastBrowserViewBounds || !mainWindow || mainWindow.isDestroyed()) return false;
   const url = view.webContents.getURL();
-  let resumeAt = 0;
-  if (isYoutubeUrl(url) && /\/watch/.test(url)) {
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 800));
-    const seconds = await Promise.race([
-      view.webContents.executeJavaScript(
-        `(function(){var v=document.querySelector('#movie_player video, video');return v&&!v.paused?Math.floor(v.currentTime):0;})()`
-      ).catch(() => 0),
-      timeout,
-    ]);
-    resumeAt = Number(seconds) || 0;
+  if (!isAllowedPageUrl(url)) return false;
+  if (!browserRebuildBudgets[cause].take()) {
+    health.event('page-rebuild-refused', { cause, detail });
+    browserDiagnostics.warn('browser-rebuild-refused', `[BrowserView] not rebuilding (${cause}): its budget for ten minutes is spent`);
+    return false;
   }
-  if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
-  browserDiagnostics.info('browser-recycle', `[BrowserView] refreshing page (${reason}) resume=${resumeAt}s`, 1000);
-  invalidateBrowserGaze(view);
-  if (resumeAt > 5 && isAllowedPageUrl(url)) {
+  browserRecyclePending = false;
+  if (cause === 'memory') lastMemoryRebuildAt = Date.now();
+  const resumeAt = resumeSecondsFor(url);
+  let target = url;
+  if (resumeAt > 5) {
     const next = new URL(url);
     next.searchParams.set('t', `${resumeAt}s`);
-    view.webContents.loadURL(next.toString()).catch(() => undefined);
-  } else {
-    view.webContents.reload();
+    target = next.toString();
   }
-  mainWindow?.webContents.send('webview:notice', { kind: 'refreshed', reason });
+  const bounds = { ...lastBrowserViewBounds };
+  const keepHighContrast = highContrastEnabled;
+  const pageMb = rendererMemoryMb(view.webContents);
+  browserDiagnostics.info('browser-rebuild', `[BrowserView] building the page again in a new process (${cause}: ${detail}) resume=${resumeAt}s`, 1000);
+  health.event('page-rebuild', { cause, detail, pageMb, resumeAt, kind: pageKindOf(url) });
+  mainWindow.webContents.send('webview:notice', { kind: cause === 'memory' ? 'refreshed' : 'recovered', reason: cause });
+  const result = await openBrowserPage(target, bounds, { quiet: true, highContrast: keepHighContrast });
+  return !!result.success;
 }
 
-/** Every 15 s: past the soft budget the page is refreshed at the next change of video, past the hard one at once. */
+// The page watch, every second: is the page answering, and every 15th tick, memory.
+const BROWSER_WATCH_TICK_MS = 1000;
+const BROWSER_MEMORY_EVERY_TICKS = 15;
+// A script unanswered this long gets a probe sent after it (see checkPageResponding).
+const PAGE_PROBE_AFTER_MS = 3000;
+// A document still loading after this long is slow too (a slow network or a starved computer);
+// it is never rebuilt for that, only the bar is shown.
+const PAGE_LOAD_SLOW_MS = 15000;
+// A navigation still waiting for its first response this long is asked for once more.
+const PAGE_LOAD_RETRY_MS = 20000;
+
+/**
+ * Is the page answering? A script that has waited PAGE_PROBE_AFTER_MS gets a tiny probe
+ * sent after it. If the probe answers, the page is running scripts and the older ones only
+ * lost their answers (they stop counting). If the probe does not answer within PAGE_SLOW_MS
+ * the page is slow: the interface is told, and shows the bar with Back even in calm full
+ * screen. Unanswered for PAGE_STUCK_REBUILD_MS, the page is built again in a new process.
+ * Chromium's own 'unresponsive' event does not cover this: it comes only for unanswered
+ * input events, and gaze requests are scripts.
+ */
+function checkPageResponding(view: BrowserView, sessionId: number): void {
+  const now = Date.now();
+  const work = pageWorkFor(view);
+  const lost = work.sweep(now);
+  if (lost) health.event('page-script-lost', { dropped: lost });
+  const loading = (view as any)._pageScriptReady === false;
+  let waitedMs = 0;
+  if (loading) {
+    waitedMs = pageLoadingSince ? now - pageLoadingSince : 0;
+    // A navigation whose first response has not come after PAGE_LOAD_RETRY_MS is asked for once
+    // more (a page built again while the old page's process was still ending waited for good).
+    const pendingUrl = (view as any)._pendingUrl as string | undefined;
+    if (waitedMs >= PAGE_LOAD_RETRY_MS && !(view as any)._loadRetried && pendingUrl && isAllowedPageUrl(pendingUrl)) {
+      let waitingForResponse = false;
+      try { waitingForResponse = view.webContents.isWaitingForResponse(); } catch { waitingForResponse = false; }
+      if (waitingForResponse) {
+        (view as any)._loadRetried = true;
+        health.event('page-load-retry', { waitedMs, kind: pageKindOf(pendingUrl) });
+        view.webContents.loadURL(pendingUrl).catch(() => undefined);
+      }
+    }
+    if (waitedMs < PAGE_LOAD_SLOW_MS) waitedMs = 0;
+  } else {
+    const probe = (view as any)._probe as { startedAt: number } | undefined;
+    if (!probe && work.oldestAgeMs(now) >= PAGE_PROBE_AFTER_MS) {
+      const token = work.begin('probe', now, 1);
+      if (token !== null) {
+        const sent = { startedAt: now };
+        (view as any)._probe = sent;
+        view.webContents.executeJavaScript('0').then(() => {
+          const dropped = work.dropStartedBefore(sent.startedAt);
+          if (dropped) health.event('page-script-lost', { dropped, probeMs: Date.now() - sent.startedAt });
+        }, () => undefined).finally(() => {
+          work.end(token);
+          if ((view as any)._probe === sent) (view as any)._probe = undefined;
+        });
+      }
+    }
+    const current = (view as any)._probe as { startedAt: number } | undefined;
+    waitedMs = current && now - current.startedAt >= PAGE_SLOW_MS ? now - current.startedAt : 0;
+  }
+  if (!waitedMs) {
+    if (pageSlowSince) {
+      health.event('page-answering', { slowForMs: now - pageSlowSince });
+      pageSlowSince = 0;
+    }
+    (view as any)._stuckRebuildTried = false;
+    return;
+  }
+  if (!pageSlowSince) {
+    pageSlowSince = now;
+    health.event('page-slow', { waitedMs, loading, oldest: work.oldestKind(now), waiting: work.count(now) });
+  }
+  if (now - lastPageSlowNoticeAt >= PAGE_SLOW_NOTICE_REPEAT_MS) {
+    lastPageSlowNoticeAt = now;
+    mainWindow?.webContents.send('webview:notice', { kind: 'slow' });
+  }
+  // Once per stuck spell: when the rebuild budget is spent, the bar with Back stays offered.
+  if (!loading && waitedMs >= PAGE_STUCK_REBUILD_MS && !browserViewHidden && !(view as any)._stuckRebuildTried) {
+    (view as any)._stuckRebuildTried = true;
+    void rebuildBrowserPage(view, sessionId, 'stuck', `no answer for ${Math.round(waitedMs / 1000)} s`);
+  }
+}
+
+/** Memory, from the page's own use and the whole computer's (browserSafety.ts browserMemoryAction). */
+function checkBrowserMemory(view: BrowserView, sessionId: number): void {
+  const pageMb = rendererMemoryMb(view.webContents);
+  let availableMb: number | null = null;
+  try { availableMb = Math.round(process.getSystemMemoryInfo().free / 1024); } catch { availableMb = null; }
+  const { action, reason } = browserMemoryAction(pageMb, availableMb);
+  if (action === 'none') return;
+  if (action === 'now') {
+    if (Date.now() - lastMemoryRebuildAt < MEMORY_REBUILD_MIN_GAP_MS) return;
+    if ((view as any)._pageScriptReady === false) return;   // a page still loading finishes first
+    void rebuildBrowserPage(view, sessionId, 'memory', reason);
+    return;
+  }
+  if (!browserRecyclePending) {
+    browserRecyclePending = true;
+    health.event('page-memory-high', { reason, pageMb, availableMb });
+    browserDiagnostics.info('browser-memory-soft', `[BrowserView] ${reason}: a new page at the next change of video`, 60000);
+  }
+}
+
+/** The page watch: answering every second, memory every 15 s. */
 function startBrowserMemoryWatch(view: BrowserView, sessionId: number): void {
   stopBrowserMemoryWatch();
+  let tick = 0;
   browserMemoryTimer = setInterval(() => {
     if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) {
       stopBrowserMemoryWatch();
       return;
     }
-    const usedMb = rendererMemoryMb(view.webContents);
-    if (usedMb === null) return;
-    const budget = browserMemoryBudgetMb();
-    if (usedMb >= budget.hard) {
-      void recycleBrowserPage(view, sessionId, `memory ${usedMb} MB`);
-    } else if (usedMb >= budget.soft && !browserRecyclePending) {
-      browserRecyclePending = true;
-      browserDiagnostics.info('browser-memory-soft', `[BrowserView] ${usedMb} MB: refresh at the next page change`, 60000);
-    }
-  }, 15000);
+    checkPageResponding(view, sessionId);
+    tick += 1;
+    if (tick % BROWSER_MEMORY_EVERY_TICKS === 0) checkBrowserMemory(view, sessionId);
+  }, BROWSER_WATCH_TICK_MS);
 }
 
 function getDomainFromUrl(url: string): string {
@@ -791,11 +1026,16 @@ async function sendBrowserPlaybackState(): Promise<void> {
   // Skip while a document is loading — the executeJavaScript below would
   // just be parked (holding a did-stop-loading listener) until dom-ready.
   if ((view as any)._pageScriptReady === false) return;
-  if (playbackPollInFlight) return;
-  playbackPollInFlight = true;
+  // One poll waiting in the page at a time. The tracker, unlike the flag it replaces,
+  // lets go of a poll the page never answers (pageWork.ts), so the poll cannot stop for good.
+  const work = pageWorkFor(view);
+  const token = work.begin('playback', Date.now(), 1);
+  if (token === null) return;
+  // While the page cursor is off (watching, gaze paused) the page's change watcher rests.
+  const quiet = Date.now() - lastBrowserCursorFrameAt > PAGE_QUIET_AFTER_MS;
   try {
     const raw: any = await view.webContents.executeJavaScript(
-      'window.gcGetPlaybackState ? window.gcGetPlaybackState() : null'
+      `window.gcGetPlaybackState ? window.gcGetPlaybackState(${quiet ? 'true' : 'false'}) : null`
     );
     if (
       !mainWindow ||
@@ -806,6 +1046,10 @@ async function sendBrowserPlaybackState(): Promise<void> {
       return;
     }
     if (!raw || typeof raw !== 'object') return;
+    const seconds = Number(raw.time);
+    if (raw.playing && Number.isFinite(seconds) && seconds > 0) {
+      lastPlaybackPosition = { url: view.webContents.getURL(), seconds: Math.floor(seconds) };
+    }
     const next = {
       playing: !!raw.playing,
       hasVideo: !!raw.hasVideo,
@@ -829,7 +1073,7 @@ async function sendBrowserPlaybackState(): Promise<void> {
   } catch {
     /* page may be navigating / destroyed — ignore */
   } finally {
-    playbackPollInFlight = false;
+    work.end(token);
   }
 }
 
@@ -1516,10 +1760,13 @@ function createWindow(): void {
     browserViewRequestSeq += 1;
     void closeActiveBrowserView('interface-reload');
   });
-  mainWindow.webContents.on('render-process-gone', () => {
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    health.event('ui-process-gone', { reason: details?.reason, exitCode: details?.exitCode });
     browserViewRequestSeq += 1;
     void closeActiveBrowserView('interface-renderer-gone');
   });
+  mainWindow.webContents.on('unresponsive', () => health.event('ui-unresponsive'));
+  mainWindow.webContents.on('responsive', () => health.event('ui-responsive'));
 
   // Load app. GAZECONNECT_UI=dist (what .\start-dev.bat --fast sets) runs the
   // built interface from dist/ instead of the development server: it is one
@@ -1834,7 +2081,7 @@ function setupIpcHandlers(): void {
   // BROWSERVIEW — GAZE-CONTROLLED WEB BROWSING
   // ============================================
 
-  ipcMain.handle('webview:open', async (_event: any, url: string, bounds: { x: number; y: number; width: number; height: number }) => {
+  openBrowserPage = async (url: string, bounds: { x: number; y: number; width: number; height: number }, options: OpenPageOptions = {}): Promise<OpenPageResult> => {
     browserDiagnostics.debug('webview-open', `[Main] webview:open called for: ${url}`, 500);
     const ticket = ++browserViewRequestSeq;
     let openedView: BrowserView | null = null;
@@ -1849,7 +2096,7 @@ function setupIpcHandlers(): void {
       return { success: false, error: 'blocked url' };
     }
     try {
-      await closeActiveBrowserView('replace');
+      await closeActiveBrowserView(options.quiet ? 'rebuild' : 'replace', { quiet: options.quiet, endProcess: options.quiet });
       // A close or a newer open arrived while the previous page was closing.
       if (ticket !== browserViewRequestSeq || !mainWindow || mainWindow.isDestroyed()) {
         return { success: false, cancelled: true };
@@ -1859,7 +2106,8 @@ function setupIpcHandlers(): void {
       lastBrowserDwellState = 'idle';
       resetEdgeScrollState();
       mainWindow.webContents.send('webview:links', { links: [] });
-      highContrastEnabled = false;
+      // A rebuilt page keeps the person's high contrast; a newly opened one starts without.
+      highContrastEnabled = options.highContrast === true;
 
       const view = new BrowserView({
         webPreferences: {
@@ -1980,6 +2228,8 @@ function setupIpcHandlers(): void {
         browserDiagnostics.debug('dom-ready', `[Main] dom-ready for: ${view.webContents.getURL()}`, 1000);
         // Page can now run scripts — reopen the per-frame poll gate.
         (view as any)._pageScriptReady = true;
+        (view as any)._loadRetried = false;
+        pageLoadingSince = 0;
         void injectBrowserPageHelpers();
         flushBrowserGazeReset(view);
       });
@@ -2025,6 +2275,11 @@ function setupIpcHandlers(): void {
         // the gate open — the script survives those.
         if (isMainFrame && !isInPlace) {
           (view as any)._pageScriptReady = false;
+          (view as any)._pendingUrl = _url;
+          pageLoadingSince = Date.now();
+          // The old document's unanswered scripts will never answer for the new one (pageWork.ts).
+          pageWorkFor(view).clear();
+          (view as any)._probe = undefined;
         }
         if (isMainFrame) invalidateBrowserGaze(view);
       });
@@ -2034,6 +2289,7 @@ function setupIpcHandlers(): void {
         (view as any)._pageCssKey = undefined;
         (view as any)._pageCssKind = undefined;
         browserRecyclePending = false;
+        (view as any)._lastMainUrl = nextUrl;
         invalidateBrowserGaze(view);
         pruneNavigationHistory(view.webContents);
         void injectBrowserPageHelpers();
@@ -2043,9 +2299,16 @@ function setupIpcHandlers(): void {
         invalidateBrowserGaze(view);
         if (isMainFrame !== false) {
           pruneNavigationHistory(view.webContents);
-          // A page over its memory budget is refreshed now, as the next video starts anyway.
-          if (browserRecyclePending) {
-            void recycleBrowserPage(view, sessionId, 'memory');
+          const previousUrl: string = (view as any)._lastMainUrl || '';
+          (view as any)._lastMainUrl = nextUrl;
+          // A page over its memory budget, or on a computer short of memory, is built again
+          // now in a new process, as the next video starts anyway (at most once a minute).
+          // Only at a real change of page or video, never at an address rewritten in place.
+          if (browserRecyclePending && !samePageAndVideo(previousUrl, nextUrl) &&
+              Date.now() - lastMemoryRebuildAt >= MEMORY_REBUILD_MIN_GAP_MS) {
+            void rebuildBrowserPage(view, sessionId, 'memory', 'at the change of video').then((rebuilt) => {
+              if (!rebuilt && activeBrowserView === view && !view.webContents.isDestroyed()) void injectBrowserPageHelpers();
+            });
             return;
           }
         }
@@ -2072,6 +2335,7 @@ function setupIpcHandlers(): void {
       // restart (like a crash) reloads the same page instead of closing it.
       onBrowserViewEvent('unresponsive', () => {
         browserDiagnostics.warn('browser-unresponsive', '[BrowserView] renderer became unresponsive');
+        health.event('page-unresponsive', { kind: pageKindOf(view.webContents.getURL() || '') });
         if (browserUnresponsiveTimer) return;
         browserUnresponsiveTimer = setTimeout(() => {
           browserUnresponsiveTimer = null;
@@ -2088,6 +2352,9 @@ function setupIpcHandlers(): void {
       onBrowserViewEvent('render-process-gone', (_event, details) => {
         const reason = details?.reason || 'unknown';
         browserDiagnostics.warn('browser-render-gone', `[BrowserView] render process gone: ${reason}`);
+        health.event('page-process-gone', { reason, exitCode: details?.exitCode });
+        pageWorkFor(view).clear();
+        (view as any)._probe = undefined;
         if (browserUnresponsiveTimer) clearTimeout(browserUnresponsiveTimer);
         browserUnresponsiveTimer = null;
         (view as any)._pageScriptReady = false;
@@ -2096,8 +2363,17 @@ function setupIpcHandlers(): void {
           setTimeout(() => {
             if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId || view.webContents.isDestroyed()) return;
             invalidateBrowserGaze(view);
-            view.webContents.reload();
+            // Told first, so the interface keeps full screen across the reload; the video resumes where it was.
             mainWindow?.webContents.send('webview:notice', { kind: 'recovered', reason });
+            const current = view.webContents.getURL();
+            const resumeAt = resumeSecondsFor(current);
+            if (resumeAt > 5 && isAllowedPageUrl(current)) {
+              const next = new URL(current);
+              next.searchParams.set('t', `${resumeAt}s`);
+              view.webContents.loadURL(next.toString()).catch(() => undefined);
+            } else {
+              view.webContents.reload();
+            }
           }, 400);
           return;
         }
@@ -2138,7 +2414,23 @@ function setupIpcHandlers(): void {
       };
       browserViewHidden = false;
 
-      await view.webContents.loadURL(url);
+      // A page built again right after its old process was ended can fail its first load
+      // (ERR_FAILED in 2 of 2 fault-injection runs on 10 Oct 2026; YouTube's service worker had
+      // lived in that process). It is asked for again, twice at most, instead of being closed.
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          await view.webContents.loadURL(url);
+          break;
+        } catch (loadErr: any) {
+          const aborted = loadErr?.code === 'ERR_ABORTED' || loadErr?.errno === -3;
+          if (aborted || !options.quiet || attempt > 2 || activeBrowserView !== view || ticket !== browserViewRequestSeq) throw loadErr;
+          health.event('page-load-retry', { attempt, error: String(loadErr?.code || loadErr?.errno || 'failed') });
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          if (activeBrowserView !== view || ticket !== browserViewRequestSeq || view.webContents.isDestroyed()) {
+            return { success: false, cancelled: true };
+          }
+        }
+      }
       // Closed or replaced while it loaded: the page is already gone.
       if (activeBrowserView !== view || ticket !== browserViewRequestSeq) {
         return { success: false, cancelled: true };
@@ -2163,7 +2455,9 @@ function setupIpcHandlers(): void {
       await closeActiveBrowserView('open-failed');
       return { success: false, error: err?.message };
     }
-  });
+  };
+  ipcMain.handle('webview:open', (_event: any, url: string, bounds: { x: number; y: number; width: number; height: number }) =>
+    openBrowserPage(url, bounds));
 
   ipcMain.handle('webview:close', async () => {
     browserViewRequestSeq += 1;
@@ -2222,17 +2516,26 @@ function setupIpcHandlers(): void {
     if (!isPageScrollDirection(direction)) return { ok: false, reason: 'bad-direction' };
     if ((view as any)._pageScriptReady === false) return { ok: false, reason: 'loading' };
     if (pageScrollInFlight && direction !== 'top') return { ok: false, reason: 'busy' };
+    // A scroll the page has not answered, even one given up on after 5 s, still waits in the
+    // page: no second one joins it (pageWork.ts). Top keeps its own place.
+    const work = pageWorkFor(view);
+    const token = work.begin(direction === 'top' ? 'scroll-top' : 'scroll', Date.now(), 1);
+    if (token === null) return { ok: false, reason: 'busy' };
     pageScrollInFlight = true;
+    let sent = false;
     try {
       // The page's own smooth scroll must not be paused by a dwell that has just started on it.
       invalidateBrowserGaze(view);
-      const result = await withPageTimeout(
-        view.webContents.executeJavaScript(buildPageScrollScript(direction)) as Promise<PageScrollResult | null>);
+      const script = view.webContents.executeJavaScript(buildPageScrollScript(direction)) as Promise<PageScrollResult | null>;
+      sent = true;
+      script.then(() => work.end(token), () => work.end(token));
+      const result = await withPageTimeout(script);
       if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId) return { ok: false, reason: 'stale' };
       return result || { ok: false, reason: 'no-result' };
     } catch (err: any) {
       return { ok: false, reason: err?.message || 'failed' };
     } finally {
+      if (!sent) work.end(token);
       pageScrollInFlight = false;
     }
   });
@@ -2272,13 +2575,28 @@ function setupIpcHandlers(): void {
       return { ok: false, status: 'failed', detail: 'unknown_command' };
     }
 
+    // The same command still waiting in the page (the bar's state poll every 1.2 s, a
+    // second press of Next) is answered "busy" at once instead of queueing one more
+    // script there; at most YOUTUBE_SCRIPT_LIMIT commands wait in all (pageWork.ts).
+    const work = pageWorkFor(view);
+    const now = Date.now();
+    const token = work.count(now, 'yt:') < YOUTUBE_SCRIPT_LIMIT ? work.begin(`yt:${command}`, now, 1) : null;
+    if (token === null) {
+      health.event('page-busy', { command });
+      return { ok: false, status: 'busy', detail: 'page_busy' };
+    }
+
+    let sent = false;
     try {
       // A page that has stopped responding gives up the command after 5 s instead of
-      // holding it (and the toolbar polling it) until the page is recovered.
-      const result = await withPageTimeout(view.webContents.executeJavaScript(
+      // holding it (and the toolbar polling it) until the page is recovered. The script
+      // keeps its place in the tracker until the page has actually answered it.
+      const script = view.webContents.executeJavaScript(
         buildYoutubeCommandScript(command),
         true
-      ) as Promise<YoutubeCommandResult | null>);
+      ).finally(() => work.end(token)) as Promise<YoutubeCommandResult | null>;
+      sent = true;
+      const result = await withPageTimeout(script);
       if (activeBrowserView !== view || activeBrowserViewSessionId !== sessionId) {
         return { ok: false, status: 'failed', detail: 'stale_browser_view' };
       }
@@ -2303,6 +2621,7 @@ function setupIpcHandlers(): void {
       browserDiagnostics.recordCommand(command, safeResult.status || 'failed', safeResult.youtubeState);
       return safeResult;
     } catch (err: any) {
+      if (!sent) work.end(token);
       console.error('webview:youtubeCommand error:', err?.message || err);
       browserDiagnostics.recordCommand(command, 'failed');
       return { ok: false, status: 'failed', detail: err?.message || String(err) };
@@ -2708,10 +3027,18 @@ function setupIpcHandlers(): void {
       invalidateBrowserGaze(view);
       return;
     }
+    // A request the page has left unanswered gives its slot back (browserGazeGate.ts);
+    // before 10 Oct 2026 one lost answer stopped gaze selection on the page for good.
+    if (gate.expire(Date.now(), BROWSER_GAZE_REQUEST_DEADLINE_MS)) {
+      health.event('gaze-request-expired', { waiting: pageWorkFor(view).count(Date.now(), 'gaze') });
+      lastBrowserDwellState = 'idle';
+    }
     if (!cursorEnabled) {
       gate.disable();
       lastBrowserDwellState = 'idle';
       flushBrowserGazeReset(view);
+    } else {
+      lastBrowserCursorFrameAt = Date.now();
     }
     // Document loading: the in-page cursor script does not exist yet, and
     // every executeJavaScript issued now would be parked until dom-ready
@@ -2803,8 +3130,12 @@ function setupIpcHandlers(): void {
       flushBrowserGazeReset(view);
       const pollNow = Date.now();
       if (pollNow >= lastBrowserGazePollAt && pollNow - lastBrowserGazePollAt < BROWSER_GAZE_MIN_INTERVAL_MS) return;
+      // A page still holding the given-up request and the current one gets no third.
+      const work = pageWorkFor(view);
+      if (work.count(pollNow, 'gaze') >= PAGE_GAZE_SCRIPT_LIMIT) return;
       const request = gate.begin(emittedAt, pollNow);
       if (!request) return;
+      const token = work.begin('gaze', pollNow, PAGE_GAZE_SCRIPT_LIMIT);
       lastBrowserGazePollAt = pollNow;
       // v17.21 — convert view DIPs → page CSS px before hit-testing. The
       // page runs at zoomFactor (1.35 default), so CSS coords = view/zoom.
@@ -2844,6 +3175,7 @@ function setupIpcHandlers(): void {
           } catch { /* ignore parse errors */ }
         }
       }).catch(() => { }).finally(() => {
+        work.end(token);
         gate.finish(request);
         flushBrowserGazeReset(view);
       });
@@ -2939,6 +3271,9 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     console.log('GazeConnect Pro starting...');
 
+    // The health log first, so a slow start is recorded too (healthRecorder.ts).
+    health.start();
+
     // 0. The embedded browser's own session: safety rules first, and a disk cache
     //    that cannot grow without bound on the patient's laptop.
     void capBrowserCache(getBrowserSession());
@@ -2962,6 +3297,18 @@ app.on('web-contents-created', (_event, contents) => {
   contents.on('will-attach-webview', (event) => event.preventDefault());
 });
 
+// The GPU process draws the interface and the page alike: when it goes, everything stops
+// painting until Chromium starts it again. Recorded for the health log.
+app.on('child-process-gone', (_event, details) => {
+  health.event('process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode });
+});
+
+// The interface's heartbeat for the health log, every 2 s with its worst frame delay.
+// Only the interface window may send it; web pages have no way to reach it at all.
+ipcMain.on('health:beat', (event, frameLagMs: unknown) => {
+  if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents) health.uiBeat(frameLagMs);
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     isQuitting = true;
@@ -2982,6 +3329,8 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  health.event('quit');
+  health.stop();
   runtimeRetryTimers.forEach(timer => clearTimeout(timer));
   runtimeRetryTimers.clear();
   stopPythonBackend();

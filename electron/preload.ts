@@ -61,6 +61,11 @@ const api = {
     rendererReady: () => ipcRenderer.invoke('app:renderer-ready'),
   },
 
+  // The interface's heartbeat for the health log (electron/healthRecorder.ts): one-way, a number only.
+  health: {
+    beat: (frameLagMs: number) => ipcRenderer.send('health:beat', Number(frameLagMs) || 0),
+  },
+
   floorplan: {
     ensureServer: () => ipcRenderer.invoke('floorplan:ensure-server'),
     request: (input: { endpoint: string; body?: string }) => ipcRenderer.invoke('floorplan:request', input),

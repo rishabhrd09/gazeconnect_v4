@@ -38,7 +38,16 @@ for (const url of [
   'http://192.168.1.1/', 'http://10.0.0.5/', 'http://172.20.1.1/', 'http://169.254.169.254/latest',
   'http://router/', 'http://printer.local/', 'https://user:pass@example.com/', 'http://0.0.0.0:8080/',
   'https://evil.localhost/', 'http://[fd00::1]/', 'http://[fe80::1]/', '', null, 42, 'x'.repeat(5000),
+  // An IPv4 address carried in IPv6 (10 Oct 2026): the URL parser writes it in hex, which
+  // the dotted-only check let through to this computer and the local network.
+  'http://[::ffff:127.0.0.1]:8765/', 'http://[::ffff:7f00:1]/', 'http://[::ffff:c0a8:101]/',
+  'http://[0:0:0:0:0:ffff:a00:5]/', 'http://[::ffff:0:7f00:1]/', 'http://[::7f00:1]/',
+  'http://[64:ff9b::c0a8:101]/', 'http://[::ffff:a9fe:a9fe]/latest',
 ]) expect(!safety.isAllowedPageUrl(url), `refused: ${String(url).slice(0, 60)}`);
+expect(!safety.isAllowedRequestUrl('ws://[::ffff:7f00:1]:8765/'), 'the backend socket is unreachable through an IPv4-mapped address');
+for (const url of ['http://[2001:4860:4860::8888]/', 'http://[::ffff:808:808]/', 'http://[64:ff9b::808:808]/']) {
+  expect(safety.isAllowedPageUrl(url), `public IPv6 and public embedded IPv4 allowed: ${url}`);
+}
 
 // 2. Requests a page may make: never to this computer or the local network.
 expect(safety.isAllowedRequestUrl('https://i.ytimg.com/vi/x/mq.jpg'), 'thumbnails load');
@@ -141,11 +150,34 @@ metrics = [{ pid: 4242, memory: { privateBytes: 512000, workingSetSize: 700000 }
 expect(safety.rendererMemoryMb({ getOSProcessId: () => 4242 }) === 500, 'private memory in MB');
 metrics = [];
 expect(safety.rendererMemoryMb({ getOSProcessId: () => 4242 }) === null, 'unknown process gives no reading');
-const small = safety.browserMemoryBudgetMb(4 * 1024 ** 3);
-const large = safety.browserMemoryBudgetMb(32 * 1024 ** 3);
-expect(small.soft === 750 && small.hard === 1100, `4 GB laptop budget ${JSON.stringify(small)}`);
+const GB = 1024 ** 3;
+const small = safety.browserMemoryBudgetMb(4 * GB);
+const eight = safety.browserMemoryBudgetMb(7.7 * GB);
+const large = safety.browserMemoryBudgetMb(32 * GB);
+// 10 Oct 2026: the floors were 750 / 1100 MB, above anything a YouTube page uses, so a 4 GB
+// laptop never refreshed its page. A page there is now built again at the next change of video
+// once it passes 450 MB; the maintainer's 7.7 GB laptop at about 710 MB (pages measured 230-535).
+expect(small.soft === 450 && small.hard === 750, `4 GB laptop budget ${JSON.stringify(small)}`);
+expect(eight.soft === 710 && eight.hard === 1183, `7.7 GB laptop budget ${JSON.stringify(eight)}`);
 expect(large.soft === 1400 && large.hard === 2400, `32 GB budget ${JSON.stringify(large)}`);
-expect(small.soft > 506, 'a normal YouTube page (up to 506 MB measured) is not refreshed even on 4 GB');
+expect(eight.soft > 535, 'a normal YouTube page (up to 535 MB measured) is not refreshed for itself on 8 GB');
+const limits4 = safety.systemMemoryLimitsMb(4 * GB);
+const limits8 = safety.systemMemoryLimitsMb(7.7 * GB);
+expect(limits4.low === 400 && limits4.critical === 250, `4 GB computer limits ${JSON.stringify(limits4)}`);
+expect(limits8.low === 552 && limits8.critical === 276, `7.7 GB computer limits ${JSON.stringify(limits8)}`);
+const act = (page, available, total = 7.7 * GB) => safety.browserMemoryAction(page, available, total).action;
+expect(act(null, 100) === 'none', 'no reading of the page: nothing done');
+expect(act(400, 2000) === 'none', 'a normal page on a computer with room: left alone');
+expect(act(720, 2000) === 'next-video', 'a page past its budget: rebuilt at the next change of video');
+expect(act(1200, 2000) === 'now', 'a page past its hard budget: rebuilt now');
+expect(act(470, 500) === 'next-video', 'a computer short of memory: the page rebuilt at the next change of video');
+expect(act(430, 500) === 'none', 'a page about the size of a fresh one is left alone');
+expect(act(600, 200) === 'now', 'a large page on a computer about to page the app to disk: rebuilt now');
+// 10 Oct 2026 (fault-injection run): a 355 MB page was rebuilt mid-video at 184 MB available,
+// and the new page was back at 548 MB a minute later. A page that size is left playing.
+expect(act(355, 184) === 'none', 'a page the size of a fresh one is not interrupted, however short the computer is');
+expect(act(460, 200, 4 * GB) === 'now' && act(500, 300, 4 * GB) === 'next-video' && act(460, 2000, 4 * GB) === 'next-video',
+  'on 4 GB: a page past 450 MB rebuilt now when the computer is critically short, else at the next change of video');
 
 // 6. Automatic recovery stops after three attempts in ten minutes.
 const budget = new safety.RecoveryBudget();
@@ -175,10 +207,15 @@ for (const [needle, message] of [
 for (const channel of ["'webview:executeJs'", "'webview:type'", "'webview:click'"]) {
   expect(!main.includes(`ipcMain.handle(${channel}`), `retired channel ${channel} stays removed`);
 }
-expect(/withPageTimeout\(\s*view\.webContents\.executeJavaScript\(buildPageScrollScript/.test(main),
+expect(/const script = view\.webContents\.executeJavaScript\(buildPageScrollScript[\s\S]{0,200}withPageTimeout\(script\)/.test(main),
   'Up / Down gives up on a page that stops responding');
-expect(/withPageTimeout\(view\.webContents\.executeJavaScript\(\s*buildYoutubeCommandScript/.test(main),
+expect(/const script = view\.webContents\.executeJavaScript\(\s*buildYoutubeCommandScript[\s\S]{0,200}withPageTimeout\(script\)/.test(main),
   'YouTube controls give up on a page that stops responding');
+// 10 Oct 2026: and every script sent to the page holds a place in the page-work tracker until the
+// page answers it, so a busy page is never sent the same request again and again.
+expect(/work\.begin\(`yt:\$\{command\}`/.test(main) && /work\.begin\('playback'/.test(main) &&
+  /work\.begin\(direction === 'top' \? 'scroll-top' : 'scroll'/.test(main) && /work\.begin\('gaze', pollNow/.test(main) &&
+  /work\.begin\('gaze', now/.test(main), 'YouTube commands, the playback poll, Up / Down and gaze requests are limited while they wait');
 
 // 8. A page that stops responding cannot hold a control (and every press after it) forever.
 const settle = (promise) => promise.then((value) => ({ value }), (error) => ({ error: error.message }));
