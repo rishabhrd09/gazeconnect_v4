@@ -60,9 +60,14 @@ const NavSideNote: React.FC<{ anchor: React.RefObject<HTMLDivElement>; children:
         const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
         observer?.observe(bar);
         window.addEventListener('resize', measure);
+        // A bar that moves without changing size (centred once the screen's styles and fonts
+        // have settled) tells no observer: its place is read again twice a second, one
+        // measurement that re-renders only when something changed.
+        const settle = window.setInterval(measure, 500);
         return () => {
             observer?.disconnect();
             window.removeEventListener('resize', measure);
+            window.clearInterval(settle);
         };
     }, [anchor]);
     if (!box || box.width < NAV_SIDE_NOTE_MIN_WIDTH) return null;
