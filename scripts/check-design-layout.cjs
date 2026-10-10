@@ -187,9 +187,10 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 // The search keyboard opened from YouTube and from Quick Search (6 Oct 2026).
                 await run('youtube-search', async () => { await route('web'); await p.click('#hub-youtube'); await p.click('#yl-search'); });
                 await run('search-keyboard', async () => { await route('web'); await p.click('#hub-search'); await p.click('#qs-type-search'); });
-                // Suggestions beside the typed text while typing (7 Oct 2026; moved up 8 Oct 2026).
+                // Suggestions beside the typed text while typing (7 Oct 2026; moved up 8 Oct 2026). Keys are
+                // matched in either case: the Familiar keyboard, the default since 8 Oct 2026, shows lower case.
                 await run('youtube-search-typed', async () => { await route('web'); await p.click('#hub-youtube'); await p.click('#yl-search');
-                    for (const letter of ['L', 'A', 'T']) await p.locator('.search-keyboard .keyboard-key[data-action="letter"]').filter({ hasText: new RegExp('^' + letter + '$') }).first().click();
+                    for (const letter of ['L', 'A', 'T']) await p.locator('.search-keyboard .keyboard-key[data-action="letter"]').filter({ hasText: new RegExp('^' + letter + '$', 'i') }).first().click();
                     await p.locator('.search-keyboard-suggestion').first().waitFor(); });
                 // The redesigned story, answer and Social pages (6 Oct 2026).
                 await run('news-article', async () => { await route('web'); await p.click('#hub-news'); await p.click('#ni-0'); });
