@@ -130,5 +130,71 @@ class TTSAvailableTests(unittest.TestCase):
         self.assertEqual(list(speech_chunks('  ')), [])
 
 
+# Plays the backend: starts the voice engine with a stand-in worker, reports the
+# worker's process id, then lives until it is killed.
+BACKEND_SCRIPT = '''
+import sys, time
+sys.path.insert(0, sys.argv[1])
+from services.local_voice import TTSEngine
+
+def lingering_worker(requests, events, generation, shutdown, root):
+    events.put(('ready', ''))
+    while True:
+        time.sleep(1)
+
+if __name__ == '__main__':
+    engine = TTSEngine(worker_target=lingering_worker)
+    engine.start()
+    while not engine.available:
+        time.sleep(0.02)
+    print(engine._process.pid, flush=True)
+    time.sleep(120)
+'''
+
+
+def _pid_alive(pid):
+    if sys.platform == 'win32':
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    import os
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+class VoiceWorkerLifetimeTests(unittest.TestCase):
+    def test_worker_exits_when_the_backend_is_killed(self):
+        """The app closed abruptly ends the backend without its shutdown code: the
+        voice worker, which holds the model (about 400 MB), must go with it."""
+        import subprocess
+        root = pathlib.Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            script = pathlib.Path(temp) / 'backend.py'
+            script.write_text(BACKEND_SCRIPT, encoding='utf-8')
+            backend = subprocess.Popen([sys.executable, str(script), str(root)],
+                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+            try:
+                worker_pid = int(backend.stdout.readline())
+                self.assertTrue(_pid_alive(worker_pid))
+            finally:
+                backend.kill()  # TerminateProcess on Windows: no shutdown code runs
+                backend.wait(10)
+            deadline = time.monotonic() + 10
+            while _pid_alive(worker_pid) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertFalse(_pid_alive(worker_pid), 'voice worker outlived the backend')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

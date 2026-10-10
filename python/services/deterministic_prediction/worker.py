@@ -9,37 +9,23 @@ from __future__ import annotations
 
 import gc
 import multiprocessing
-import os
-import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..process_lifetime import exit_with_parent
 from .engine import MAX_WORD_CANDIDATES, MAX_WORD_SLOTS, DeterministicPredictionEngine, SnapshotLineage
 from .policy import GazeConnectWordPolicy, load_english_only_withheld
 
 _ENGINE: Optional[DeterministicPredictionEngine] = None
 _POLICY_NAME = 'gazeconnect'
-_WATCHING_PARENT = False
 
 
 def _exit_with_parent() -> None:
-    """A worker process must not outlive the backend that spawned it.
-
-    Electron ends the backend with a hard kill (TerminateProcess on Windows),
-    which skips executor shutdown; the pool's pipe does not tell the worker, so
-    it would stay orphaned. The parent sentinel does, on every platform."""
-    global _WATCHING_PARENT
-    parent = multiprocessing.parent_process()
-    if parent is None or _WATCHING_PARENT:
-        return
-    _WATCHING_PARENT = True
-
-    def watch() -> None:
-        parent.join()
-        os._exit(0)
-
-    threading.Thread(target=watch, name='prediction-parent-watch', daemon=True).start()
+    """A worker process must not outlive the backend that spawned it
+    (services/process_lifetime.py: Electron hard-kills the backend, which skips
+    executor shutdown, and the pool's pipe does not tell the worker)."""
+    exit_with_parent()
 
 
 def build_policy(engine: DeterministicPredictionEngine, name: str):

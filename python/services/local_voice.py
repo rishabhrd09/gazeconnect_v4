@@ -17,6 +17,8 @@ import threading
 import time
 from pathlib import Path
 
+from .process_lifetime import exit_with_parent
+
 LOG = logging.getLogger(__name__)
 ASSETS = Path(__file__).resolve().parents[1] / 'assets' / 'kokoro'
 VOICE = 'af_heart'
@@ -141,6 +143,15 @@ def _worker(requests, events, generation, shutdown, root: str):
             # tried on the next explicit request; never silently change voices.
 
 
+def _run_worker(target, requests, events, generation, shutdown, root: str):
+    """The voice worker's entry point: it ends with the backend (services/process_lifetime.py).
+
+    Without this, a worker left by an abruptly closed app kept the model, about
+    400 MB, for days (found 10 Oct 2026)."""
+    exit_with_parent()
+    target(requests, events, generation, shutdown, root)
+
+
 class TTSEngine:
     """Nonblocking facade; only one current and one pending utterance."""
     def __init__(self, enabled: bool = True, *, assets: Path = ASSETS, worker_target=_worker):
@@ -190,8 +201,8 @@ class TTSEngine:
         self._events = self._ctx.Queue(maxsize=16)
         self._generation = self._ctx.Value('Q', 0, lock=False)
         self._shutdown = self._ctx.Event()
-        self._process = self._ctx.Process(target=self._worker_target,
-            args=(self._requests, self._events, self._generation, self._shutdown, str(self.assets)),
+        self._process = self._ctx.Process(target=_run_worker,
+            args=(self._worker_target, self._requests, self._events, self._generation, self._shutdown, str(self.assets)),
             name='kokoro-af-heart', daemon=True)
         self._publish('starting')
         try:
