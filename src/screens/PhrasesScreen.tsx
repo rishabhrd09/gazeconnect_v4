@@ -12,7 +12,9 @@ import { darkColors, lightColors, mixColors, screenThemes, warmScreenTokens } fr
 import GazeButton from '../components/core/GazeButton';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { GlobalNavBar } from '../components/GlobalNavBar';
+import AddToMessageNote from '../components/AddToMessageNote';
 import { useTheme } from '../contexts/ThemeContext';
+import type { AddToMessage } from '../utils/addToMessage';
 import {
   EmergencyIcon, MedicalIcon,
   HappyIcon, FamilyIcon, MessageIcon, BedIcon, GridIcon
@@ -55,6 +57,8 @@ interface PhrasesScreenProps {
   onSpeak: (text: string) => void;
   isDarkMode?: boolean;
   showHindi?: boolean;
+  /** Opened from Add to Message: a chosen phrase joins the message instead of being spoken. */
+  addToMessage?: AddToMessage;
 }
 
 type CategoryKey = string;
@@ -147,7 +151,7 @@ const RECENT_KEY = 'gc_recent_phrases';
 const MAX_RECENT = 10;
 
 const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
-  onNavigate, onSpeak, isDarkMode = true, showHindi = false,
+  onNavigate, onSpeak, isDarkMode = true, showHindi = false, addToMessage,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('communication');
   const colors = isDarkMode ? darkColors : lightColors;
@@ -191,11 +195,6 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
   const visiblePhrases = displayedPhrases.slice(0, 9);
 
   const handlePhraseClick = useCallback((phrase: { en: string; hi?: string }, idx: number) => {
-    onSpeak(phrase.en);
-    setActivatedIdx(idx);
-    if (flashRef.current) clearTimeout(flashRef.current);
-    flashRef.current = setTimeout(() => setActivatedIdx(null), 600);
-
     // Add to recent list — deduplicate, cap at MAX_RECENT
     setRecentPhrases(prev => {
       const entry = { en: phrase.en, hi: (phrase as any).hi ?? '' };
@@ -204,7 +203,16 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
       try { sessionStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
-  }, [onSpeak]);
+    // From Add to Message the phrase joins the message (and the keyboard comes back).
+    if (addToMessage) {
+      addToMessage.add(phrase.en);
+      return;
+    }
+    onSpeak(phrase.en);
+    setActivatedIdx(idx);
+    if (flashRef.current) clearTimeout(flashRef.current);
+    flashRef.current = setTimeout(() => setActivatedIdx(null), 600);
+  }, [addToMessage, onSpeak]);
 
   return (
     <div className={`phrases-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
@@ -219,7 +227,8 @@ const PhrasesScreen: React.FC<PhrasesScreenProps> = ({
       <GlobalNavBar
         currentPage="phrases"
         onNavigate={onNavigate}
-
+        onBack={addToMessage?.back}
+        note={addToMessage && <AddToMessageNote text={addToMessage.text} />}
         isDarkMode={isDarkMode}
       />
 

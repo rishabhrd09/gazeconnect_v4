@@ -165,6 +165,13 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 await p.evaluate(({ mode, theme }) => { sessionStorage.clear(); sessionStorage.setItem('qa-theme',theme); sessionStorage.setItem('qa-profile', JSON.stringify({ version: 1, settings: { designMode: mode } })); localStorage.clear(); }, { mode, theme });
                 await run('home', reset);
                 await run('keyboard-nav', async () => { await route('keyboard'); await p.click('#nav-restore-btn'); });
+                // Add to Message (10 Oct 2026): the four cards from the keyboard's Quick Words, and each
+                // card's screen while adding (Back to the cards, the note beside the navigation).
+                const addToMessage = async () => { await route('keyboard');
+                    await p.locator('.keyboard-key[data-action="quickWords"]').first().click(); await p.locator('#add-quick').waitFor(); };
+                await run('add-to-message', addToMessage);
+                for (const [id, name] of [['quick', 'quick-phrases'], ['phrases', 'phrases'], ['people', 'people'], ['assistance', 'assistance']])
+                    await run('add-' + name, async () => { await addToMessage(); await p.click('#add-' + id); await p.locator('.add-message-note').waitFor(); });
                 for (const [screen, name] of [['quickwords', 'quick-phrases'], ['phrases', 'phrases'], ['people', 'people'], ['medical', 'assistance'], ['activities', 'activities'], ['floor-plan', 'design-home'], ['floor-plan-survey', 'survey'], ['web', 'web-hub'], ['music', 'music'], ['needs', 'needs'], ['feelings', 'feelings'], ['customize', 'customize'], ['spatial', 'spatial'], ['compass-map', 'compass-setup']])
                     await run(name, () => route(screen));
                 await run('bp-choices', async () => { await route('quickwords'); await p.click('#qws-emergency-3'); });

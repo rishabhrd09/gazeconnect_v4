@@ -30,9 +30,10 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `.\build-installer.bat` — Build production .exe installer
 
 ## File Structure
-- `src/screens/` — 19 screen files. Active routes are defined in `src/App.tsx`; `AlertModeScreen` renders out-of-band and `CalibrationScreen` exists but is not currently routed.
+- `src/screens/` — 20 screen files. Active routes are defined in `src/App.tsx`; `AlertModeScreen` renders out-of-band and `CalibrationScreen` exists but is not currently routed.
 - `src/components/core/` — GazeButton, GazeCursor, GazeControlToggle
 - `src/components/GlobalNavBar.tsx` — Top nav bar on every screen
+- `src/utils/addToMessage.ts` — Add to Message: Quick Words on the keyboard / Zone Board opens four cards (Quick Phrases, Phrases, People, Daily Assistance); a choice joins the message instead of being spoken, except urgent care requests, which are always spoken at once
 - `src/utils/design.ts` — Design tokens, colors, typography, spacing
 - `python/` — Backend (WebSocket server, word prediction, filters)
 - `python/services/deterministic_prediction/` — Default word predictor (deterministic GazeCompass port: engine, worker process, learning, policy)

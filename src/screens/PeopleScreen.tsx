@@ -24,10 +24,16 @@ import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { MAX_ACTIVE_PEOPLE } from '../types/customization';
+import AddToMessageNote from '../components/AddToMessageNote';
+import type { AddToMessage } from '../utils/addToMessage';
 
-interface Props { onNavigate: (s: string) => void; onSpeak: (t: string) => void; isDarkMode?: boolean; showHindi?: boolean; }
+interface Props {
+  onNavigate: (s: string) => void; onSpeak: (t: string) => void; isDarkMode?: boolean; showHindi?: boolean;
+  /** Opened from Add to Message: a person chosen joins the message by name, in one selection. */
+  addToMessage?: AddToMessage;
+}
 
-const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true, showHindi = false }) => {
+const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true, showHindi = false, addToMessage }) => {
   const colors = isDarkMode ? darkColors : lightColors;
   const [selected, setSelected] = useState<string | null>(null);
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
@@ -84,11 +90,12 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
       <GlobalNavBar
         currentPage="people"
         onNavigate={onNavigate}
-
+        onBack={addToMessage?.back}
+        note={addToMessage && <AddToMessageNote text={addToMessage.text} />}
         isDarkMode={isDarkMode}
       />
 
-      <div className="people-choices" data-dense={isDensePeopleGrid}
+      <div className="people-choices" data-dense={isDensePeopleGrid} data-adding={Boolean(addToMessage)}
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -102,12 +109,13 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
         }}
       >
         {activePeople.map(p => {
-          const isSelected = selected === p.name;
+          // Adding to the message, nothing is picked out first: a name is chosen and added.
+          const isSelected = !addToMessage && selected === p.name;
           return (
             <GazeButton
               key={p.name}
               id={`person-${p.name.replace(/\s+/g, '-').toLowerCase()}`}
-              onClick={() => setSelected(p.name)}
+              onClick={() => (addToMessage ? addToMessage.add(p.name) : setSelected(p.name))}
               isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled}
               gazeEnabledTimestamp={lastEnabledTimestamp}
@@ -157,7 +165,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
         })}
       </div>
 
-      {selectedPerson && (
+      {selectedPerson && !addToMessage && (
         <div className="people-speak" style={{
           flex: 1,
           minHeight: 0,

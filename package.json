@@ -34,7 +34,8 @@
     "check:youtube-page": "node scripts/check-youtube-page.cjs",
     "check:search-keyboard": "node scripts/check-search-keyboard.cjs && node scripts/check-search-suggestions.cjs",
     "check:calm-video": "node scripts/check-calm-video.cjs",
-    "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs"
+    "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs",
+    "check:add-to-message": "node scripts/check-add-to-message.cjs"
   },
   "dependencies": {
     "react": "^18.2.0",

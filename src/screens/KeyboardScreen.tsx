@@ -408,7 +408,8 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         }
         break;
       case 'quickWords':
-        onNavigate('quickwords');
+        // Add to Message: the four cards for what can join the message (utils/addToMessage.ts).
+        onNavigate('add-to-message');
         break;
       case 'deleteWord':
         setText(p => {
@@ -1068,7 +1069,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
                 setNavHidden(true);
                 setWordLengthHint(null);
               }}
-              onQuickWords={() => onNavigate('quickwords')}
+              onQuickWords={() => onNavigate('add-to-message')}
             />
           </div>
         )

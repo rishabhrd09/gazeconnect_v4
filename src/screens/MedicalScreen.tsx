@@ -10,10 +10,12 @@ import { darkColors, lightColors, screenThemes, warmScreenTokens } from '../util
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import GazeButton from '../components/core/GazeButton';
 import { GlobalNavBar } from '../components/GlobalNavBar';
+import AddToMessageNote from '../components/AddToMessageNote';
 import { useCustomization } from '../contexts/CustomizationContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { BellIcon } from '../components/icons/Icons';
 import type { MedicalSection } from '../types/customization';
+import type { AddToMessage } from '../utils/addToMessage';
 import medicalUrgentIcon from '../assets/daily-assistance/medical-urgent.png';
 import bedPositionIcon from '../assets/daily-assistance/bed-position.png';
 import dailyCareIcon from '../assets/daily-assistance/daily-care.png';
@@ -24,6 +26,11 @@ interface MedicalScreenProps {
   onSpeak: (text: string) => void;
   isDarkMode?: boolean;
   showHindi?: boolean;
+  /**
+   * Opened from Add to Message: a chosen request joins the message instead of being spoken,
+   * except an urgent one (suction, breathing, severe pain...), which is still spoken at once.
+   */
+  addToMessage?: AddToMessage;
 }
 
 interface MedItem { en: string; hi: string; urgent?: boolean; }
@@ -231,7 +238,7 @@ const PhraseButton: React.FC<{
   item: MedItem;
   isDarkMode: boolean;
   showHindi: boolean;
-  onActivate: (text: string) => void;
+  onActivate: (item: MedItem) => void;
   gazeEnabled: boolean;
   timestamp: number;
   cardBg: string;
@@ -246,7 +253,7 @@ const PhraseButton: React.FC<{
 }) => (
   <GazeButton
     id={`phrase-${item.en}`}
-    onClick={() => onActivate(item.en)}
+    onClick={() => onActivate(item)}
     gazeEnabled={gazeEnabled}
     gazeEnabledTimestamp={timestamp}
     isDarkMode={isDarkMode}
@@ -285,7 +292,7 @@ const PhraseButton: React.FC<{
 );
 
 const MedicalScreen: React.FC<MedicalScreenProps> = ({
-  onNavigate, onSpeak, isDarkMode = true, showHindi = false,
+  onNavigate, onSpeak, isDarkMode = true, showHindi = false, addToMessage,
 }) => {
   const colors = isDarkMode ? darkColors : lightColors;
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
@@ -331,12 +338,17 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
     if (lastSpokenTimerRef.current) clearTimeout(lastSpokenTimerRef.current);
   }, []);
 
-  const handleActivate = useCallback((text: string) => {
-    onSpeak(text);
-    setLastSpoken(text);
+  const handleActivate = useCallback((item: MedItem) => {
+    // From Add to Message a request joins the message; an urgent one is never left waiting there.
+    if (addToMessage && !item.urgent) {
+      addToMessage.add(item.en);
+      return;
+    }
+    onSpeak(item.en);
+    setLastSpoken(item.en);
     if (lastSpokenTimerRef.current) clearTimeout(lastSpokenTimerRef.current);
     lastSpokenTimerRef.current = setTimeout(() => setLastSpoken(''), 4200);
-  }, [onSpeak]);
+  }, [addToMessage, onSpeak]);
 
   return (
     <div className={`medical-screen${isLight ? ' theme-light' : isMix ? ' theme-mix' : isWarm ? ' theme-warm' : ''}`} style={{
@@ -347,7 +359,8 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
       overflow: 'hidden',
       padding: '4px 20px 6px 20px',
     }}>
-      <GlobalNavBar currentPage="medical" onNavigate={onNavigate} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="medical" onNavigate={onNavigate} isDarkMode={isDarkMode}
+        onBack={addToMessage?.back} note={addToMessage && <AddToMessageNote text={addToMessage.text} />} />
 
       {lastSpoken && (
         <div style={{

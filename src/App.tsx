@@ -12,6 +12,9 @@ import { normalizeFilterPreset } from './config/gazeFilterConfig';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { darkColors, lightColors } from './utils/design';
 import { chooseSpeechRoute } from './utils/ttsRouting';
+import {
+  ADD_TO_MESSAGE_SCREEN, appendToMessage, messageReturnAfter, type AddToMessage, type TypingScreen,
+} from './utils/addToMessage';
 import { WebSocketProvider, useWS } from './hooks/useWebSocket';
 import { GazeControlProvider, useGazeControl } from './components/core/GazeControlToggle';
 import { RealGazeProvider } from './contexts/RealGazeContext';
@@ -58,12 +61,14 @@ const CompassMapScreen = React.lazy(() => import('./screens/CompassMapScreen'));
 const DesignHomeLandingScreen = React.lazy(() => import('./screens/DesignHomeLandingScreen'));
 const CustomizeScreen = React.lazy(() => import('./screens/CustomizeScreen'));
 const QuickWordsScreen = React.lazy(() => import('./screens/QuickWordsScreen'));
+const AddToMessageScreen = React.lazy(() => import('./screens/AddToMessageScreen'));
 const MusicScreen = React.lazy(() => import('./screens/MusicScreen'));
 
 // Pulled in quietly once the first screen is on the glass, most used first, so
 // moving between screens never waits for a download.
 const SCREEN_LOADERS: Array<() => Promise<unknown>> = [
   () => import('./screens/KeyboardScreen'),
+  () => import('./screens/AddToMessageScreen'),
   () => import('./screens/PhrasesScreen'),
   () => import('./screens/QuickWordsScreen'),
   () => import('./screens/MedicalScreen'),
@@ -91,7 +96,7 @@ const ScreenLoading: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
 type Screen = 'home' | 'keyboard' | 'phrases' | 'feelings' | 'needs' |
   'people' | 'medical' | 'settings' | 'activities' | 'spatial' | 'web' |
   'floor-plan' | 'floor-plan-survey' | 'compass-map' | 'customize' |
-  'quickwords' | 'music';
+  'quickwords' | 'music' | typeof ADD_TO_MESSAGE_SCREEN;
 
 const KEYBOARD_TEXT_SESSION_KEY = 'gazeconnect_keyboard_text_session';
 
@@ -173,8 +178,9 @@ const InnerApp: React.FC = () => {
     }
   });
 
-  // Quick Words injection mode: tracks which screen requested inject
-  const [quickWordsReturnScreen, setQuickWordsReturnScreen] = useState<string | null>(null);
+  // Add to Message (utils/addToMessage.ts): the typing screen that opened it, while the
+  // person chooses something to add to the message; null otherwise.
+  const [messageReturnScreen, setMessageReturnScreen] = useState<TypingScreen | null>(null);
 
   // Destructure settings for convenience
   const { isDarkMode, ttsRate, ttsVolume } = settings;
@@ -271,13 +277,9 @@ const InnerApp: React.FC = () => {
       } catch { /* ignore */ }
     }
 
-    // Track inject mode: if navigating to quickwords from a typing screen,
-    // remember the return screen so QuickWordsScreen can inject words
-    if (s === 'quickwords' && (currentScreen === 'keyboard' || currentScreen === 'spatial')) {
-      setQuickWordsReturnScreen(currentScreen);
-    } else if (s !== 'quickwords') {
-      setQuickWordsReturnScreen(null);
-    }
+    // Add to Message: entered from a typing screen, kept while the person moves among its
+    // screens, ended by any other screen (utils/addToMessage.ts).
+    setMessageReturnScreen(previous => messageReturnAfter(currentScreen, s, previous));
 
     setCurrentScreen(s as Screen);
     ws.setScreen(s);
@@ -340,21 +342,27 @@ const InnerApp: React.FC = () => {
   }, [ws.isConnected, ttsRate, ttsVolume]);
 
   const handleAlertModeHome = useCallback(() => {
-    setQuickWordsReturnScreen(null);
+    setMessageReturnScreen(null);
     setCurrentScreen('home');
     ws.setScreen('home');
     disableAlertMode();
   }, [disableAlertMode, ws]);
   const handleTextChange = useCallback((text: string) => setGlobalText(text), []);
 
-  // Quick Words injection: appends a word to the global text (used by QuickWordsScreen in inject mode)
-  const handleWordInject = useCallback((word: string) => {
+  // Add to Message: the choice joins the message, and the person is back on the typing screen.
+  const handleAddToMessage = useCallback((words: string) => {
     setGlobalText(prev => {
-      const next = prev.endsWith(' ') || prev === '' ? `${prev}${word} ` : `${prev} ${word} `;
+      const next = appendToMessage(prev, words);
       try { sessionStorage.setItem(KEYBOARD_TEXT_SESSION_KEY, next); } catch { /* ignore */ }
       return next;
     });
-  }, []);
+    handleNavigate(messageReturnScreen || 'keyboard');
+  }, [handleNavigate, messageReturnScreen]);
+  const addToMessage = React.useMemo<AddToMessage | undefined>(() => (messageReturnScreen ? {
+    text: globalText,
+    add: handleAddToMessage,
+    back: () => handleNavigate(ADD_TO_MESSAGE_SCREEN),
+  } : undefined), [globalText, handleAddToMessage, handleNavigate, messageReturnScreen]);
 
   useEffect(() => {
     try {
@@ -395,14 +403,14 @@ const InnerApp: React.FC = () => {
           learnWord={ws.learnWord}
           learnSentence={ws.learnSentence}
         />;
-      case 'phrases': return <PhrasesScreen {...common} />;
+      case 'phrases': return <PhrasesScreen {...common} addToMessage={addToMessage} />;
       case 'settings':
         return <SettingsScreen {...common} />;
 
-      case 'medical': return <MedicalScreen {...common} />;
+      case 'medical': return <MedicalScreen {...common} addToMessage={addToMessage} />;
       case 'feelings': return <FeelingScreen {...common} />;
       case 'needs': return <BasicNeedsScreen {...common} />;
-      case 'people': return <PeopleScreen {...common} />;
+      case 'people': return <PeopleScreen {...common} addToMessage={addToMessage} />;
       case 'activities': return <ActivitiesScreen {...common} />;
       case 'web': return <WebBrowsingScreen {...common} />;
       case 'floor-plan': return <DesignHomeLandingScreen {...common} />;
@@ -410,11 +418,9 @@ const InnerApp: React.FC = () => {
       case 'compass-map': return <CompassMapScreen {...common} />;
       case 'customize': return <CustomizeScreen {...common} />;
       case 'music': return <MusicScreen {...common} />;
-      case 'quickwords': return <QuickWordsScreen {...common}
-        injectMode={!!quickWordsReturnScreen}
-        onWordInject={handleWordInject}
-        returnScreen={quickWordsReturnScreen || 'home'}
-      />;
+      case 'quickwords': return <QuickWordsScreen {...common} addToMessage={addToMessage} />;
+      case ADD_TO_MESSAGE_SCREEN: return <AddToMessageScreen onNavigate={handleNavigate} isDarkMode={isDarkMode}
+        messageText={globalText} returnScreen={messageReturnScreen || 'keyboard'} />;
       default: return <HomeScreen {...common} />;
     }
   };

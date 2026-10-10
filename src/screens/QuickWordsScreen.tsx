@@ -12,25 +12,26 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import QuickWordsGrid from '../components/shared/QuickWordsGrid';
 import QuickWordPhraseOverlay from '../components/QuickWordPhraseOverlay';
+import AddToMessageNote from '../components/AddToMessageNote';
 import type { Phrase, QuickWord } from '../types/customization';
+import type { AddToMessage } from '../utils/addToMessage';
 
 interface QuickWordsScreenProps {
   onNavigate: (screen: string) => void;
   onSpeak: (text: string) => void;
   isDarkMode?: boolean;
   showHindi?: boolean;
-  injectMode?: boolean;
-  onWordInject?: (word: string) => void;
-  returnScreen?: string;
+  /** Opened from Add to Message: a chosen phrase joins the message instead of being spoken. */
+  addToMessage?: AddToMessage;
 }
 
 const UI_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 const HINDI_FONT = "'Noto Sans Devanagari', 'Mangal', sans-serif";
 
 const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
-  onNavigate, onSpeak, isDarkMode = true, showHindi = false,
-  injectMode = false, onWordInject, returnScreen = 'keyboard',
+  onNavigate, onSpeak, isDarkMode = true, showHindi = false, addToMessage,
 }) => {
+  const injectMode = Boolean(addToMessage);
   const { data: { quickWords } } = useCustomization();
   const { isGazeEnabled, lastEnabledTimestamp } = useGazeControl();
   const { isLight, isMix, isWarm } = useTheme();
@@ -71,8 +72,17 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
     if (dismissRef.current) clearTimeout(dismissRef.current);
   }, []);
 
+  // The Medical / Urgent words (and their phrases) are spoken at once even from Add to Message:
+  // an urgent request is never left waiting in a message (utils/addToMessage.ts).
+  const urgentWordKeys = useMemo(() => new Set(
+    (categories.find(category => category.id === 'emergency')?.words ?? []).map(word => word.id || word.en),
+  ), [categories]);
+  const addsToMessage = useCallback((word: QuickWord | null) => (
+    injectMode && !(word && urgentWordKeys.has(word.id || word.en))
+  ), [injectMode, urgentWordKeys]);
+
   const handleWordSelect = useCallback((word: QuickWord) => {
-    if (injectMode || word.phrases?.length) {
+    if (addsToMessage(word) || word.phrases?.length) {
       setActiveWord(word);
       return;
     }
@@ -81,13 +91,12 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
     setLastSpoken({ en: word.en, hi: word.hi });
     if (dismissRef.current) clearTimeout(dismissRef.current);
     dismissRef.current = setTimeout(() => setLastSpoken(null), 2200);
-  }, [injectMode, onSpeak]);
+  }, [addsToMessage, onSpeak]);
 
   const handlePhraseSelect = useCallback((phrase: Phrase) => {
-    if (injectMode && onWordInject) {
-      onWordInject(phrase.en);
+    if (addToMessage && addsToMessage(activeWord)) {
       setActiveWord(null);
-      onNavigate(returnScreen);
+      addToMessage.add(phrase.en);
       return;
     }
 
@@ -96,7 +105,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
     setActiveWord(null);
     if (dismissRef.current) clearTimeout(dismissRef.current);
     dismissRef.current = setTimeout(() => setLastSpoken(null), 2600);
-  }, [injectMode, onNavigate, onSpeak, onWordInject, returnScreen]);
+  }, [activeWord, addToMessage, addsToMessage, onSpeak]);
 
   const relatedWords = useMemo(() => {
     if (!activeWord?.relatedWordIds?.length) return [];
@@ -117,7 +126,8 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
         padding: '4px 20px 12px 20px',
       }}
     >
-      <GlobalNavBar currentPage="quickwords" onNavigate={onNavigate} isDarkMode={isDarkMode} />
+      <GlobalNavBar currentPage="quickwords" onNavigate={onNavigate} isDarkMode={isDarkMode}
+        onBack={addToMessage?.back} note={addToMessage && <AddToMessageNote text={addToMessage.text} />} />
 
       <QuickWordPhraseOverlay
         isOpen={Boolean(activeWord)}
@@ -132,7 +142,7 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
         showHindi={showHindi}
       />
 
-      {!injectMode && lastSpoken && (
+      {lastSpoken && (
         <div style={{
           position: 'fixed',
           top: '50%',

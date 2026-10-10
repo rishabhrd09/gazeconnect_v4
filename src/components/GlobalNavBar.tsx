@@ -35,7 +35,48 @@ interface GlobalNavBarProps {
     gazePositionOffset?: string;
     /** When provided, renders a Back button in the nav pill that calls this callback */
     onBack?: () => void;
+    /** A short note in the free space left of the navigation (never on Home, never a gaze target). */
+    note?: React.ReactNode;
 }
+
+/**
+ * A short note in the free space left of the navigation (Add to Message, 10 Oct 2026). The
+ * approved designs centre the navigation as a group and hide its side cells, so the note is
+ * placed by measuring the bar: exactly the space beside it, never over a target, nothing
+ * moved. Where that space is too narrow for the note, there is no note.
+ */
+const NAV_SIDE_NOTE_MIN_WIDTH = 150;
+const NavSideNote: React.FC<{ anchor: React.RefObject<HTMLDivElement>; children: React.ReactNode }> = ({ anchor, children }) => {
+    const [box, setBox] = React.useState<{ top: number; height: number; width: number } | null>(null);
+    React.useLayoutEffect(() => {
+        const bar = anchor.current;
+        if (!bar) return undefined;
+        const measure = () => {
+            const r = bar.getBoundingClientRect();
+            setBox(previous => (previous && previous.top === r.top && previous.height === r.height && previous.width === r.left
+                ? previous : { top: r.top, height: r.height, width: r.left }));
+        };
+        measure();
+        const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+        observer?.observe(bar);
+        window.addEventListener('resize', measure);
+        return () => {
+            observer?.disconnect();
+            window.removeEventListener('resize', measure);
+        };
+    }, [anchor]);
+    if (!box || box.width < NAV_SIDE_NOTE_MIN_WIDTH) return null;
+    return (
+        <div className="nav-side-note" style={{
+            position: 'fixed', left: 0, top: box.top, height: box.height, width: box.width,
+            display: 'flex', alignItems: 'center', boxSizing: 'border-box',
+            padding: '0 clamp(12px, 1.2vw, 22px) 0 clamp(16px, 1.8vw, 34px)',
+            pointerEvents: 'none', zIndex: 2,
+        }}>
+            {children}
+        </div>
+    );
+};
 
 const navIconStyle: React.CSSProperties = {
     width: 'clamp(22px, 2.8vh, 32px)',
@@ -84,7 +125,9 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
     onQuickWords,
     gazePositionOffset,
     onBack,
+    note,
 }) => {
+    const navContainerRef = React.useRef<HTMLDivElement>(null);
     const colors = isDarkMode ? darkColors : warmColors;
     const navFontFamily = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
     const { isGazeEnabled, toggleGaze } = useGazeControl();
@@ -199,7 +242,9 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
 
     return (
         <>
+            {note && currentPage !== 'home' && <NavSideNote anchor={navContainerRef}>{note}</NavSideNote>}
             <div
+                ref={navContainerRef}
                 className="nav-bar-container"
                 data-gaze-screen={currentPage}
                 data-nav-count={navActionCount}
@@ -380,7 +425,7 @@ const GlobalNavBarComponent: React.FC<GlobalNavBarProps> = ({
 
                                     {/* QUICK WORDS */}
                                     <button
-                                        onClick={() => onQuickWords ? onQuickWords() : onNavigate('quickwords')}
+                                        onClick={() => onQuickWords ? onQuickWords() : onNavigate('add-to-message')}
                                         className="gaze-button nav-btn"
                                         data-gaze="true"
                                         data-gaze-context="navigation"
