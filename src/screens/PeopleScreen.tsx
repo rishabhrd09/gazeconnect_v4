@@ -115,6 +115,7 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
             <GazeButton
               key={p.name}
               id={`person-${p.name.replace(/\s+/g, '-').toLowerCase()}`}
+              className="people-card"
               onClick={() => (addToMessage ? addToMessage.add(p.name) : setSelected(p.name))}
               isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled}
@@ -141,7 +142,9 @@ const PeopleScreen: React.FC<Props> = ({ onNavigate, onSpeak, isDarkMode = true,
                 // NOTE: no transform here. GazeButton handles its own hover scale.
               }}
             >
-              <span style={{
+              {/* A round initial, as a contact card has (10 Oct 2026); the name says it in full. */}
+              <span className="people-avatar" aria-hidden="true">{p.name.trim().charAt(0).toUpperCase()}</span>
+              <span className="people-name" style={{
                 minWidth: 0,
                 maxWidth: '100%',
                 fontSize: isDensePeopleGrid ? 'clamp(34px, 4vh, 48px)' : 'clamp(38px, 5vh, 62px)',

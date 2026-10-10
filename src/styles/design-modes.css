@@ -333,13 +333,23 @@
 :root[data-design][data-theme][data-look] .phrases-stage .phrase-card { padding: clamp(12px,2vh,24px) !important; }
 :root[data-design][data-theme][data-look] .phrases-stage .phrase-card span { font-size: clamp(26px,3.5vh,38px) !important; line-height: 1.3 !important; }
 
-/* People: consistent names, then one centred full-width speak action. */
-:root[data-design][data-theme][data-look] .people-choices { width: 87.5vw; margin: auto auto 0; padding: 0 !important; height: 44vh; grid-auto-rows: minmax(0,1fr); gap: clamp(18px,2.4vh,26px) !important; }
-:root[data-design][data-theme][data-look] .people-choices .gaze-button { min-height: 80px !important; height: 100%; }
-:root[data-design][data-theme][data-look] .people-choices .gaze-button span { font-size: clamp(37px,4.8vh,52px) !important; line-height: 1.25 !important; }
-:root[data-design][data-theme][data-look] .people-choices[data-dense='true'] .gaze-button span { font-size: clamp(30px,3.6vh,40px) !important; }
-/* Adding a name to the message there is no speak card under the names: they stand centred alone. */
-:root[data-design][data-theme][data-look] .people-choices[data-adding='true'] { margin: auto; }
+/* People (redesigned 10 Oct 2026, maintainer request: much taller cards in the look of Home and Add
+   to Message). Each person is a large card, a round initial and the name: up to six stand two rows
+   by three, seven to nine (MAX_ACTIVE_PEOPLE) three by three with the initial beside the name.
+   The speak bar for the chosen person sits under them. */
+:root[data-design][data-theme][data-look] .people-choices { width: min(87.5vw,2100px); margin: auto auto 0; padding: 0 !important; height: clamp(360px,54vh,640px); grid-template-rows: repeat(2,minmax(0,1fr)); gap: clamp(18px,2.4vh,30px) !important; }
+:root[data-design][data-theme][data-look] .people-choices[data-dense='true'] { height: clamp(390px,58vh,680px); grid-template-rows: repeat(3,minmax(0,1fr)); }
+/* Adding a name to the message there is no speak bar: the names stand centred alone, taller still. */
+:root[data-design][data-theme][data-look] .people-choices[data-adding='true'] { margin: auto; height: clamp(400px,60vh,700px); }
+:root[data-design][data-theme][data-look] .people-choices[data-adding='true'][data-dense='true'] { height: clamp(420px,64vh,740px); }
+:root[data-design][data-theme][data-look] .people-choices .gaze-button { min-height: 80px !important; height: 100% !important; padding: clamp(14px,2vh,26px) clamp(20px,2vw,36px) !important; }
+:root[data-design][data-theme][data-look] .people-choices .gaze-button > div:last-child { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(12px,1.7vh,22px); width: 100%; min-width: 0; }
+:root[data-design][data-theme][data-look] .people-choices[data-dense='true'] .gaze-button > div:last-child { flex-direction: row; justify-content: flex-start; gap: clamp(16px,1.5vw,28px); padding-left: clamp(4px,.9vw,18px); }
+:root[data-design][data-theme][data-look] .design-surface .people-choices .people-avatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: clamp(64px,9.4vh,108px); height: clamp(64px,9.4vh,108px); border-radius: 50%; background: var(--design-panel); color: var(--design-green) !important; font-size: clamp(28px,4.2vh,48px) !important; font-weight: 700 !important; letter-spacing: 0 !important; line-height: 1 !important; }
+:root[data-design][data-theme][data-look] .design-surface .people-choices[data-dense='true'] .people-avatar { width: clamp(56px,7.6vh,88px); height: clamp(56px,7.6vh,88px); font-size: clamp(24px,3.4vh,40px) !important; }
+:root[data-design][data-theme][data-look] .design-surface .people-choices .gaze-button[aria-pressed='true'] .people-avatar { background: var(--design-page); }
+:root[data-design][data-theme][data-look] .design-surface .people-choices .people-name { font-size: clamp(34px,4.6vh,56px) !important; font-weight: 600 !important; line-height: 1.15 !important; letter-spacing: -.02em !important; text-align: center; }
+:root[data-design][data-theme][data-look] .design-surface .people-choices[data-dense='true'] .people-name { font-size: clamp(30px,3.9vh,46px) !important; text-align: left; }
 :root[data-design][data-theme][data-look] .people-speak { width: min(73vw,1700px); height: clamp(104px,13.4vh,150px); flex: 0 0 auto !important; margin: 3vh auto auto; padding: 0 !important; }
 :root[data-design][data-theme][data-look] .people-speak .gaze-button { min-height: 80px !important; height: 100%; background: var(--design-selected) !important; }
 

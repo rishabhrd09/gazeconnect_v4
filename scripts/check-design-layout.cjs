@@ -172,6 +172,16 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 await run('add-to-message', addToMessage);
                 for (const [id, name] of [['quick', 'quick-phrases'], ['phrases', 'phrases'], ['people', 'people'], ['assistance', 'assistance']])
                     await run('add-' + name, async () => { await addToMessage(); await p.click('#add-' + id); await p.locator('.add-message-note').waitFor(); });
+                // People at its limit of nine (MAX_ACTIVE_PEOPLE), three by three (10 Oct 2026), as chosen
+                // from Home and while adding to the message; then the default six again.
+                const ninePeople = (on) => p.evaluate((on) => { const d = JSON.parse(sessionStorage.getItem('qa-profile'));
+                    if (on) d.people = ['Rishabh', 'Bhawana', 'Parakh', 'Caretaker', 'Nurse', 'Doctor', 'Physiotherapist', 'Grandmother', 'Neighbour']
+                        .map(name => ({ name, nameHi: name, role: 'Other', phrases: [], isActive: true }));
+                    else delete d.people;
+                    sessionStorage.setItem('qa-profile', JSON.stringify(d)); }, on);
+                await run('people-nine', async () => { await ninePeople(true); await route('people'); });
+                await run('add-people-nine', async () => { await ninePeople(true); await addToMessage(); await p.click('#add-people'); await p.locator('.add-message-note').waitFor(); });
+                await ninePeople(false);
                 for (const [screen, name] of [['quickwords', 'quick-phrases'], ['phrases', 'phrases'], ['people', 'people'], ['medical', 'assistance'], ['activities', 'activities'], ['floor-plan', 'design-home'], ['floor-plan-survey', 'survey'], ['web', 'web-hub'], ['music', 'music'], ['needs', 'needs'], ['feelings', 'feelings'], ['customize', 'customize'], ['spatial', 'spatial'], ['compass-map', 'compass-setup']])
                     await run(name, () => route(screen));
                 await run('bp-choices', async () => { await route('quickwords'); await p.click('#qws-emergency-3'); });
