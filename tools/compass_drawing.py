@@ -66,11 +66,10 @@ def dashed(c, points, color, width, dash, close=False):
 
 def sheet_size(m,technical=False):
     if technical:return 2100,1485   # A3 at 5 px/mm (see draw_sheet)
-    # Crop unused canvas around the real aspect ratio. Never distort X vs Y to
-    # occupy a landscape viewport; gaze zoom can inspect all four corners.
-    width,depth=max(m['width'],m['depth']),min(m['width'],m['depth'])
-    scale=min(1390/width,790/depth)
-    return math.ceil(width*scale+190), math.ceil(depth*scale+180)
+    # Crop unused canvas around the real aspect ratio. The road is always at the
+    # bottom: a deep plot gives a tall sheet, never a rotated plan.
+    scale=min(1390/m['width'],820/m['depth'])
+    return math.ceil(m['width']*scale+190), math.ceil(m['depth']*scale+180)
 
 
 def fixture_palette(palette,dark):
@@ -517,11 +516,13 @@ def draw_2d(c,m,palette,cw,ch,technical=False):
     if technical:
         return draw_sheet(c, m)
     bg,surface,ink,muted,edge=palette
-    rotated=m['depth']>m['width']
-    across,down=(m['depth'],m['width']) if rotated else (m['width'],m['depth'])
+    # Front / road at the bottom and the back at the top at every aspect, as on
+    # the map: rotating a deep plot swapped its left and right for the reader.
+    rotated=False
+    across,down=m['width'],m['depth']
     s=min((cw-190)/across,(ch-190)/down)
     left=(cw-across*s)/2;top=84;bottom=top+down*s;right=left+across*s
-    point=(lambda x,y:(left+y*s,top+x*s)) if rotated else (lambda x,y:(left+x*s,top+(m['depth']-y)*s))
+    point=lambda x,y:(left+x*s,top+(m['depth']-y)*s)
     c.rectangle(left,top,across*s,down*s);paint(c,surface);c.fill()
     plan = Plan(c, m, palette, point, s, SCREEN, False, rotated)
     plan.draw()

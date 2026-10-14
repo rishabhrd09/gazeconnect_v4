@@ -12,24 +12,25 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'python')]
 from compass_presentation import normalise, render
 from compass_resources import RenderResources, MAX_CACHE_BYTES, MAX_CACHE_ITEMS
 
-def peak_memory_bytes():
+def memory_bytes():
+    """(peak working set, current private bytes) on Windows; (peak resident set, None) elsewhere."""
     if sys.platform == 'win32':
         import ctypes
         from ctypes import wintypes
         class Counters(ctypes.Structure):
             _fields_ = [('cb', wintypes.DWORD), ('faults', wintypes.DWORD)] + [
                 (name, ctypes.c_size_t) for name in ('peak_working', 'working', 'peak_paged',
-                'paged', 'peak_nonpaged', 'nonpaged', 'pagefile', 'peak_pagefile')]
+                'paged', 'peak_nonpaged', 'nonpaged', 'pagefile', 'peak_pagefile', 'private')]
         counters = Counters(); counters.cb = ctypes.sizeof(counters)
         query = ctypes.WinDLL('psapi', use_last_error=True).GetProcessMemoryInfo
         query.argtypes = (wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD)
         query.restype = wintypes.BOOL
         if not query(wintypes.HANDLE(-1), ctypes.byref(counters), counters.cb):
             raise ctypes.WinError(ctypes.get_last_error())
-        return counters.peak_working
+        return counters.peak_working, counters.private
     import resource
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return peak if sys.platform == 'darwin' else peak * 1024
+    return (peak if sys.platform == 'darwin' else peak * 1024), None
 
 source = normalise(json.loads((ROOT / 'python/tests/fixtures/compass_architectural_map.json').read_text()))
 cache = RenderResources()
@@ -45,8 +46,9 @@ for iteration in range(3):
         latencies.append((time.perf_counter() - start) * 1000)
         assert image.startswith(b'<?xml' if settings['fmt']=='svg' else b'\x89PNG')
     gc.collect()
-    peak = peak_memory_bytes()
-    passes.append({'iteration':iteration+1, 'cache':cache.stats(), 'process_peak_mib':round(peak/1024**2,2)})
+    peak, private = memory_bytes()
+    passes.append({'iteration':iteration+1, 'cache':cache.stats(), 'process_peak_mib':round(peak/1024**2,2),
+                   'process_private_mib':round(private/1024**2,2) if private else None})
     assert cache.stats()['bytes'] <= MAX_CACHE_BYTES
     assert cache.stats()['items'] <= MAX_CACHE_ITEMS
 cached=[]

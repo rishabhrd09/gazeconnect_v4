@@ -1,0 +1,119 @@
+{
+ "rss_after_import_mb": 34.1,
+ "options_s": 0.197,
+ "options": [
+  [
+   "Closest to my map",
+   true
+  ],
+  [
+   "Room balance",
+   true
+  ],
+  [
+   "Circulation space",
+   true
+  ],
+  [
+   "Private rooms",
+   true
+  ]
+ ],
+ "notes": [
+  "first_floor: 8 compass cells remain unassigned and are not assumed to be corridors.",
+  "Architectural preview: 9-inch outer and 6-inch inner walls; doors, windows, furniture and stair arrangement are proposed. Room sizes are clear between the proposed walls and dimension chains follow the map grid. Verify site setbacks and construction details with your designer."
+ ],
+ "ground": {
+  "doors": [
+   [
+    "g-porch",
+    "g-staircase",
+    "main"
+   ],
+   [
+    "g-lawn",
+    "g-drawing",
+    "exterior"
+   ],
+   [
+    "g-lawn",
+    "g-living",
+    "exterior"
+   ],
+   [
+    "g-staircase",
+    "g-bathroom",
+    "bath"
+   ],
+   [
+    "g-drawing",
+    "g-bedroom",
+    "internal"
+   ],
+   [
+    "g-living",
+    "g-dining",
+    "internal"
+   ],
+   [
+    "g-living",
+    "g-kitchen",
+    "internal"
+   ],
+   [
+    "g-bathroom",
+    "g-backyard",
+    "exterior"
+   ]
+  ],
+  "windows": 10,
+  "stair": true
+ },
+ "first": {
+  "doors": [
+   [
+    "f-ff_stairLanding",
+    "f-ff_bathroom",
+    "bath"
+   ],
+   [
+    "f-ff_stairLanding",
+    "f-ff_living",
+    "internal"
+   ],
+   [
+    "f-ff_bathroom",
+    "f-ff_master",
+    "bath"
+   ],
+   [
+    "f-ff_living",
+    "f-ff_terrace",
+    "exterior"
+   ],
+   [
+    "f-ff_master",
+    "f-ff_bed2",
+    "internal"
+   ]
+  ],
+  "windows": 10,
+  "stair": true
+ },
+ "render_s": {
+  "gc_ground_2d_warm.png": 0.099,
+  "gc_first_2d_warm.png": 0.082,
+  "gc_ground_2d_dark.png": 0.093,
+  "gc_ground_sheet.png": 0.096,
+  "gc_first_sheet.png": 0.093,
+  "gc_ground_3d_warm.png": 0.145,
+  "gc_first_3d_warm.png": 0.13,
+  "gc_exterior_a0.png": 0.331,
+  "gc_exterior_a1.png": 0.343,
+  "gc_exterior_a2.png": 0.348,
+  "gc_exterior_a3.png": 0.314
+ },
+ "dxf_s": 0.104,
+ "pdf_s": 0.106,
+ "peak_rss_mb": 122.2
+}

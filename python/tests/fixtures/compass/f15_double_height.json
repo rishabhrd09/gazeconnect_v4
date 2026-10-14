@@ -1,0 +1,696 @@
+{
+ "id": "F15",
+ "title": "C2: open plan with a double-height living hall",
+ "cases": [
+  {
+   "name": "c2",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r3_c2",
+         "r3_c3",
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "f-ff_terrace-1",
+        "use": "ff_terrace",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "f-void-1",
+        "use": "void",
+        "regions": [
+         "r2_c3"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {
+     "drawingRoom": "separate"
+    }
+   },
+   "expect": {
+    "issues": [],
+    "labels": {
+     "f-void-1": "Open to below"
+    },
+    "kernel": {
+     "doubleHeight": [
+      "g-living-1"
+     ],
+     "boundaries": [
+      [
+       "f-ff_living-1",
+       "f-void-1",
+       "rail",
+       "gallery"
+      ],
+      [
+       "f-ff_master-1",
+       "f-void-1",
+       "partition",
+       "void-privacy"
+      ],
+      [
+       "f-void-1",
+       "f-ff_terrace-1",
+       "exterior",
+       "double-height"
+      ],
+      [
+       "g-living-1",
+       "g-dining-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-kitchen-1",
+       "g-drawing-1",
+       "partition",
+       "drawing-separate"
+      ],
+      [
+       "g-staircase-1",
+       "g-living-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-kitchen-1",
+       "open",
+       "kitchen-open"
+      ]
+     ],
+     "tallGlazing": true,
+     "notes": [
+      "double-height"
+     ]
+    }
+   }
+  },
+  {
+   "name": "half-void-passage",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [
+       "r2_c3"
+      ],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r3_c2",
+         "r3_c3",
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "f-ff_terrace-1",
+        "use": "ff_terrace",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "f-passage-1",
+        "use": "passage",
+        "regions": [
+         "r2_c3.L"
+        ]
+       },
+       {
+        "id": "f-void-1",
+        "use": "void",
+        "regions": [
+         "r2_c3.R"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {
+     "drawingRoom": "separate"
+    }
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "boundaries": [
+      [
+       "f-passage-1",
+       "f-void-1",
+       "rail",
+       "gallery"
+      ],
+      [
+       "f-ff_living-1",
+       "f-passage-1",
+       "open",
+       "circulation"
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "void-cuts-route",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_bed2-1",
+        "use": "ff_bed2",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r3_c1",
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "f-void-1",
+        "use": "void",
+        "regions": [
+         "r2_c3"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "notes": [
+      "void-cuts-route",
+      "unreachable"
+     ],
+     "adjustment": {
+      "code": "void-cuts-route",
+      "cell": "r2_c3",
+      "halves": {
+       "L": "passage",
+       "R": "void"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "void-over-bedroom",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r3_c2",
+         "r3_c3",
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "f-void-1",
+        "use": "void",
+        "regions": [
+         "r3_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [
+     "void-below:f-void-1"
+    ]
+   }
+  }
+ ]
+}

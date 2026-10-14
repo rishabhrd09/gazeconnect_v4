@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatSize } from '../utils/feetInches';
 
 interface ArchCellProps {
   cellKey: string;
@@ -23,6 +24,8 @@ interface ArchCellProps {
   neighborW: string | null;
   cellLayout?: 'left' | 'right' | 'top' | 'bottom';
   hideText?: boolean;
+  /** The room's identity (two bedrooms are two rooms); neighbours are compared by identity when given. */
+  identity?: string | null;
 }
 
 export const ArchitecturalCell: React.FC<ArchCellProps> = ({
@@ -48,8 +51,10 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
   neighborW,
   cellLayout,
   hideText,
+  identity,
 }) => {
   const isOccupied = !!roomId;
+  const self = identity ?? roomId;
 
   const isExtTop = row === totalRows;
   const isExtBottom = row === 1;
@@ -59,10 +64,10 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
   const extWall = '3px solid var(--ui-border)';
   const intWall = '1.5px solid var(--ui-border)';
 
-  const wallBreakN = isOccupied && neighborN !== roomId;
-  const wallBreakS = isOccupied && neighborS !== roomId;
-  const wallBreakE = isOccupied && neighborE !== roomId;
-  const wallBreakW = isOccupied && neighborW !== roomId;
+  const wallBreakN = isOccupied && neighborN !== self;
+  const wallBreakS = isOccupied && neighborS !== self;
+  const wallBreakE = isOccupied && neighborE !== self;
+  const wallBreakW = isOccupied && neighborW !== self;
 
   const borderTop = isExtTop ? extWall : (!wallBreakN && isOccupied ? 'none' : intWall);
   const borderBottom = isExtBottom ? extWall : (!wallBreakS && isOccupied ? 'none' : intWall);
@@ -224,7 +229,7 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
         }}
       >
-        {cellWidthFt}x{cellDepthFt} ft
+        {formatSize(cellWidthFt, cellDepthFt)}
       </span>
     </div>
   );
@@ -307,7 +312,7 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {cellWidthFt}&times;{cellDepthFt} ft
+              {formatSize(cellWidthFt, cellDepthFt)}
             </span>
           </>
         )
@@ -353,6 +358,38 @@ export const ArchitecturalCell: React.FC<ArchCellProps> = ({
           </span>
         </>
       )}
+    </div>
+  );
+};
+
+export interface SplitHalf {
+  identity: string | null;
+  label: string | null;
+  color: string | null;
+  size: string;
+}
+
+/** A divided cell on the map: two halves inside the cell's single gaze target (IMPLEMENTATION_PLAN.md §5.1 step 8). */
+export const SplitCellFace: React.FC<{ row: number; col: number; totalRows: number; totalCols: number; left: SplitHalf; right: SplitHalf }> = ({
+  row, col, totalRows, totalCols, left, right,
+}) => {
+  const ext = '3px solid var(--ui-border)';
+  const int = '1.5px solid var(--ui-border)';
+  const same = !!left.identity && left.identity === right.identity;
+  const half = (h: SplitHalf) => (
+    <div style={{ background: h.color ? `color-mix(in srgb, ${h.color} 18%, var(--ui-surface))` : 'var(--ui-surface)' }}>
+      <span>{h.label ? h.label.toUpperCase() : 'EMPTY'}</span>
+      <span>{h.size}</span>
+    </div>
+  );
+  return (
+    <div className="split-cell" data-same={same} style={{
+      borderTop: row === totalRows ? ext : int, borderBottom: row === 1 ? ext : int,
+      borderLeft: col === 1 ? ext : int, borderRight: col === totalCols ? ext : int,
+    }}>
+      {half(left)}
+      {half(right)}
+      <i aria-hidden="true" />
     </div>
   );
 };

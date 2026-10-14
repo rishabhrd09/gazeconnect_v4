@@ -1,4 +1,6 @@
-/** Isolated browser + real local floor-plan API. No user saves or live gaze backend. */
+/** Isolated browser + real local floor-plan API. No user saves or live gaze backend.
+ * Since 14 Oct 2026 this checks the original studio, kept as the fallback when the version 2 map is off
+ * (GAZECONNECT_COMPASS_V2=0; here localStorage gc-compass-v2 = 0). The new studio: check-compass-studio-v2.cjs. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -29,7 +31,7 @@ let browser;
   await page.goto('http://127.0.0.1:5173');await page.locator('#kb').waitFor();
   async function open(mode='focus',theme='warm',firstRooms=false,architecture=false){
     await page.evaluate(({mode,theme,state})=>{
-      sessionStorage.clear();localStorage.clear();sessionStorage.setItem('qa-theme',theme);
+      sessionStorage.clear();localStorage.clear();localStorage.setItem('gc-compass-v2','0');sessionStorage.setItem('qa-theme',theme);
       sessionStorage.setItem('qa-profile',JSON.stringify({version:1,settings:{designMode:mode}}));
       localStorage.setItem('compass_persistent_backup',JSON.stringify(state));
     },{mode,theme,state:draft(firstRooms,architecture)});
@@ -75,7 +77,7 @@ let browser;
     await page.setViewportSize({width:size[0],height:size[1]});await open(mode,theme);
     assert.equal(await page.locator('#confirm-gen-both').isEnabled(),false);
     await audit(label+'-scope');
-    const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup')).state);
+    const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).floors);
     await page.click('#confirm-gen-yes');await page.locator('.studio-drawing img').waitFor();
     assert.match(await page.locator('.studio-heading').innerText(),/PLAN 1 OF 4/);
     await audit(label+'-2d');
@@ -112,7 +114,7 @@ let browser;
     }
     await page.click('#compass-studio-back');await page.click('#compass-studio-back');
     assert.equal(await page.locator('.compass-plan-studio').count(),0);
-    const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup')).state);
+    const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).floors);
     assert.deepEqual(after,before,'Preview must preserve both floors and the active draft');
   }
   // An eight-room, irregular plan includes real stair treads, fittings and windows.

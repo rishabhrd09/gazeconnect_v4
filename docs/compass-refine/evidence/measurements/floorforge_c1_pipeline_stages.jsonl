@@ -1,0 +1,13 @@
+{"stage": "intent", "status": "finished", "seconds": 0.0008}
+{"stage": "programme", "status": "finished", "seconds": 0.0}
+{"stage": "layout", "status": "finished", "seconds": 0.0113}
+{"stage": "openings", "status": "finished", "seconds": 0.0}
+{"stage": "anchors", "status": "finished", "seconds": 0.0002}
+{"stage": "exterior", "status": "finished", "seconds": 0.0054}
+{"stage": "structure", "status": "finished", "seconds": 0.0}
+{"stage": "validate", "status": "finished", "seconds": 0.0018}
+{"stage": "documents", "status": "finished", "seconds": 0.0005}
+{"stage": "scene", "status": "finished", "seconds": 1.5451}
+{"stage": "sheets", "status": "finished", "seconds": 0.0279}
+{"stage": "render", "status": "finished", "seconds": 0.0}
+{"stage": "exports", "status": "finished", "seconds": 0.4654}

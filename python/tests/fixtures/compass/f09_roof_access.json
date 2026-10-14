@@ -1,0 +1,87 @@
+{
+ "id": "F9",
+ "title": "Ground floor only, stair to the roof",
+ "cases": [
+  {
+   "name": "roof",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "East",
+     "gate": "Center",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c3"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c2"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c2"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "roofAccess": true,
+     "notes": [
+      "roof-access"
+     ]
+    }
+   }
+  }
+ ]
+}

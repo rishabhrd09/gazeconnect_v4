@@ -1,0 +1,25 @@
+{
+  "name": "C1 comparison house",
+  "note": "40 x 60 ft plot, North-facing road, gate Left, ground + first floor. Rows: r1 = front (road), r4 = back; columns: c1 = left as seen from the road. Cells are 10 x 15 ft. The house occupies rows 2-3 (40 x 30 ft per floor). GazeConnect: row 1 = porch + lawn, row 4 = backyard. FloorForge: row 1 = 15 ft front setback, row 4 = 15 ft rear setback.",
+  "plot": {"width_ft": 40, "depth_ft": 60, "facing": "North", "gate": "Left", "type": "Middle Plot"},
+  "ground": [
+    {"gc": "porch", "label": "Outer Lobby / Porch / Open Area", "ff": null, "cells": ["r1_c1"]},
+    {"gc": "lawn", "label": "Lawn / Garden", "ff": null, "cells": ["r1_c2", "r1_c3", "r1_c4"]},
+    {"gc": "staircase", "label": "Living Lobby + Staircase", "ff": "stair", "ffName": "Stair hall", "cells": ["r2_c1"]},
+    {"gc": "living", "label": "Living Hall", "ff": "living", "ffName": "Living", "cells": ["r2_c2", "r2_c3"]},
+    {"gc": "drawing", "label": "Drawing Room", "ff": "drawing-room", "ffName": "Drawing room", "cells": ["r2_c4"]},
+    {"gc": "bathroom", "label": "Bathroom", "ff": "bathroom", "ffName": "Bathroom", "cells": ["r3_c1"]},
+    {"gc": "dining", "label": "Dining Hall", "ff": "dining", "ffName": "Dining", "cells": ["r3_c2"]},
+    {"gc": "kitchen", "label": "Kitchen + Store", "ff": "kitchen", "ffName": "Kitchen", "cells": ["r3_c3"]},
+    {"gc": "bedroom", "label": "Bedroom", "ff": "bedroom", "ffName": "Bedroom 2", "cells": ["r3_c4"]},
+    {"gc": "backyard", "label": "Backyard", "ff": null, "cells": ["r4_c1", "r4_c2", "r4_c3", "r4_c4"]}
+  ],
+  "first": [
+    {"gc": "ff_stairLanding", "label": "1F Stair Landing", "ff": "stair", "ffName": "Stair hall", "cells": ["r2_c1"]},
+    {"gc": "ff_living", "label": "1F Living / Family", "ff": "family", "ffName": "Family lounge", "cells": ["r2_c2", "r2_c3"]},
+    {"gc": "ff_terrace", "label": "1F Open Terrace", "ff": "terrace", "ffName": "Terrace", "cells": ["r2_c4"]},
+    {"gc": "ff_bathroom", "label": "1F Bathroom", "ff": "bathroom", "ffName": "Bathroom 1F", "cells": ["r3_c1"]},
+    {"gc": "ff_master", "label": "1F Master Bedroom", "ff": "bedroom", "ffName": "Master bedroom", "cells": ["r3_c2", "r3_c3"]},
+    {"gc": "ff_bed2", "label": "1F Bedroom 2", "ff": "bedroom", "ffName": "Bedroom 3", "cells": ["r3_c4"]}
+  ]
+}

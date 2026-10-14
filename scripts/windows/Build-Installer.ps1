@@ -67,9 +67,14 @@ try {
         '--hidden-import', 'websockets.legacy.server') + (Get-KokoroBundleArguments) + @(
         (Join-Path $PSScriptRoot 'backend_entry.py'))
     Invoke-Checked $VenvPython $backendArgs
+    # No OR-Tools: the v5 optimizer route was removed and the Compass studio never used it.
+    # The version 2 studio (14 Oct 2026) draws its text from the bundled Atkinson Hyperlegible Next
+    # outlines (tools/assets/fonts, OFL), read by tools/compass_text.py from compass_fonts.
     $floorplanArgs = $common + @('--name', 'GazeConnectFloorplan',
-        '--collect-all', 'cairo', '--collect-all', 'ortools', '--collect-all', 'shapely',
-        '--collect-all', 'ezdxf', '--hidden-import', 'gazeplan_engine_v5.engine',
+        '--collect-all', 'cairo', '--collect-all', 'shapely', '--collect-all', 'ezdxf',
+        '--add-data', ((Join-Path $ProjectRoot 'tools\assets\fonts') + ';compass_fonts'),
+        '--hidden-import', 'compass_studio',
+        '--exclude-module', 'ortools', '--exclude-module', 'pandas',
         (Join-Path $PSScriptRoot 'floorplan_entry.py'))
     Invoke-Checked $VenvPython $floorplanArgs
     $pythonStage = Join-Path $work 'python-dist'

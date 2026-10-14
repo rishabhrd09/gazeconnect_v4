@@ -101,10 +101,8 @@ def options(source: dict, scope: str) -> dict:
     if not choices:
         # A perfectly legitimate unfinished drawing can fail access/minimum-room
         # checks. Show it honestly as a concept, rather than hiding all output.
+        # Rooms below a size target keep their doors; the notes name the room.
         validation = _validate(data)
-        for floor in FLOORS.values():
-            if floor in data:
-                data[floor].pop("doorOpenings", None)
         notes = validation["issues"] + validation["warnings"]
         choices = [{"id": "map-" + _geometry_signature(data), "label": "My map preview",
                     "summary": "Your placed rooms, with unfilled cells left open.",
@@ -144,7 +142,9 @@ def model(source: dict, floor: str, align_stair: bool = True, ground: dict | Non
         rooms.append({**p, "polygons": parts, "anchor": anchor, "tone": ROOM_TONES[i % len(ROOM_TONES)]})
     result = {"width": float(data["plot"]["width_ft"]), "depth": float(data["plot"]["depth_ft"]),
             "facing": data["plot"].get("facing", "South"), "floor": floor, "rooms": rooms,
-            "doors": f.get("doorOpenings", []) if validation["valid"] else [], "valid": validation["valid"]}
+            # _validate plans doors on every floor whose geometry is sound, and
+            # removes stale ones elsewhere; a size shortfall never removes them.
+            "doors": f.get("doorOpenings", []), "valid": validation["valid"]}
     result["architecture"] = details(result, hint)
     return result
 

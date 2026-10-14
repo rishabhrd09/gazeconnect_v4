@@ -58,10 +58,10 @@ export function CompassPlanStudio({ source, scope, onClose, onSpeak, onLegacyRev
   const alive = useRef(true);
   const speak = useRef(onSpeak); speak.current = onSpeak;
   const plan = plans[index];
-  const rotatedPlan = !!plan && plan.compassData.plot.depth_ft > plan.compassData.plot.width_ft;
   const left = `${imageInset.x}%`, right = `${100 - imageInset.x}%`;
   const top = `${imageInset.y}%`, bottom = `${100 - imageInset.y}%`;
-  const zoomPositions = rotatedPlan ? ['50% 50%', `${right} ${top}`, `${right} ${bottom}`, `${left} ${top}`, `${left} ${bottom}`] : ['50% 50%', `${left} ${top}`, `${right} ${top}`, `${left} ${bottom}`, `${right} ${bottom}`];
+  // The road is always at the bottom of the drawing, so back = top and left = left.
+  const zoomPositions = ['50% 50%', `${left} ${top}`, `${right} ${top}`, `${left} ${bottom}`, `${right} ${bottom}`];
   const hasFirst = !!plan?.compassData.first_floor?.placements.length;
   const rooms = (floor === 'first' ? plan?.compassData.first_floor : plan?.compassData.ground_floor)?.placements || [];
   const selectedRoom = roomId ? rooms.find(r => r.placementId === roomId) : undefined;
@@ -127,11 +127,22 @@ export function CompassPlanStudio({ source, scope, onClose, onSpeak, onLegacyRev
     if (!plan || exportLock.current) return;
     exportLock.current = true; setExporting(true); setExportMessage('Preparing your download…');
     try {
-      const blob = await renderCompassPlan(plan.compassData, { floor, view: format === 'png' ? view : 'technical', format, theme: drawingTheme, angle, room_id: format === 'png' ? roomId : undefined, style: exterior });
+      const settings = { floor, view: (format === 'png' ? view : 'technical') as CompassView | 'technical', format, theme: drawingTheme, angle, room_id: format === 'png' ? roomId : undefined, style: exterior };
+      const fileName = `GazeConnect-plan-${index + 1}-${floor}-${format === 'png' ? (selectedRoom ? `room-${roomIndex + 1}-3d` : view) : 'drawing'}.${format}`;
+      const save = (window as any).electronAPI?.floorplan?.save;
+      if (save) {
+        // No Save dialog: the app writes to Documents\GazeConnect Plans\<date> (electron/floorplanService.ts).
+        const result = await save({ endpoint: '/api/floorplan/compass/render', body: JSON.stringify({ compass_map: plan.compassData, ...settings }), fileName });
+        if (!alive.current) return;
+        const message = result?.ok ? `${format.toUpperCase()} saved in Documents, GazeConnect Plans.` : (result?.error || 'Download failed. Please try again.');
+        setExportMessage(message); speak.current(message);
+        return;
+      }
+      const blob = await renderCompassPlan(plan.compassData, settings);
       if (!alive.current) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a'); link.href = url;
-      link.download = `GazeConnect-plan-${index + 1}-${floor}-${format === 'png' ? (selectedRoom ? `room-${roomIndex + 1}-3d` : view) : 'drawing'}.${format}`;
+      link.download = fileName;
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
       setExportMessage(`${format.toUpperCase()} download started.`); speak.current(`${format.toUpperCase()} download started.`);

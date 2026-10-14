@@ -1,0 +1,133 @@
+{
+ "id": "F4",
+ "title": "Divided cells beside whole and divided cells",
+ "cases": [
+  {
+   "name": "passage-spine",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "South",
+     "gate": "Center",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [
+       "r2_c2",
+       "r2_c3",
+       "r3_c2"
+      ],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r2_c3.L"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c2.L"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r2_c3.R"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2.L"
+        ]
+       },
+       {
+        "id": "g-passage-1",
+        "use": "passage",
+        "regions": [
+         "r2_c2.R",
+         "r3_c2.R"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c2"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "labels": {
+     "g-passage-1": "Passage"
+    },
+    "kernel": {
+     "boundaries": [
+      [
+       "g-living-1",
+       "g-passage-1",
+       "open",
+       "circulation"
+      ],
+      [
+       "g-bedroom-1",
+       "g-passage-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-bathroom-1",
+       "g-passage-1",
+       "partition",
+       "privacy"
+      ]
+     ],
+     "nodes": [
+      [
+       "h",
+       180,
+       180
+      ],
+      [
+       "h",
+       540,
+       180
+      ],
+      [
+       "h",
+       180,
+       300
+      ]
+     ],
+     "doors": [
+      [
+       "g-passage-1",
+       "g-bedroom-1",
+       "internal"
+      ],
+      [
+       "g-passage-1",
+       "g-bathroom-1",
+       "bath"
+      ]
+     ]
+    }
+   }
+  }
+ ]
+}

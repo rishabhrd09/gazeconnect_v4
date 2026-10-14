@@ -1,0 +1,159 @@
+{
+ "id": "F3",
+ "title": "Dividing a cell that a room already owns",
+ "cases": [
+  {
+   "name": "living-keeps-left-half",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "South",
+     "gate": "Center",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [
+       "r2_c3"
+      ],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r2_c3.R"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3.L"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c2"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "labels": {
+     "g-living-1": "Living Hall",
+     "g-bathroom-1": "Bathroom"
+    },
+    "regionsIn": {
+     "r2_c3.L": [
+      240,
+      180,
+      300,
+      360
+     ],
+     "r2_c3.R": [
+      300,
+      180,
+      360,
+      360
+     ]
+    },
+    "areasSqft": {
+     "g-living-1": 225,
+     "g-bathroom-1": 75
+    },
+    "kernel": {
+     "boundaries": [
+      [
+       "g-living-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ]
+     ],
+     "nodes": [
+      [
+       "h",
+       180,
+       300
+      ],
+      [
+       "h",
+       360,
+       300
+      ]
+     ],
+     "doors": [
+      [
+       "g-living-1",
+       "g-bathroom-1",
+       "bath"
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "disconnecting-left-half",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "South",
+     "gate": "Center",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [
+       "r2_c3"
+      ],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r2_c3.L"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3.R"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c2"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [
+     "room-disconnected:g-living-1"
+    ]
+   }
+  }
+ ]
+}

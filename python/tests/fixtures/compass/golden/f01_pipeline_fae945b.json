@@ -1,0 +1,112 @@
+{
+ "fixture": "F1",
+ "options": [
+  {
+   "label": "My map preview",
+   "valid": false
+  }
+ ],
+ "notes": [
+  "g-living: no uninterrupted rectangle meets the preliminary width/depth target.",
+  "g-drawing: no uninterrupted rectangle meets the preliminary width/depth target.",
+  "g-masterBed: no uninterrupted rectangle meets the preliminary width/depth target.",
+  "f-ff_living: no uninterrupted rectangle meets the preliminary width/depth target.",
+  "f-ff_master: no uninterrupted rectangle meets the preliminary width/depth target.",
+  "first_floor: 6 compass cells remain unassigned and are not assumed to be corridors.",
+  "Architectural preview: 9-inch outer and 6-inch inner walls; doors, windows, furniture and stair arrangement are proposed. Room sizes are clear between the proposed walls and dimension chains follow the map grid. Verify site setbacks and construction details with your designer.",
+  "Dining Hall: no outside wall for a window here; plan a ventilation shaft or a skylight."
+ ],
+ "floors": {
+  "ground": {
+   "rooms": 10,
+   "doors": [],
+   "windows": 14,
+   "stair": true,
+   "wallsOutsidePlotFt": [
+    0.375,
+    0.375,
+    0.375,
+    0.375
+   ],
+   "clearSizesFt": {
+    "g-porch": null,
+    "g-living": [
+     6.875,
+     24.375
+    ],
+    "g-drawing": [
+     14.375,
+     11.875
+    ],
+    "g-staircase": [
+     6.875,
+     24.375
+    ],
+    "g-dining": [
+     7.0,
+     12.0
+    ],
+    "g-bathroom": [
+     6.875,
+     12.0
+    ],
+    "g-kitchen": [
+     14.5,
+     11.875
+    ],
+    "g-masterBed": [
+     6.75,
+     24.375
+    ],
+    "g-bedroom": [
+     6.75,
+     11.875
+    ],
+    "g-backyard": null
+   }
+  },
+  "first": {
+   "rooms": 7,
+   "doors": [],
+   "windows": 11,
+   "stair": true,
+   "wallsOutsidePlotFt": [
+    0.375,
+    -12.125,
+    0.375,
+    0.375
+   ],
+   "clearSizesFt": {
+    "f-ff_stairLanding": [
+     6.875,
+     11.875
+    ],
+    "f-ff_living": [
+     6.875,
+     24.25
+    ],
+    "f-ff_bed2": [
+     6.875,
+     11.875
+    ],
+    "f-ff_bathroom": [
+     6.875,
+     11.875
+    ],
+    "f-ff_master": [
+     14.25,
+     11.75
+    ],
+    "f-ff_balcony": null,
+    "f-ff_terrace": null
+   }
+  }
+ },
+ "dxf": {
+  "version": "AC1024",
+  "insunits": 4,
+  "measurement": 1,
+  "auditErrors": 0,
+  "frontAtZero": true
+ }
+}

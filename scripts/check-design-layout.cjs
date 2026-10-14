@@ -213,13 +213,23 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 await run('music-songs', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); });
                 await run('music-songs-2', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); await p.click('#music-playlist-next-page'); });
                 await run('music-player', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); await p.locator('[id^="music-song-"]').first().click(); });
-                await run('compass-map', async () => { await route('compass-map'); await p.locator('#f-skip').waitFor(); for (let i = 0; i < 8 && await p.locator('#f-skip').count(); i++) {
+                // A 40 ft plot (14 Oct 2026), so a half cell can hold a room and the Refine picker opens.
+                await run('compass-map', async () => { await route('compass-map'); await p.locator('#f-skip').waitFor(); await p.click('#f-skip'); await p.click('[id="fq-1-40 ft"]'); for (let i = 0; i < 8 && await p.locator('#f-skip').count(); i++) {
                     await p.click('#f-skip');
                     await p.waitForTimeout(50);
                 } await p.locator('#nav-restore').waitFor(); await p.waitForTimeout(1800); });
                 await run('compass-nav', async () => { await p.click('#nav-restore'); });
                 await run('compass-rooms', async () => { await p.click('#strip-rooms'); await p.click('#menu-ready'); });
                 await run('compass-rooms-2', async () => { await p.click('#menu-next'); await p.click('#menu-ready'); });
+                // Refine (14 Oct 2026): the rail in Refine, the focus view, the room picker for one half (first
+                // and last page), a divided cell, the WHOLE CELL question, and the map with the divided cell.
+                await run('compass-refine', async () => { await p.click('#back-map'); await p.click('#strip-refine'); });
+                await run('compass-refine-focus', async () => { await p.click('#cell-r2_c2'); await p.locator('.compass-refine-focus').waitFor(); });
+                await run('compass-refine-assign', async () => { await p.click('#refine-left'); await p.click('#assign-ready'); });
+                await run('compass-refine-assign-3', async () => { await p.click('#assign-next'); await p.click('#assign-next'); await p.click('#assign-ready'); });
+                await run('compass-refine-divided', async () => { await p.locator('[id^="assign-passage-"]').click(); await p.locator('.compass-refine-focus').waitFor(); });
+                await run('compass-refine-question', async () => { await p.click('#refine-whole'); await p.locator('.refine-question').waitFor(); });
+                await run('compass-refine-map', async () => { await p.click('#refine-whole-cancel'); await p.click('#refine-back'); });
                 await run('home-urgent', async () => { await route('settings'); await p.click('#sidebar-home'); await p.getByRole('button', { name: /^Urgent Needs \+ Quick Phrases/ }).click(); await p.getByRole('button', { name: 'Save Changes', exact: true }).click(); await p.getByRole('button', { name: 'Home', exact: true }).click(); });
                 await run('urgent-needs', async () => { await p.click('#dock-0'); });
                 // Restore the default Home for the independent Settings checks.
@@ -232,7 +242,8 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
     await browser.close();
     const issues = rows.flatMap(r => [
         ...(!BASELINE ? r.targets.filter(t =>
-            !t.disabled && (['menu-prev','menu-next','back-map','menu-ready','menu-gaze-toggle','ready-road-left','nav-back','view-summary','nav-skip','f-ready','f-back','f-skip'].includes(t.id))
+            !t.disabled && (['menu-prev','menu-next','back-map','menu-ready','menu-gaze-toggle','ready-road-left','nav-back','view-summary','nav-skip','f-ready','f-back','f-skip',
+                'assign-prev','assign-next','assign-back','assign-ready','assign-gaze-toggle','refine-undo','refine-whole','refine-gaze-toggle','refine-back'].includes(t.id))
             && (t.h < 103.5 || ((Number(r.key.split('/')[0]) === 1366 ? 768 : ({1280:800,1440:900,1728:1000})[Number(r.key.split('/')[0])] || 1080) - t.y - t.h) < 27.5)
         ).map(t => ({screen:r.key, footerClearance:t.id, height:t.h})) : []),
         ...(!BASELINE && r.targets.some(t => t.id === 'strip-refine-map') ? [{screen:r.key, retiredControl:'Refine Map'}] : []),

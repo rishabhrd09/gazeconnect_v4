@@ -258,11 +258,8 @@ def draw_stair(s, w, d, twin=True, along=False):
         s.walk = [(lane / 2, d - .35), (lane / 2, landing / 2), (lane + STAIR_GAP + lane / 2, landing / 2),
                   (lane + STAIR_GAP + lane / 2, d - .45)]
     else:
-        per = 12
-        tread = d / per
-        for i in range(per):
-            s.block(0, d - (i + 1) * tread, w, d - i * tread, 0, (i + 1) * RISE, 'stair')
-        s.walk = [(w / 2, d - .35), (w / 2, .45)]
+        # A short flight would need risers above the 7½-inch limit for a 10 ft storey.
+        raise ValueError('A stair is a dog-leg or one straight flight of 16 risers.')
     s.outline(s.walk, False)                                                                # Walking line.
     (ax, ay), (bx, by) = s.walk[-2], s.walk[-1]
     length = math.hypot(bx - ax, by - ay) or 1
@@ -319,11 +316,17 @@ class Item:
 
 
 class Room:
-    """One room's free floor, door zones, windows and what has been placed so far."""
+    """One room's free floor, door zones, windows and what has been placed so far.
 
-    def __init__(self, shape, rect, doors, windows):
+    `inset`: clearance from the room outline (the default suits outlines on wall centre
+    lines; a clear outline already inside the walls needs only a finger's width).
+    `walls`: the real wall faces of each side of `rect` as (from, to) intervals; an open-plan
+    room has no wall toward its open neighbours, so nothing is stood against that side."""
+
+    def __init__(self, shape, rect, doors, windows, inset=INSET, walls=None):
         self.shape, self.rect = shape, rect
-        self.free = shape.buffer(-INSET, join_style=2)
+        self.inset = inset
+        self.free = shape.buffer(-inset, join_style=2)
         bounds = self.free.bounds if not self.free.is_empty else None
         self.free_rect = bounds if bounds and abs(self.free.area - box(*bounds).area) < 1e-6 else None
         whole = shape.bounds
@@ -349,6 +352,8 @@ class Room:
         for side, (a, b) in sides.items():
             origin = a[0] if side in 'SN' else a[1]
             self.walls[side] = [(origin + lo, origin + hi) for lo, hi in _intervals(LineString([a, b]), boundary)]
+        if walls is not None:
+            self.walls = {side: list(walls.get(side, [])) for side in 'SNWE'}
 
     def covers(self, r):
         f = self.free_rect
@@ -410,11 +415,12 @@ def zone_of(frame, item):
 def wall_positions(room, item, sides=None, step=.25):
     """Every position along each real wall of the room's main rectangle, back to the wall."""
     x1, y1, x2, y2 = room.rect
+    inset = room.inset
     for side in 'SNWE':
         if sides and side not in sides:
             continue
         horizontal = side in 'SN'
-        start, length = (x1 + INSET, x2 - x1 - 2 * INSET) if horizontal else (y1 + INSET, y2 - y1 - 2 * INSET)
+        start, length = (x1 + inset, x2 - x1 - 2 * inset) if horizontal else (y1 + inset, y2 - y1 - 2 * inset)
         if item.w > length + 1e-9:
             continue
         walls = room.walls[side]
@@ -425,9 +431,9 @@ def wall_positions(room, item, sides=None, step=.25):
             if not any(a - .01 <= mid <= b + .01 for a, b in walls):
                 continue  # The inside edge of an L-shaped room is not a wall to stand against.
             if horizontal:
-                frame = Frame(side, lo, y1 + INSET if side == 'S' else y2 - INSET - item.d, item.w, item.d)
+                frame = Frame(side, lo, y1 + inset if side == 'S' else y2 - inset - item.d, item.w, item.d)
             else:
-                frame = Frame(side, x1 + INSET if side == 'W' else x2 - INSET - item.d, lo, item.w, item.d)
+                frame = Frame(side, x1 + inset if side == 'W' else x2 - inset - item.d, lo, item.w, item.d)
             yield side, t, length, lo, lo + item.w, frame
 
 
@@ -481,14 +487,15 @@ def stair(shape, rect, doors, windows, hint=None):
     `hint` is the stair of the other floor: the same footprint is used when it
     fits, so the two plans agree about where the stair rises."""
     room = Room(shape, rect, doors, windows)
-    if hint:
+    if hint and (hint['twin'] or hint.get('along')):
         item = Item('stair', hint['w'], hint['d'], front=FLIGHT, twin=hint['twin'], along=hint.get('along', False))
         frame = place_at(room, item, Frame(hint['side'], hint['x'], hint['y'], hint['w'], hint['d']))
         if frame is not None:
             return fixture(frame, item), room
     straight = ((RISERS - 1) * TREAD, FLIGHT)
-    for (w, d), twin, along in ((STAIR_TWIN, True, False), (straight, False, True), ((FLIGHT, 9.0), False, False),
-                                ((FLIGHT, 6.0), False, False)):
+    # Only the two real 16-riser stairs: the dog-leg core or one straight flight of
+    # 12'-6". When neither fits, the caller reports it; no shorter, steeper stair is drawn.
+    for (w, d), twin, along in ((STAIR_TWIN, True, False), (straight, False, True)):
         item = Item('stair', w, d, front=FLIGHT, twin=twin, along=along)
         frame = place(room, item, lambda s, t, L, lo, hi, f, fp: min(t, L - t - f.w) - room.door_distance(fp) * .05)
         if frame is not None:
@@ -499,7 +506,7 @@ def stair(shape, rect, doors, windows, hint=None):
 def turning_space(room):
     """Centre of a clear 5 ft wheelchair turning circle nearest the room centre, or None."""
     radius = TURNING_CIRCLE / 2
-    usable = room.free.buffer(-radius + INSET, join_style=2)
+    usable = room.free.buffer(-radius + room.inset, join_style=2)
     if usable.is_empty:
         return None
     x1, y1, x2, y2 = usable.bounds

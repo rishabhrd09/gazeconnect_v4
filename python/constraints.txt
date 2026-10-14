@@ -37,7 +37,6 @@ multidict==6.9.1
 networkx==3.7
 numpy==2.5.3
 onnxruntime==1.30.0
-ortools==9.15.6755
 packaging==26.3
 pandas==3.0.6
 pefile==2024.8.26
@@ -63,7 +62,6 @@ setuptools==84.0.0
 shapely==2.1.2
 six==1.17.0
 squarify==0.4.5
-svgwrite==1.4.3
 typing_extensions==4.16.0
 tzdata==2026.4
 websockets==17.1

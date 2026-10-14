@@ -1,0 +1,585 @@
+{
+ "id": "F6",
+ "title": "Open plan: living, dining, kitchen and stair hall without walls",
+ "cases": [
+  {
+   "name": "drawing-open-kitchen-open",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "boundaries": [
+      [
+       "g-living-1",
+       "g-dining-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-staircase-1",
+       "g-living-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-drawing-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-kitchen-1",
+       "open",
+       "kitchen-open"
+      ],
+      [
+       "g-bedroom-1",
+       "g-staircase-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-bathroom-1",
+       "g-kitchen-1",
+       "partition",
+       "hygiene"
+      ],
+      [
+       "g-bedroom-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-living-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "drawing-open-kitchen-closed",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {
+     "kitchen": "closed"
+    }
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "boundaries": [
+      [
+       "g-living-1",
+       "g-dining-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-staircase-1",
+       "g-living-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-drawing-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-kitchen-1",
+       "partition",
+       "kitchen-closed"
+      ],
+      [
+       "g-bedroom-1",
+       "g-staircase-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-bathroom-1",
+       "g-kitchen-1",
+       "partition",
+       "hygiene"
+      ],
+      [
+       "g-bedroom-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-living-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "drawing-separate-kitchen-open",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {
+     "drawingRoom": "separate"
+    }
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "boundaries": [
+      [
+       "g-living-1",
+       "g-dining-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-staircase-1",
+       "g-living-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-drawing-1",
+       "partition",
+       "drawing-separate"
+      ],
+      [
+       "g-dining-1",
+       "g-kitchen-1",
+       "open",
+       "kitchen-open"
+      ],
+      [
+       "g-bedroom-1",
+       "g-staircase-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-bathroom-1",
+       "g-kitchen-1",
+       "partition",
+       "hygiene"
+      ],
+      [
+       "g-bedroom-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-living-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "name": "drawing-separate-kitchen-closed",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-dining-1",
+        "use": "dining",
+        "regions": [
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {
+     "drawingRoom": "separate",
+     "kitchen": "closed"
+    }
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "boundaries": [
+      [
+       "g-living-1",
+       "g-dining-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-staircase-1",
+       "g-living-1",
+       "open",
+       "open-plan"
+      ],
+      [
+       "g-dining-1",
+       "g-drawing-1",
+       "partition",
+       "drawing-separate"
+      ],
+      [
+       "g-dining-1",
+       "g-kitchen-1",
+       "partition",
+       "kitchen-closed"
+      ],
+      [
+       "g-bedroom-1",
+       "g-staircase-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-bathroom-1",
+       "g-kitchen-1",
+       "partition",
+       "hygiene"
+      ],
+      [
+       "g-bedroom-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ],
+      [
+       "g-living-1",
+       "g-bathroom-1",
+       "partition",
+       "privacy"
+      ]
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -67,3 +67,51 @@
   .compass-action-strip button { gap: 6px !important; }
   .compass-room-menu { gap: 14px; }
 }
+
+/* Refine: one cell as two equal halves, road below (docs/compass-refine/IMPLEMENTATION_PLAN.md §5).
+   The halves are separated by more than the gaze focus keep-zone (30 px); every footer target is >= 104 px. */
+.compass-refine-focus { position: fixed; inset: 0; z-index: 5200; display: flex; flex-direction: column; background: var(--ui-page); color: var(--ui-ink); padding: clamp(16px, 2vh, 24px) clamp(24px, 3vw, 48px) var(--compass-bottom-clearance); box-sizing: border-box; gap: clamp(10px, 1.4vh, 18px); font-family: var(--ui-font); }
+.compass-refine-focus * { box-sizing: border-box; }
+.refine-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-shrink: 0; }
+.refine-header h1 { font-size: clamp(24px, 3vh, 34px); font-weight: 650; margin: 0 0 6px; line-height: 1.25; letter-spacing: -.01em; }
+.refine-header p { margin: 0; color: var(--ui-muted); font-size: clamp(16px, 1.9vh, 21px); }
+.refine-thumb { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.refine-thumb-grid { display: grid; grid-template-columns: repeat(4, clamp(16px, 2.3vh, 28px)); grid-auto-rows: clamp(16px, 2.3vh, 28px); gap: 2px; padding: 3px; background: var(--ui-border); border-radius: 6px; }
+.refine-thumb-cell { display: flex; gap: 1px; background: var(--ui-border); border-radius: 2px; overflow: hidden; }
+.refine-thumb-cell b { flex: 1; background: var(--ui-surface); }
+.refine-thumb-cell[data-focus='true'] { outline: 3px solid var(--ui-accent-ink); outline-offset: 1px; }
+.refine-thumb-road { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: var(--ui-muted); }
+.refine-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.refine-halves { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(40px, 4vw, 72px) minmax(0, 1fr); }
+.refine-gap { pointer-events: none; }
+.refine-halves .refine-half { width: 100% !important; height: 100% !important; min-width: 80px !important; min-height: 80px !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 1.6vh, 18px); border: 2px solid var(--ui-border) !important; border-radius: 18px !important; color: var(--ui-ink) !important; box-shadow: none !important; padding: 16px !important; }
+.refine-halves .refine-half:not([style]) { background: var(--ui-surface) !important; }
+/* GazeButton wraps its children in one block: lay that out as the centred column. */
+.refine-halves .refine-half > div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 1.6vh, 18px); text-align: center; }
+.refine-halves .refine-half:hover { border-color: var(--ui-accent-ink) !important; }
+.refine-half-side { font-size: clamp(16px, 2vh, 22px); letter-spacing: .12em; color: var(--ui-muted); font-weight: 700; }
+.refine-half-owner { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: clamp(26px, 3.6vh, 42px); font-weight: 650; text-align: center; line-height: 1.2; }
+.refine-half-owner i { width: 20px; height: 20px; border-radius: 6px; display: inline-block; flex-shrink: 0; }
+.refine-half-size { font-size: clamp(18px, 2.2vh, 26px); color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.refine-half-below { font-size: clamp(16px, 1.9vh, 21px); color: var(--ui-muted); }
+.refine-road { flex-shrink: 0; text-align: center; padding: 6px; border-radius: 0 0 12px 12px; background: var(--ui-panel); border: 1px solid var(--ui-border); font-weight: 700; letter-spacing: .12em; color: var(--ui-muted); font-size: clamp(14px, 1.6vh, 18px); }
+.refine-question { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(16px, 2.4vh, 28px); }
+.refine-question p { text-align: center; font-size: clamp(22px, 3vh, 32px); line-height: 1.4; margin: 0 auto; max-width: 1100px; }
+.refine-question-answers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+.refine-question-answers button { width: 100% !important; min-width: 80px !important; min-height: clamp(104px, 16vh, 180px) !important; height: auto !important; font-size: clamp(21px, 2.6vh, 30px) !important; border: 1px solid var(--ui-border) !important; border-radius: 16px !important; background: var(--ui-surface) !important; color: var(--ui-ink) !important; padding: 16px !important; box-shadow: none !important; }
+.refine-message { margin: 0; min-height: 1.35em; text-align: center; font-size: clamp(16px, 2vh, 22px); line-height: 1.35; color: var(--ui-ink); flex-shrink: 0; }
+.refine-footer { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 1.5vw, 24px); flex-shrink: 0; }
+.refine-footer button { width: 100% !important; min-width: 80px !important; height: clamp(104px, 12vh, 136px) !important; min-height: 104px !important; padding: 12px 20px !important; color: var(--ui-ink) !important; background: var(--ui-surface) !important; border: 1px solid var(--ui-border) !important; border-radius: 14px !important; font-size: clamp(17px, 2vh, 23px) !important; box-shadow: none !important; }
+.refine-footer button:disabled { opacity: 1 !important; color: var(--ui-muted) !important; border-style: dashed !important; background: var(--ui-page) !important; }
+.refine-footer button[aria-pressed='true'] { background: var(--ui-selected) !important; }
+.compass-room-status[data-fit='no'] { color: var(--ui-ink) !important; font-weight: 700; }
+
+/* Divided cells on the map: two halves inside the cell's one gaze target, a line between different rooms. */
+.split-cell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; box-sizing: border-box; font-family: var(--ui-font); }
+.split-cell > div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 4px; min-width: 0; text-align: center; }
+.split-cell > div > span:first-child { font-size: clamp(13px, 1.8vh, 21px); font-weight: 650; color: var(--ui-ink); line-height: 1.15; overflow-wrap: anywhere; }
+.split-cell > div > span + span { font-size: clamp(10px, 1.25vh, 14px); font-weight: 650; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.split-cell > i { position: absolute; top: 6%; bottom: 6%; left: 50%; width: 0; border-left: 2px solid var(--ui-ink); transform: translateX(-1px); pointer-events: none; }
+.split-cell[data-same='true'] > i { border-left: 1.5px dashed var(--ui-muted); }
+/* Refine: every cell is a target for dividing, shown by a dashed line inside it, drawn over the cell's face. */
+.compass-cell-grid > button.compass-cell-refine::after { content: ''; position: absolute; inset: 5px; border: 2px dashed var(--ui-accent-ink); border-radius: 8px; pointer-events: none; z-index: 20; }

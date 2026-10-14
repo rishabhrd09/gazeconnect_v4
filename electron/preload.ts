@@ -66,9 +66,18 @@ const api = {
     beat: (frameLagMs: number) => ipcRenderer.send('health:beat', Number(frameLagMs) || 0),
   },
 
+  // Feature switches read once at start. GAZECONNECT_COMPASS_V2=0 returns the Compass map to the
+  // earlier studio (no Refine) without touching saved drafts (docs/compass-refine/IMPLEMENTATION_PLAN.md §10).
+  features: {
+    compassV2: (() => { try { return process.env.GAZECONNECT_COMPASS_V2 !== '0'; } catch { return true; } })(),
+  },
+
   floorplan: {
     ensureServer: () => ipcRenderer.invoke('floorplan:ensure-server'),
     request: (input: { endpoint: string; body?: string }) => ipcRenderer.invoke('floorplan:request', input),
+    // Gaze-safe download: the app names the file and writes it to Documents\GazeConnect Plans\<date>.
+    save: (input: { endpoint: string; body: string; fileName: string }) => ipcRenderer.invoke('floorplan:save', input),
+    resources: () => ipcRenderer.invoke('floorplan:resources'),
   },
 
   // Settings persistence

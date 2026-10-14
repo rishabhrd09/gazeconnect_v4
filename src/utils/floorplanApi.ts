@@ -17,6 +17,8 @@ const runtimeApiBase =
 
 const API_BASE = runtimeApiBase || 'http://127.0.0.1:5050';
 let floorplanBootPromise: Promise<void> | null = null;
+/** False when the app's service did not answer its readiness check (electron/floorplanService.ts). */
+let floorplanReady = true;
 
 // The packaged renderer uses file:// and has no web origin. Let the main
 // process call only its fixed loopback API; do not allow null origins or disable CORS.
@@ -40,12 +42,12 @@ async function ensureFloorplanServerReady(): Promise<void> {
     try {
       const api = (window as any).electronAPI;
       if (api?.floorplan?.ensureServer) {
-        await api.floorplan.ensureServer();
-        // Give the spawned process a short warm-up window.
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        // Main resolves once the service answers /api/health (150 ms steps, up to 25 s),
+        // so a cold first request no longer races the process start.
+        floorplanReady = (await api.floorplan.ensureServer()) !== false;
       }
     } catch {
-      // Backend health checks and request retries handle readiness errors.
+      floorplanReady = false;
     } finally {
       floorplanBootPromise = null;
     }
@@ -377,8 +379,9 @@ export function compileCompassPayload(
 ): CompassMapPayload {
   const pw = foundation.plotWidth || 40;
   const pd = foundation.plotDepth || 60;
-  const cellW = Math.round(pw / gridCols);
-  const cellD = Math.round(pd / gridRows);
+  // Exact: a 30 ft plot has 7.5 ft cells. Rounding here once reported 8 ft.
+  const cellW = pw / gridCols;
+  const cellD = pd / gridRows;
 
   const mkPlacements = (pls: any[]): PlacementEntry[] =>
     pls.map((p, index) => ({
@@ -483,6 +486,10 @@ export interface CompassPlanOption {
 async function compassRequest(endpoint: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   await ensureFloorplanServerReady();
   signal?.throwIfAborted();
+  if (!floorplanReady) {
+    floorplanReady = true;   // The next request checks again.
+    throw new Error('The floor plan service did not start. Please try again in a moment.');
+  }
   const timeout = new AbortController();
   const abort = () => timeout.abort();
   signal?.addEventListener('abort', abort, { once: true });
@@ -539,4 +546,130 @@ export async function renderCompassPlan(compassData: CompassMapPayload, options:
 }, signal?: AbortSignal): Promise<Blob> {
   const response = await compassRequest('/api/floorplan/compass/render', { compass_map: compassData, ...options }, signal);
   return response.blob();
+}
+
+// ─── Compass studio, version 2 (docs/compass-refine/IMPLEMENTATION_PLAN.md §6, §8.2) ──────────
+// One PlanModel per plan; three views (Plan, Top view, Outside) and honest exports drawn from it.
+// Every request carries a job id: the service runs the newest request of each channel and answers
+// a replaced one with 409, which these helpers return as null (the studio simply ignores it).
+
+export type StudioView = 'plan' | 'top' | 'outside';
+export type OutsidePreset = 'front-left' | 'front-right' | 'back-left' | 'back-right';
+export interface StudioRoom {
+  id: string; use: string; label: string; zone: string; regions: string[];
+  areaSqft: number; clearSqft: number | null; clear: [number, number] | null; doubleHeight: boolean;
+}
+export interface StudioNote {
+  code: string; severity: 'info' | 'warning' | 'conflict' | 'infeasible'; message: string;
+  rooms: string[]; regions: string[]; floor?: 'ground' | 'first';
+  adjustment?: { action: string; text?: string; [key: string]: unknown };
+}
+export interface CompassModelSummary {
+  modelHash: string;
+  plot: { widthIn: number; depthIn: number; facing: string; gate: string; plotType: string; widthFt: number; depthFt: number };
+  storeys: 1 | 2;
+  floors: Partial<Record<'ground' | 'first', { rooms: StudioRoom[]; doors: number; windows: number; stair: boolean; reached: string[] }>>;
+  notes: StudioNote[];
+  checks: Record<string, boolean>;
+  notices: string[];
+  floorsDrawn: Array<'ground' | 'first'>;
+}
+export interface StudioRenderOptions {
+  view: StudioView | 'sheet' | 'cad';
+  floor: 'ground' | 'first';
+  format: 'png' | 'pdf' | 'dxf-in' | 'dxf-mm' | 'readme';
+  theme: string;
+  preset?: OutsidePreset;
+  width?: number;
+  height?: number;
+  export?: boolean;
+  /** A light machine (electron/floorplanService.ts resources): downloads are drawn without supersampling. */
+  light?: boolean;
+}
+
+let studioJobCounter = 0;
+export function nextStudioJobId(): string {
+  studioJobCounter += 1;
+  return `s${Date.now().toString(36)}-${studioJobCounter}`;
+}
+
+async function studioRequest(endpoint: string, body: unknown, signal?: AbortSignal): Promise<Response | null> {
+  await ensureFloorplanServerReady();
+  signal?.throwIfAborted();
+  if (!floorplanReady) {
+    floorplanReady = true;
+    throw new Error('The floor plan service did not start. Please try again in a moment.');
+  }
+  const timeout = new AbortController();
+  const abort = () => timeout.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  // The service's own deadlines end a stuck view well before this (and Electron's 35 s watchdog).
+  const timer = setTimeout(abort, 40000);
+  try {
+    const request = () => new Promise<Response>((resolve, reject) => {
+      const cancel = () => reject(new DOMException('Plan request cancelled', 'AbortError'));
+      timeout.signal.addEventListener('abort', cancel, { once: true });
+      floorplanFetch(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: timeout.signal,
+      }).then(resolve, reject).finally(() => timeout.signal.removeEventListener('abort', cancel));
+    });
+    const response = await request();
+    signal?.throwIfAborted();
+    if (response.status === 409) {
+      await response.body?.cancel();
+      return null;                                 // Replaced by a newer request: nothing to show.
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'The plan could not be drawn. Please try again.');
+    }
+    return response;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof TypeError) throw new Error('The floor plan service is unavailable. Please try again in a moment.');
+    if (timeout.signal.aborted) throw new Error('The floor plan service took too long. Please try again.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+  }
+}
+
+export async function getCompassModel(plan: unknown, signal?: AbortSignal, jobId = nextStudioJobId()): Promise<CompassModelSummary | null> {
+  const response = await studioRequest('/api/floorplan/compass/v2/model', { plan, jobId }, signal);
+  return response ? response.json() : null;
+}
+
+export async function renderCompassView(plan: unknown, options: StudioRenderOptions, signal?: AbortSignal,
+  jobId = nextStudioJobId()): Promise<Blob | null> {
+  const response = await studioRequest('/api/floorplan/compass/v2/render', { plan, jobId, ...options }, signal);
+  return response ? response.blob() : null;
+}
+
+export interface SaveOutcome { ok: boolean; folder?: string; file?: string; place?: 'Documents' | 'Downloads'; error?: string; }
+
+/** Saves one drawing without a Save dialog (Electron writes it to Documents\GazeConnect Plans\<date>). */
+export async function saveCompassFile(plan: unknown, options: StudioRenderOptions, fileName: string): Promise<SaveOutcome> {
+  const save = (window as any).electronAPI?.floorplan?.save;
+  const body = JSON.stringify({ plan, jobId: nextStudioJobId(), ...options, export: true });
+  if (save) return save({ endpoint: '/api/floorplan/compass/v2/render', body, fileName });
+  // Browser preview (no Electron): the browser's own download.
+  const response = await studioRequest('/api/floorplan/compass/v2/render', JSON.parse(body));
+  if (!response) return { ok: false, error: 'A newer download replaced this one.' };
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url; link.download = fileName;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  return { ok: true };
+}
+
+export interface FloorplanResources { totalMb: number; availableMb: number; floorMb: number; light: boolean; exterior: boolean; }
+
+/** Memory for the heavier views (electron/floorplanService.ts); null outside Electron. */
+export async function getFloorplanResources(): Promise<FloorplanResources | null> {
+  const query = (window as any).electronAPI?.floorplan?.resources;
+  if (!query) return null;
+  try { return await query(); } catch { return null; }
 }

@@ -1,0 +1,365 @@
+{
+ "id": "F7",
+ "title": "Stair core: aligned, misaligned, too small, with dining",
+ "cases": [
+  {
+   "name": "aligned",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c2",
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1",
+         "r3_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r3_c2",
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1",
+         "r3_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "stair": "aligned"
+    }
+   }
+  },
+  {
+   "name": "misaligned",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c2",
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1",
+         "r3_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r3_c2",
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c4"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "stair": "misaligned",
+     "notes": [
+      "stair-misaligned"
+     ]
+    }
+   }
+  },
+  {
+   "name": "host-too-small",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 240,
+     "depthIn": 360,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "stair": "none",
+     "notes": [
+      "stair-no-fit"
+     ]
+    }
+   }
+  },
+  {
+   "name": "dining-and-stair",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-diningStaircase-1",
+        "use": "diningStaircase",
+        "regions": [
+         "r2_c2",
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "kernel": {
+     "stair": "ground-only"
+    }
+   }
+  }
+ ]
+}

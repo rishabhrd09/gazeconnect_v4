@@ -14,7 +14,8 @@ import { app, BrowserWindow, BrowserView, ipcMain, Tray, Menu, screen, nativeIma
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
-import { requestFloorplan, type FloorplanRequest } from './floorplanTransport';
+import { type FloorplanRequest } from './floorplanTransport';
+import { FloorplanService, fromMainWindow, type SaveRequest } from './floorplanService';
 import { browserDiagnostics } from './browser/browserDiagnostics';
 import {
   BROWSER_CURSOR_CSS,
@@ -64,7 +65,6 @@ installStdioGuard(() => {
 
 let mainWindow: BrowserWindow | null = null;
 let pythonProcess: ChildProcess | null = null;
-let floorplanProcess: ChildProcess | null = null;
 let tobiiProcess: ChildProcess | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
@@ -177,6 +177,7 @@ const health = new HealthRecorder(
       oldestKind: work.oldestKind(now) || undefined,
     };
   },
+  () => floorplanService.healthSnapshot(),
 );
 let pageScrollInFlight = false;
 const blockedNoticeAt = new Map<string, number>();
@@ -1408,71 +1409,18 @@ function stopPythonBackend(): void {
   }
 }
 
-function startFloorplanServer(): void {
-  if (isQuitting || floorplanProcess) return;
-
-  const isDev = !app.isPackaged;
-  let command: string;
-  let args: string[];
-
-  if (isDev) {
-    const venvPython = path.join(__dirname, '..', 'python', '.venv',
-      ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
-    command = fs.existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3');
-    const scriptPath = path.join(__dirname, '..', 'tools', 'floorplan_server.py');
-    if (!fs.existsSync(scriptPath)) {
-      console.warn(`Floor plan server script not found at: ${scriptPath}`);
-      return;
-    }
-    args = [scriptPath];
-  } else {
-    command = path.join(process.resourcesPath, 'python', 'floorplan', 'GazeConnectFloorplan.exe');
-    if (!fs.existsSync(command)) {
-      console.error('Floor plan server is missing from the installed bundle.');
-      return;
-    }
-    args = [];
-  }
-
-  console.log(`Starting floor plan server: ${command} ${args.join(' ')}`);
-
-  const startedAt = Date.now();
-  floorplanProcess = spawn(command, args, {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, FLOORPLAN_PORT: process.env.FLOORPLAN_PORT || '5050' },
-    windowsHide: true,
-  });
-
-  if (floorplanProcess.stdout) {
-    floorplanProcess.stdout.on('data', (data) => {
-      console.log(`[FloorPlan] ${data.toString().trim()}`);
-    });
-  }
-
-  if (floorplanProcess.stderr) {
-    floorplanProcess.stderr.on('data', (data) => {
-      console.error(`[FloorPlan Error] ${data.toString().trim()}`);
-    });
-  }
-
-  floorplanProcess.on('close', (code) => {
-    console.log(`Floor plan server exited with code ${code}`);
-    floorplanProcess = null;
-    scheduleRuntimeRetry('floorplan', startFloorplanServer, startedAt);
-  });
-
-  floorplanProcess.on('error', (err) => {
-    console.error('Failed to start floor plan server:', err);
-    floorplanProcess = null;
-  });
-}
+// The floor-plan service (floorplanService.ts): started lazily by the Compass studio, ends with
+// the app (--parent-pid) or after ten idle minutes, and is replaced if a drawing gets stuck.
+const floorplanService = new FloorplanService({
+  isQuitting: () => isQuitting,
+  kill: (child) => killProcessTree(child),
+  retry: (restart, startedAt) => scheduleRuntimeRetry('floorplan', restart, startedAt),
+  event: (name, data) => health.event(name, data),
+  port: () => Number(process.env.FLOORPLAN_PORT) || 5050,
+});
 
 function stopFloorplanServer(): void {
-  if (floorplanProcess) {
-    console.log('Stopping floor plan server...');
-    killProcessTree(floorplanProcess);
-    floorplanProcess = null;
-  }
+  floorplanService.stop();
 }
 
 // ============================================
@@ -1957,18 +1905,26 @@ function setupIpcHandlers(): void {
     return true;
   });
 
-  ipcMain.handle('floorplan:ensure-server', () => {
-    if (!floorplanProcess) {
-      startFloorplanServer();
-    }
-    return true;
+  // Resolves true once the service answers /api/health (no fixed warm-up pause).
+  ipcMain.handle('floorplan:ensure-server', (event) => {
+    if (!fromMainWindow(event, mainWindow)) throw new Error('Floor-plan requests are only available to the main app.');
+    return floorplanService.ensureReady();
   });
 
   ipcMain.handle('floorplan:request', (event, input: FloorplanRequest) => {
-    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
-      throw new Error('Floor-plan requests are only available to the main app.');
-    }
-    return requestFloorplan(input, Number(process.env.FLOORPLAN_PORT) || 5050);
+    if (!fromMainWindow(event, mainWindow)) throw new Error('Floor-plan requests are only available to the main app.');
+    return floorplanService.request(input);
+  });
+
+  // Gaze-safe download: the service draws the file and main writes it to Documents\GazeConnect Plans.
+  ipcMain.handle('floorplan:save', (event, input: SaveRequest) => {
+    if (!fromMainWindow(event, mainWindow)) throw new Error('Floor-plan requests are only available to the main app.');
+    return floorplanService.save(input);
+  });
+
+  ipcMain.handle('floorplan:resources', (event) => {
+    if (!fromMainWindow(event, mainWindow)) throw new Error('Floor-plan requests are only available to the main app.');
+    return floorplanService.resources();
   });
 
   // Stream app context

@@ -1,0 +1,31 @@
+{
+  "name": "C2 look-development house: open plan + double-height living",
+  "note": "40 x 60 ft plot, North-facing, gate Left, G+1, cells 10 x 15 ft, house in rows 2-3. Ground floor: stair hall, living hall, dining and kitchen form one open space (no walls); drawing room, bedroom and bathroom are enclosed. Living hall is double height over r2_c3 (first-floor void).",
+  "plot": {"width_ft": 40, "depth_ft": 60, "facing": "North", "gate": "Left", "type": "Middle Plot"},
+  "ground": [
+    {"gc": "porch", "label": "Outer Lobby / Porch / Open Area", "cells": ["r1_c1"]},
+    {"gc": "lawn", "label": "Lawn / Garden", "cells": ["r1_c2", "r1_c3", "r1_c4"]},
+    {"gc": "staircase", "label": "Living Lobby + Staircase", "cells": ["r2_c1"]},
+    {"gc": "living", "label": "Living Hall", "cells": ["r2_c2", "r2_c3"]},
+    {"gc": "drawing", "label": "Drawing Room", "cells": ["r2_c4"]},
+    {"gc": "bedroom", "label": "Bedroom", "cells": ["r3_c1"]},
+    {"gc": "bathroom", "label": "Bathroom", "cells": ["r3_c2"]},
+    {"gc": "dining", "label": "Dining Hall", "cells": ["r3_c3"]},
+    {"gc": "kitchen", "label": "Kitchen + Store", "cells": ["r3_c4"]},
+    {"gc": "backyard", "label": "Backyard", "cells": ["r4_c1", "r4_c2", "r4_c3", "r4_c4"]}
+  ],
+  "first": [
+    {"gc": "ff_stairLanding", "label": "1F Stair Landing", "cells": ["r2_c1"]},
+    {"gc": "ff_living", "label": "1F Family Lounge", "cells": ["r2_c2"]},
+    {"gc": "ff_terrace", "label": "1F Open Terrace", "cells": ["r2_c4"]},
+    {"gc": "ff_bathroom", "label": "1F Bathroom", "cells": ["r3_c1"]},
+    {"gc": "ff_master", "label": "1F Master Bedroom", "cells": ["r3_c2", "r3_c3", "r3_c4"]}
+  ],
+  "void_first": ["r2_c3"],
+  "open_plan": ["stair", "living", "dining", "kitchen"],
+  "doors": {
+    "ground": [["porch", "staircase", "main"], ["staircase", "bedroom"], ["living", "drawing"], ["dining", "bathroom"], ["kitchen", "backyard"]],
+    "first": [["ff_stairLanding", "ff_bathroom"], ["ff_living", "ff_master"], ["ff_master", "ff_terrace"]]
+  },
+  "rails_first": [["ff_living", "void"]]
+}

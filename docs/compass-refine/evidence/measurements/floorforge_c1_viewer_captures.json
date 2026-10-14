@@ -1,0 +1,137 @@
+{
+ "backend": "gpu",
+ "views": {
+  "ff_hero": {
+   "ms_including_settle": 2842,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 39,
+   "browser_tree_mb": 634
+  },
+  "ff_corner_front_left": {
+   "ms_including_settle": 2765,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 77,
+   "browser_tree_mb": 655
+  },
+  "ff_corner_front_right": {
+   "ms_including_settle": 2748,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 83,
+   "browser_tree_mb": 681
+  },
+  "ff_corner_back_right": {
+   "ms_including_settle": 2781,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 40,
+   "browser_tree_mb": 641
+  },
+  "ff_corner_back_left": {
+   "ms_including_settle": 2772,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 86,
+   "browser_tree_mb": 661
+  },
+  "ff_aerial": {
+   "ms_including_settle": 2762,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 98,
+   "browser_tree_mb": 682
+  },
+  "ff_top": {
+   "ms_including_settle": 2796,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 41,
+   "browser_tree_mb": 641
+  },
+  "ff_dollhouse_ground": {
+   "ms_including_settle": 2781,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 79,
+   "browser_tree_mb": 660
+  },
+  "ff_dollhouse_first": {
+   "ms_including_settle": 2799,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 81,
+   "browser_tree_mb": 690
+  },
+  "ff_planmode_ground": {
+   "ms_including_settle": 2801,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 41,
+   "browser_tree_mb": 644
+  },
+  "ff_planmode_first": {
+   "ms_including_settle": 2796,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 188,
+   "js_heap_mb": 72,
+   "browser_tree_mb": 667
+  },
+  "ff_hero_performance": {
+   "ms_including_settle": 6458,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 153,
+   "js_heap_mb": 39,
+   "browser_tree_mb": 664
+  },
+  "ff_dollhouse_ground_performance": {
+   "ms_including_settle": 2789,
+   "calls": 1,
+   "triangles": 1,
+   "geometries": 265,
+   "textures": 153,
+   "js_heap_mb": 42,
+   "browser_tree_mb": 664
+  }
+ },
+ "memory": {
+  "after_load": {
+   "js_heap_mb": 36,
+   "browser_tree_mb": 567
+  },
+  "end": {
+   "browser_tree_mb": 697
+  }
+ },
+ "ready_ms": 588,
+ "gl": {
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+  "quality": "high"
+ },
+ "errors": []
+}

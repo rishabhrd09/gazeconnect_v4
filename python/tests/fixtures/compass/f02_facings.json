@@ -1,0 +1,12 @@
+{
+  "id": "F2",
+  "title": "One orientation table for every view and export",
+  "note": "facing = the direction the road side faces. The map always has the road at the bottom and the back at the top. 'north' is the north direction in plan coordinates (+x along the road to the right, +y away from the road). 'labels' are the map's edge labels; 'roseDegrees' is the clockwise rotation of the map's north arrow from screen-up. Shared by src/utils/compassDirections.ts, the map's compass rose, tools/compass_geometry.north_vector, every drawing and the DXF north arrow. Apply F1 under each facing: only labels, arrows and north change, never geometry.",
+  "base": "f01_asymmetric_30x50.json",
+  "facings": {
+    "South": {"north": [0, 1], "labels": {"back": "North", "left": "West", "right": "East"}, "roseDegrees": 0},
+    "East": {"north": [1, 0], "labels": {"back": "West", "left": "South", "right": "North"}, "roseDegrees": 90},
+    "North": {"north": [0, -1], "labels": {"back": "South", "left": "East", "right": "West"}, "roseDegrees": 180},
+    "West": {"north": [-1, 0], "labels": {"back": "East", "left": "North", "right": "South"}, "roseDegrees": 270}
+  }
+}

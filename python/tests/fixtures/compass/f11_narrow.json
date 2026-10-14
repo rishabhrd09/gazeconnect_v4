@@ -1,0 +1,77 @@
+{
+ "id": "F11",
+ "title": "20 ft narrow plot",
+ "cases": [
+  {
+   "name": "half-bath",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 240,
+     "depthIn": 480,
+     "facing": "South",
+     "gate": "Center",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "floors": {
+     "ground": {
+      "splits": [
+       "r3_c2"
+      ],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2.L"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c2",
+         "r1_c3"
+        ]
+       }
+      ]
+     }
+    },
+    "choices": {}
+   },
+   "expect": {
+    "issues": [],
+    "regionsIn": {
+     "r3_c2.L": [
+      60,
+      240,
+      90,
+      360
+     ]
+    },
+    "kernel": {
+     "notes": [
+      "size-short"
+     ]
+    }
+   }
+  }
+ ]
+}

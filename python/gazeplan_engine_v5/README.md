@@ -98,5 +98,5 @@ For full v5 capabilities install:
 - `shapely`
 - `networkx`
 - `squarify`
-- `ortools`
+- `ortools` (optional; not installed by setup. Without it the optimizer uses its treemap seed.)
 - `ezdxf`

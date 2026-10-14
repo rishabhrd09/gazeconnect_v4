@@ -1,5 +1,7 @@
 /** Synthetic gaze through the production dwell loop; isolated saves and socket.
- * Software verification only: this does not simulate Tobii tracking accuracy. */
+ * Software verification only: this does not simulate Tobii tracking accuracy.
+ * The original studio, kept as the fallback with the version 2 map off (gc-compass-v2 = 0, 14 Oct 2026);
+ * the Refine views and the new studio are dwelled through in check-compass-refine-dwell.cjs. */
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const draft=require('./compass-qa-draft.cjs');
@@ -9,7 +11,7 @@ let browser;
  const page=await browser.newPage({viewport:{width:1366,height:768}});page.setDefaultTimeout(15000);
  const errors=[],rows=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(state=>{
-  localStorage.setItem('compass_persistent_backup',JSON.stringify(state));
+  localStorage.setItem('compass_persistent_backup',JSON.stringify(state));localStorage.setItem('gc-compass-v2','0');
   window.qa={sample:null,clicks:[],capture:false};
   window.WebSocket=class {
    static OPEN=1;static CONNECTING=0;static CLOSED=3;

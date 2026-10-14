@@ -1,0 +1,61 @@
+{
+  "id": "F1",
+  "title": "Asymmetric two-floor house, 30 x 50 ft, North-facing, gate Left",
+  "note": "Appendix A of docs/compass-refine/IMPLEMENTATION_PLAN.md. 'v1' is the map as the app sent it before CompassPlanV2; 'plan' is the same intent in CompassPlanV2. Migrating 'v1' must give 'plan' exactly.",
+  "v1": {
+    "grid_size": {"rows": 4, "cols": 4},
+    "plot": {"width_ft": 30, "depth_ft": 50, "facing": "North", "type": "Middle Plot", "num_floors": "Multi-Floor", "gate_position": "Left"},
+    "cell_size_ft": {"width": 8, "depth": 13},
+    "ground_floor": {"placements": [
+      {"room": "Outer Lobby / Porch / Open Area", "roomId": "porch", "placementId": "g-porch", "cells": ["r1_c1"]},
+      {"room": "Living Hall", "roomId": "living", "placementId": "g-living", "cells": ["r1_c2", "r2_c2"]},
+      {"room": "Drawing Room", "roomId": "drawing", "placementId": "g-drawing", "cells": ["r1_c3", "r1_c4"]},
+      {"room": "Living Lobby + Staircase", "roomId": "staircase", "placementId": "g-staircase", "cells": ["r2_c1", "r3_c1"]},
+      {"room": "Dining Hall", "roomId": "dining", "placementId": "g-dining", "cells": ["r2_c3"]},
+      {"room": "Bathroom", "roomId": "bathroom", "placementId": "g-bathroom", "cells": ["r2_c4"]},
+      {"room": "Kitchen + Store", "roomId": "kitchen", "placementId": "g-kitchen", "cells": ["r3_c2", "r3_c3"]},
+      {"room": "Master Bedroom", "roomId": "masterBed", "placementId": "g-masterBed", "cells": ["r3_c4", "r4_c4"]},
+      {"room": "Bedroom", "roomId": "bedroom", "placementId": "g-bedroom", "cells": ["r4_c1"]},
+      {"room": "Backyard", "roomId": "backyard", "placementId": "g-backyard", "cells": ["r4_c2", "r4_c3"]}
+    ]},
+    "first_floor": {"placements": [
+      {"room": "1F Stair Landing", "roomId": "ff_stairLanding", "placementId": "f-ff_stairLanding", "cells": ["r2_c1"]},
+      {"room": "1F Living / Family", "roomId": "ff_living", "placementId": "f-ff_living", "cells": ["r2_c2", "r3_c2"]},
+      {"room": "1F Bedroom 2", "roomId": "ff_bed2", "placementId": "f-ff_bed2", "cells": ["r3_c1"]},
+      {"room": "1F Bathroom", "roomId": "ff_bathroom", "placementId": "f-ff_bathroom", "cells": ["r3_c3"]},
+      {"room": "1F Master Bedroom", "roomId": "ff_master", "placementId": "f-ff_master", "cells": ["r4_c3", "r4_c4"]},
+      {"room": "1F Balcony", "roomId": "ff_balcony", "placementId": "f-ff_balcony", "cells": ["r1_c2"]},
+      {"room": "1F Open Terrace", "roomId": "ff_terrace", "placementId": "f-ff_terrace", "cells": ["r1_c3", "r1_c4"]}
+    ]}
+  },
+  "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {"widthIn": 360, "depthIn": 600, "facing": "North", "gate": "Left", "plotType": "Middle Plot"},
+    "storeys": 2,
+    "floors": {
+      "ground": {"splits": [], "rooms": [
+        {"id": "g-backyard-1", "use": "backyard", "regions": ["r4_c2", "r4_c3"]},
+        {"id": "g-bathroom-1", "use": "bathroom", "regions": ["r2_c4"]},
+        {"id": "g-bedroom-1", "use": "bedroom", "regions": ["r4_c1"]},
+        {"id": "g-dining-1", "use": "dining", "regions": ["r2_c3"]},
+        {"id": "g-drawing-1", "use": "drawing", "regions": ["r1_c3", "r1_c4"]},
+        {"id": "g-kitchen-1", "use": "kitchen", "regions": ["r3_c2", "r3_c3"]},
+        {"id": "g-living-1", "use": "living", "regions": ["r1_c2", "r2_c2"]},
+        {"id": "g-masterBed-1", "use": "masterBed", "regions": ["r3_c4", "r4_c4"]},
+        {"id": "g-porch-1", "use": "porch", "regions": ["r1_c1"]},
+        {"id": "g-staircase-1", "use": "staircase", "regions": ["r2_c1", "r3_c1"]}
+      ]},
+      "first": {"splits": [], "rooms": [
+        {"id": "f-ff_balcony-1", "use": "ff_balcony", "regions": ["r1_c2"]},
+        {"id": "f-ff_bathroom-1", "use": "ff_bathroom", "regions": ["r3_c3"]},
+        {"id": "f-ff_bed2-1", "use": "ff_bed2", "regions": ["r3_c1"]},
+        {"id": "f-ff_living-1", "use": "ff_living", "regions": ["r2_c2", "r3_c2"]},
+        {"id": "f-ff_master-1", "use": "ff_master", "regions": ["r4_c3", "r4_c4"]},
+        {"id": "f-ff_stairLanding-1", "use": "ff_stairLanding", "regions": ["r2_c1"]},
+        {"id": "f-ff_terrace-1", "use": "ff_terrace", "regions": ["r1_c3", "r1_c4"]}
+      ]}
+    },
+    "choices": {}
+  }
+}

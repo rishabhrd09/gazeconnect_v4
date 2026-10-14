@@ -3,7 +3,8 @@
  * Papa watched YouTube and came back by itself only after a long wait).
  *
  * Every SAMPLE_MS one line of JSON: memory and CPU of each process (main, interface, page, GPU,
- * the rest), the computer's available and committed memory, the main process's worst event-loop
+ * the rest; the floor-plan service by its own report while it runs), the computer's available
+ * and committed memory, the main process's worst event-loop
  * delay, the interface's heartbeat and frame delay, and the page's oldest unanswered script.
  * Events (a stuck page, a page rebuilt, a process gone, a stall) are written as they happen.
  * After a freeze the lines before it say which part stopped first; a gap between lines is the
@@ -63,6 +64,8 @@ export class HealthRecorder {
   constructor(
     private readonly roles: () => Roles,
     private readonly page: () => PageHealth,
+    /** The floor-plan service's own report (floorplanService.ts), only while it runs. */
+    private readonly floorplan: () => Record<string, unknown> | null = () => null,
   ) {}
 
   start(): void {
@@ -155,6 +158,7 @@ export class HealthRecorder {
           commitLimitMb: system.swapTotal ? mb(system.swapTotal) : null,
         },
         page: this.page(),
+        ...((floorplan) => (floorplan ? { floorplan } : {}))(this.floorplan()),
       });
       this.maxLagMs = 0;
       this.uiLagMs = 0;

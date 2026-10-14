@@ -390,6 +390,36 @@ def _coverage_issue(
     return None
 
 
+def _room_fits(geometry: List[Dict[str, float]], short_min: float, long_min: float) -> bool:
+    """Whether one rectangle inside the whole room (not inside one cell) meets both sizes.
+
+    A two-cell room 7'-6" x 25'-0" made of two 7'-6" x 12'-6" cells is judged by its
+    7'-6" x 25'-0" body. Coordinates are compressed to the room's own edges, and a
+    prefix sum answers "is this rectangle all room?" in constant time.
+    """
+    xs = sorted({r[k] for r in geometry for k in ("x1", "x2")})
+    ys = sorted({r[k] for r in geometry for k in ("y1", "y2")})
+    nx, ny = len(xs) - 1, len(ys) - 1
+    covered = [[any(r["x1"] < (xs[i] + xs[i + 1]) / 2 < r["x2"] and r["y1"] < (ys[j] + ys[j + 1]) / 2 < r["y2"]
+                    for r in geometry) for j in range(ny)] for i in range(nx)]
+    prefix = [[0] * (ny + 1) for _ in range(nx + 1)]
+    for i in range(nx):
+        for j in range(ny):
+            prefix[i + 1][j + 1] = covered[i][j] + prefix[i][j + 1] + prefix[i + 1][j] - prefix[i][j]
+    for i1 in range(nx):
+        for i2 in range(i1 + 1, nx + 1):
+            width = xs[i2] - xs[i1]
+            for j1 in range(ny):
+                for j2 in range(j1 + 1, ny + 1):
+                    cells = prefix[i2][j2] - prefix[i1][j2] - prefix[i2][j1] + prefix[i1][j1]
+                    if cells != (i2 - i1) * (j2 - j1):
+                        break  # Taller rectangles from this row keep the same hole.
+                    depth = ys[j2] - ys[j1]
+                    if min(width, depth) >= short_min - 1e-5 and max(width, depth) >= long_min - 1e-5:
+                        return True
+    return False
+
+
 def _door_issues(floor: str, floor_obj: Dict[str, Any], plot: Dict[str, Any]) -> List[str]:
     by_id = {p["placementId"]: p for p in floor_obj["placements"]}
     problems: List[str] = []
@@ -550,13 +580,21 @@ def _access_route(compass_map: Dict[str, Any], floor: str) -> Tuple[List[str], L
 
 
 def _validate(compass_map: Dict[str, Any]) -> Dict[str, Any]:
+    """Geometry first, then access; room-size targets are reported separately.
+
+    `issues` that are geometry (overlaps, gaps, cells outside the plot) block doors.
+    `shortfalls` (a room below its preliminary size target) never do: the map still
+    has real doors and a real route, and the notes say which room is small.
+    """
     issues: List[str] = []
+    shortfalls: List[str] = []
     warnings: List[str] = []
     plot = compass_map["plot"]
     width, depth = float(plot["width_ft"]), float(plot["depth_ft"])
     rows, cols = compass_map["grid_size"]["rows"], compass_map["grid_size"]["cols"]
     area_by_floor: Dict[str, float] = {}
     access_by_floor: Dict[str, Any] = {}
+    geometry_valid = True
     stair_rects: Dict[str, List[Dict[str, float]]] = {}
     for floor in _FLOORS:
         floor_obj = compass_map.get(floor)
@@ -565,6 +603,7 @@ def _validate(compass_map: Dict[str, Any]) -> Dict[str, Any]:
         rect_entries: List[Tuple[str, Dict[str, float]]] = []
         occupied_cells = set(_cell_owners(floor_obj))
         stair_rects[floor] = []
+        floor_start = len(issues)
         for p in floor_obj["placements"]:
             pid = p["placementId"]
             geometry = p["geometryRects"]
@@ -595,13 +634,10 @@ def _validate(compass_map: Dict[str, Any]) -> Dict[str, Any]:
             if kind not in _OUTDOOR:
                 req = get_nbc_requirements(kind)
                 if area + 1e-5 < req["min_area_sqft"]:
-                    issues.append(f"{pid}: {area:.1f} sq ft is below the preliminary {kind} area target of {req['min_area_sqft']:.1f} sq ft.")
-                if not any(
-                    r["x2"] - r["x1"] >= req["min_width_ft"] - 1e-5
-                    and r["y2"] - r["y1"] >= req["min_depth_ft"] - 1e-5
-                    for r in geometry
-                ):
-                    issues.append(f"{pid}: no uninterrupted rectangle meets the preliminary width/depth target.")
+                    shortfalls.append(f"{pid}: {area:.1f} sq ft is below the preliminary {kind} area target of {req['min_area_sqft']:.1f} sq ft.")
+                sizes = (req["min_width_ft"], req["min_depth_ft"])
+                if geometry and not _room_fits(geometry, min(sizes), max(sizes)):
+                    shortfalls.append(f"{pid}: no uninterrupted rectangle meets the preliminary width/depth target.")
             # Multiple cells of one room must form one edge-connected polygon.
             visited = {0}
             queue = deque([0])
@@ -636,8 +672,12 @@ def _validate(compass_map: Dict[str, Any]) -> Dict[str, Any]:
             issues.append(f"{floor}: {coverage_problem}")
         if empty_rects:
             warnings.append(f"{floor}: {len(empty_rects)} compass cells remain unassigned and are not assumed to be corridors.")
-        # Invalid geometry should not be passed to access/wall construction.
-        if not issues:
+        # Invalid geometry should not be passed to access/wall construction, and
+        # doors carried in from an earlier layout must not outlive it.
+        if len(issues) > floor_start:
+            geometry_valid = False
+            floor_obj.pop("doorOpenings", None)
+        else:
             access_issues, doors, access = _access_route(compass_map, floor)
             issues.extend(access_issues)
             floor_obj["doorOpenings"] = doors
@@ -667,8 +707,10 @@ def _validate(compass_map: Dict[str, Any]) -> Dict[str, Any]:
             ):
                 issues.append("Ground-floor stairs and first-floor landing have no common 3 × 6 ft footprint for a preliminary stair opening.")
     return {
-        "valid": not issues,
-        "issues": list(dict.fromkeys(issues)),
+        "valid": not issues and not shortfalls,
+        "geometry_valid": geometry_valid,
+        "issues": list(dict.fromkeys(issues + shortfalls)),
+        "shortfalls": list(dict.fromkeys(shortfalls)),
         "warnings": warnings,
         "preliminary_only": True,
         "access": access_by_floor,

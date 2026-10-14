@@ -9,25 +9,21 @@ def self_test():
     import cairo
     import ezdxf
     import shapely
-    from ortools.sat.python import cp_model
-    from floorplan_server import app, HAS_V5
+    from floorplan_server import app
 
-    if not HAS_V5:
-        raise RuntimeError("Bundled v5 floor-plan engine failed to import")
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 8, 8)
     output = io.BytesIO()
     surface.write_to_png(output)
     if not output.getvalue().startswith(b"\x89PNG"):
         raise RuntimeError("Cairo PNG render failed")
-    model = cp_model.CpModel()
-    value = model.NewIntVar(1, 1, "value")
-    solver = cp_model.CpSolver()
-    if solver.Solve(model) != cp_model.OPTIMAL or solver.Value(value) != 1:
-        raise RuntimeError("Bundled constraint solver failed")
-    if app.test_client().get("/api/health").status_code != 200:
+    health = app.test_client().get("/api/health")
+    if health.status_code != 200 or health.get_json().get("status") != "ok":
         raise RuntimeError("Floor-plan health route failed")
+    if "ortools" in sys.modules or "pandas" in sys.modules:
+        raise RuntimeError("The floor-plan service must not load OR-Tools or pandas")
     compass_self_test()
-    print(json.dumps({"self_test": "passed", "renderer": "Cairo", "solver": "loaded"}))
+    compass_v2_self_test()
+    print(json.dumps({"self_test": "passed", "renderer": "Cairo", "memory": health.get_json().get("memory")}))
 
 
 def compass_self_test():
@@ -60,11 +56,51 @@ def compass_self_test():
         raise RuntimeError('Bundled Compass room view failed')
 
 
+def compass_v2_self_test():
+    """The version 2 studio (14 Oct 2026): a plan with a divided cell, drawn every way the studio offers.
+    Also proves the bundled plan fonts are found (tools/assets/fonts, packed as compass_fonts)."""
+    import compass_text
+    from floorplan_server import app
+
+    fonts = compass_text._font_dir()
+    for name in ("AtkinsonHyperlegibleNext-Regular.ttf", "AtkinsonHyperlegibleNext-Bold.ttf"):
+        if not (fonts / name).is_file():
+            raise RuntimeError(f"Bundled plan font missing: {fonts / name}")
+    plan = {
+        "schema": "gazeconnect.compass-plan", "version": 2,
+        "plot": {"widthIn": 480, "depthIn": 720, "facing": "South", "gate": "Center", "plotType": "Middle Plot"},
+        "storeys": 1, "choices": {},
+        "floors": {"ground": {"splits": ["r2_c3"], "rooms": [
+            {"id": "g-bathroom-1", "use": "bathroom", "regions": ["r2_c3.R"]},
+            {"id": "g-living-1", "use": "living", "regions": ["r1_c2", "r1_c3", "r2_c2"]},
+            {"id": "g-passage-1", "use": "passage", "regions": ["r2_c3.L"]},
+            {"id": "g-porch-1", "use": "porch", "regions": ["r1_c1"]},
+        ]}},
+    }
+    client = app.test_client()
+    model = client.post("/api/floorplan/compass/v2/model", json={"plan": plan})
+    if model.status_code != 200 or "ground" not in model.get_json().get("floorsDrawn", []):
+        raise RuntimeError(f"Bundled Compass v2 model failed: {model.status_code}")
+    checks = [
+        ({"view": "plan", "format": "png"}, b"\x89PNG"),
+        ({"view": "top", "format": "png"}, b"\x89PNG"),
+        ({"view": "outside", "format": "png", "preset": "front-left"}, b"\x89PNG"),
+        ({"view": "sheet", "format": "pdf"}, b"%PDF-"),
+        ({"view": "cad", "format": "dxf-in"}, b"  0\nSECTION"),
+        ({"view": "cad", "format": "dxf-mm"}, b"  0\nSECTION"),
+    ]
+    for options, magic in checks:
+        output = client.post("/api/floorplan/compass/v2/render", json={
+            "plan": plan, "floor": "ground", "theme": "warm", "width": 800, "height": 600, "jobId": "self-test", **options,
+        })
+        if output.status_code != 200 or not output.data.startswith(magic):
+            raise RuntimeError(f"Bundled Compass v2 {options['view']} {options['format']} failed: {output.status_code}")
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["--self-test"]:
         self_test()
     else:
-        from floorplan_server import app, _cleanup_temp
-        _cleanup_temp(max_files=20, max_v5_dirs=5)
-        app.run(host="127.0.0.1", port=int(os.environ.get("FLOORPLAN_PORT", "5050")),
-                debug=False, use_reloader=False)
+        # --parent-pid and --idle-seconds come from Electron (startFloorplanServer).
+        from floorplan_server import main
+        main(sys.argv[1:])

@@ -1,6 +1,8 @@
 /** Synthetic gaze through the real browser cursor and dwell loop. Uses a virtual
  * clock and an isolated WebSocket boundary; captures activations before side effects.
- * This verifies software selection, not Tobii hardware latency or accuracy. */
+ * This verifies software selection, not Tobii hardware latency or accuracy.
+ * Compass screens, by DWELL_QA_SCREENS: compass-map, compass-nav, compass-rooms, compass-rooms-2, and (14 Oct 2026)
+ * compass-refine, compass-refine-focus, compass-refine-assign. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs=require('fs'),assert=require('assert/strict');
 (async()=>{
  const b=await chromium.launch({headless:true}),p=await b.newPage({viewport:{width:1366,height:768}});p.setDefaultTimeout(10000);const rows=[],errors=[];p.on('pageerror',e=>errors.push(e.message));
@@ -16,12 +18,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs
  for(const screen of (process.env.DWELL_QA_SCREENS||'home,keyboard,quickwords,phrases,people,medical,activities,web').split(',')){
   // Consecutive Compass cases share the same route. Close the previous room
   // picker through its real action; navigating to the same route doesn't remount it.
-  await p.evaluate(()=>{qa.capture=false;qa.sample=null;document.querySelector('#back-map')?.click();});
-  await p.clock.runFor(300);
+  // Refine screens (14 Oct 2026) close the room picker for a half, then the focus view, the same way.
+  for(const close of ['#back-map','#assign-back','#refine-back']){await p.evaluate(sel=>{qa.capture=false;qa.sample=null;document.querySelector(sel)?.click();},close);await p.clock.runFor(300);}
   await p.evaluate(screen=>{qa.capture=false;qa.sample=null;let e=document.querySelector('button');let f=e[Object.keys(e).find(k=>k.startsWith('__reactFiber$'))];while(f){if(typeof f.memoizedProps?.onNavigate==='function'){f.memoizedProps.onNavigate(screen);return;}f=f.return;}throw Error('route missing');},screen.startsWith('compass-') ? 'compass-map' : screen);await p.clock.runFor(1500);
   if(screen.startsWith('compass-')) {
    // Let the lazy map module mount before advancing the foundation's virtual timers.
    for(let i=0;i<20 && !await p.locator('#f-skip,#strip-rooms').count();i++){await new Promise(r=>setTimeout(r,100));await p.clock.runFor(1000);}
+   // A 40 ft plot, so a half cell can hold a room and the Refine picker opens.
+   if(await p.locator('#f-skip').count()){await p.locator('#f-skip').evaluate(e=>e.click());await p.clock.runFor(100);await p.locator('[id="fq-1-40 ft"]').evaluate(e=>e.click());await p.clock.runFor(100);}
    for(let i=0;i<8 && await p.locator('#f-skip').count();i++){await p.locator('#f-skip').evaluate(e=>e.click());await p.clock.runFor(100);}
    await p.clock.runFor(3500);
    if(screen==='compass-nav')await p.locator('#nav-restore').evaluate(e=>e.click());
@@ -29,6 +33,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs
     await p.locator('#strip-rooms').evaluate(e=>e.click());await p.clock.runFor(300);
     if(screen==='compass-rooms-2'){await p.locator('#menu-next').evaluate(e=>e.click());await p.clock.runFor(300);}
     await p.locator('#menu-ready').evaluate(e=>e.click());
+   } else if(screen.startsWith('compass-refine')){
+    // compass-refine: the map in Refine; -focus: one cell's two halves; -assign: the room picker for a half.
+    if(!/DONE/.test(await p.locator('#strip-refine').innerText())){await p.locator('#strip-refine').evaluate(e=>e.click());await p.clock.runFor(300);}
+    if(screen!=='compass-refine'){await p.locator('#cell-r2_c2').evaluate(e=>e.click());await p.clock.runFor(300);}
+    if(screen==='compass-refine-assign'){await p.locator('#refine-left').evaluate(e=>e.click());await p.clock.runFor(300);await p.locator('#assign-ready').evaluate(e=>e.click());}
    } else await p.locator('#ready-road-left').evaluate(e=>e.click());
    await p.clock.runFor(1000);
   }
@@ -39,6 +48,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs
    // control between independent cases rather than disabling that safety timer.
    if(screen==='compass-nav'||screen==='compass-map') {
     await p.evaluate(()=>{qa.capture=false;qa.sample=null;const ready=document.querySelector('#ready-road-left');if(ready?.getAttribute('aria-pressed')==='false')ready.click();});
+    await p.clock.runFor(500);
+   }
+   // Refine on the map ends after the same 45 quiet seconds; re-enter it through its real control.
+   if(screen==='compass-refine') {
+    await p.evaluate(()=>{qa.capture=false;qa.sample=null;const b=document.querySelector('#strip-refine');if(b&&!/DONE/.test(b.innerText))b.click();});
     await p.clock.runFor(500);
    }
    await p.evaluate(t=>{qa.sample=null;window.dispatchEvent(new CustomEvent('gaze_lost'));qa.capture=true;qa.clicks=[];qa.started=Date.now();qa.sample={x:t.x,y:t.y};},t);for(let elapsed=0;elapsed<6400;elapsed+=256){await p.clock.runFor(256);if(await p.evaluate(()=>qa.clicks.length))break;}const clicks=await p.evaluate(()=>qa.clicks);rows.push({screen,target:t.id||t.text,clicks});

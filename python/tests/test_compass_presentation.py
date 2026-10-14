@@ -156,8 +156,10 @@ class CompassPresentationTests(unittest.TestCase):
         source=json.loads((Path(__file__).parent/'fixtures/compass_architectural_map.json').read_text())
         p=options(source,'ground')['options'][0]['compassData'];m=model(p,'ground')
         width,height=sheet_size(m)
-        # A tall plot is rotated to use the screen, never independently stretched.
-        self.assertGreater(width,height)
+        # The road stays at the bottom: a deep plot gives a tall sheet at its true
+        # proportions, never a rotated (left/right swapped) or stretched plan.
+        self.assertLess(width,height)
+        self.assertAlmostEqual((width-190)/(height-180),m['width']/m['depth'],places=2)
         images=[]
         for angle in range(4):images.append(render(p,view='3d',angle=angle))
         self.assertEqual(len(set(images)),4)

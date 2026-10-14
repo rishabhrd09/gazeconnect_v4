@@ -1,9 +1,12 @@
 /**
- * CompassMapScreen — v5 Final Surgical Fix
- * ========================================
+ * CompassMapScreen: the Compass map (4 x 4 cells, road at the bottom), placed with gaze.
+ *
+ * Version 2 (docs/compass-refine/IMPLEMENTATION_PLAN.md): rooms are identities ("Bedroom 1", "Bedroom 2"),
+ * any cell can be divided exactly 50 % left | 50 % right with REFINE, and one canonical plan
+ * (CompassPlanV2) is what is saved, sent to the studio and drawn. Every change is one undoable step.
+ * The grid, its gaze targets and their dwell timings are unchanged: a divided cell stays one target.
  * - Grid: 4x4 Connected Architectural Layout (Zero gaps)
  * - Plot: Flush to Road (No black gap)
- * - Gaze Button: Floating Anchor (Does not shrink grid)
  * - Styling: Professional CAD Blueprints
  */
 
@@ -11,47 +14,54 @@ import React, {
   useReducer, useCallback, useMemo, useEffect, useState, useRef,
 } from 'react';
 import GazeButton from '../components/core/GazeButton';
-import { GazeToggleCardFace } from '../components/core/GazeToggleCardFace';
 import '../styles/compass-workspace.css';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { useWS } from '../hooks/useWebSocket';
-import { ArchitecturalCell } from '../components/ArchitecturalCell';
+import { ArchitecturalCell, SplitCellFace, type SplitHalf } from '../components/ArchitecturalCell';
 import { FloorPlanViewerModal } from '../components/FloorPlanViewerModal';
 import { CompassPlanStudio } from '../components/CompassPlanStudio';
+import { CompassStudio } from '../components/compass/CompassStudio';
+import { CompassRoomPicker, PICKER_PAGE, type PickerCard, type PickerQuestion } from '../components/compass/CompassRoomPicker';
+import { CompassRefineFocus, type HalfFace, type ThumbCell } from '../components/compass/CompassRefineFocus';
 import { PlanReviewModal } from '../components/PlanReviewModal';
 import {
   compileCompassPayload,
   CompassMapPayload,
   CompassPlanScope,
+  FloorPayload,
   generatePlanCandidates,
   PlanCandidate,
 } from '../utils/floorplanApi';
 import {
   GridCellKey,
-  CompassPhase,
-  ExpansionDirection,
-  CellRect,
-  GridCellState,
   RoomComponent,
-  PlacementRecord,
-  CompassHistoryEntry,
-  PendingExpansion,
   FloorType,
   ALL_CELL_KEYS,
   RENDER_ORDER,
   GRID_ROWS,
   GRID_COLS
 } from '../types/compass';
+import type { CellKey, CompassPlanV2, FloorId, FloorIntent, RegionKey, RoomIntent } from '../types/compassPlan';
 import {
   parseCellKey,
   buildCellKey,
   cellToRect,
   cellsToBoundingRect,
-  getExpandedCells,
   computeCoveragePercent,
 } from '../utils/compassMath';
-import { getDirectionLabels } from '../utils/compassDirections';
+import { getDirectionLabels, NORTH_ROSE_DEGREES } from '../utils/compassDirections';
+import { formatFeetShort, formatSize } from '../utils/feetInches';
+import { REPEATABLE, STAIR_HOSTS, cellOf, deriveV1, normalisePlan, regionsTouch } from '../utils/compassPlan';
+import {
+  AssignChoice, CompassActionV2, CompassStateV2, MIN_CLEAR_IN, PlaceOutcome, assignHalf, catalogueUses, cellView,
+  clearWidthIn, compassReducer, createInitialState, giveBothHalves, halvesUsable, inches, labelsOf, ownerOf, placeCell,
+  planFromState, plotInches, regionSizeIn, roomsOfUse, splitCell, voidProblem, wholeCell, wholeOptions,
+} from '../utils/compassReducer';
+import {
+  DRAFT_KEYS, MIGRATED_KEY, ParsedDraft, V1_KEYS, backendCopy, bestDraft, draftFromState, draftScore, parseDraft,
+} from '../utils/compassDraft';
+import { compassV2Enabled } from '../utils/compassFeatures';
 import { useTheme } from '../contexts/ThemeContext';
 import type { AdvancedRefinements } from '../types/advancedMap';
 import { screenThemes, typography } from '../utils/design';
@@ -80,15 +90,12 @@ const THEME = {
 
 const UI_FONT = typography.fontFamily.primary;
 
-const COMPASS_DRAFT_KEY = 'gazeconnect_compass_progress_v1';
 const COMPASS_ACCEPTED_PLAN_KEY = 'gazeconnect_compass_accepted_plan_v1';
-const COMPASS_PRIMARY_BACKUP_KEY = 'compass_persistent_backup';
-const COMPASS_LAST_BACKUP_KEY = 'compass_last_session_backup';
-const COMPASS_DRAFT_VERSION = 1;
-const COMPASS_UNDO_HISTORY_LIMIT = 120;
 const COMPASS_AUTOSAVE_DEBOUNCE_MS = 1200;
 const COMPASS_AUTOSAVE_MIN_INTERVAL_MS = 5000;
 const COMPASS_SNAPSHOT_MIN_INTERVAL_MS = 30000;
+/** The armed grid disarms, and Refine ends, after this long without a choice. */
+const COMPASS_IDLE_MS = 45000;
 
 // ─── Room Library — 14 Ground Floor Components ───────────────
 
@@ -129,16 +136,20 @@ const ROOM_LIBRARY: Record<string, RoomLibEntry> = {
   ff_balcony: { roomLabel: '1F Balcony', shortLabel: '1F Balcony', color: '#26A69A', expandable: false, recommendedCells: 1, typicalSqft: '40-80' },
   ff_terrace: { roomLabel: '1F Open Terrace', shortLabel: '1F Terrace', color: '#66BB6A', expandable: false, recommendedCells: 1, typicalSqft: '60-120' },
   ff_stairLanding: { roomLabel: '1F Stair Landing', shortLabel: '1F Stairs', color: '#8D6E63', expandable: false, recommendedCells: 1, typicalSqft: '40-60' },
+  // Added 14 Oct 2026 (IMPLEMENTATION_PLAN.md §12): a passage on either floor, and the void over a double-height hall.
+  passage: { roomLabel: 'Passage', shortLabel: 'Passage', color: '#B0A48A', expandable: false, recommendedCells: 1, typicalSqft: '25-60' },
+  void: { roomLabel: 'Open to below', shortLabel: 'Open below', color: '#9AA8B5', expandable: false, recommendedCells: 1 },
 };
 
+// Passage (both floors) and Open to below (first floor) were added on 14 Oct 2026 (IMPLEMENTATION_PLAN.md §12).
 const GF_IDS = [
   'porch', 'lawn', 'verandah', 'backyard', 'drawing', 'kitchen', 'living',
   'masterBed', 'bedroom',
-  'bathroom', 'staircase', 'diningStaircase', 'dining', 'icu', 'balcony', 'terrace',
+  'bathroom', 'staircase', 'diningStaircase', 'dining', 'icu', 'balcony', 'terrace', 'passage',
 ];
 const FF_IDS = [
   'ff_master', 'ff_bed2', 'ff_bed3', 'ff_living', 'ff_bathroom',
-  'ff_balcony', 'ff_terrace', 'ff_stairLanding',
+  'ff_balcony', 'ff_terrace', 'ff_stairLanding', 'passage', 'void',
 ];
 
 // ─── Foundation Questions ─────────────────────────────────
@@ -208,38 +219,7 @@ interface FoundationQuestion {
   parse?: (v: string) => any;
 }
 
-// ─── State Types ──────────────────────────────────────────
-
-interface FloorData {
-  placements: PlacementRecord[];
-  grid: Record<string, GridCellState>;
-  coveragePercent: number;
-}
-
-interface CompassState {
-  phase: CompassPhase;
-  currentFloor: FloorType;
-  foundation: {
-    facing: string | null;
-    plotWidth: number | null;
-    plotDepth: number | null;
-    plotType: string | null;
-    numFloors: string | null;
-    numBedrooms: string | null;
-    gatePosition: string | null;
-  };
-  foundationStep: number;
-  grid: Record<string, GridCellState>;
-  componentQueue: RoomComponent[];
-  currentIndex: number;
-  placements: PlacementRecord[];
-  armed: boolean;
-  pendingExpansion: PendingExpansion | null;
-  history: CompassHistoryEntry[];
-  groundFloorData: FloorData | null;
-  firstFloorData: FloorData | null;
-  numFloors: string;
-}
+// ─── Saved details from the retired Refine Map (read-only) ───
 
 type CompassFloorRefinements = Record<FloorType, AdvancedRefinements>;
 type CompassFloorMetadata = Record<'gnd' | '1f', { advanced_refinements: AdvancedRefinements; cell_layouts?: AdvancedRefinements['cellLayouts'] }>;
@@ -327,47 +307,6 @@ function readAcceptedCompassPlan(): AcceptedCompassPlan | null {
   }
 }
 
-interface CompassDraftPayload {
-  version: number;
-  state: CompassState;
-  refinements?: AdvancedRefinements;
-  advancedFloorMetadata?: CompassFloorMetadata;
-}
-
-type CompassAction =
-  | { type: 'HYDRATE_DRAFT'; draft: CompassState }
-  | { type: 'SET_FOUNDATION'; key: FoundationKey; value: any }
-  | {
-    type: 'PREFILL_FOUNDATION';
-    foundation: {
-      facing: string;
-      plotWidth: number;
-      plotDepth: number;
-      plotType: string;
-      numFloors: string;
-    };
-    numFloors: string;
-  }
-  | { type: 'FOUNDATION_BACK' }
-  | { type: 'COMPLETE_FOUNDATION'; queue: RoomComponent[]; numFloors: string }
-  | { type: 'AUTO_FOUNDATION'; foundation: { facing: string; plotWidth: number; plotDepth: number; plotType: string }; queue: RoomComponent[]; numFloors: string }
-  | { type: 'SET_QUEUE'; queue: RoomComponent[] }
-  | { type: 'ARM_GRID' }
-  | { type: 'DISARM_GRID' }
-  | { type: 'PLACE_ROOM'; cell: GridCellKey }
-  | { type: 'EXPAND_ROOM'; direction: ExpansionDirection | 'none' }
-  | { type: 'NEXT_ROOM' }
-  | { type: 'SKIP_ROOM' }
-  | { type: 'UNDO' }
-  | { type: 'RESET'; queue: RoomComponent[] }
-  | { type: 'ADD_ROOM'; room: RoomComponent }
-  | { type: 'REMOVE_PLACED_ROOM'; placementId: string }
-  | { type: 'CONTINUE_PLACING' }
-  | { type: 'START_FIRST_FLOOR'; queue: RoomComponent[] }
-  | { type: 'SWITCH_FLOOR'; floor: FloorType }
-  | { type: 'SET_NUM_FLOORS'; value: 'Single Floor' | 'Multi-Floor' }
-  | { type: 'FINISH_NO_FIRST_FLOOR' }
-  | { type: 'SELECT_ROOM'; roomIndex: number };
 
 // ─── Helpers ──────────────────────────────────────────────
 
@@ -375,50 +314,6 @@ function makeRoom(id: string): RoomComponent {
   const lib = ROOM_LIBRARY[id];
   if (!lib) throw new Error(`Unknown room: ${id}`);
   return { roomId: id, ...lib };
-}
-
-const VALID_ROOM_IDS = new Set<string>([...GF_IDS, ...FF_IDS]);
-
-function normalizeRoomId(roomId: string | null | undefined): string | null {
-  if (!roomId) return null;
-  if (roomId === 'commonBath') return 'bathroom';
-  return roomId;
-}
-
-function sanitizeRoomQueue(queue: RoomComponent[]): RoomComponent[] {
-  const seen = new Set<string>();
-  const ids = queue
-    .map((r) => normalizeRoomId(r.roomId))
-    .filter((id): id is string => !!id && VALID_ROOM_IDS.has(id))
-    .filter((id) => {
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-  return ids.map(makeRoom);
-}
-
-function sanitizePlacements(placements: PlacementRecord[]): PlacementRecord[] {
-  return placements.map((p) => {
-    const normalizedId = normalizeRoomId(p.roomId) || p.roomId;
-    const lib = ROOM_LIBRARY[normalizedId] || ROOM_LIBRARY[p.roomId];
-    return {
-      ...p,
-      roomId: normalizedId,
-      roomLabel: lib?.roomLabel || p.roomLabel,
-    };
-  });
-}
-
-function sanitizeGrid(grid: Record<string, GridCellState>): Record<string, GridCellState> {
-  const next: Record<string, GridCellState> = {};
-  for (const [key, cell] of Object.entries(grid)) {
-    next[key] = {
-      ...cell,
-      roomId: normalizeRoomId(cell.roomId),
-    };
-  }
-  return next;
 }
 
 function generateGFQueue(): RoomComponent[] {
@@ -429,397 +324,104 @@ function generateFFQueue(): RoomComponent[] {
   return FF_IDS.map(makeRoom);
 }
 
-function createEmptyGrid(): Record<string, GridCellState> {
-  const grid: Record<string, GridCellState> = {};
-  for (const key of ALL_CELL_KEYS) {
-    grid[key] = { roomId: null, anchorPlacementId: null, isExpandedChild: false };
-  }
-  return grid;
+const queueFor = (floor: FloorId): RoomComponent[] => (floor === 'first' ? generateFFQueue() : generateGFQueue());
+const libraryOf = (use: string | null | undefined) => (use ? ROOM_LIBRARY[use] : undefined);
+const ROW_NAMES: Record<number, string> = { 1: 'front', 2: 'front-middle', 3: 'back-middle', 4: 'back' };
+
+type LegacyFloorDetails = { refinements?: Partial<AdvancedRefinements>; unknownRooms?: unknown[] };
+function legacyFloor(legacy: CompassPlanV2['legacy'] | undefined, floor: FloorId): LegacyFloorDetails | undefined {
+  return (legacy?.refinements as Record<string, LegacyFloorDetails> | undefined)?.[floor];
 }
 
-function getOccupiedSet(grid: Record<string, GridCellState>): Set<string> {
-  return new Set(Object.entries(grid).filter(([_, cell]) => cell.roomId !== null).map(([k]) => k));
+/** Cells that hold details saved by the retired Refine Map; they stay locked, as before, until the map is converted. */
+function legacyCells(legacy: CompassPlanV2['legacy'] | undefined, floor: FloorId): Set<string> {
+  const out = new Set<string>();
+  const refinements = legacy && !legacy.converted ? legacyFloor(legacy, floor)?.refinements : undefined;
+  if (!refinements || typeof refinements !== 'object') return out;
+  for (const s of refinements.subCellSplits || []) if (s?.parentCell) out.add(s.parentCell);
+  for (const e of refinements.customEdges || []) if (e?.cells?.[0]) out.add(e.cells[0]);
+  for (const v of refinements.voidMarkers || []) if (v?.cell) out.add(v.cell);
+  for (const r of refinements.cellRotations || []) if (r?.cell) out.add(r.cell);
+  for (const x of refinements.cellExpansions || []) if (x?.cell) out.add(x.cell);
+  return out;
 }
 
-function saveSnapshot(state: CompassState): CompassHistoryEntry {
-  return JSON.parse(JSON.stringify({
-    grid: state.grid, placements: state.placements,
-    currentIndex: state.currentIndex, phase: state.phase,
-    pendingExpansion: state.pendingExpansion,
-  }));
-}
-
-function appendHistory(
-  history: CompassHistoryEntry[],
-  snapshot: CompassHistoryEntry,
-): CompassHistoryEntry[] {
-  if (history.length >= COMPASS_UNDO_HISTORY_LIMIT) {
-    return [...history.slice(-(COMPASS_UNDO_HISTORY_LIMIT - 1)), snapshot];
-  }
-  return [...history, snapshot];
-}
-
-function createInitialState(queue: RoomComponent[]): CompassState {
-  return {
-    phase: 'foundation', currentFloor: 'ground',
-    foundation: { facing: null, plotWidth: null, plotDepth: null, plotType: null, numFloors: null, numBedrooms: null, gatePosition: null },
-    foundationStep: 0,
-    grid: createEmptyGrid(), componentQueue: queue, currentIndex: 0,
-    placements: [], armed: false, pendingExpansion: null, history: [],
-    groundFloorData: null, firstFloorData: null, numFloors: 'Single Floor',
+/** The saved details of an unconverted map, per floor, in the shape the saved-plan viewer reads. */
+function refinementsFromLegacy(legacy: CompassPlanV2['legacy'] | undefined): CompassFloorRefinements {
+  const of = (floor: FloorId) => {
+    const saved = legacyFloor(legacy, floor)?.refinements;
+    return normalizeCompassRefinements(saved, saved?.cellLayouts);
   };
+  return { ground: of('ground'), first: of('first') };
 }
 
-function clampRoomIndex(index: number, queueLength: number): number {
-  if (!Number.isFinite(index)) return 0;
-  return Math.max(0, Math.min(index, queueLength));
-}
-
-function sanitizeDraftState(draft: CompassState): CompassState {
-  const fallbackQueue = draft.currentFloor === 'first' ? generateFFQueue() : generateGFQueue();
-  const cleanedQueue = Array.isArray(draft.componentQueue) ? sanitizeRoomQueue(draft.componentQueue) : fallbackQueue;
-  const queue = cleanedQueue.length > 0 ? cleanedQueue : fallbackQueue;
-  const queueLength = queue.length;
-  return {
-    ...draft,
-    phase: draft.phase || 'foundation',
-    currentFloor: draft.currentFloor || 'ground',
-    grid: sanitizeGrid(draft.grid),
-    placements: Array.isArray(draft.placements) ? sanitizePlacements(draft.placements) : [],
-    componentQueue: queue,
-    currentIndex: clampRoomIndex(draft.currentIndex ?? 0, queueLength),
-    armed: false,
-    pendingExpansion: null,
-    history: Array.isArray(draft.history) ? draft.history : [],
+/** What the retired Refine Map saved, in words, for the conversion question. */
+function legacySummary(legacy: CompassPlanV2['legacy'] | undefined): string {
+  if (!legacy) return '';
+  const names: Record<string, string> = {
+    subCellSplits: 'divided cells', customEdges: 'wall changes', voidMarkers: 'open-to-below marks', cellRotations: 'rotations',
+    cellExpansions: 'expansions', caregiverAnnotations: 'notes', vastuFlags: 'vastu flags', accessibilityMarkers: 'accessibility marks',
+    cellLayouts: 'stair layouts', unknownRooms: 'rooms of unknown types',
   };
-}
-
-function parseCompassDraft(rawDraft: string): { state: CompassState, refinements?: AdvancedRefinements, advancedFloorMetadata?: CompassFloorMetadata } | null {
-  try {
-    const parsed = JSON.parse(rawDraft) as CompassDraftPayload | CompassState;
-    const draftState = (parsed as CompassDraftPayload).state
-      ? (parsed as CompassDraftPayload).state
-      : (parsed as CompassState);
-
-    if (!draftState || typeof draftState !== 'object') return null;
-    if (!draftState.foundation || !draftState.grid || !Array.isArray(draftState.componentQueue)) {
-      return null;
+  const found = new Set<string>();
+  for (const floor of ['ground', 'first'] as FloorId[]) {
+    const details = legacyFloor(legacy, floor);
+    for (const [key, value] of Object.entries(details?.refinements || {})) {
+      if (Array.isArray(value) ? value.length : value && typeof value === 'object' ? Object.keys(value).length : value) found.add(names[key] || key);
     }
-    return {
-      state: sanitizeDraftState(draftState),
-      refinements: (parsed as CompassDraftPayload).refinements,
-      advancedFloorMetadata: (parsed as CompassDraftPayload).advancedFloorMetadata,
-    };
-  } catch {
-    return null;
+    if (details?.unknownRooms?.length) found.add(names.unknownRooms);
   }
+  return [...found].join(', ');
 }
 
-function getDraftRestoreScore(parsed: { state: CompassState, refinements?: AdvancedRefinements } | null): number {
-  if (!parsed?.state) return -1;
-  const placements = Array.isArray(parsed.state.placements) ? parsed.state.placements.length : 0;
-  const hasFoundation = !!parsed.state.foundation?.facing
-    || !!parsed.state.foundation?.plotWidth
-    || !!parsed.state.foundation?.plotDepth;
-  const phaseBonus = parsed.state.phase && parsed.state.phase !== 'foundation' ? 2 : 0;
-  return placements * 100 + phaseBonus + (hasFoundation ? 1 : 0);
+/** "3 feet 9 by 12 feet 6", for speech. */
+function sizeWords(widthIn: number, depthIn: number): string {
+  const words = (value: number) => {
+    const total = Math.round(value);
+    const feet = Math.floor(total / 12);
+    const rest = total - feet * 12;
+    return rest ? `${feet} feet ${rest}` : `${feet} feet`;
+  };
+  return `${words(widthIn)} by ${words(depthIn)}`;
 }
 
-function pickBestDraftRaw(candidates: Array<string | null>): string | null {
-  let bestRaw: string | null = null;
-  let bestScore = -1;
-  for (const raw of candidates) {
-    if (!raw) continue;
-    const score = getDraftRestoreScore(parseCompassDraft(raw));
-    if (score > bestScore) {
-      bestScore = score;
-      bestRaw = raw;
-    }
-  }
-  return bestRaw;
+/** Owned cells, a divided half counting one half. */
+function ownedCount(floor: FloorIntent): number {
+  return floor.rooms.reduce((sum, r) => sum + r.regions.reduce((m, k) => m + (k.includes('.') ? .5 : 1), 0), 0);
 }
 
-// ─── Reducer ──────────────────────────────────────────────
+/**
+ * The map's version 1 form, with cell rectangles and areas, as the original studio (GAZECONNECT_COMPASS_V2=0),
+ * the saved-plan viewer and older backend readers expect (§4.8). Null when the map has divided cells, a
+ * passage or an open-to-below, which only the version 2 studio can draw.
+ */
+function legacyMapOf(state: CompassStateV2): CompassMapPayload | null {
+  let v1: any;
+  try { v1 = deriveV1(normalisePlan(planFromState(state))); } catch { return null; }
+  if (v1.requires_v2) return null;
+  const pw = state.foundation.plotWidth || 40;
+  const pd = state.foundation.plotDepth || 60;
+  const records = (key: 'ground_floor' | 'first_floor') =>
+    ((v1[key]?.placements || []) as Array<{ room: string; roomId: string; placementId: string; cells: GridCellKey[] }>).map(p => ({
+      placementId: p.placementId, roomId: p.roomId, roomLabel: p.room, occupiedCells: p.cells,
+      coords: cellsToBoundingRect(p.cells, pw, pd),
+      cellRects: Object.fromEntries(p.cells.map(c => [c, cellToRect(c, pw, pd)])),
+    }));
+  const coverage = (floor: FloorId) => computeCoveragePercent(ownedCount(state.floors[floor]));
+  const ground = { placements: records('ground_floor'), coveragePercent: coverage('ground') };
+  const first = state.floors.first.rooms.length ? { placements: records('first_floor'), coveragePercent: coverage('first') } : null;
+  const onFirst = state.currentFloor === 'first';
+  const current = onFirst ? (first || { placements: [], coveragePercent: 0 }) : ground;
+  return compileCompassPayload(state.foundation, current.placements, GRID_ROWS, GRID_COLS, current.coveragePercent,
+    onFirst ? ground : null, onFirst ? null : first, state.currentFloor);
+}
 
-function compassReducer(state: CompassState, action: CompassAction): CompassState {
-  switch (action.type) {
-    case 'HYDRATE_DRAFT':
-      return sanitizeDraftState(action.draft);
-
-    case 'SET_FOUNDATION':
-      return {
-        ...state,
-        foundation: { ...state.foundation, [action.key]: action.value },
-        foundationStep: Math.min(state.foundationStep + 1, FOUNDATION_QUESTIONS.length),
-      };
-
-    case 'PREFILL_FOUNDATION':
-      return {
-        ...state,
-        phase: 'foundation',
-        foundationStep: 0,
-        foundation: {
-          ...state.foundation,
-          ...action.foundation,
-        },
-        numFloors: action.numFloors,
-        armed: false,
-        pendingExpansion: null,
-      };
-
-    case 'FOUNDATION_BACK':
-      if (state.foundationStep <= 0) return state;
-      return { ...state, foundationStep: state.foundationStep - 1 };
-
-    case 'COMPLETE_FOUNDATION':
-      return { ...state, phase: 'placement', componentQueue: action.queue, currentIndex: 0, armed: false, numFloors: action.numFloors };
-
-    case 'AUTO_FOUNDATION':
-      return {
-        ...state, phase: 'placement', foundation: { ...state.foundation, ...action.foundation },
-        foundationStep: FOUNDATION_QUESTIONS.length,
-        componentQueue: action.queue, currentIndex: 0, armed: false,
-        numFloors: action.numFloors,
-      };
-
-    case 'SET_QUEUE':
-      if (state.phase !== 'foundation') return state;
-      return { ...state, componentQueue: action.queue };
-
-    case 'ARM_GRID':
-      if (state.phase !== 'placement' || state.pendingExpansion) return state;
-      if (state.currentIndex >= state.componentQueue.length) return state;
-      return { ...state, armed: true };
-
-    case 'DISARM_GRID':
-      return { ...state, armed: false };
-
-    case 'PLACE_ROOM': {
-      if (!state.armed || state.pendingExpansion || state.phase !== 'placement') return state;
-      if (state.currentIndex >= state.componentQueue.length) return state;
-      const room = state.componentQueue[state.currentIndex];
-      const cellState = state.grid[action.cell];
-      const isCurrentRoomCell = cellState?.roomId === room.roomId;
-
-      // Allow overwriting if confirmed (UI handles confirmation)
-      // If occupied by another room, we must remove this cell from that room's placement
-      let finalPlacements = state.placements;
-      if (cellState?.roomId && !isCurrentRoomCell) {
-        const victimRoomId = cellState.roomId;
-        finalPlacements = finalPlacements.map(p => {
-          if (p.roomId === victimRoomId) {
-            // Remove the stolen cell
-            const newCells = p.occupiedCells.filter((c: GridCellKey) => c !== action.cell);
-            return { ...p, occupiedCells: newCells };
-          }
-          return p;
-        }).filter(p => p.occupiedCells.length > 0); // Remove placement if no cells left
-      }
-
-      const existingPlacement = finalPlacements.find((p) => p.roomId === room.roomId) || null;
-      const placementId = existingPlacement?.placementId || `p_${Date.now()}_${room.roomId}`;
-      const history = appendHistory(state.history, saveSnapshot(state));
-      const newGrid = { ...state.grid };
-
-      let occupiedCells: GridCellKey[] = [];
-      if (isCurrentRoomCell) {
-        newGrid[action.cell] = { roomId: null, anchorPlacementId: null, isExpandedChild: false };
-        occupiedCells = (existingPlacement?.occupiedCells || []).filter((c: GridCellKey) => c !== action.cell);
-      } else {
-        newGrid[action.cell] = { roomId: room.roomId, anchorPlacementId: placementId, isExpandedChild: false };
-        occupiedCells = Array.from(new Set([...(existingPlacement?.occupiedCells || []), action.cell])) as GridCellKey[];
-      }
-
-      const nextPlacements = finalPlacements.filter((p) => p.roomId !== room.roomId);
-      if (occupiedCells.length === 0) {
-        return {
-          ...state,
-          grid: newGrid,
-          placements: nextPlacements,
-          armed: true,
-          pendingExpansion: null,
-          history,
-        };
-      }
-
-      // Recalculate geometry for the current room
-      const pw = state.foundation.plotWidth || 40;
-      const pd = state.foundation.plotDepth || 60;
-      const coords = cellsToBoundingRect(occupiedCells, pw, pd);
-      const cellRects: Record<string, CellRect> = {};
-      for (const cell of occupiedCells) cellRects[cell] = cellToRect(cell, pw, pd);
-      const anchorCell = occupiedCells[0];
-      const placement: PlacementRecord = {
-        placementId,
-        roomId: room.roomId,
-        roomLabel: room.roomLabel,
-        anchorCell,
-        occupiedCells,
-        coords,
-        cellRects,
-      };
-
-      // Also need to update geometry for the victim room if it was modified?
-      // Yes, if victim room lost a cell, its coords/rects might need update.
-      // Ideally we re-calculate all placements, but for now let's rely on the fact that
-      // we only touched the victim's occupiedCells list. 
-      // If we want to be correct, we should map over nextPlacements and update if modified.
-      // But `nextPlacements` contains the victim room (modified).
-      const updatedNextPlacements = nextPlacements.map(p => {
-        if (cellState?.roomId && p.roomId === cellState.roomId) {
-          // Re-calc geometry for victim
-          const vCoords = cellsToBoundingRect(p.occupiedCells, pw, pd);
-          const vCellRects: Record<string, CellRect> = {};
-          for (const c of p.occupiedCells) vCellRects[c] = cellToRect(c, pw, pd);
-          // Verify anchor cell is still valid?
-          let vAnchor = p.anchorCell;
-          if (!p.occupiedCells.includes(vAnchor)) vAnchor = p.occupiedCells[0];
-
-          return { ...p, coords: vCoords, cellRects: vCellRects, anchorCell: vAnchor };
-        }
-        return p;
-      });
-
-      return {
-        ...state,
-        grid: newGrid,
-        placements: [...updatedNextPlacements, placement],
-        armed: true,
-        pendingExpansion: null,
-        history,
-      };
-    }
-
-    case 'EXPAND_ROOM': {
-      if (!state.pendingExpansion) return state;
-      const { anchorCell, room } = state.pendingExpansion;
-      const placementId = state.grid[anchorCell]?.anchorPlacementId;
-      if (!placementId) return state;
-      const pw = state.foundation.plotWidth || 40;
-      const pd = state.foundation.plotDepth || 60;
-      const occupiedCells = action.direction === 'none' ? [anchorCell] : getExpandedCells(anchorCell, action.direction);
-      const newGrid = { ...state.grid };
-      for (const cell of occupiedCells) {
-        if (cell === anchorCell) continue;
-        newGrid[cell] = { roomId: room.roomId, anchorPlacementId: placementId, isExpandedChild: true };
-      }
-      const coords = cellsToBoundingRect(occupiedCells, pw, pd);
-      const cellRects: Record<string, CellRect> = {};
-      for (const cell of occupiedCells) cellRects[cell] = cellToRect(cell, pw, pd);
-      const placement: PlacementRecord = { placementId, roomId: room.roomId, roomLabel: room.roomLabel, anchorCell, occupiedCells, coords, cellRects };
-      const nextIdx = state.currentIndex + 1;
-      return { ...state, grid: newGrid, placements: [...state.placements, placement], currentIndex: nextIdx, pendingExpansion: null, armed: nextIdx < state.componentQueue.length, phase: nextIdx >= state.componentQueue.length ? 'review' : 'placement' };
-    }
-
-    case 'NEXT_ROOM': {
-      if (state.phase !== 'placement') return state;
-      if (!state.armed) return state;
-      const currentRoom = state.componentQueue[state.currentIndex];
-      if (!currentRoom) return state;
-      const nextIdx = state.currentIndex + 1;
-      return {
-        ...state,
-        currentIndex: nextIdx,
-        armed: false,
-        pendingExpansion: null,
-        phase: nextIdx >= state.componentQueue.length ? 'review' : 'placement',
-      };
-    }
-
-    case 'SKIP_ROOM': {
-      const nextIdx = state.currentIndex + 1;
-      return { ...state, currentIndex: nextIdx, armed: false, pendingExpansion: null, phase: nextIdx >= state.componentQueue.length ? 'review' : 'placement' };
-    }
-
-    case 'UNDO':
-      if (state.phase === 'placement' && !state.armed) return state;
-      if (state.history.length === 0) return state;
-      const prev = state.history[state.history.length - 1];
-      return { ...state, grid: prev.grid, placements: prev.placements, currentIndex: prev.currentIndex, phase: prev.phase, pendingExpansion: prev.pendingExpansion, armed: false, history: state.history.slice(0, -1) };
-
-    case 'RESET':
-      return createInitialState(action.queue);
-
-    case 'ADD_ROOM':
-      return { ...state, componentQueue: [...state.componentQueue, action.room], phase: 'placement' };
-
-    case 'REMOVE_PLACED_ROOM': {
-      const target = state.placements.find((p) => p.placementId === action.placementId);
-      if (!target) return state;
-      const history = appendHistory(state.history, saveSnapshot(state));
-      const newGrid = { ...state.grid };
-      for (const cell of target.occupiedCells) newGrid[cell] = { roomId: null, anchorPlacementId: null, isExpandedChild: false };
-      const targetIdx = state.componentQueue.findIndex((r) => r.roomId === target.roomId);
-      return {
-        ...state,
-        grid: newGrid,
-        placements: state.placements.filter((p) => p.placementId !== action.placementId),
-        currentIndex: targetIdx >= 0 ? targetIdx : state.currentIndex,
-        phase: 'placement',
-        armed: false,
-        pendingExpansion: null,
-        history,
-      };
-    }
-
-    case 'CONTINUE_PLACING':
-      return { ...state, phase: 'placement', armed: false, pendingExpansion: null };
-
-    case 'START_FIRST_FLOOR': {
-      const occCount = new Set(Object.entries(state.grid).filter(([_, c]) => c.roomId).map(([k]) => k)).size;
-      const gfData: FloorData = { placements: state.placements, grid: state.grid, coveragePercent: computeCoveragePercent(occCount) };
-      return {
-        ...state, phase: 'placement', currentFloor: 'first',
-        groundFloorData: gfData, grid: createEmptyGrid(),
-        componentQueue: action.queue, currentIndex: 0,
-        placements: [], armed: false, pendingExpansion: null, history: [],
-      };
-    }
-
-    case 'FINISH_NO_FIRST_FLOOR':
-      return state;
-
-    case 'SWITCH_FLOOR': {
-      if (action.floor === state.currentFloor) return state;
-      const swOcc = getOccupiedSet(state.grid).size;
-      const swSnap: FloorData = { placements: state.placements, grid: state.grid, coveragePercent: computeCoveragePercent(swOcc) };
-      if (action.floor === 'first') {
-        const ff = state.firstFloorData;
-        const ffQueue = generateFFQueue();
-        const ffPlacements = ff ? ff.placements : [];
-        const ffIdx = ff ? getNextRoomIndex(ffQueue, ffPlacements) : 0;
-        return {
-          ...state, currentFloor: 'first', groundFloorData: swSnap, firstFloorData: null,
-          grid: ff ? ff.grid : createEmptyGrid(), placements: ffPlacements,
-          componentQueue: ffQueue, currentIndex: ffIdx,
-          phase: ffIdx >= ffQueue.length ? 'review' : 'placement',
-          armed: false, pendingExpansion: null, history: [],
-        };
-      } else {
-        const gf = state.groundFloorData;
-        if (!gf) return state;
-        const gfQueue = generateGFQueue();
-        const gfIdx = getNextRoomIndex(gfQueue, gf.placements);
-        return {
-          ...state, currentFloor: 'ground', firstFloorData: swSnap, groundFloorData: null,
-          grid: gf.grid, placements: gf.placements,
-          componentQueue: gfQueue, currentIndex: gfIdx,
-          phase: gfIdx >= gfQueue.length ? 'review' : 'placement',
-          armed: false, pendingExpansion: null, history: [],
-        };
-      }
-    }
-
-    case 'SET_NUM_FLOORS':
-      return { ...state, numFloors: action.value };
-
-    case 'SELECT_ROOM':
-      if (action.roomIndex < 0 || action.roomIndex >= state.componentQueue.length) return state;
-      return { ...state, currentIndex: action.roomIndex, phase: 'placement', armed: false, pendingExpansion: null };
-
-    default:
-      return state;
-  }
+/** Each floor's empty cells, as the version 1 backend copy carried them. */
+function withEmptyCells(map: CompassMapPayload): Record<string, unknown> {
+  const floor = (data: FloorPayload | undefined) => data && {
+    ...data, empty_cells: ALL_CELL_KEYS.filter(k => !data.placements.some(p => p.cells.includes(k))),
+  };
+  return { ...map, ground_floor: floor(map.ground_floor), ...(map.first_floor ? { first_floor: floor(map.first_floor) } : {}) };
 }
 
 // ─── Compass Rose ─────────────────────────────────────────
@@ -831,8 +433,7 @@ const CompassRose: React.FC<{ facing: string; bg?: string; border?: string; text
   //   South-facing road → viewer faces North → N is at SCREEN TOP                              (rot 0)
   //   West-facing road  → viewer faces East → viewer's right = South → N is at SCREEN LEFT     (rot 270)
   //   North-facing road → viewer faces South → N is at SCREEN BOTTOM                           (rot 180)
-  const facingToNorthRot: Record<string, number> = { South: 0, East: 90, North: 180, West: 270 };
-  const rot = facingToNorthRot[facing] ?? 0;
+  const rot = NORTH_ROSE_DEGREES[facing] ?? 0;
   const ring = border || THEME.border;
   const ink = textColor || THEME.textSub;
   const north = northColor || '#8C3F3F';
@@ -924,7 +525,7 @@ const ScaleBar: React.FC<{ feet: number; bg?: string; ink?: string; muted?: stri
         color: mutedColor, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
         fontVariantNumeric: 'tabular-nums',
       }}>
-        {`0   ${feet}   ${feet * 2} ft`}
+        {`0   ${formatFeetShort(feet)}   ${formatFeetShort(feet * 2)} ft`}
       </div>
     </div>
   );
@@ -942,9 +543,10 @@ interface CompassMapScreenProps {
 // ─── Main Component ───────────────────────────────────────
 
 function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMapScreenProps) {
-  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze, enableGaze } = useGazeControl();
+  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze, enableGaze, signalNavigation } = useGazeControl();
   const { isLight, isMix, isWarm } = useTheme();
   const ws = useWS();
+  const v2Enabled = useMemo(() => compassV2Enabled(), []);
 
   // ── Theme-aware tokens (drafting paper / workshop dusk) ──
   const T_pageBg = 'var(--ui-page)';
@@ -977,16 +579,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   const [hoveredCell, setHoveredCell] = useState<GridCellKey | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuConfirmRemove, setMenuConfirmRemove] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState(false);
-  const [expansionReady, setExpansionReady] = useState(false);
   const [surveyLoading, setSurveyLoading] = useState(true);
-  // v5: Removed dwellingCell/dwellProgress state — they powered a redundant
-  // per-cell progress bar that has been removed in favour of GazeButton's
-  // built-in DwellProgressRing/Shrink. Keeping the state would leak memory
-  // and add no-op renders.
   const [studioScope, setStudioScope] = useState<CompassPlanScope>('ground');
   const [showCompassStudio, setShowCompassStudio] = useState(false);
+  const [studioPlan, setStudioPlan] = useState<CompassPlanV2 | null>(null);
   const [showFloorPlanViewer, setShowFloorPlanViewer] = useState(false);
   const [viewerInitialFloor, setViewerInitialFloor] = useState<'ground' | 'first'>('ground');
   const [compiledPayload, setCompiledPayload] = useState<CompassMapPayload | null>(null);
@@ -1003,13 +600,28 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const [foundationReady, setFoundationReady] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const [menuReady, setMenuReady] = useState(false);
   const [menuPage, setMenuPage] = useState(0);
-  const [confirmReplace, setConfirmReplace] = useState<{ cell: GridCellKey, oldRoomId: string, newRoomId: string } | null>(null);
+  const [confirmReplace, setConfirmReplace] = useState<{ cell: GridCellKey; oldLabel: string; oldColor: string; use: string } | null>(null);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
   // Compass map opens with the global NavBar hidden by default — the canvas is
   // the workspace; users press SHOW NAV when they need to navigate elsewhere.
   const [navHidden, setNavHidden] = useState(true);
+  // A draft saved by a newer build is shown, never changed or overwritten (§4.8).
+  const [readOnlyDraft, setReadOnlyDraft] = useState(false);
+  // Refine (§5): the mode, the cell in focus, and the half whose room is being chosen. UI state only:
+  // it is never saved, and leaving it never changes the map.
+  const [refineMode, setRefineMode] = useState(false);
+  const [focusCell, setFocusCell] = useState<CellKey | null>(null);
+  const [focusQuestion, setFocusQuestion] = useState<PickerQuestion | null>(null);
+  const [focusMessage, setFocusMessage] = useState('');
+  const [assignKey, setAssignKey] = useState<RegionKey | null>(null);
+  const [assignReady, setAssignReady] = useState(false);
+  const [assignPage, setAssignPage] = useState(0);
+  const [pickerQuestion, setPickerQuestion] = useState<PickerQuestion | null>(null);
+  const [pickerNotice, setPickerNotice] = useState('');
+  const [refineTouch, setRefineTouch] = useState(0);
 
   // Compass Map is a direct-work screen: open with gaze ready and nav hidden
   // so room placement can begin without a manual gaze-toggle round trip.
@@ -1042,8 +654,6 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   // Auto-hide global nav when the phase advances to placement/review — gives
   // the canvas the full workspace immediately after the foundation survey.
-  // If the user revealed the nav during the survey, it should fold back away
-  // automatically as the actual mapping work starts.
   const lastAutoHidePhaseRef = useRef<string | null>(null);
   useEffect(() => {
     if ((state.phase === 'placement' || state.phase === 'review') && lastAutoHidePhaseRef.current !== state.phase) {
@@ -1057,17 +667,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   const [roomToast, setRoomToast] = useState<{ name: string; color: string; index: number; total: number } | null>(null);
   const roomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Read-only compatibility for plans saved before the Refine Map editor was retired.
-  const [floorRefinements, setFloorRefinements] = useState<CompassFloorRefinements>(() => readCompassFloorRefinements(null));
-  const refinements = floorRefinements[state.currentFloor];
-  const refinementsHydratedRef = useRef(false);
+  // Full-screen choices replace the map while they are open, so no hidden target can answer gaze.
+  const fullScreenOverlay = menuOpen || !!focusCell || !!assignKey;
   // A dialog owns gaze input while open.
-  const isConfirmationOpen = !!confirmReplace || !!confirmGenerate || showRestoreConfirm || showRestartConfirm || showPlanReview || showCompassStudio || showFloorPlanViewer;
+  const isConfirmationOpen = !!confirmReplace || !!confirmGenerate || showRestoreConfirm || showRestartConfirm || showConvertConfirm
+    || showPlanReview || showCompassStudio || showFloorPlanViewer;
+  const overlayOpen = isConfirmationOpen || fullScreenOverlay;
 
   const surveyProcessed = useRef(false);
-  const prevPhaseRef = useRef<CompassPhase>(state.phase);
-  // v5: Removed dwellAnimRef/dwellStartRef — they backed the per-cell rAF
-  // loop driving the now-deleted bottom progress bar.
+  const prevPhaseRef = useRef<string>(state.phase);
   const saveSurveyRef = useRef(ws.saveSurvey);
   const snapshotSurveyRef = useRef(ws.snapshotSurvey);
   const surveyDataRef = useRef(ws.surveyData);
@@ -1082,27 +690,34 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   }, [ws.saveSurvey, ws.snapshotSurvey, ws.surveyData]);
 
   // ── Computed ────────────────────────────────────────────
+  const floorId: FloorId = state.currentFloor;
+  const floor = state.floors[floorId];
+  const below = floorId === 'first' ? state.floors.ground : undefined;
+  const labels = useMemo(() => labelsOf(floor), [floor]);
   const currentRoom = state.phase === 'placement' && state.currentIndex < state.componentQueue.length
     ? state.componentQueue[state.currentIndex] : null;
-  const currentPlacement = useMemo(
-    () => (currentRoom ? state.placements.find((p) => p.roomId === currentRoom.roomId) || null : null),
-    [state.placements, currentRoom],
-  );
-  const occupiedCount = useMemo(() => getOccupiedSet(state.grid).size, [state.grid]);
-  const coveragePercent = computeCoveragePercent(occupiedCount);
+  const owned = ownedCount(floor);
+  const coveragePercent = computeCoveragePercent(owned);
   const pw = state.foundation.plotWidth || 40;
   const pd = state.foundation.plotDepth || 60;
-  const cellWFt = Math.round(pw / GRID_COLS);
-  const cellDFt = Math.round(pd / GRID_ROWS);
+  const { widthIn, depthIn } = plotInches(state);
+  // Exact cell sizes: a 30 ft plot has 7'-6" cells. Labels format them in feet and inches.
+  const cellWFt = pw / GRID_COLS;
+  const cellDFt = pd / GRID_ROWS;
   const facing = state.foundation.facing || 'South';
   const directions = getDirectionLabels(facing);
   const sideLabels = directions;
   const backDir = directions.back;
   const isMultiFloor = state.numFloors === 'Multi-Floor';
-  const groundRoomCount = (state.currentFloor === 'ground' ? state.placements : state.groundFloorData?.placements || []).length;
-  const firstRoomCount = (state.currentFloor === 'first' ? state.placements : state.firstFloorData?.placements || []).length;
-  const canPreviewPlan = groundRoomCount > 0 && !state.pendingExpansion;
-
+  const groundRoomCount = state.floors.ground.rooms.length;
+  const firstRoomCount = state.floors.first.rooms.length;
+  const canPreviewPlan = groundRoomCount > 0;
+  const floorName = floorId === 'first' ? 'First floor' : 'Ground floor';
+  // Details saved by the retired Refine Map: read-only, and their cells locked, until the map is converted.
+  const legacyLocked = !!state.legacy && !state.legacy.converted;
+  const lockedCells = useMemo(() => legacyCells(state.legacy, floorId), [state.legacy, floorId]);
+  const floorRefinements = useMemo(() => refinementsFromLegacy(legacyLocked ? state.legacy : undefined), [state.legacy, legacyLocked]);
+  const colourOf = (use: string | null | undefined) => libraryOf(use)?.color || '#78909C';
 
   // ── Room change toast — show briefly when currentIndex changes ──
   useEffect(() => {
@@ -1138,64 +753,43 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     setSurveyLoading(false);
     dispatch({
       type: 'PREFILL_FOUNDATION',
-      foundation: {
-        // v6: Default facing changed 'South' → 'West' per ALS user preference
-        // (most common Indian residential orientation in our test bed). Plot
-        // size 40×60 kept as before — both are tweakable in the foundation
-        // questions, this is just the pre-fill so a power user can SKIP through.
-        facing: 'West',
-        plotWidth: 40,
-        plotDepth: 60,
-        plotType: 'Middle Plot',
-        numFloors,
-      },
+      // Default facing West, 40 x 60 ft (the most common plot in the test bed); every answer stays editable.
+      foundation: { facing: 'West', plotWidth: 40, plotDepth: 60, plotType: 'Middle Plot', numFloors },
       numFloors,
     });
     onSpeak(`${speakMsg} Please answer facing and floor count to begin mapping.`);
   }, [onSpeak]);
 
-  // ── Session Resume (same app run only) ─────────────────────
-  // v6 BUGFIX: Removed COMPASS_LAST_BACKUP_KEY from the auto-hydration list.
-  // Previously: when the user clicked "Restart Map", we moved the current draft
-  // into LAST_BACKUP (so the explicit "LOAD PREVIOUS SESSION" button could still
-  // recover it) and cleared SESSION + PRIMARY. But this same hydration block was
-  // also reading LAST_BACKUP and picking the "best" of the three — so after the
-  // user navigated to Home and came back, it auto-restored the cells they had
-  // just intentionally deleted. Worse, line 1135 then wrote it back to PRIMARY,
-  // effectively un-doing the Restart.
-  //
-  // Correct contract:
-  //   - Auto-hydration on mount  → SESSION + PRIMARY only (current/in-progress work)
-  //   - LAST_BACKUP              → ONLY via the explicit "LOAD PREVIOUS SESSION"
-  //                                button in the foundation screen (line ~1957)
-  //
-  // This means: if you never clicked Restart, you resume exactly where you left
-  // off. If you clicked Restart, you get a clean slate next time you open the
-  // screen — and the "Load Previous Session" button is still there if you change
-  // your mind.
+  // ── Session resume (same app run only) ─────────────────────
+  // Auto-hydration reads only the session and primary drafts (current work). The last-session backup is
+  // reached only through LOAD PREVIOUS SESSION, so a Restart is never undone by reopening the screen.
+  // Version 2 keys first; a version 1 draft is migrated once (its keys stay untouched for a rollback build).
+  const hydrate = useCallback((parsed: ParsedDraft, raw: string | null, spoken: string) => {
+    dispatch({ type: 'HYDRATE', state: parsed.state });
+    surveyProcessed.current = true;
+    setReadOnlyDraft(parsed.newer);
+    const notices = parsed.notices.length ? ` ${parsed.notices.join(' ')}` : '';
+    onSpeak(parsed.newer ? 'This map was saved by a newer version of GazeConnect. It is shown read-only.' : `${spoken}${notices}`);
+    if (raw && !parsed.newer && !parsed.fromV1) {
+      try { localStorage.setItem(DRAFT_KEYS.primary, raw); } catch { /* Ignore storage write errors. */ }
+    }
+  }, [onSpeak]);
+
   useEffect(() => {
     let restoredFromDraft = false;
     try {
-      const rawDraft = sessionStorage.getItem(COMPASS_DRAFT_KEY);
-      const rawBackup = localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY);
-      const draftToLoad = pickBestDraftRaw([rawDraft, rawBackup]);
-      if (draftToLoad) {
-        const draft = parseCompassDraft(draftToLoad);
-        if (draft && draft.state) {
-          try {
-            localStorage.setItem(COMPASS_PRIMARY_BACKUP_KEY, draftToLoad);
-          } catch {
-            // Ignore storage write errors.
-          }
-          dispatch({ type: 'HYDRATE_DRAFT', draft: draft.state });
-          setFloorRefinements(readCompassFloorRefinements(draft));
-          refinementsHydratedRef.current = true;
-          surveyProcessed.current = true;
+      const v2 = bestDraft([sessionStorage.getItem(DRAFT_KEYS.session), localStorage.getItem(DRAFT_KEYS.primary)], queueFor);
+      if (v2) {
+        hydrate(v2.parsed, v2.raw, 'Compass progress restored. Continue from where you left off.');
+        restoredFromDraft = true;
+      } else if (!localStorage.getItem(MIGRATED_KEY)) {
+        const v1 = bestDraft([sessionStorage.getItem(V1_KEYS.session), localStorage.getItem(V1_KEYS.primary)], queueFor);
+        if (v1 && draftScore(v1.parsed) > 0) {
+          hydrate(v1.parsed, null, 'Your Compass map was updated to the new map. Continue from where you left off.');
           restoredFromDraft = true;
-          setSurveyLoading(false);
-          onSpeak('Compass progress restored. Continue from where you left off.');
         }
       }
+      if (restoredFromDraft) setSurveyLoading(false);
     } catch {
       // Ignore malformed local draft payloads.
     }
@@ -1204,7 +798,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       if (!restoredFromDraft) setSurveyLoading(false);
     }, 900);
     return () => clearTimeout(t);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (surveyProcessed.current || surveyLoading) return;
@@ -1226,6 +820,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const pt = ptRaw ? (ptMap[ptRaw] || ptRaw) : null;
     const nf = (a.num_floors as string) || 'Single Floor';
     const nfNorm = (nf === 'Ground Only' || nf === 'Single Floor') ? 'Single Floor' : 'Multi-Floor';
+    // The kitchen is open to the living hall unless the survey asked for a closed kitchen (§4.7).
+    const answers = (a.answers && typeof a.answers === 'object' ? a.answers : a) as Record<string, any>;
+    if (/closed/i.test(String(answers.gf_kitchen_config || ''))) dispatch({ type: 'SET_CHOICE', key: 'kitchen', value: 'closed' });
     dispatch({
       type: 'PREFILL_FOUNDATION',
       foundation: {
@@ -1240,128 +837,76 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     onSpeak('Survey defaults loaded. Please confirm house facing and number of floors.');
   }, [ws.surveyData, surveyLoading, onSpeak, startWithDefaultFoundation]);
 
+  // ── Local draft: every change, version 2 keys only ──
   useEffect(() => {
-    if (surveyLoading) return;
+    if (surveyLoading || readOnlyDraft) return;
     try {
-      const persistedState: CompassState = {
-        ...state,
-        history: [],
-        armed: false,
-        pendingExpansion: null,
-      };
-      const draftPayload: CompassDraftPayload = {
-        version: COMPASS_DRAFT_VERSION,
-        state: persistedState,
-        refinements, // Legacy active-floor field for older app versions.
-        advancedFloorMetadata: buildCompassFloorMetadata(floorRefinements),
-      };
-      const jsonPayload = JSON.stringify(draftPayload);
-      const previousPrimary = localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY);
-      if (previousPrimary && previousPrimary !== jsonPayload) {
-        const previousParsed = parseCompassDraft(previousPrimary);
-        const previousPlacementCount = previousParsed?.state?.placements?.length ?? 0;
-        if (previousPlacementCount > 0) {
-          localStorage.setItem(COMPASS_LAST_BACKUP_KEY, previousPrimary);
-        }
+      const json = JSON.stringify(draftFromState(state));
+      const previousPrimary = localStorage.getItem(DRAFT_KEYS.primary);
+      if (previousPrimary && previousPrimary !== json) {
+        const previous = parseDraft(previousPrimary, queueFor);
+        if (previous && draftScore(previous) >= 100) localStorage.setItem(DRAFT_KEYS.last, previousPrimary);
       }
-      sessionStorage.setItem(COMPASS_DRAFT_KEY, jsonPayload);
-      localStorage.setItem(COMPASS_PRIMARY_BACKUP_KEY, jsonPayload);
+      sessionStorage.setItem(DRAFT_KEYS.session, json);
+      localStorage.setItem(DRAFT_KEYS.primary, json);
+      localStorage.setItem(MIGRATED_KEY, '1');
     } catch {
       // Ignore storage write errors.
     }
-  }, [state, refinements, floorRefinements, surveyLoading]);
+  }, [state, surveyLoading, readOnlyDraft]);
 
   useEffect(() => {
     if (state.phase === 'foundation') setFoundationReady(false);
   }, [state.foundationStep, state.phase]);
 
   useEffect(() => {
-    if (menuOpen) { setMenuReady(false); setMenuPage(Math.floor(state.currentIndex / 8)); }
+    if (menuOpen) { setMenuReady(false); setMenuPage(Math.floor(state.currentIndex / PICKER_PAGE)); }
   }, [menuOpen, state.currentIndex, state.currentFloor]);
 
   // ── Phase Speech ────────────────────────────────────────
   useEffect(() => {
     if (prevPhaseRef.current === 'placement' && state.phase === 'review') {
-      const mapped = new Set(state.placements.map((p) => p.roomId)).size;
+      const mapped = new Set(floor.rooms.map((r) => r.use)).size;
       const total = state.componentQueue.length;
-      onSpeak(`${state.currentFloor === 'first' ? 'First floor' : 'Ground floor'} sequence complete. ${mapped} of ${total} rooms mapped, ${coveragePercent}% coverage.`);
+      onSpeak(`${floorName} sequence complete. ${mapped} of ${total} rooms mapped, ${coveragePercent}% coverage.`);
     }
     prevPhaseRef.current = state.phase;
-  }, [state.phase, state.placements, state.componentQueue.length, coveragePercent, state.currentFloor, onSpeak]);
-
-  useEffect(() => {
-    if (state.pendingExpansion) onSpeak(`${state.pendingExpansion.room.roomLabel} can expand. Choose direction or keep single cell.`);
-  }, [state.pendingExpansion, onSpeak]);
-
-  // ── Expansion Delay ─────────────────────────────────────
-  useEffect(() => {
-    if (state.pendingExpansion) { setExpansionReady(false); const t = setTimeout(() => setExpansionReady(true), 400); return () => clearTimeout(t); }
-    setExpansionReady(false); return undefined;
-  }, [state.pendingExpansion]);
-
-  // ── v5: Dwell-to-Select Timer + helpers DELETED ────────────
-  // The old custom dwell timer (2000ms, rAF-driven) duplicated the dwell
-  // behaviour that GazeButton already provides. Cells now use GazeButton's
-  // built-in dwell (set via dwellCategory="compassMapAction" on the cell render). This:
-  //   - removes ~one rAF loop per cell hover (CPU win on 16 cells)
-  //   - kills the "two animations competing for foveal attention" problem
-  //   - keeps cell dwell scaling with the Compass setting via the local
-  //     dwellCategory="compassMapAction" so user dwell settings remain centralized.
+  }, [state.phase, floor, state.componentQueue.length, coveragePercent, floorName, onSpeak]);
 
   // ── Auto-disarm 45s ─────────────────────────────────────
   useEffect(() => {
     if (!state.armed) return;
-    const t = setTimeout(() => { dispatch({ type: 'DISARM_GRID' }); onSpeak('Grid disarmed due to inactivity.'); }, 45000);
+    const t = setTimeout(() => { dispatch({ type: 'DISARM_GRID' }); onSpeak('Grid disarmed due to inactivity.'); }, COMPASS_IDLE_MS);
     return () => clearTimeout(t);
   }, [state.armed, onSpeak]);
 
-  // ── Keyboard Shortcuts ──────────────────────────────────
+  const endRefine = useCallback((spoken?: string) => {
+    setRefineMode(false); setFocusCell(null); setFocusQuestion(null); setFocusMessage('');
+    setAssignKey(null); setPickerQuestion(null); setPickerNotice('');
+    if (spoken) onSpeak(spoken);
+  }, [onSpeak]);
+
+  // The same 45 quiet seconds that disarm the grid end Refine on the map (§5.1), with speech: there every cell
+  // answers to gaze without READY. The focus view and the room picker are deliberate overlays with their own
+  // Back, like the room menu, so they stay open. Leaving Refine never changes the map.
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); dws({ type: 'UNDO' }); return; }
-      if (e.key === 'Escape') { if (menuOpen) { setMenuOpen(false); return; } if (state.pendingExpansion) dws({ type: 'EXPAND_ROOM', direction: 'none' }); else if (state.armed) dws({ type: 'DISARM_GRID' }); return; }
-      if (state.phase !== 'placement') return;
-      if (e.key.toLowerCase() === 'r' && !state.pendingExpansion) dws({ type: state.armed ? 'DISARM_GRID' : 'ARM_GRID' });
-      else if (e.key.toLowerCase() === 'n' && !state.pendingExpansion) dws({ type: 'NEXT_ROOM' });
-      else if (e.key.toLowerCase() === 'u') dws({ type: 'UNDO' });
-      else if (e.key.toLowerCase() === 'k' && state.pendingExpansion) dws({ type: 'EXPAND_ROOM', direction: 'none' });
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [state.phase, state.armed, state.pendingExpansion, menuOpen]);
+    if (!refineMode || focusCell || assignKey) return;
+    const t = setTimeout(() => endRefine('Refine ended after 45 quiet seconds.'), COMPASS_IDLE_MS);
+    return () => clearTimeout(t);
+  }, [refineMode, refineTouch, focusCell, assignKey, state.floors, endRefine]);
+  const touchRefine = () => setRefineTouch(n => n + 1);
 
   // ── dispatchWithSpeech ──────────────────────────────────
-  const dws = useCallback((action: CompassAction) => {
+  const dws = useCallback((action: CompassActionV2) => {
     switch (action.type) {
       case 'ARM_GRID': if (currentRoom) onSpeak(`Grid ready. Place ${currentRoom.roomLabel}.`); break;
       case 'DISARM_GRID': onSpeak('Grid disarmed.'); break;
-      case 'PLACE_ROOM': {
-        const { row, col } = parseCellKey(action.cell);
-        if (currentRoom) {
-          const existingRoomId = state.grid[action.cell]?.roomId;
-          if (existingRoomId === currentRoom.roomId) {
-            onSpeak(`${currentRoom.roomLabel} removed from row ${row}, column ${col}.`);
-          } else if (existingRoomId && existingRoomId !== currentRoom.roomId) {
-            const takenBy = ROOM_LIBRARY[existingRoomId]?.roomLabel || 'another room';
-            onSpeak(`Cell row ${row}, column ${col} is already used by ${takenBy}.`);
-          } else {
-            // #2 — voice confirmation on placement
-            const zoneRow = row === 4 ? 'Back' : row === 3 ? 'Inner back' : row === 2 ? 'Inner front' : 'Front';
-            const zoneCol = col === 1 ? 'Left' : col === 2 ? 'Left centre' : col === 3 ? 'Right centre' : 'Right';
-            onSpeak(`${currentRoom.roomLabel} placed. ${zoneRow}, ${zoneCol} zone.`);
-          }
-        }
-        break;
-      }
-      case 'EXPAND_ROOM': if (state.pendingExpansion) { const rm = state.pendingExpansion.room; onSpeak(action.direction === 'none' ? `Keeping ${rm.roomLabel} in single cell.` : `${rm.roomLabel} expanded ${action.direction}.`); } break;
       case 'NEXT_ROOM': {
         if (!state.armed) {
           onSpeak('Press READY first.');
           break;
         }
-        const currentHasCells = currentRoom
-          ? state.placements.some((p) => p.roomId === currentRoom.roomId)
-          : false;
+        const currentHasCells = currentRoom ? roomsOfUse(floor, currentRoom.roomId).length > 0 : false;
         const next = state.currentIndex + 1 < state.componentQueue.length ? state.componentQueue[state.currentIndex + 1] : null;
         if (!currentHasCells && currentRoom) {
           if (next) onSpeak(`${currentRoom.roomLabel} left unplaced. Next room: ${next.roomLabel}.`);
@@ -1374,31 +919,34 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       }
       case 'SKIP_ROOM': if (currentRoom) { const next = state.currentIndex + 1 < state.componentQueue.length ? state.componentQueue[state.currentIndex + 1] : null; onSpeak(`Skipped ${currentRoom.roomLabel}.${next ? ` Next: ${next.roomLabel}.` : ''}`); } break;
       case 'UNDO':
-        if (!state.armed) {
-          onSpeak('Press READY first.');
-          break;
-        }
-        if (state.history.length > 0) {
-          const p = state.history[state.history.length - 1];
-          const rm = state.componentQueue[p.currentIndex];
-          if (rm) onSpeak(`Undone. Re-placing ${rm.roomLabel}.`);
-        }
+        onSpeak(state.history.length > 0 ? 'Undone.' : 'Nothing to undo.');
         break;
-      case 'REMOVE_PLACED_ROOM': { const t = state.placements.find((p) => p.placementId === action.placementId); if (t) onSpeak(`${t.roomLabel} removed.`); break; }
       case 'RESET': onSpeak('Map cleared. Starting fresh.'); break;
+      default: break;
     }
     dispatch(action);
-  }, [currentRoom, state, onSpeak]);
+  }, [currentRoom, state, floor, onSpeak]);
 
-  // ── Expansion Direction ─────────────────────────────────
-  const getExpDir = useCallback((cellKey: GridCellKey): ExpansionDirection | null => {
-    if (!state.pendingExpansion) return null;
-    const { anchorCell, validDirections } = state.pendingExpansion;
-    const a = parseCellKey(anchorCell);
-    if (validDirections.includes('right') && a.col < GRID_COLS && cellKey === buildCellKey(a.row, a.col + 1)) return 'right';
-    if (validDirections.includes('down') && a.row < GRID_ROWS && cellKey === buildCellKey(a.row + 1, a.col)) return 'down';
-    return null;
-  }, [state.pendingExpansion]);
+  // ── Keyboard Shortcuts ──────────────────────────────────
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); if (!readOnlyDraft) dws({ type: 'UNDO' }); return; }
+      if (e.key === 'Escape') {
+        if (assignKey) { setAssignKey(null); setPickerQuestion(null); setPickerNotice(''); return; }
+        if (focusCell) { setFocusCell(null); setFocusQuestion(null); setFocusMessage(''); return; }
+        if (menuOpen) { setMenuOpen(false); return; }
+        if (refineMode) { endRefine('Refine done.'); return; }
+        if (state.armed) dws({ type: 'DISARM_GRID' });
+        return;
+      }
+      if (state.phase !== 'placement' || refineMode || menuOpen) return;
+      if (e.key.toLowerCase() === 'r') dws({ type: state.armed ? 'DISARM_GRID' : 'ARM_GRID' });
+      else if (e.key.toLowerCase() === 'n') dws({ type: 'NEXT_ROOM' });
+      else if (e.key.toLowerCase() === 'u' && !readOnlyDraft) dws({ type: 'UNDO' });
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [state.phase, state.armed, menuOpen, refineMode, focusCell, assignKey, readOnlyDraft, dws, endRefine]);
 
   // ── Foundation Handler ──────────────────────────────────
   const handleFoundationAnswer = useCallback((value: string) => {
@@ -1408,7 +956,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     if (!q) return;
     setFoundationReady(false);
     const parsed = q.parse ? q.parse(value) : value;
-    dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: parsed });
+    dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: parsed, total: FOUNDATION_QUESTIONS.length });
     const remaining = FOUNDATION_QUESTIONS.length - state.foundationStep - 1;
     if (remaining > 0) { onSpeak(`Selected ${value}. ${remaining} question${remaining > 1 ? 's' : ''} remaining.`); }
     else { onSpeak('Foundation complete. Starting room placement.'); }
@@ -1419,147 +967,109 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     }
   }, [state.foundationStep, state.foundation.numFloors, onSpeak]);
 
+  // ── The version 1 map: for the original studio (flag off), the saved-plan viewer and older backend readers ──
+  const legacyPayload = useCallback((): CompassMapPayload | null => {
+    const map = legacyMapOf(state);
+    return map ? attachCompassFloorRefinements(map, floorRefinements, floorId) as CompassMapPayload : null;
+  }, [state, floorRefinements, floorId]);
+
+  // The backend copy: the canonical plan, beside the derived version 1 fields older readers expect (§4.8).
+  // Both travel in compass_map, so they are always saved together.
+  const surveyPayload = useCallback((source: string) => {
+    const copy = backendCopy(state);
+    const legacy = legacyPayload();
+    const compassMap = { ...(legacy ? withEmptyCells(legacy) : copy.compass_map), compass_plan: copy.compass_plan, saved_at: new Date().toISOString() };
+    return { ...(surveyDataRef.current || {}), compass_map: compassMap, source };
+  }, [state, legacyPayload]);
+
   // ── Save Handler ────────────────────────────────────────
   const handleSave = useCallback(() => {
-    const mkPlacements = (pl: PlacementRecord[]) => pl.map((p) => ({
-      room: p.roomLabel, roomId: p.roomId, placementId: p.placementId, cells: p.occupiedCells,
-      coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
-      cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-      area_sqft: Math.round(p.occupiedCells.reduce((area, cell) => {
-        const rect = cellToRect(cell, pw, pd);
-        return area + (rect.x2 - rect.x1) * (rect.y2 - rect.y1);
-      }, 0)),
-    }));
-
-    let payload: any = {
-      grid_size: { rows: GRID_ROWS, cols: GRID_COLS },
-      plot: { width_ft: pw, depth_ft: pd, facing, type: state.foundation.plotType, num_floors: state.numFloors },
-      cell_size_ft: { width: cellWFt, depth: cellDFt },
-      saved_at: new Date().toISOString(),
-      advanced_refinements: refinements,
-    };
-
-    if (state.currentFloor === 'first' && state.groundFloorData) {
-      payload.ground_floor = { placements: mkPlacements(state.groundFloorData.placements), coverage_percent: state.groundFloorData.coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.groundFloorData!.grid[k]?.roomId) };
-      payload.first_floor = { placements: mkPlacements(state.placements), coverage_percent: coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.grid[k]?.roomId) };
-    } else if (state.currentFloor === 'ground' && state.firstFloorData) {
-      payload.ground_floor = { placements: mkPlacements(state.placements), coverage_percent: coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.grid[k]?.roomId) };
-      payload.first_floor = { placements: mkPlacements(state.firstFloorData.placements), coverage_percent: state.firstFloorData.coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.firstFloorData!.grid[k]?.roomId) };
-    } else {
-      payload.ground_floor = { placements: mkPlacements(state.placements), coverage_percent: coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.grid[k]?.roomId) };
-    }
-
-    payload = attachCompassFloorRefinements(payload, floorRefinements, state.currentFloor);
-    const existing = surveyDataRef.current || {};
-    saveSurveyRef.current?.({ ...existing, compass_map: payload, source: 'compass-map-manual' });
+    if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
+    const payload = surveyPayload('compass-map-manual');
+    saveSurveyRef.current?.(payload);
     if (typeof snapshotSurveyRef.current === 'function') {
-      snapshotSurveyRef.current({ ...existing, compass_map: payload, source: 'compass-map-manual' });
+      snapshotSurveyRef.current(payload);
     }
-    onSpeak(`Compass Map saved. ${state.placements.length} rooms placed.`);
+    onSpeak(`Compass Map saved. ${floor.rooms.length} rooms placed.`);
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 5000);
-  }, [state, pw, pd, cellWFt, cellDFt, coveragePercent, facing, onSpeak, refinements, floorRefinements]);
+  }, [surveyPayload, floor.rooms.length, onSpeak, readOnlyDraft]);
 
-  // ── Autosave: silently save after each placement change ───
-  const placementCount = state.placements.length;
-  const autosavePhase = state.phase;
+  // ── Autosave: silently save after each change ───
+  const roomTotal = groundRoomCount + firstRoomCount;
   useEffect(() => {
-    if (placementCount === 0) return;
-    if (autosavePhase !== 'placement' && autosavePhase !== 'review') return;
+    if (roomTotal === 0 || readOnlyDraft) return;
+    if (state.phase !== 'placement' && state.phase !== 'review') return;
     // Debounce and save only when there is meaningful new layout data.
     const t = setTimeout(() => {
-      const mkPlacements = (pl: PlacementRecord[]) => pl.map((p) => ({
-        room: p.roomLabel, roomId: p.roomId, placementId: p.placementId, cells: p.occupiedCells,
-        coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
-        cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-        area_sqft: Math.round(p.occupiedCells.reduce((area, cell) => {
-          const rect = cellToRect(cell, pw, pd);
-          return area + (rect.x2 - rect.x1) * (rect.y2 - rect.y1);
-        }, 0)),
-      }));
-      let payload: any = {
-        grid_size: { rows: GRID_ROWS, cols: GRID_COLS },
-        plot: { width_ft: pw, depth_ft: pd, facing, type: state.foundation.plotType, num_floors: state.numFloors },
-        cell_size_ft: { width: cellWFt, depth: cellDFt },
-        saved_at: new Date().toISOString(),
-        advanced_refinements: refinements,
-      };
-      if (state.currentFloor === 'first' && state.groundFloorData) {
-        payload.ground_floor = { placements: mkPlacements(state.groundFloorData.placements), coverage_percent: state.groundFloorData.coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.groundFloorData!.grid[k]?.roomId) };
-        payload.first_floor = { placements: mkPlacements(state.placements), coverage_percent: coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.grid[k]?.roomId) };
-      } else if (state.currentFloor === 'ground' && state.firstFloorData) {
-        payload.ground_floor = { placements: mkPlacements(state.placements), coverage_percent: coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.grid[k]?.roomId) };
-        payload.first_floor = { placements: mkPlacements(state.firstFloorData.placements), coverage_percent: state.firstFloorData.coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.firstFloorData!.grid[k]?.roomId) };
-      } else {
-        payload.ground_floor = { placements: mkPlacements(state.placements), coverage_percent: coveragePercent, empty_cells: ALL_CELL_KEYS.filter((k: GridCellKey) => !state.grid[k]?.roomId) };
-      }
-      payload = attachCompassFloorRefinements(payload, floorRefinements, state.currentFloor);
-      const fingerprintPayload = { ...payload };
-      delete (fingerprintPayload as Record<string, any>).saved_at;
-      const fingerprint = JSON.stringify({
-        floor: state.currentFloor,
-        coverage: coveragePercent,
-        placements: state.placements.length,
-        payload: fingerprintPayload,
-      });
-
+      const fingerprint = JSON.stringify(backendCopy(state).compass_plan);
       if (fingerprint === lastAutosaveFingerprintRef.current) {
         return;
       }
-
       const now = Date.now();
       if (now - lastAutosaveAtRef.current < COMPASS_AUTOSAVE_MIN_INTERVAL_MS) {
         return;
       }
-
-      const existing = surveyDataRef.current || {};
-      saveSurveyRef.current?.({ ...existing, compass_map: payload, source: 'compass-map-autosave' });
+      const payload = surveyPayload('compass-map-autosave');
+      saveSurveyRef.current?.(payload);
       lastAutosaveAtRef.current = now;
       lastAutosaveFingerprintRef.current = fingerprint;
-
       if (
         typeof snapshotSurveyRef.current === 'function'
         && now - lastSnapshotAtRef.current >= COMPASS_SNAPSHOT_MIN_INTERVAL_MS
       ) {
-        snapshotSurveyRef.current({ ...existing, compass_map: payload, source: 'compass-map-autosave' });
+        snapshotSurveyRef.current(payload);
         lastSnapshotAtRef.current = now;
       }
     }, COMPASS_AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [placementCount, autosavePhase, state, pw, pd, cellWFt, cellDFt, coveragePercent, facing, refinements, floorRefinements]);
+  }, [roomTotal, state, surveyPayload, readOnlyDraft]);
 
   // ── Restart Survey Handler ────────────────────────────────
   const handleRestartCompass = useCallback(() => {
+    // A newer version's map is never overwritten (§4.8), so it cannot be restarted here either.
+    if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
     setShowRestartConfirm(true);
-  }, []);
+  }, [readOnlyDraft, onSpeak]);
 
   const executeRestartCompass = useCallback(() => {
     try {
-      const primary = localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY);
-      const sessionDraft = sessionStorage.getItem(COMPASS_DRAFT_KEY);
-      const bestBeforeReset = pickBestDraftRaw([primary, sessionDraft]);
-      if (bestBeforeReset) {
-        const parsed = parseCompassDraft(bestBeforeReset);
-        const placementCount = parsed?.state?.placements?.length ?? 0;
-        if (placementCount > 0) {
-          localStorage.setItem(COMPASS_LAST_BACKUP_KEY, bestBeforeReset);
-        }
+      const bestBeforeReset = bestDraft([localStorage.getItem(DRAFT_KEYS.primary), sessionStorage.getItem(DRAFT_KEYS.session)], queueFor);
+      if (bestBeforeReset && draftScore(bestBeforeReset.parsed) >= 100) {
+        localStorage.setItem(DRAFT_KEYS.last, bestBeforeReset.raw);
       }
-      sessionStorage.removeItem(COMPASS_DRAFT_KEY);
-      localStorage.removeItem(COMPASS_PRIMARY_BACKUP_KEY);
-    } catch (e) { }
+      sessionStorage.removeItem(DRAFT_KEYS.session);
+      localStorage.removeItem(DRAFT_KEYS.primary);
+      localStorage.setItem(MIGRATED_KEY, '1');
+    } catch { /* Storage may be unavailable. */ }
     dispatch({ type: 'RESET', queue: initialQueue });
-    // Clear all cell-level refinements (splits, walls, voids, rotations,
-    // expansions, layouts, vastu flags, etc.) so the user gets a truly clean
-    // canvas — no leftover ✦ stars on cells they previously edited.
-    setFloorRefinements(readCompassFloorRefinements(null));
-    refinementsHydratedRef.current = true;
     setAcceptedCompassPlan(null);
+    setReadOnlyDraft(false);
+    endRefine();
     try { localStorage.removeItem(COMPASS_ACCEPTED_PLAN_KEY); } catch { /* Storage may be unavailable. */ }
     setFoundationReady(false);
     setShowRestartConfirm(false);
     onSpeak('Map reset. Please answer the foundation questions again.');
-  }, [initialQueue, onSpeak]);
+  }, [initialQueue, onSpeak, endRefine]);
+
+  /** Whether LOAD PREVIOUS SESSION has anything to load (the frozen version 1 draft only before migration). */
+  const hasSavedDraft = () => {
+    try {
+      return !!(localStorage.getItem(DRAFT_KEYS.primary) || localStorage.getItem(DRAFT_KEYS.last)
+        || (!localStorage.getItem(MIGRATED_KEY) && (localStorage.getItem(V1_KEYS.primary) || localStorage.getItem(V1_KEYS.last))));
+    } catch { return false; }
+  };
+
+  const restorePrevious = () => {
+    try {
+      let best = bestDraft([localStorage.getItem(DRAFT_KEYS.primary), localStorage.getItem(DRAFT_KEYS.last)], queueFor);
+      if (!best && !localStorage.getItem(MIGRATED_KEY)) {
+        best = bestDraft([localStorage.getItem(V1_KEYS.primary), localStorage.getItem(V1_KEYS.last)], queueFor);
+      }
+      if (best) hydrate(best.parsed, best.parsed.fromV1 ? null : best.raw, 'Previous session restored.');
+    } catch { /* Ignore malformed drafts. */ }
+    setShowRestoreConfirm(false);
+  };
 
   const requestPlanCandidates = useCallback(async (payload: CompassMapPayload) => {
     const requestId = ++planReviewRequestId.current;
@@ -1595,69 +1105,243 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     onSpeak(`${result.candidates.length} geometry-checked ${result.candidates.length === 1 ? 'design' : 'designs'} ready. Review the first design.`);
   }, [onSpeak, viewerSeedNotes, ws.surveyData]);
 
-  // Compile the unchanged Compass Map choices, then review validated plans.
+  // The saved-plan viewer for maps that still hold details from the retired Refine Map.
+  const openLegacyReview = useCallback(() => {
+    const payload = legacyPayload();
+    setShowCompassStudio(false);
+    if (!payload) { onSpeak('This map uses divided cells; open it in the Compass studio.'); return; }
+    setCompiledPayload(payload);
+    setPlanReviewSource(payload);
+    setShowPlanReview(true);
+    void requestPlanCandidates(payload);
+  }, [legacyPayload, requestPlanCandidates, onSpeak]);
+
+  // ── Generate: the one canonical plan goes to the studio ──
   const handleGenerateFloorPlan = useCallback((scope: CompassPlanScope = 'ground') => {
-    const payload = compileCompassPayload(
-      state.foundation,
-      state.placements.map((p) => ({
-        placementId: p.placementId,
-        roomId: p.roomId,
-        roomLabel: p.roomLabel,
-        occupiedCells: p.occupiedCells,
-        coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
-        cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-      })),
-      GRID_ROWS,
-      GRID_COLS,
-      coveragePercent,
-      state.groundFloorData ? {
-        placements: state.groundFloorData.placements.map((p) => ({
-          placementId: p.placementId,
-          roomId: p.roomId,
-          roomLabel: p.roomLabel,
-          occupiedCells: p.occupiedCells,
-          coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
-          cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-        })),
-        coveragePercent: state.groundFloorData.coveragePercent,
-      } : null,
-      state.firstFloorData ? {
-        placements: state.firstFloorData.placements.map((p) => ({
-          placementId: p.placementId,
-          roomId: p.roomId,
-          roomLabel: p.roomLabel,
-          occupiedCells: p.occupiedCells,
-          coords: cellsToBoundingRect(p.occupiedCells, pw, pd),
-          cellRects: Object.fromEntries(p.occupiedCells.map((c: GridCellKey) => [c, cellToRect(c, pw, pd)])),
-        })),
-        coveragePercent: state.firstFloorData.coveragePercent,
-      } : null,
-      state.currentFloor,
-    );
-    const source = attachCompassFloorRefinements(payload, floorRefinements, state.currentFloor);
-    setCompiledPayload(source);
-    setPlanReviewSource(source);
+    let plan: CompassPlanV2;
+    try {
+      plan = normalisePlan(planFromState(state));
+    } catch {
+      onSpeak('The map could not be read. Please check the plot answers.');
+      return;
+    }
     setStudioScope(scope);
+    if (v2Enabled) {
+      setStudioPlan(plan);
+    } else {
+      // GAZECONNECT_COMPASS_V2=0: the original studio, which can draw only undivided maps.
+      const payload = legacyPayload();
+      if (!payload) { onSpeak('This map has divided cells. The new Compass studio is needed to draw them.'); return; }
+      setCompiledPayload(payload);
+      setPlanReviewSource(payload);
+    }
     setShowCompassStudio(true);
     onSpeak(scope === 'ground' ? 'Opening the ground floor plan. Your first floor draft is kept.' : 'Opening both floors.');
-  }, [state, pw, pd, coveragePercent, onSpeak, floorRefinements]);
+  }, [state, onSpeak, v2Enabled, legacyPayload]);
 
-  // Hydrate once: later backend echoes must not overwrite in-progress edits.
-  useEffect(() => {
-    if (refinementsHydratedRef.current) return;
-    const compassMap = (ws.surveyData as any)?.compass_map;
-    if (compassMap) {
-      setFloorRefinements(readCompassFloorRefinements(compassMap, state.currentFloor));
-      refinementsHydratedRef.current = true;
-    }
-  }, [ws.surveyData, state.currentFloor]);
-
-  const switchCompassFloor = (floor: FloorType) => {
-    if (floor === state.currentFloor) return;
-    dispatch({ type: 'SWITCH_FLOOR', floor });
+  const switchCompassFloor = (next: FloorType) => {
+    if (next === state.currentFloor) return;
+    if (refineMode) endRefine();
+    dispatch({ type: 'SWITCH_FLOOR', floor: next, queue: queueFor(next) });
   };
 
-  // ─── Gaze Toggle ────────────────────────────────────────
+  // ── Placement: a dwell on a whole cell while a room is armed ──
+  const commitPlacement = (outcome: PlaceOutcome, cellKey: GridCellKey) => {
+    if (outcome.kind === 'refused') { onSpeak(outcome.message); return; }
+    if (outcome.kind === 'confirm-replace') {
+      if (!currentRoom) return;
+      setConfirmReplace({ cell: cellKey, oldLabel: outcome.victimLabel, oldColor: colourOf(outcome.victim.use), use: currentRoom.roomId });
+      onSpeak(`Replace ${outcome.victimLabel} with ${currentRoom.roomLabel}?`);
+      return;
+    }
+    dispatch({ type: 'COMMIT_FLOOR', floor: outcome.floor, activeRoomId: outcome.activeRoomId });
+    const added = !!outcome.roomId && outcome.floor.rooms.some(r => r.id === outcome.roomId && r.regions.includes(cellKey as RegionKey));
+    if (!added) { onSpeak(outcome.message); return; }
+    // Voice confirmation on placement
+    const { row, col } = parseCellKey(cellKey);
+    const zoneRow = row === 4 ? 'Back' : row === 3 ? 'Inner back' : row === 2 ? 'Inner front' : 'Front';
+    const zoneCol = col === 1 ? 'Left' : col === 2 ? 'Left centre' : col === 3 ? 'Right centre' : 'Right';
+    onSpeak(`${outcome.message} ${zoneRow}, ${zoneCol} zone.`);
+  };
+
+  const onCellClick = (cellKey: GridCellKey) => {
+    if (overlayOpen) return;
+    if (lockedCells.has(cellKey)) {
+      onSpeak('This cell has saved plan details. View them using Generate Plan.');
+      return;
+    }
+    if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
+    if (refineMode) { openFocus(cellKey); return; }
+    if (state.phase !== 'placement') return;
+    if (!state.armed) { onSpeak('Press READY first.'); return; }
+    if (!currentRoom) return;
+    commitPlacement(placeCell(state, cellKey, currentRoom.roomId, false, below), cellKey);
+  };
+
+  // ── Refine (§5): a cell in focus, then the room for one of its halves ──
+  const toggleRefine = () => {
+    if (overlayOpen) return;
+    if (refineMode) { endRefine('Refine done.'); return; }
+    if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
+    if (legacyLocked) {
+      setShowConvertConfirm(true);
+      onSpeak('This map has saved plan details from the earlier Refine Map. Convert it to the new map first?');
+      return;
+    }
+    signalNavigation();
+    if (state.armed) dispatch({ type: 'DISARM_GRID' });
+    setRefineMode(true);
+    touchRefine();
+    onSpeak('Refine. Look at a cell.');
+  };
+
+  const openFocus = (cell: CellKey) => {
+    signalNavigation();
+    setFocusCell(cell); setFocusQuestion(null); setFocusMessage('');
+    touchRefine();
+    const { row, col } = parseCellKey(cell);
+    onSpeak(`Row ${row}, column ${col}. Choose the left half or the right half.`);
+  };
+
+  const closeFocus = () => {
+    signalNavigation();
+    setFocusCell(null); setFocusQuestion(null); setFocusMessage('');
+    touchRefine();
+    onSpeak('Back to the map. Look at another cell, or choose Done refining.');
+  };
+
+  /** The state with the focus cell divided but not committed: dividing and choosing a half's room are one step. */
+  const workingState = (): CompassStateV2 => {
+    if (!focusCell || floor.splits.includes(focusCell)) return state;
+    return { ...state, floors: { ...state.floors, [floorId]: splitCell(floor, focusCell) } };
+  };
+
+  const onHalf = (half: 'L' | 'R') => {
+    if (!focusCell) return;
+    const key = `${focusCell}.${half}` as RegionKey;
+    touchRefine();
+    if (!floor.splits.includes(focusCell) && !halvesUsable(widthIn, depthIn)) {
+      const message = `On a ${pw} ft plot a half cell is only ${inches(clearWidthIn(key, widthIn, depthIn))} wide inside: too narrow for any room. The cell stays whole.`;
+      setFocusMessage(message);
+      onSpeak(`${message} Choose Back to map.`);
+      return;
+    }
+    signalNavigation();
+    setAssignKey(key); setAssignReady(false); setAssignPage(0); setPickerQuestion(null); setPickerNotice('');
+    onSpeak(`Room for the ${half === 'L' ? 'left' : 'right'} half. Press READY, then choose a room.`);
+  };
+
+  /** When a change takes area from the room that holds the stair: whether the stair still fits is decided by the
+   * floor-plan service (its plan notes), so the person is told where to look, and that UNDO puts it back (§5.3). */
+  const stairNote = (before: FloorIntent, after: FloorIntent) => {
+    const area = (f: FloorIntent) => f.rooms.filter(r => STAIR_HOSTS[floorId].has(r.use))
+      .reduce((n, r) => n + r.regions.reduce((m, k) => m + (k.includes('.') ? .5 : 1), 0), 0);
+    return area(after) < area(before) ? ' The stair room is smaller now: the plan notes say whether its stair still fits, and UNDO puts it back.' : '';
+  };
+
+  /** Commits a split and its half's room (or both halves) as one undoable step, then returns to the cell. */
+  const finishAssign = (outcome: { floor: FloorIntent; roomId: string | null; message: string }, key: RegionKey) => {
+    dispatch({ type: 'COMMIT_FLOOR', floor: outcome.floor, activeRoomId: outcome.roomId ?? state.activeRoomId });
+    const otherSide = key.endsWith('.L') ? 'right' : 'left';
+    const stair = stairNote(floor, outcome.floor);
+    let spoken = outcome.message;
+    if (outcome.roomId) {
+      const size = regionSizeIn(key, widthIn, depthIn);
+      spoken = `${outcome.message.replace(/\.$/, '')}, ${sizeWords(size.width, size.depth)}.`;
+    }
+    signalNavigation();
+    setAssignKey(null); setPickerQuestion(null); setPickerNotice('');
+    setFocusMessage(`${outcome.message}${stair}`);
+    touchRefine();
+    onSpeak(`${spoken}${stair} Choose the ${otherSide} half, or go back to the map.`);
+  };
+
+  const refuse = (message: string) => { setPickerQuestion(null); setPickerNotice(message); onSpeak(message); };
+
+  const applyAssign = (choice: AssignChoice, key: RegionKey) => {
+    if (!focusCell) return;
+    touchRefine();
+    const st = workingState();
+    const outcome = assignHalf(st, key, choice, below);
+    const otherKey = (key.endsWith('.L') ? key.replace('.L', '.R') : key.replace('.R', '.L')) as RegionKey;
+    const wfloor = st.floors[floorId];
+    const owners = [...new Set([ownerOf(wfloor, `${focusCell}.L`), ownerOf(wfloor, `${focusCell}.R`)].filter(Boolean))] as RoomIntent[];
+    const replaces = (use: string) => {
+      const others = owners.filter(r => r.use !== use).map(r => labelsOf(wfloor)[r.id]);
+      return others.length ? ` (replaces ${others.join(' and ')} here)` : '';
+    };
+    const wholeFor = (use: string) => {
+      const whole = giveBothHalves(st, focusCell, use);
+      if (whole.kind === 'commit') finishAssign(whole, key);
+      else refuse('message' in whole ? whole.message : 'Not possible here.');
+    };
+    switch (outcome.kind) {
+      case 'commit':
+        finishAssign(outcome, key);
+        return;
+      case 'ask-separate':
+        setPickerQuestion({ text: outcome.message, answers: [
+          { id: 'assign-separate', label: `Make a separate ${outcome.label}`, deliberate: true,
+            action: () => applyAssign({ type: 'use', use: outcome.use, separate: true }, key) },
+          { id: 'assign-other', label: 'Choose another room', action: () => setPickerQuestion(null) },
+        ] });
+        onSpeak(outcome.message);
+        return;
+      case 'too-narrow': {
+        const name = libraryOf(outcome.use)?.roomLabel || outcome.use;
+        setPickerQuestion({ text: outcome.message, answers: [
+          { id: 'assign-whole', label: `Use the whole cell for ${name}${replaces(outcome.use)}`, deliberate: true, action: () => wholeFor(outcome.use) },
+          { id: 'assign-other', label: 'Choose another room', action: () => setPickerQuestion(null) },
+        ] });
+        onSpeak(`${outcome.message} Use the whole cell, or choose another room.`);
+        return;
+      }
+      case 'disconnects': {
+        const otherSide = key.endsWith('.L') ? 'right' : 'left';
+        const answers: PickerQuestion['answers'] = [
+          // The other half is assigned by the same rules, so any question it raises is asked in turn.
+          { id: 'assign-other-half', label: `Give the ${otherSide} half instead`, deliberate: true, action: () => applyAssign(choice, otherKey) },
+        ];
+        if (choice.type === 'use') {
+          answers.push({ id: 'assign-both-halves', label: `Give both halves to ${libraryOf(choice.use)?.roomLabel || choice.use}`,
+            deliberate: true, action: () => wholeFor(choice.use) });
+        }
+        answers.push({ id: 'assign-other', label: 'Choose another room', action: () => setPickerQuestion(null) });
+        setPickerQuestion({ text: outcome.message, answers });
+        onSpeak(outcome.message);
+        return;
+      }
+      default:
+        refuse(outcome.message);
+    }
+  };
+
+  const onWhole = () => {
+    if (!focusCell) return;
+    touchRefine();
+    const options = wholeOptions(floor, focusCell);
+    const apply = (owner: string | null) => {
+      const next = wholeCell(floor, focusCell, owner);
+      dispatch({ type: 'COMMIT_FLOOR', floor: next, activeRoomId: owner ?? state.activeRoomId });
+      setFocusQuestion(null);
+      const message = `${owner ? `Whole cell: ${labelsOf(next)[owner] || 'room'}.` : 'Whole cell: empty.'}${stairNote(floor, next)}`;
+      setFocusMessage(message);
+      onSpeak(message);
+    };
+    if (options.length === 1 && options[0].allowed && !options[0].removes.length) { apply(options[0].owner); return; }
+    setFocusQuestion({
+      text: 'Make this cell whole again? Choose who keeps it.',
+      answers: [
+        ...options.map((o, i) => ({
+          id: `refine-whole-${i}`, label: o.allowed ? o.label : `${o.label}: not possible, ${o.reason}`, deliberate: true,
+          action: o.allowed ? () => apply(o.owner) : () => onSpeak(`Not possible: ${o.reason}.`),
+        })),
+        { id: 'refine-whole-cancel', label: 'Keep it divided', action: () => { setFocusQuestion(null); onSpeak('The cell stays divided.'); } },
+      ],
+    });
+    onSpeak('Make this cell whole again? Choose who keeps it.');
+  };
+
   // ─── RENDER: Foundation Phase ───────────────────────────
   const renderFoundation = () => {
     if (surveyLoading) {
@@ -1705,7 +1389,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               <GazeButton id="f-ready" className="survey-primary-action" gazeEnabled={isGazeEnabled}
                 gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm} dwellCategory="compassMapAction"
                 onClick={() => { setFoundationReady(true); onSpeak('Ready. Please choose an option.'); }}>READY</GazeButton>
-              {!showRestoreConfirm && (localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY) || localStorage.getItem(COMPASS_LAST_BACKUP_KEY)) && (
+              {!showRestoreConfirm && hasSavedDraft() && (
                 <GazeButton id="f-restore" gazeEnabled={isGazeEnabled && !isConfirmationOpen}
                   gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm} dwellCategory="deliberateAction"
                   onClick={() => setShowRestoreConfirm(true)}>LOAD PREVIOUS SESSION</GazeButton>
@@ -1719,7 +1403,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               isDarkMode={!isWarm} dwellCategory="backSkipButton"
               onClick={() => {
                 const dflt = q.parse ? q.parse(q.options[0]) : q.options[0];
-                dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: dflt });
+                dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: dflt, total: FOUNDATION_QUESTIONS.length });
                 onSpeak(`Skipped. Default: ${q.options[0]}.`);
                 if (state.foundationStep === FOUNDATION_QUESTIONS.length - 1) dispatch({ type: 'COMPLETE_FOUNDATION', queue: generateGFQueue(), numFloors: state.foundation.numFloors || 'Single Floor' });
               }}>SKIP →</GazeButton>
@@ -1729,45 +1413,36 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     );
   };
 
-  // ─── RENDER: Vertical CAD Sidebar — all controls stacked ──
-
-  // Context overlay removed — room name now displayed on the road section
-
-
   // ─── RENDER: Right Action Strip (The "Connected Column") ───
+  // Five actions share the rail: Floor, Rooms, Next, Refine and Generate (§5.1). While Refine is on, its
+  // button reads DONE REFINING and the other four are disabled. With the version 2 map off, Refine is not offered.
   const renderActionStrip = () => {
-    const controlsUnlocked = !!currentRoom && state.phase === 'placement' && state.armed && !state.pendingExpansion;
+    const controlsUnlocked = !!currentRoom && state.phase === 'placement' && state.armed && !refineMode;
+    const live = isGazeEnabled && !overlayOpen;
 
-    // Common style for strip buttons — taller in nav-visible mode so each
-    // button feels properly hit-target sized for eye-gaze even when the
-    // strip's vertical column is shorter (compressed by HIDE NAV + bottom gap).
+    // Common style for strip buttons. Five buttons of at least 80 px fit the rail at 768 px heights.
     const stripBtnStyle = (active: boolean, specialColor?: string) => ({
       flex: 1, width: '100%', borderRadius: 0, margin: 0,
       border: 'none',
       borderBottom: `1px solid ${T_panelBorderSoft}`,
-      background: active ? (specialColor ? specialColor : T_accentSubtle) : (isLight ? 'transparent' : isMix ? 'transparent' : 'transparent'),
+      background: active ? (specialColor ? specialColor : T_accentSubtle) : 'transparent',
       color: active ? T_textMain : T_textDim,
       fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900,
       letterSpacing: '0.4px',
       display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-      gap: 'clamp(8px, 1.2vh, 14px)',
-      // Chunkier vertical padding — gives every button extra height
-      // independent of the strip's flex distribution.
-      padding: 'clamp(14px, 2.1vh, 26px) clamp(8px, 1vw, 14px)',
+      gap: 'clamp(6px, 1vh, 12px)',
+      padding: 'clamp(10px, 1.6vh, 22px) clamp(8px, 1vw, 14px)',
       transition: 'all 0.2s ease',
-      minHeight: 'clamp(96px, 11vh, 130px)',
+      minHeight: 'clamp(80px, 9vh, 130px)',
     });
+    const accentWash = isLight || isMix ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : 'rgba(45,212,191,0.1)';
 
     return (
       <div className="compass-action-strip" style={{
         position: 'absolute',
         right: '24px',
-        // Dynamic top — tighter when nav is visible. HIDE NAV ends at ~295;
-        // strip now starts at 304 (only ~9px below HIDE NAV instead of ~21px),
-        // reclaiming vertical space so each button can be taller.
+        // Dynamic top — tighter when nav is visible.
         top: navHidden ? '152px' : '304px',
-        // The stylesheet reserves a bottom gaze-clearance band; the four
-        // remaining controls share the rail's available height equally.
         width: '296px',
         height: navHidden ? 'calc(100% - 184px)' : 'calc(100% - 324px)',
         background: T_panelBg,
@@ -1776,14 +1451,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         display: 'flex', flexDirection: 'column',
         zIndex: 50,
         boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
-        pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
+        pointerEvents: overlayOpen ? 'none' : 'auto',
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            {/* NORMAL PLACEMENT BUTTONS */}
             {/* BUTTON 0: FLOOR TOGGLE */}
-            <GazeButton id="strip-floor" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+            <GazeButton id="strip-floor" gazeEnabled={live && !refineMode} disabled={refineMode} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
-                if (isConfirmationOpen) return;
+                if (overlayOpen || refineMode) return;
                 if (isMultiFloor) {
                   const next = state.currentFloor === 'ground' ? 'first' : 'ground';
                   switchCompassFloor(next);
@@ -1793,73 +1467,148 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   onSpeak('First floor mapping enabled.');
                 }
               }}
-              style={stripBtnStyle(true, isLight ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : isMix ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : (state.currentFloor === 'ground' ? 'rgba(45,212,191,0.1)' : 'rgba(100,181,246,0.1)'))}>
+              style={stripBtnStyle(!refineMode, isLight || isMix ? accentWash : (state.currentFloor === 'ground' ? 'rgba(45,212,191,0.1)' : 'rgba(100,181,246,0.1)'))}>
               {isMultiFloor ? (
                 <>
-                  <div style={{ fontSize: 'clamp(22px, 2.6vh, 28px)', fontWeight: 900, color: T_textMain, letterSpacing: '0.6px' }}>{state.currentFloor === 'ground' ? 'GND' : '1F'}</div>
+                  <div style={{ fontSize: 'clamp(22px, 2.6vh, 28px)', fontWeight: 900, color: refineMode ? T_textDim : T_textMain, letterSpacing: '0.6px' }}>{state.currentFloor === 'ground' ? 'GND' : '1F'}</div>
                   <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', fontWeight: 700, color: T_textSub, letterSpacing: '1.2px' }}>SWITCH</div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: 'clamp(22px, 2.6vh, 28px)', fontWeight: 900, color: T_textMain, letterSpacing: '0.6px' }}>GND</div>
-                  <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', fontWeight: 700, color: T_accent, letterSpacing: '0.8px' }}>+ ADD 1F</div>
+                  <div style={{ fontSize: 'clamp(22px, 2.6vh, 28px)', fontWeight: 900, color: refineMode ? T_textDim : T_textMain, letterSpacing: '0.6px' }}>GND</div>
+                  <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', fontWeight: 700, color: refineMode ? T_textDim : T_accent, letterSpacing: '0.8px' }}>+ ADD 1F</div>
                 </>
               )}
             </GazeButton>
             {/* BUTTON 1: ROOMS (MENU) */}
-            <GazeButton id="strip-rooms" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
-              onClick={() => { setMenuOpen(true); onSpeak('Components menu.'); }}
-              style={stripBtnStyle(true, T_accentSubtle)}>
-              <div style={{ fontSize: 'clamp(26px, 3.2vh, 34px)', marginBottom: '-4px', color: T_textMain }}>{'☰'}</div>
-              <div style={{ fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900, color: T_textMain, letterSpacing: '1px' }}>ROOMS</div>
+            <GazeButton id="strip-rooms" gazeEnabled={live && !refineMode} disabled={refineMode} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+              onClick={() => { if (refineMode) return; setMenuOpen(true); onSpeak('Components menu.'); }}
+              style={stripBtnStyle(!refineMode, T_accentSubtle)}>
+              <div style={{ fontSize: 'clamp(24px, 3vh, 34px)', marginBottom: '-4px', color: refineMode ? T_textDim : T_textMain }}>{'☰'}</div>
+              <div style={{ fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900, color: refineMode ? T_textDim : T_textMain, letterSpacing: '1px' }}>ROOMS</div>
             </GazeButton>
 
-            {/* BUTTON 2: NEXT / KEEP 1 */}
-            {state.pendingExpansion ? (
-              <GazeButton id="strip-keep" gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
-                onClick={() => dws({ type: 'EXPAND_ROOM', direction: 'none' })}
-                style={{ ...stripBtnStyle(true, 'rgba(234, 179, 8, 0.15)'), color: '#FACC15' }}>
-                <div style={{ fontSize: '24px' }}>TOP</div>
-                <div>KEEP 1</div>
-              </GazeButton>
-            ) : (
-              <GazeButton id="strip-next" gazeEnabled={isGazeEnabled && controlsUnlocked && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
-                onClick={() => {
-                  if (isConfirmationOpen) return;
-                  if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
-                  dws({ type: 'NEXT_ROOM' });
-                }}
-                style={{
-                  ...stripBtnStyle(controlsUnlocked, isLight ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : isMix ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : 'rgba(45,212,191,0.1)'),
-                  color: controlsUnlocked
-                    ? (isLight ? T_accent : isMix ? '#5E9CA8' : '#2DD4BF')
-                    : (isLight ? T_textDim : isMix ? T_textDim : '#475569')
-                }}>
-                <div style={{ fontSize: 'clamp(28px, 3.4vh, 36px)' }}>{'→'}</div>
-                <div style={{ fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900, letterSpacing: '1px' }}>NEXT</div>
-              </GazeButton>
-            )}
-
-            {/* BUTTON 3: GENERATE */}
-            <GazeButton id="strip-generate" gazeEnabled={isGazeEnabled && canPreviewPlan && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+            {/* BUTTON 2: NEXT */}
+            <GazeButton id="strip-next" gazeEnabled={live && controlsUnlocked} disabled={refineMode} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
-                if (isConfirmationOpen) return;
-                if (!canPreviewPlan) { onSpeak('Place a ground floor room and finish its size choice first.'); return; }
+                if (overlayOpen || refineMode) return;
+                if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
+                dws({ type: 'NEXT_ROOM' });
+              }}
+              style={{
+                ...stripBtnStyle(controlsUnlocked, accentWash),
+                color: controlsUnlocked
+                  ? (isLight ? T_accent : isMix ? '#5E9CA8' : '#2DD4BF')
+                  : (isLight || isMix ? T_textDim : '#475569'),
+              }}>
+              <div style={{ fontSize: 'clamp(26px, 3.2vh, 36px)' }}>{'→'}</div>
+              <div style={{ fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900, letterSpacing: '1px' }}>NEXT</div>
+            </GazeButton>
+
+            {/* BUTTON 3: REFINE / DONE REFINING (§5.1). Not offered when the version 2 map is off. */}
+            {v2Enabled && <GazeButton id="strip-refine" gazeEnabled={live && !readOnlyDraft} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+              selected={refineMode} disabled={readOnlyDraft} onClick={toggleRefine}
+              style={{
+                ...stripBtnStyle(true, refineMode ? T_accentSubtle : 'transparent'),
+                ...(refineMode ? { boxShadow: `inset 0 0 0 3px ${T_accent}` } : {}),
+              }}>
+              <div style={{ fontSize: 'clamp(20px, 2.4vh, 26px)', fontWeight: 900, color: refineMode ? T_accent : T_textMain, letterSpacing: '1px' }}>
+                {refineMode ? 'DONE REFINING' : 'REFINE'}
+              </div>
+              <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', fontWeight: 700, color: T_textSub, letterSpacing: '0.8px' }}>
+                {refineMode ? 'BACK TO PLACING ROOMS' : legacyLocked ? 'CONVERT THE MAP FIRST' : 'DIVIDE A CELL'}
+              </div>
+            </GazeButton>}
+
+            {/* BUTTON 4: GENERATE */}
+            <GazeButton id="strip-generate" gazeEnabled={live && canPreviewPlan && !refineMode} disabled={refineMode} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+              onClick={() => {
+                if (overlayOpen || refineMode) return;
+                if (!canPreviewPlan) { onSpeak('Place a ground floor room first.'); return; }
                 setConfirmGenerate(true);
                 onSpeak('Choose ground floor only, or both floors.');
               }}
               style={{
-                ...stripBtnStyle(canPreviewPlan, T_generatePlanBg),
+                ...stripBtnStyle(canPreviewPlan && !refineMode, T_generatePlanBg),
                 borderBottom: 'none',
-                color: (canPreviewPlan)
-                  ? (isLight ? T_textInverse : isMix ? T_textInverse : '#497775')
+                color: (canPreviewPlan && !refineMode)
+                  ? (isLight || isMix ? T_textInverse : '#497775')
                   : T_textDim,
               }}>
-              <div style={{ fontSize: 'clamp(24px, 2.8vh, 30px)' }}>{'📝'}</div>
+              <div style={{ fontSize: 'clamp(22px, 2.6vh, 30px)' }}>{'📝'}</div>
               <div style={{ textAlign: 'center', lineHeight: 1.1, fontSize: 'clamp(18px, 2.1vh, 22px)', fontWeight: 900, letterSpacing: '0.8px' }}>GENERATE{'\n'}PLAN</div>
             </GazeButton>
         </div>
       </div>
+    );
+  };
+
+  // ─── RENDER: one map cell. A divided cell stays one gaze target (§5.2). ───
+  const neighbourId = (r: number, c: number, side: 'N' | 'S' | 'E' | 'W'): string | null => {
+    if (r < 1 || r > GRID_ROWS || c < 1 || c > GRID_COLS) return null;
+    const v = cellView(floor, buildCellKey(r, c));
+    if (!v.split) return v.whole?.id || null;
+    // The half that faces this cell: an east neighbour's left half, a west neighbour's right half.
+    if (side === 'E') return v.left?.id || null;
+    if (side === 'W') return v.right?.id || null;
+    return v.left && v.left.id === v.right?.id ? v.left.id : null;
+  };
+  const shortNameOf = (room: RoomIntent): string => {
+    const number = labels[room.id]?.match(/ (\d+)$/)?.[1];
+    const short = libraryOf(room.use)?.shortLabel || labels[room.id] || room.use;
+    return number ? `${short} ${number}` : short;
+  };
+
+  const renderCell = (cellKey: GridCellKey) => {
+    const view = cellView(floor, cellKey);
+    const owner = view.whole;
+    const { row, col } = parseCellKey(cellKey);
+    const isHov = hoveredCell === cellKey;
+    const cellGaze = refineMode
+      ? isGazeEnabled && !overlayOpen && !readOnlyDraft
+      : isGazeEnabled && state.phase === 'placement' && state.armed && !!currentRoom && !overlayOpen;
+    const half = (room: RoomIntent | null, key: string): SplitHalf => {
+      const size = regionSizeIn(key, widthIn, depthIn);
+      return { identity: room?.id || null, label: room ? shortNameOf(room) : null, color: room ? colourOf(room.use) : null,
+        size: formatSize(size.width / 12, size.depth / 12) };
+    };
+    return (
+      <GazeButton key={cellKey} id={`cell-${cellKey}`} gazeEnabled={cellGaze}
+        className={refineMode ? 'compass-cell-refine' : undefined}
+        gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+        onDwellStart={() => setHoveredCell(cellKey)}
+        onDwellCancel={() => { if (hoveredCell === cellKey) setHoveredCell(null); }}
+        onDwellComplete={() => setHoveredCell(null)}
+        onClick={() => onCellClick(cellKey)}
+        ariaLabel={view.split
+          ? `Row ${row}, column ${col}, divided: left ${view.left ? labels[view.left.id] : 'empty'}, right ${view.right ? labels[view.right.id] : 'empty'}`
+          : `Row ${row}, column ${col}: ${owner ? labels[owner.id] : 'empty'}`}
+        contentFill
+        style={{
+          width: '100%', height: '100%', border: 'none', background: 'transparent',
+          display: 'flex', overflow: 'hidden', padding: 0,
+          position: 'relative',
+          ...(isHov && cellGaze ? { zIndex: 10, boxShadow: '0 6px 16px rgba(0,0,0,0.22)' } : {})
+        }}
+      >
+        {view.split ? (
+          <SplitCellFace row={row} col={col} totalRows={GRID_ROWS} totalCols={GRID_COLS}
+            left={half(view.left, `${cellKey}.L`)} right={half(view.right, `${cellKey}.R`)} />
+        ) : (
+          <ArchitecturalCell
+            cellKey={cellKey} row={row} col={col} totalRows={GRID_ROWS} totalCols={GRID_COLS}
+            roomId={owner?.use || null} identity={owner?.id || null}
+            roomLabel={owner ? labels[owner.id] : null} shortLabel={owner ? shortNameOf(owner) : null}
+            roomColor={colourOf(owner?.use)}
+            cellWidthFt={cellWFt} cellDepthFt={cellDFt}
+            isArmed={state.armed && !!currentRoom && !refineMode}
+            isExpTarget={false} isExpAnchor={false} expDirection={null}
+            neighborN={neighbourId(row + 1, col, 'N')} neighborS={neighbourId(row - 1, col, 'S')}
+            neighborE={neighbourId(row, col + 1, 'E')} neighborW={neighbourId(row, col - 1, 'W')}
+            cellLayout={(floorRefinements[floorId].cellLayouts || {})[cellKey] || undefined}
+          />
+        )}
+      </GazeButton>
     );
   };
 
@@ -1871,11 +1620,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       flex: 1, // Fill available space
       position: 'relative',
       overflow: 'hidden',
-      // Top: push grid down ~24px from top NavBar.
-      // The workspace stylesheet keeps the road controls clear of the screen edge.
       // Right: 360px reserves space for the 296px sidebar + 24px right inset + ~40px gap.
       padding: '24px 360px 20px 40px',
-      pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto',
+      pointerEvents: overlayOpen ? 'none' : 'auto',
     }}>
 
       {/* Plot Area Container */}
@@ -1883,22 +1630,17 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         flex: 1, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center'
       }}>
-        {/* Compound Wall — multi-layer architectural boundary
-            • Outer warm-stone trim (theme-aware) — reads like a real property wall
-            • Inner sage compound with grass/lawn appearance
-            • Thicker on top + sides; bottom flows into road bar (gate side)
-            • Subtle ground shadow gives the plot weight
-        */}
-        <div className="compass-plot-frame" data-armed={state.armed} style={{
+        {/* Compound Wall — multi-layer architectural boundary */}
+        <div className="compass-plot-frame" data-armed={state.armed || refineMode} style={{
           flex: 1, width: '100%',
           display: 'flex', flexDirection: 'column',
-          borderTop: state.armed
+          borderTop: state.armed || refineMode
             ? `6px solid ${T_accent}`
             : `6px solid ${isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328'}`,
-          borderLeft: state.armed
+          borderLeft: state.armed || refineMode
             ? `6px solid ${T_accent}`
             : `6px solid ${isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328'}`,
-          borderRight: state.armed
+          borderRight: state.armed || refineMode
             ? `6px solid ${T_accent}`
             : `6px solid ${isLight ? '#8B7355' : isMix ? '#5A4A36' : '#3A3328'}`,
           borderBottom: 'none',
@@ -1925,17 +1667,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             muted={isLight ? T_textSub : isMix ? '#8E7E62' : T_textDim}
           />
 
-          {/* Direction labels — inset tabs on the wall edges (architectural drawing style)
-              Side walls use writing-mode vertical-rl so the text runs along the wall
-              naturally and stays inside the overflow:hidden boundary.
-
-              v5: Added pointerEvents:'none' on all three labels. They sit at
-              z-index 3 above the grid (z-index 2) and visually overlap the
-              outer ~15px of edge cells (top of r1_c2/c3, left of r2_c1/r3_c1,
-              right of r2_c4/r3_c4). Without pointer-event opt-out, gaze landing
-              on those edges hit the label (which has no onClick) and produced
-              NO dwell — corners felt "dead" for users. They're informational
-              only; the cell beneath should always own the dwell. */}
+          {/* Direction labels — inset tabs on the wall edges. Informational only (pointerEvents none),
+              so the cell beneath always owns the dwell. */}
           <div className="compass-direction" style={{
             position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3,
             padding: '4px 16px', borderRadius: '0 0 10px 10px',
@@ -1971,11 +1704,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             pointerEvents: 'none', userSelect: 'none',
           }}>RIGHT &middot; {sideLabels.right.toUpperCase()}</div>
 
-          {/* Grid
-              v5: Bumped gap 2px → clamp(6px, 0.8vh, 10px) — eye-tracker jitter
-              (~5-15px even after filtering) was flipping dwell between adjacent
-              cells. A larger gap creates a "dead zone" so brief micro-saccades
-              land on neutral grout instead of cancelling/firing the wrong cell. */}
+          {/* Grid. The gap is a dead zone, so micro-saccades land on neutral grout instead of a neighbour. */}
           <div className="compass-cell-grid" style={{
             position: 'absolute', inset: '12px',
             display: 'grid',
@@ -1987,103 +1716,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             borderRadius: '6px',
             zIndex: 2
           }}>
-            {RENDER_ORDER.map((cellKey: GridCellKey) => {
-              const cs = state.grid[cellKey];
-              const isOcc = !!cs?.roomId;
-              const lib = isOcc ? ROOM_LIBRARY[cs.roomId!] : null;
-              const isCurrentRoomCell = !!currentRoom && cs?.roomId === currentRoom.roomId;
-              const expDir = getExpDir(cellKey);
-              const isExpTarget = expDir !== null;
-              const isExpAnchor = !!state.pendingExpansion && state.pendingExpansion.anchorCell === cellKey;
-              const { row, col } = parseCellKey(cellKey);
-              const isHov = hoveredCell === cellKey;
-
-              const cellGaze = isExpTarget
-                  ? isGazeEnabled && expansionReady && !isConfirmationOpen && !menuOpen
-                  : isGazeEnabled && state.phase === 'placement' && state.armed && !state.pendingExpansion && !!currentRoom && !isConfirmationOpen && !menuOpen;
-
-              const getNeighborRoom = (r: number, c: number): string | null => {
-                if (r < 1 || r > GRID_ROWS || c < 1 || c > GRID_COLS) return null;
-                const key = buildCellKey(r, c);
-                return state.grid[key]?.roomId || null;
-              };
-
-              // Identify anchor for continuous rendering text (top-leftmost cell of this room group)
-              const cellLayout = (refinements.cellLayouts || {})[cellKey] || undefined;
-              return (
-                <GazeButton key={cellKey} id={`cell-${cellKey}`} gazeEnabled={cellGaze}
-                  gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
-                  // v5: Removed custom startCellDwell/cancelCellDwell hooks —
-                  // GazeButton's own DwellProgressRing/Shrink already shows progress.
-                  // Two simultaneous animations were wasting CPU and visually
-                  // competing for the user's foveal attention.
-                  onDwellStart={() => setHoveredCell(cellKey)}
-                  onDwellCancel={() => { if (hoveredCell === cellKey) setHoveredCell(null); }}
-                  onDwellComplete={() => setHoveredCell(null)}
-                  onClick={() => {
-                    if (isConfirmationOpen) return;
-                    const savedDetail = refinements.subCellSplits.some(s => s.parentCell === cellKey)
-                      || refinements.customEdges.some(e => e.cells[0] === cellKey)
-                      || refinements.voidMarkers.some(v => v.cell === cellKey)
-                      || refinements.cellRotations.some(r => r.cell === cellKey)
-                      || refinements.cellExpansions.some(e => e.cell === cellKey);
-                    if (savedDetail) {
-                      onSpeak('This cell has saved plan details. View them using Generate Plan.');
-                      return;
-                    }
-                    if (isExpTarget && expDir) { dws({ type: 'EXPAND_ROOM', direction: expDir }); return; }
-                    if (state.phase !== 'placement') return;
-                    if (state.pendingExpansion) { onSpeak('Choose expansion direction.'); return; }
-                    if (!state.armed) { onSpeak('Press READY first.'); return; }
-
-                    if (!isOcc || isCurrentRoomCell) {
-                      dws({ type: 'PLACE_ROOM', cell: cellKey });
-                    } else if (isOcc && !isCurrentRoomCell && currentRoom) {
-                      // Occupied by DIFFERENT room -> Ask Confirmation
-                      setConfirmReplace({ cell: cellKey, oldRoomId: cs.roomId!, newRoomId: currentRoom.roomId });
-                      onSpeak(`Replace ${lib?.roomLabel} with ${currentRoom.roomLabel}?`);
-                    }
-                  }}
-                  contentFill
-                  style={{
-                    width: '100%', height: '100%', border: 'none', background: 'transparent',
-                    display: 'flex', overflow: 'hidden', padding: 0,
-                    position: 'relative',
-                    // v5: Removed nested transform:scale(1.01). GazeButton already
-                    // applies scale(1.02) on hover internally — stacking both pushed
-                    // the cell's outer edge into adjacent cells, occasionally firing
-                    // mouseleave on the wrong neighbor and cancelling the dwell.
-                    // Box-shadow alone provides clear "this cell is being looked at"
-                    // feedback without any geometric shift that breaks gaze targeting.
-                    ...(isHov && cellGaze ? { zIndex: 10, boxShadow: '0 6px 16px rgba(0,0,0,0.22)' } : {})
-                  }}
-                >
-                  <ArchitecturalCell
-                    cellKey={cellKey} row={row} col={col} totalRows={GRID_ROWS} totalCols={GRID_COLS}
-                    roomId={cs?.roomId || null} roomLabel={lib?.roomLabel || null} shortLabel={lib?.shortLabel || null}
-                    roomColor={lib?.color || '#78909C'}
-                    cellWidthFt={cellWFt} cellDepthFt={cellDFt}
-                    isArmed={state.armed && !state.pendingExpansion && !!currentRoom}
-                    isExpTarget={isExpTarget} isExpAnchor={isExpAnchor} expDirection={expDir}
-                    pendingRoomColor={state.pendingExpansion?.room.color}
-                    neighborN={getNeighborRoom(row + 1, col)} neighborS={getNeighborRoom(row - 1, col)}
-                    neighborE={getNeighborRoom(row, col + 1)} neighborW={getNeighborRoom(row, col - 1)}
-                    cellLayout={cellLayout}
-                  />
-                  {/* v5: Removed duplicate bottom progress bar. The parent
-                      GazeButton already renders DwellProgressRing/Shrink centred
-                      on the cell — having a second progress indicator at the
-                      bottom edge competed for foveal attention and pulled the
-                      user's gaze toward the bottom of the cell, increasing the
-                      chance of drifting onto the cell below. */}
-                </GazeButton>
-              );
-            })}
+            {RENDER_ORDER.map(renderCell)}
           </div>
         </div>
 
-        {/* Minimal gaze-protection gap between grid bottom row and road — visually
-            almost touching so the road reads as the natural plot edge */}
+        {/* Minimal gaze-protection gap between grid bottom row and road */}
         <div data-gaze="false" style={{ width: '100%', height: 'clamp(4px, 0.6vh, 8px)', flexShrink: 0, pointerEvents: 'none' }} />
 
         {/* Road Section — taller with stronger presence + gate indicator */}
@@ -2100,13 +1737,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           color: isLight ? T_textMain : isMix ? '#FFFCF1' : THEME.road, fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 26px)', letterSpacing: '0.6px',
           boxShadow: isLight ? '0 -4px 14px rgba(82, 66, 45, 0.08)' : isMix ? '0 -4px 16px rgba(0,0,0,0.22)' : 'none',
         }}>
-          {/* Gate diagram — spans exactly one cell width (25% of grid frontage).
-              Position respects user's foundation choice:
-                Left   → leftmost cell (center 12.5%)
-                Center → straddles cells 2&3 boundary (center 50%)
-                Right  → rightmost cell (center 87.5%)
-              Visual: pillared gate frame with two doors and an entry arrow,
-              styled like an architectural site-plan gate marker. */}
+          {/* Gate diagram — spans exactly one cell width (25% of grid frontage), at the foundation's gate position. */}
           {(() => {
             const gp = state.foundation.gatePosition || 'Center';
             const centerPct = gp === 'Left' ? 12.5 : gp === 'Right' ? 87.5 : 50;
@@ -2125,7 +1756,6 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 pointerEvents: 'none', userSelect: 'none',
                 filter: isLight ? 'drop-shadow(0 3px 5px rgba(82, 66, 45, 0.22))' : 'drop-shadow(0 3px 5px rgba(0,0,0,0.32))',
               }}>
-                {/* Gate frame stretches the full container width */}
                 <svg
                   width="100%"
                   height="26"
@@ -2134,32 +1764,24 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   aria-hidden="true"
                   style={{ display: 'block' }}
                 >
-                  {/* Lintel cap — slightly extruded above the wall line */}
                   <rect x="0" y="0" width="100" height="5" fill={stoneShade} />
                   <rect x="0" y="3" width="100" height="4" fill={stone} />
-                  {/* Left pillar */}
                   <rect x="0" y="5" width="4.5" height="19" fill={stone} />
                   <rect x="0" y="5" width="1.2" height="19" fill={stoneShade} />
-                  {/* Right pillar */}
                   <rect x="95.5" y="5" width="4.5" height="19" fill={stone} />
                   <rect x="98.8" y="5" width="1.2" height="19" fill={stoneShade} />
-                  {/* Pillar bases */}
                   <rect x="-1" y="22" width="7" height="4" fill={stoneShade} />
                   <rect x="94" y="22" width="7" height="4" fill={stoneShade} />
-                  {/* Two gate panels (split center, decorative) */}
                   <rect x="6" y="8" width="42" height="14" fill="none" stroke={stone} strokeWidth="0.7" opacity="0.55" />
                   <rect x="52" y="8" width="42" height="14" fill="none" stroke={stone} strokeWidth="0.7" opacity="0.55" />
-                  {/* Vertical bars on each panel (gate slats) */}
                   <line x1="20" y1="9" x2="20" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
                   <line x1="34" y1="9" x2="34" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
                   <line x1="66" y1="9" x2="66" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
                   <line x1="80" y1="9" x2="80" y2="21" stroke={stone} strokeWidth="0.45" opacity="0.42" />
-                  {/* Hinges */}
                   <circle cx="2.2" cy="11" r="0.9" fill={cream} opacity="0.78" />
                   <circle cx="2.2" cy="19" r="0.9" fill={cream} opacity="0.78" />
                   <circle cx="97.8" cy="11" r="0.9" fill={cream} opacity="0.78" />
                   <circle cx="97.8" cy="19" r="0.9" fill={cream} opacity="0.78" />
-                  {/* Entry arrow at the center seam */}
                   <polygon points="50,18 46.5,12 53.5,12" fill={stone} opacity="0.78" />
                 </svg>
                 <div style={{
@@ -2177,14 +1799,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               </div>
             );
           })()}
-          {/* READY BUTTON - Left (~25% width = 1 cell width) */}
-          {state.phase === 'placement' && (
+          {/* READY BUTTON - Left (~25% width = 1 cell width). Not shown in Refine, where cells answer directly. */}
+          {state.phase === 'placement' && !refineMode && (
             <div className="compass-road-ready" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${100 / GRID_COLS}%`, padding: '6px' }}>
               <GazeButton
                 id="ready-road-left" selected={state.armed}
-                gazeEnabled={isGazeEnabled && !isConfirmationOpen && !menuOpen} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
+                gazeEnabled={isGazeEnabled && !overlayOpen && !readOnlyDraft} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
-                  if (isConfirmationOpen) return;
+                  if (overlayOpen) return;
+                  if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
                   if (state.armed) { dws({ type: 'DISARM_GRID' }); } else { dws({ type: 'ARM_GRID' }); }
                 }}
                 style={{
@@ -2192,14 +1815,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                   borderRadius: '12px',
                   fontWeight: 900, fontSize: 'clamp(24px, 2.9vh, 32px)', letterSpacing: '1.4px',
                   background: state.armed
-                    ? (isLight ? T_accent : isMix ? T_accent : 'rgba(45,212,191,0.25)')
-                    : (isLight ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : isMix ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : 'rgba(45,212,191,0.05)'),
+                    ? (isLight || isMix ? T_accent : 'rgba(45,212,191,0.25)')
+                    : (isLight || isMix ? `color-mix(in srgb, ${T_accent} 10%, transparent)` : 'rgba(45,212,191,0.05)'),
                   border: state.armed
-                    ? `3px solid ${isLight ? T_accent : isMix ? T_accent : '#2DD4BF'}`
-                    : `2px solid ${isLight ? `color-mix(in srgb, ${T_accent} 33%, transparent)` : isMix ? `color-mix(in srgb, ${T_accent} 33%, transparent)` : 'rgba(45,212,191,0.2)'}`,
+                    ? `3px solid ${isLight || isMix ? T_accent : '#2DD4BF'}`
+                    : `2px solid ${isLight || isMix ? `color-mix(in srgb, ${T_accent} 33%, transparent)` : 'rgba(45,212,191,0.2)'}`,
                   color: state.armed
-                    ? (isLight ? T_textInverse : isMix ? T_textInverse : T_textInverse)
-                    : (isLight ? T_accent : isMix ? T_accent : 'rgba(45,212,191,0.6)'),
+                    ? T_textInverse
+                    : (isLight || isMix ? T_accent : 'rgba(45,212,191,0.6)'),
                   boxShadow: state.armed
                     ? (isLight ? '0 4px 12px rgba(31, 107, 126, 0.28)' : isMix ? '0 4px 14px rgba(0,0,0,0.30)' : '0 0 20px rgba(45,212,191,0.2)')
                     : 'none',
@@ -2211,24 +1834,27 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             </div>
           )}
 
-          {/* Road label + live coverage counter */}
-          <div className="compass-road-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
+          {/* Road label + live coverage counter (or the Refine instruction) */}
+          <div className="compass-road-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none', ...(refineMode || readOnlyDraft ? { maxWidth: '44%', textAlign: 'center' as const } : {}) }}>
             <span style={{
               color: isLight ? T_accent : isMix ? '#5E9CA8' : THEME.road,
               fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 27px)', letterSpacing: '0.6px',
               fontVariantNumeric: 'tabular-nums',
             }}>
-              FRONT / ROAD ({facing}) &ndash; {pw} ft
+              {readOnlyDraft ? 'READ-ONLY MAP' : refineMode ? 'REFINE' : <>FRONT / ROAD ({facing}) &ndash; {pw} ft</>}
             </span>
-            {state.phase === 'placement' && (
+            {(readOnlyDraft || refineMode || state.phase === 'placement') && (
               <span style={{
                 fontSize: 'clamp(14px, 1.6vh, 18px)',
                 fontWeight: 700,
                 color: isLight ? T_textSub : isMix ? '#C4B697' : 'rgba(56,189,248,0.6)',
                 letterSpacing: '0.4px',
+                lineHeight: 1.3,
                 fontVariantNumeric: 'tabular-nums',
               }}>
-                {occupiedCount} / {16} cells placed &middot; {coveragePercent}%
+                {readOnlyDraft ? 'Saved by a newer version of GazeConnect'
+                  : refineMode ? 'Look at a cell to divide it into left and right halves'
+                    : <>{formatFeetShort(owned)} / {16} cells placed &middot; {coveragePercent}%</>}
               </span>
             )}
           </div>
@@ -2240,7 +1866,19 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               display: 'flex', alignItems: 'stretch', justifyContent: 'center',
               padding: '0 10px', pointerEvents: 'none',
             }}>
-              {currentRoom && state.currentIndex < state.componentQueue.length ? (
+              {refineMode ? (
+                <div style={{
+                  flex: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                  background: isLight ? T_cardBg : isMix ? '#2D2820' : 'rgba(15, 23, 42, 0.6)',
+                  borderRadius: '12px',
+                  border: `2px solid ${T_panelBorderSoft}`,
+                }}>
+                  <span style={{ fontSize: 'clamp(16px, 2vh, 22px)', fontWeight: 800, color: T_textMain, textAlign: 'center', lineHeight: 1.25 }}>
+                    {floor.splits.length} DIVIDED {floor.splits.length === 1 ? 'CELL' : 'CELLS'}
+                  </span>
+                </div>
+              ) : currentRoom && state.currentIndex < state.componentQueue.length ? (
                 <div style={{
                   flex: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px',
@@ -2307,7 +1945,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center', maxWidth: '600px', padding: '40px' }}>
         <div style={{ fontSize: 'clamp(22px, 3vh, 32px)', fontWeight: 800, color: T_textMain, marginBottom: '16px' }}>Ground Floor Complete!</div>
-        <div style={{ fontSize: 'clamp(14px, 1.8vh, 20px)', color: T_textSub, marginBottom: '32px' }}>{state.placements.length} rooms placed, {coveragePercent}% coverage</div>
+        <div style={{ fontSize: 'clamp(14px, 1.8vh, 20px)', color: T_textSub, marginBottom: '32px' }}>{floor.rooms.length} rooms placed, {coveragePercent}% coverage</div>
         <div style={{ fontSize: 'clamp(18px, 2.2vh, 24px)', color: T_textMain, marginBottom: '24px', fontWeight: 700 }}>Map First Floor?</div>
         <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
           <GazeButton id="start-ff" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
@@ -2338,22 +1976,22 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // ─── RENDER: Confirmation Overlays ────────────────────────
   const renderConfirmationOverlay = () => {
     if (confirmReplace) {
-      const oldLib = ROOM_LIBRARY[confirmReplace.oldRoomId];
-      const newLib = ROOM_LIBRARY[confirmReplace.newRoomId];
+      const newLib = libraryOf(confirmReplace.use);
       return (
         <div className="compass-confirmation" role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 6000, background: T_overlayDim, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
           <div style={{ background: T_panelBg, border: `3px solid ${T_panelBorder}`, borderRadius: '24px', padding: '60px', maxWidth: '1000px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
             <div style={{ fontSize: '36px', fontWeight: 900, color: T_textMain, marginBottom: '32px' }}>Replace Room?</div>
             <div style={{ fontSize: '28px', color: T_textSub, marginBottom: '50px', lineHeight: 1.5 }}>
-              Do you really want to replace <span style={{ color: oldLib?.color || T_textMain, fontWeight: 700 }}>{oldLib?.roomLabel}</span> with <span style={{ color: newLib?.color || T_textMain, fontWeight: 700 }}>{newLib?.roomLabel}</span>?
+              Do you really want to replace <span style={{ color: confirmReplace.oldColor, fontWeight: 700 }}>{confirmReplace.oldLabel}</span> with <span style={{ color: newLib?.color || T_textMain, fontWeight: 700 }}>{newLib?.roomLabel || confirmReplace.use}</span>?
             </div>
             <div style={{ display: 'flex', gap: '40px', justifyContent: 'center' }}>
               <GazeButton id="confirm-replace-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="deliberateAction"
                 onClick={() => {
-                  dws({ type: 'PLACE_ROOM', cell: confirmReplace.cell });
+                  const pending = confirmReplace;
                   setConfirmReplace(null);
+                  commitPlacement(placeCell(state, pending.cell, pending.use, true, below), pending.cell);
                 }}
-                style={{ padding: '38px 90px', minHeight: '126px', borderRadius: '24px', background: isLight ? T_accent : isMix ? T_accent : '#334155', border: `4px solid ${T_textMain}`, color: T_textInverse, fontSize: '38px', fontWeight: 900, minWidth: '390px' }}>
+                style={{ padding: '38px 90px', minHeight: '126px', borderRadius: '24px', background: isLight || isMix ? T_accent : '#334155', border: `4px solid ${T_textMain}`, color: T_textInverse, fontSize: '38px', fontWeight: 900, minWidth: '390px' }}>
                 YES
               </GazeButton>
               <GazeButton id="confirm-replace-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
@@ -2400,30 +2038,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             </div>
             <div style={{ display: 'flex', gap: '50px', justifyContent: 'center' }}>
               <GazeButton id="confirm-restore-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="deliberateAction"
-                onClick={() => {
-                  try {
-                    const item = pickBestDraftRaw([
-                      localStorage.getItem(COMPASS_PRIMARY_BACKUP_KEY),
-                      localStorage.getItem(COMPASS_LAST_BACKUP_KEY),
-                    ]);
-                    if (item) {
-                      const parsed = parseCompassDraft(item);
-                      if (parsed && parsed.state) {
-                        try {
-                          localStorage.setItem(COMPASS_PRIMARY_BACKUP_KEY, item);
-                        } catch {
-                          // Ignore storage write errors.
-                        }
-                        dispatch({ type: 'HYDRATE_DRAFT', draft: parsed.state });
-                        setFloorRefinements(readCompassFloorRefinements(parsed));
-                        refinementsHydratedRef.current = true;
-                        surveyProcessed.current = true;
-                        onSpeak('Previous session restored.');
-                      }
-                    }
-                  } catch (e) { }
-                  setShowRestoreConfirm(false);
-                }}
+                onClick={restorePrevious}
                 style={{ padding: '38px 100px', minHeight: '132px', borderRadius: '24px', background: T_info, border: 'none', color: T_textInverse, fontSize: '38px', fontWeight: 900, minWidth: '420px' }}>
                 YES, RESTORE
               </GazeButton>
@@ -2464,86 +2079,158 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       );
     }
 
+    // Convert a map that still holds details from the retired Refine Map (§4.8). Nothing is deleted.
+    if (showConvertConfirm) {
+      const details = legacySummary(state.legacy);
+      const divided = state.floors.ground.splits.length + state.floors.first.splits.length > 0;
+      return (
+        <div className="compass-confirmation" role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 6000, background: T_overlayDeep, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <div style={{ background: T_panelBg, border: `4px solid ${T_info}`, borderRadius: '32px', padding: '56px 64px', maxWidth: '1100px', width: '90%', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.24)' }}>
+            <div style={{ fontSize: '40px', fontWeight: 900, color: T_textMain, marginBottom: '28px' }}>Convert to the new map?</div>
+            <div style={{ fontSize: '26px', color: T_textSub, marginBottom: '44px', lineHeight: 1.5 }}>
+              Kept and drawn: your rooms{divided ? ' and divided cells' : ''}.<br />
+              Kept read-only with the map, not drawn: {details || 'the saved plan details'}.<br />
+              Nothing is deleted.
+            </div>
+            <div style={{ display: 'flex', gap: '50px', justifyContent: 'center' }}>
+              <GazeButton id="confirm-convert-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="deliberateAction"
+                onClick={() => {
+                  dispatch({ type: 'CONVERT_LEGACY' });
+                  setShowConvertConfirm(false);
+                  onSpeak('Converted. The saved details are kept read-only. Choose Refine to divide a cell.');
+                }}
+                style={{ padding: '34px 80px', minHeight: '126px', borderRadius: '24px', background: T_info, border: 'none', color: T_textInverse, fontSize: '34px', fontWeight: 900, minWidth: '400px' }}>
+                YES, CONVERT
+              </GazeButton>
+              <GazeButton id="confirm-convert-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
+                onClick={() => { setShowConvertConfirm(false); onSpeak('The map is unchanged.'); }}
+                style={{ padding: '34px 80px', minHeight: '126px', borderRadius: '24px', background: 'transparent', border: `5px solid ${T_textDim}`, color: T_textSub, fontSize: '34px', fontWeight: 900, minWidth: '360px' }}>
+                CANCEL
+              </GazeButton>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return null;
   };
 
-  // Large, stationary choices; paging retains the component queue's order.
+  // ─── RENDER: ROOM COMPONENTS (place mode). Large, stationary choices; paging keeps the queue's order. ───
   const renderMenu = () => {
     if (!menuOpen) return null;
-    const removalP = menuConfirmRemove ? state.placements.find((p) => p.placementId === menuConfirmRemove) : null;
-    const pageCount = Math.max(1, Math.ceil(state.componentQueue.length / 8));
-    const page = Math.min(menuPage, pageCount - 1);
-    const menuCardsEnabled = menuReady && !menuConfirmRemove;
-    const changePage = (next: number) => { setMenuPage(next); setMenuReady(false); };
-
+    const placedUses = new Set(floor.rooms.map(r => r.use));
+    const cards: PickerCard[] = state.componentQueue.map((room, idx) => {
+      const rooms = roomsOfUse(floor, room.roomId);
+      const cells = rooms.reduce((n, r) => n + r.regions.reduce((m, k) => m + (k.includes('.') ? .5 : 1), 0), 0);
+      const count = `${formatFeetShort(cells)} cell${cells === 1 ? '' : 's'}`;
+      const isCurr = idx === state.currentIndex;
+      return {
+        id: room.roomId, label: room.roomLabel, color: libraryOf(room.roomId)?.color || T_accent, selected: isCurr,
+        status: isCurr ? `● CURRENT ${rooms.length ? `- ${count}` : ''}`
+          : rooms.length > 1 ? `✓ PLACED — ${rooms.length} rooms, ${count}` : rooms.length ? `✓ PLACED — ${count}` : 'UNPLACED',
+      };
+    });
     return (
-      <div className="compass-room-menu">
-        <header className="compass-menu-header">
-          <div>
-            <h1>ROOM COMPONENTS</h1>
-            <p><span>{state.currentFloor === 'first' ? '1ST FLOOR' : 'GROUND'}</span>
-              {state.placements.length} / {state.componentQueue.length} placed</p>
-          </div>
-          <GazeButton id="close-menu" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            isDarkMode={!isWarm} dwellCategory="backSkipButton"
-            onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}>✕ CLOSE</GazeButton>
-        </header>
-        {removalP && <div className="compass-menu-confirm" role="alert">
-          <span>Remove {removalP.roomLabel}?</span>
-          <GazeButton id="rm-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            isDarkMode={!isWarm} dwellCategory="deliberateAction"
-            onClick={() => { dws({ type: 'REMOVE_PLACED_ROOM', placementId: menuConfirmRemove! }); setMenuConfirmRemove(null); }}>YES, REMOVE</GazeButton>
-          <GazeButton id="rm-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            isDarkMode={!isWarm} dwellCategory="backSkipButton" onClick={() => setMenuConfirmRemove(null)}>CANCEL</GazeButton>
-        </div>}
-        <div className="compass-menu-instruction" role="status">
-          <span>{menuCardsEnabled ? 'Select any room to load it for placement' : 'Click a room, or press READY to select with gaze.'}</span>
-          <span>{page + 1} / {pageCount}</span>
-        </div>
-        <div className="compass-room-grid">
-          {state.componentQueue.slice(page * 8, page * 8 + 8).map((room, offset) => {
-            const idx = page * 8 + offset;
-            const pl = state.placements.find(p => p.roomId === room.roomId);
-            const isCurr = idx === state.currentIndex;
-            const lib = ROOM_LIBRARY[room.roomId];
-            return <GazeButton key={`${page}-${room.roomId}-${idx}`} id={`m-${room.roomId}-${idx}`}
-              className="compass-room-choice" selected={isCurr} disabled={!!menuConfirmRemove}
-              gazeEnabled={isGazeEnabled && menuCardsEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-              isDarkMode={!isWarm} dwellCategory="compassMapAction"
-              onClick={() => {
-                if (menuConfirmRemove) return;
-                dispatch({ type: 'SELECT_ROOM', roomIndex: idx }); setMenuOpen(false);
-                onSpeak(pl ? `Editing ${room.roomLabel}. Press READY, then add or remove cells.` : `Selected ${room.roomLabel}. Press READY to place.`);
-              }}>
-              <span className="compass-room-dot" style={{ background: lib?.color || T_accent }} aria-hidden="true" />
-              <span className="compass-room-name">{room.roomLabel}</span>
-              <span className="compass-room-status">
-                {isCurr ? `● CURRENT ${pl ? `- ${pl.occupiedCells.length} cell${pl.occupiedCells.length === 1 ? '' : 's'}` : ''}`
-                  : pl ? `✓ PLACED — ${pl.occupiedCells.length} cells` : 'UNPLACED'}
-              </span>
-            </GazeButton>;
-          })}
-        </div>
-        <footer className="compass-menu-footer">
-          <GazeButton id="menu-prev" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            disabled={page === 0 || !!menuConfirmRemove} isDarkMode={!isWarm} dwellCategory="backSkipButton"
-            onClick={() => changePage(Math.max(0, page - 1))}>← PREVIOUS</GazeButton>
-          <GazeButton id="back-map" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            isDarkMode={!isWarm} dwellCategory="backSkipButton"
-            onClick={() => { setMenuOpen(false); setMenuConfirmRemove(null); }}>BACK TO MAP</GazeButton>
-          <GazeButton id="menu-gaze-toggle" className="gaze-switch-card" gazeEnabled alwaysActive gazeEnabledTimestamp={lastEnabledTimestamp}
-            isDarkMode={!isWarm} dwellCategory="gazeToggle" onClick={toggleGaze} selected={isGazeEnabled}
-            ariaLabel={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'}>
-            <GazeToggleCardFace on={isGazeEnabled} />
-          </GazeButton>
-          <GazeButton id="menu-ready" className="compass-primary" gazeEnabled={isGazeEnabled}
-            gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm} dwellCategory="compassMapAction" selected={menuReady}
-            onClick={() => { setMenuReady(!menuReady); onSpeak(menuReady ? 'Ready mode off.' : 'Ready. Select any room card.'); }}>READY</GazeButton>
-          <GazeButton id="menu-next" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            disabled={page === pageCount - 1 || !!menuConfirmRemove} isDarkMode={!isWarm} dwellCategory="backSkipButton"
-            onClick={() => changePage(Math.min(pageCount - 1, page + 1))}>MORE ROOMS →</GazeButton>
-        </footer>
-      </div>
+      <CompassRoomPicker mode="place" title="ROOM COMPONENTS" floorLabel={floorId === 'first' ? '1ST FLOOR' : 'GROUND'}
+        subtitle={`${state.componentQueue.filter(r => placedUses.has(r.roomId)).length} / ${state.componentQueue.length} placed`}
+        cards={cards} page={menuPage} onPage={(next) => { setMenuPage(next); setMenuReady(false); }}
+        ready={menuReady} onReady={() => { setMenuReady(!menuReady); onSpeak(menuReady ? 'Ready mode off.' : 'Ready. Select any room card.'); }}
+        onChoose={(card) => {
+          const idx = state.componentQueue.findIndex(r => r.roomId === card.id);
+          if (idx < 0) return;
+          const room = state.componentQueue[idx];
+          dispatch({ type: 'SELECT_ROOM', roomIndex: idx }); setMenuOpen(false);
+          onSpeak(roomsOfUse(floor, room.roomId).length ? `Editing ${room.roomLabel}. Press READY, then add or remove cells.` : `Selected ${room.roomLabel}. Press READY to place.`);
+        }}
+        onClose={() => setMenuOpen(false)}
+        isGazeEnabled={isGazeEnabled} lastEnabledTimestamp={lastEnabledTimestamp} toggleGaze={toggleGaze} isWarm={isWarm} />
+    );
+  };
+
+  // ─── RENDER: Refine focus view (§5.1 step 3) ───
+  const belowText = (key: string): string | undefined => {
+    if (!below) return undefined;
+    const cell = cellOf(key);
+    const room = ownerOf(below, below.splits.includes(cell) ? key : cell);
+    return `Below: ${room ? labelsOf(below)[room.id] : 'empty'}`;
+  };
+
+  const renderFocus = () => {
+    if (!focusCell || assignKey) return null;
+    const v = cellView(floor, focusCell);
+    const { row, col } = parseCellKey(focusCell);
+    // An undivided cell is shown as it would divide: both halves keep the cell's room.
+    const face = (room: RoomIntent | null, key: string): HalfFace => {
+      const size = regionSizeIn(key, widthIn, depthIn);
+      return { label: room ? labels[room.id] : 'Empty', color: room ? colourOf(room.use) : null,
+        size: `${inches(size.width)} × ${inches(size.depth)}`, below: belowText(key) };
+    };
+    const thumbnail: ThumbCell[] = RENDER_ORDER.map(key => {
+      const c = cellView(floor, key);
+      const colour = (room: RoomIntent | null) => (room ? colourOf(room.use) : null);
+      return { key, split: c.split, colors: c.split ? [colour(c.left), colour(c.right)] : [colour(c.whole)] };
+    });
+    return (
+      <CompassRefineFocus
+        title="Divide a cell"
+        subtitle={`${floorName} · Row ${row} (${ROW_NAMES[row]}), Column ${col}`}
+        left={face(v.split ? v.left : v.whole, `${focusCell}.L`)}
+        right={face(v.split ? v.right : v.whole, `${focusCell}.R`)}
+        divided={v.split} thumbnail={thumbnail} focusKey={focusCell}
+        question={focusQuestion} message={focusMessage} canUndo={state.history.length > 0}
+        onHalf={onHalf}
+        onUndo={() => { touchRefine(); setFocusQuestion(null); setFocusMessage(''); dws({ type: 'UNDO' }); }}
+        onWhole={onWhole} onBack={closeFocus}
+        isGazeEnabled={isGazeEnabled} lastEnabledTimestamp={lastEnabledTimestamp} toggleGaze={toggleGaze} isWarm={isWarm} />
+    );
+  };
+
+  // ─── RENDER: the room for one half (ROOM COMPONENTS in assign mode, §5.1 step 5) ───
+  const renderAssign = () => {
+    if (!assignKey || !focusCell) return null;
+    const st = workingState();
+    const wfloor = st.floors[floorId];
+    const names = labelsOf(wfloor);
+    const current = ownerOf(wfloor, assignKey) || null;
+    const have = clearWidthIn(assignKey, widthIn, depthIn);
+    const size = regionSizeIn(assignKey, widthIn, depthIn);
+    const { row, col } = parseCellKey(focusCell);
+    const side = assignKey.endsWith('.L') ? 'LEFT' : 'RIGHT';
+    const cards: PickerCard[] = [{
+      id: 'empty', label: 'Leave empty', color: 'var(--ui-border)', selected: !current,
+      status: current ? `Now: ${names[current.id]}` : '● THIS HALF IS EMPTY',
+    }];
+    for (const use of catalogueUses(floorId)) {
+      const lib = libraryOf(use);
+      const rooms = roomsOfUse(wfloor, use);
+      const joins = rooms.find(r => r.regions.some(k => k !== assignKey && regionsTouch(assignKey, k)));
+      const need = MIN_CLEAR_IN[use] || 0;
+      const stairTaken = STAIR_HOSTS[floorId].has(use) && wfloor.rooms.some(r => STAIR_HOSTS[floorId].has(r.use) && r.use !== use);
+      // The same rules as assignHalf, in a few words, so a card never promises what choosing it refuses.
+      let fit: PickerCard['fit'];
+      if (current?.use === use) fit = { ok: true, text: 'Already this room' };
+      else if (use === 'void') fit = voidProblem(below, [assignKey], state.choices)
+        ? { ok: false, text: 'Needs the living hall below' } : { ok: true, text: 'Makes the living hall below double height' };
+      else if (joins) fit = { ok: true, text: `Joins ${names[joins.id]}` };
+      else if (rooms.length && !REPEATABLE.has(use)) fit = { ok: false, text: 'One per floor: placed elsewhere' };
+      else if (stairTaken) fit = { ok: false, text: 'The stair is already placed' };
+      else fit = need && have < need ? { ok: false, text: `Too narrow: needs ${inches(need)}` } : { ok: true, text: `Fits: ${inches(have)} clear` };
+      cards.push({
+        id: use, label: lib?.roomLabel || use, color: colourOf(use), selected: current?.use === use, fit,
+        status: current?.use === use ? '● THIS HALF' : !rooms.length ? 'Not placed yet'
+          : rooms.length === 1 ? 'Placed on this floor' : `${rooms.length} on this floor`,
+      });
+    }
+    return (
+      <CompassRoomPicker mode="assign" title={`Room for the ${side} half`} floorLabel={floorId === 'first' ? '1ST FLOOR' : 'GROUND'}
+        subtitle={`Row ${row}, Column ${col} · ${inches(size.width)} × ${inches(size.depth)}`}
+        cards={cards} page={assignPage} onPage={(next) => { setAssignPage(next); setAssignReady(false); touchRefine(); }}
+        ready={assignReady} onReady={() => { setAssignReady(!assignReady); touchRefine(); onSpeak(assignReady ? 'Ready mode off.' : 'Ready. Select a room for this half.'); }}
+        onChoose={(card) => applyAssign(card.id === 'empty' ? { type: 'empty' } : { type: 'use', use: card.id }, assignKey)}
+        onClose={() => { signalNavigation(); setAssignKey(null); setPickerQuestion(null); setPickerNotice(''); touchRefine(); onSpeak('Back to the cell. Nothing changed.'); }}
+        question={pickerQuestion} notice={pickerNotice}
+        isGazeEnabled={isGazeEnabled} lastEnabledTimestamp={lastEnabledTimestamp} toggleGaze={toggleGaze} isWarm={isWarm} />
     );
   };
 
@@ -2552,12 +2239,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   // ─── MAIN RENDER ────────────────────────────────────────
 
-  const renderRightActionRail = () => null;
-
   return (
     <div data-nav-hidden={navHidden} className={`compass-screen${isLight ? ' theme-light' : ''}${isMix ? ' theme-mix' : ''}${isWarm ? ' theme-warm' : ''}`} style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: T_pageBg, display: 'flex', flexDirection: 'column', fontFamily: UI_FONT }}>
-      {!menuOpen && (!navHidden || state.phase === 'foundation') && (
-        <div style={{ pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto' }}>
+      {!fullScreenOverlay && (!navHidden || state.phase === 'foundation') && (
+        <div style={{ pointerEvents: overlayOpen ? 'none' : 'auto' }}>
           <GlobalNavBar
             currentPage="compass-map"
             onNavigate={onNavigate}
@@ -2569,14 +2254,14 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         </div>
       )}
       {/* Dead zone: 30px non-interactive gap between nav bar and content — prevents accidental nav clicks when targeting top-row compass cells */}
-      {!menuOpen && (!navHidden || state.phase === 'foundation') && (
+      {!fullScreenOverlay && (!navHidden || state.phase === 'foundation') && (
         <div
           data-gaze="false"
           style={{ height: '30px', pointerEvents: 'none', flexShrink: 0 }}
         />
       )}
       {/* Floating SHOW NAV ↑ button — shown when nav is hidden, aligned with right action strip */}
-      {!menuOpen && !isConfirmationOpen && navHidden && state.phase !== 'foundation' && !isFocusLocked && (
+      {!overlayOpen && navHidden && state.phase !== 'foundation' && !isFocusLocked && (
         <GazeButton
           id="nav-restore"
           gazeEnabled={isGazeEnabled}
@@ -2606,7 +2291,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         </GazeButton>
       )}
       {/* Floating HIDE NAV ↓ button — shown when nav is visible, aligned with right action strip */}
-      {!menuOpen && !isConfirmationOpen && !navHidden && (state.phase === 'placement' || state.phase === 'review') && (
+      {!overlayOpen && !navHidden && (state.phase === 'placement' || state.phase === 'review') && (
         <GazeButton
           id="hide-nav-btn"
           gazeEnabled={isGazeEnabled}
@@ -2636,28 +2321,25 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       )}
       {state.phase === 'foundation' && renderFoundation()}
 
-      {!menuOpen && (state.phase === 'placement' || (state.phase === 'review' && !showFloorTransition)) && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, overflow: 'hidden', position: 'relative', pointerEvents: (isConfirmationOpen || menuOpen) ? 'none' : 'auto' }}>
+      {!fullScreenOverlay && (state.phase === 'placement' || (state.phase === 'review' && !showFloorTransition)) && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, overflow: 'hidden', position: 'relative', pointerEvents: overlayOpen ? 'none' : 'auto' }}>
           {/* LEFT: Plot Canvas + Info Overlays */}
           <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {renderPlotCanvas()}
-            {/* Floating READY button removed - moved to Road Section */}
           </div>
 
           {/* RIGHT: Action Strip */}
           {renderActionStrip()}
-
-          {/* Floating Action Rail (Right) - keep Save/Gen if they are not in the strip */}
-          {renderRightActionRail()}
         </div>
       )}
 
-      {!menuOpen && showFloorTransition && renderFloorTransition()}
+      {!fullScreenOverlay && showFloorTransition && renderFloorTransition()}
 
       {renderMenu()}
+      {renderFocus()}
+      {renderAssign()}
       {renderConfirmationOverlay()}
 
-      {/* ═══ CELL FOCUS MODE — 3-Column Layout ═══ */}
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -2682,7 +2364,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       `}</style>
 
       {/* Room change notice belongs to the map, never above room choices. */}
-      {roomToast && !menuOpen && !isConfirmationOpen && (
+      {roomToast && !overlayOpen && !refineMode && (
         <div
           key={`room-toast-${roomToast.index}`}
           style={{
@@ -2738,7 +2420,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         )
       }
 
-      {showCompassStudio && compiledPayload && (
+      {showCompassStudio && v2Enabled && studioPlan && (
+        <CompassStudio plan={studioPlan} scope={studioScope} onSpeak={onSpeak}
+          onClose={() => { setShowCompassStudio(false); onSpeak('Back to Compass Map.'); }}
+          onLegacyReview={openLegacyReview} />
+      )}
+
+      {showCompassStudio && !v2Enabled && compiledPayload && (
         <CompassPlanStudio source={compiledPayload} scope={studioScope} onSpeak={onSpeak}
           onClose={() => { setShowCompassStudio(false); onSpeak('Back to Compass Map.'); }}
           onLegacyReview={() => {
@@ -2814,12 +2502,6 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       }
     </div >
   );
-}
-
-function getNextRoomIndex(queue: RoomComponent[], placements: PlacementRecord[]): number {
-  const placedIds = new Set(placements.map((p) => p.roomId));
-  const firstUnplacedIdx = queue.findIndex((r) => !placedIds.has(r.roomId));
-  return firstUnplacedIdx >= 0 ? firstUnplacedIdx : queue.length;
 }
 
 export default React.memo(CompassMapScreen);

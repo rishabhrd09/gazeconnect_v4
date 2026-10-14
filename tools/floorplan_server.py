@@ -36,15 +36,28 @@ PYTHON_DIR = PROJECT_ROOT / "python"
 if PYTHON_DIR.exists():
     sys.path.insert(0, str(PYTHON_DIR))
 
-from gazeconnect_floorplan_v5 import parse, CairoFloorPlan, Fl
-from floorplan_fusion_v1 import fuse_floorplan_inputs, pick_style_from_context
-from compass_resources import resources as compass_resources, RendererBusy, MAX_REQUEST_BYTES, validate_source
-try:
-    from gazeplan_engine_v5.engine import generate_floorplan_v5
-    HAS_V5 = True
-except Exception:
-    generate_floorplan_v5 = None  # type: ignore[assignment]
-    HAS_V5 = False
+from compass_resources import (resources as compass_resources, RendererBusy, JobCancelled, JobTimeout,
+                               MAX_REQUEST_BYTES, validate_source)
+import floorplan_runtime
+
+_LEGACY = None
+
+
+def _legacy():
+    """The survey/legacy renderer and its fusion load on their first request, never at start.
+
+    The Compass studio uses neither. Loading them lazily keeps the idle service small;
+    the v5 optimizer (OR-Tools and, through it, pandas) is no longer loaded at all.
+    """
+    global _LEGACY
+    if _LEGACY is None:
+        from types import SimpleNamespace
+        from gazeconnect_floorplan_v5 import parse, CairoFloorPlan
+        from floorplan_fusion_v1 import fuse_floorplan_inputs, pick_style_from_context
+        _LEGACY = SimpleNamespace(parse=parse, CairoFloorPlan=CairoFloorPlan,
+                                  fuse_floorplan_inputs=fuse_floorplan_inputs,
+                                  pick_style_from_context=pick_style_from_context)
+    return _LEGACY
 
 # ── App Setup ──────────────────────────────────────────────
 
@@ -57,9 +70,20 @@ TEMP_DIR.mkdir(exist_ok=True)
 VALID_STYLES = {"modern", "autocad", "blueprint", "presentation"}
 VALID_FORMATS = {"png", "pdf", "svg"}
 MIME_MAP = {"png": "image/png", "pdf": "application/pdf", "svg": "image/svg+xml"}
-VALID_V5_STYLES = {"presentation", "technical", "both"}
-VALID_V5_FORMATS = {"png", "pdf", "svg", "dxf"}
 MIME_MAP_V5 = {**MIME_MAP, "dxf": "application/dxf"}
+STARTED_AT = time.time()
+IDLE = None   # floorplan_runtime.IdleWatch once main() runs with --idle-seconds.
+
+
+def _touch():
+    # Electron asks /api/health every 5 s while the service runs; that is not use, or the
+    # service would never leave after its idle minutes and would keep its memory all session.
+    if IDLE is not None and request.path != "/api/health":
+        IDLE.touch()
+
+
+if hasattr(app, "before_request"):
+    app.before_request(_touch)
 
 @app.errorhandler(Exception)
 def handle_global_exception(e):
@@ -106,7 +130,7 @@ def _prepare_fused_payload(data: dict):
 
     # Preserve advanced_refinements before fusion (fusion doesn't know about them)
     adv_refinements = compass_data.get("advanced_refinements", {})
-    fused_map, fusion_report = fuse_floorplan_inputs(
+    fused_map, fusion_report = _legacy().fuse_floorplan_inputs(
         compass_data,
         survey_data=survey_data,
         user_notes=user_notes,
@@ -121,7 +145,11 @@ def _prepare_fused_payload(data: dict):
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "engine": "pycairo", "version": "4.0"})
+    """Readiness, and this process's own memory and job state for the app's health log."""
+    return jsonify({"status": "ok", "engine": "pycairo", "version": "4.0", "pid": os.getpid(), "ppid": os.getppid(),
+                    "uptimeS": round(time.time() - STARTED_AT), "memory": floorplan_runtime.process_memory(),
+                    "jobs": compass_resources.state(),
+                    "idleS": round(IDLE.idle_for()) if IDLE is not None else None})
 
 
 # Compass presentation is isolated from survey fusion and the legacy viewer.
@@ -168,6 +196,84 @@ def compass_plan_render():
         return jsonify({"error": str(error)}), 422
 
 
+# ── Compass studio, version 2: one PlanModel, three views, honest exports ──
+
+V2_MAX_BYTES = 128 * 1024
+
+
+def _v2_body():
+    if (request.content_length or 0) > V2_MAX_BYTES:
+        return None, (jsonify({"error": "This plan is too large."}), 413)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("plan"), dict):
+        return None, (jsonify({"error": "A Compass plan is required."}), 400)
+    return data, None
+
+
+def _v2_errors(call):
+    try:
+        return call()
+    except JobCancelled:
+        # A newer request for the same view replaced this one; the studio ignores this reply.
+        return jsonify({"error": "A newer view was requested.", "superseded": True}), 409
+    except JobTimeout as error:
+        return jsonify({"error": str(error)}), 504
+    except RendererBusy as error:
+        return jsonify({"error": str(error)}), 429
+    except (ValueError, TypeError, KeyError) as error:
+        return jsonify({"error": str(error)}), 422
+
+
+@app.route("/api/floorplan/compass/v2/model", methods=["POST"])
+def compass_v2_model():
+    """The plan's rooms, sizes, notes, checks and modelHash (drawn nothing)."""
+    from compass_studio import summary
+    data, failure = _v2_body()
+    if failure:
+        return failure
+
+    def run():
+        job_id = str(data.get("jobId") or "")
+        if job_id:
+            with compass_resources.latest(job_id, "preview"):
+                return jsonify(summary(data["plan"]))
+        with compass_resources.job():
+            return jsonify(summary(data["plan"]))
+    return _v2_errors(run)
+
+
+@app.route("/api/floorplan/compass/v2/render", methods=["POST"])
+def compass_v2_render():
+    """One view or export of the plan: plan / top / outside images, the A3 sheet, or the CAD files."""
+    from compass_studio import render as studio_render, MIME, model_for, plan_of
+    data, failure = _v2_body()
+    if failure:
+        return failure
+
+    def run():
+        settings = {"view": data.get("view", "plan"), "floor": data.get("floor", "ground"),
+                    "fmt": data.get("format", "png"), "theme": data.get("theme", "warm"),
+                    "preset": data.get("preset", "front-left"), "width": data.get("width", 1600),
+                    "height": data.get("height", 1000), "export": bool(data.get("export", False)),
+                    "light": bool(data.get("light", False))}
+        job_id = str(data.get("jobId") or "")
+        produce = lambda: studio_render(data["plan"], **settings)[0]
+        if job_id:
+            output = compass_resources.render_latest(data["plan"], settings, produce, job_id=job_id,
+                                                     channel="export" if settings["export"] else "preview")
+        else:
+            with compass_resources.job():
+                output = produce()
+        response = send_file(io.BytesIO(output), mimetype=MIME[settings["fmt"]],
+                             download_name=f"compass-{settings['view']}.{settings['fmt'].split('-')[0]}")
+        plan, _ = plan_of(data["plan"])
+        response.headers["X-Plan-Hash"] = model_for(plan)["modelHash"]
+        if job_id:
+            response.headers["X-Job-Id"] = job_id
+        return response
+    return _v2_errors(run)
+
+
 # ── Generate Floor Plan ───────────────────────────────────
 
 @app.route("/api/floorplan/generate", methods=["POST"])
@@ -200,12 +306,12 @@ def generate_floorplan():
 
         # Deterministic fusion: compass + survey + custom notes
         compass_data, fusion_report = _prepare_fused_payload(data)
-        style = pick_style_from_context(requested_style, fusion_report)
+        style = _legacy().pick_style_from_context(requested_style, fusion_report)
         if style not in VALID_STYLES:
             return jsonify({"error": f"Invalid style: {style}. Valid: {VALID_STYLES}"}), 400
         
         # Parse into Floor objects
-        floors = parse({"compass_map": compass_data})
+        floors = _legacy().parse({"compass_map": compass_data})
         if not floors:
             return jsonify({"error": "No floor data could be parsed"}), 400
 
@@ -224,7 +330,7 @@ def generate_floorplan():
         filepath = TEMP_DIR / filename
 
         # Render
-        renderer = CairoFloorPlan(fl, style)
+        renderer = _legacy().CairoFloorPlan(fl, style)
 
         if fmt == "png":
             renderer.render_png(str(filepath))
@@ -277,7 +383,7 @@ def generate_all_styles():
         compass_data, _fusion_report = _prepare_fused_payload(data)
         floor_select = data.get("floor", "ground")
 
-        floors = parse({"compass_map": compass_data})
+        floors = _legacy().parse({"compass_map": compass_data})
         if not floors:
             return jsonify({"error": "No floor data"}), 400
 
@@ -287,7 +393,7 @@ def generate_all_styles():
         for style in VALID_STYLES:
             ts = int(time.time() * 1000)
             filepath = TEMP_DIR / f"fp_{ts}_{style}.png"
-            renderer = CairoFloorPlan(fl, style)
+            renderer = _legacy().CairoFloorPlan(fl, style)
             renderer.render_png(str(filepath))
 
             with open(filepath, "rb") as f:
@@ -309,13 +415,13 @@ def generate_all_styles():
 
 def _candidate_previews(compass_map: dict) -> dict:
     """Render the very same vector geometry used by selected-plan exports."""
-    floors = parse({"compass_map": compass_map})
+    floors = _legacy().parse({"compass_map": compass_map})
     previews = {}
     with tempfile.TemporaryDirectory(prefix="gc_plan_review_") as directory:
         for floor in floors:
             key = "first" if "first" in floor.label.lower() else "ground"
             path = Path(directory) / f"{key}.svg"
-            CairoFloorPlan(floor, "modern").render_svg(str(path))
+            _legacy().CairoFloorPlan(floor, "modern").render_svg(str(path))
             encoded = base64.b64encode(path.read_bytes()).decode("ascii")
             previews[key] = f"data:image/svg+xml;base64,{encoded}"
     return previews
@@ -453,9 +559,9 @@ def preview_floorplan():
         data = request.get_json(force=True)
         compass_data, fusion_report = _prepare_fused_payload(data)
         style = data.get("style", "presentation")
-        style = pick_style_from_context(style, fusion_report)
+        style = _legacy().pick_style_from_context(style, fusion_report)
 
-        floors = parse({"compass_map": compass_data})
+        floors = _legacy().parse({"compass_map": compass_data})
         if not floors:
             return jsonify({"error": "No data"}), 400
 
@@ -463,7 +569,7 @@ def preview_floorplan():
         ts = int(time.time() * 1000)
         filepath = TEMP_DIR / f"preview_{ts}.png"
 
-        renderer = CairoFloorPlan(fl, style)
+        renderer = _legacy().CairoFloorPlan(fl, style)
         renderer.render_png(str(filepath))
 
         response = send_file(str(filepath), mimetype="image/png")
@@ -472,103 +578,6 @@ def preview_floorplan():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/floorplan/v5/generate", methods=["POST"])
-def generate_floorplan_v5_api():
-    """
-    POST /api/floorplan/v5/generate
-
-    Body:
-    {
-      "compass_map": {...},
-      "survey_data": {...},      // optional
-      "style": "presentation|technical|both",
-      "format": "png|pdf|svg|dxf",
-      "floor": "ground|first",
-      "variants": 1
-    }
-    """
-    if not HAS_V5:
-        return jsonify(
-            {
-                "error": "v5 engine unavailable (missing dependencies or import error).",
-                "hint": "Install optional deps: shapely networkx squarify ortools ezdxf",
-            }
-        ), 503
-    try:
-        data = request.get_json(force=True) or {}
-        style = str(data.get("style", "both")).strip().lower()
-        fmt = str(data.get("format", "png")).strip().lower()
-        floor = str(data.get("floor", "ground")).strip().lower()
-        variants = int(data.get("variants", 1) or 1)
-
-        if style not in VALID_V5_STYLES:
-            return jsonify({"error": f"Invalid v5 style: {style}. Valid: {sorted(VALID_V5_STYLES)}"}), 400
-        if fmt not in VALID_V5_FORMATS:
-            return jsonify({"error": f"Invalid v5 format: {fmt}. Valid: {sorted(VALID_V5_FORMATS)}"}), 400
-
-        ts = int(time.time() * 1000)
-        out_dir = TEMP_DIR / f"v5_{ts}"
-        result = generate_floorplan_v5(
-            data,
-            output_dir=out_dir,
-            style=style,
-            fmt=fmt,
-            floor=floor,
-            variants=variants,
-        )
-        status = str(result.get("status", "error"))
-        if status != "ok":
-            code = 422 if status == "infeasible" else 400
-            return jsonify(result), code
-
-        files = list(result.get("files") or [])
-        if len(files) == 1:
-            path = Path(files[0]["path"])
-            if not path.exists():
-                return jsonify({"error": "v5 render output missing"}), 500
-            ext = path.suffix.lower().lstrip(".")
-            response = send_file(
-                str(path),
-                mimetype=MIME_MAP_V5.get(ext, "application/octet-stream"),
-                as_attachment=False,
-                download_name=path.name,
-            )
-            _cleanup_temp(max_files=20, max_v5_dirs=5)
-            return response
-
-        # Multi-file output (e.g., style=both): return manifest JSON.
-        _cleanup_temp(max_files=20, max_v5_dirs=5)
-        return jsonify(result)
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
-
-
-@app.route("/api/floorplan/fusion-report", methods=["POST"])
-def fusion_report():
-    """
-    POST /api/floorplan/fusion-report
-    Return fused payload + explainability report without rendering.
-    """
-    try:
-        data = request.get_json(force=True)
-        if not data:
-            return jsonify({"error": "No JSON body provided"}), 400
-
-        fused_map, report = _prepare_fused_payload(data)
-        return jsonify(
-            {
-                "status": "ok",
-                "fusion_version": "v1",
-                "report": report,
-                "fused_compass_map": fused_map,
-            }
-        )
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 
 # ── Temp Cleanup ──────────────────────────────────────────
@@ -602,16 +611,25 @@ def _cleanup_temp(max_files=20, max_v5_dirs=5):
 
 # ── Main ──────────────────────────────────────────────────
 
-if __name__ == "__main__":
+def main(argv=None):
+    """Serve on loopback. With --parent-pid the service ends with the app; with
+    --idle-seconds it leaves after that long without a request (exit code 75)."""
+    global IDLE
+    options = floorplan_runtime.parse_args(sys.argv[1:] if argv is None else argv)
+    floorplan_runtime.lower_priority()
     port = int(os.environ.get("FLOORPLAN_PORT", 5050))
     _cleanup_temp(max_files=20, max_v5_dirs=5)
-    print(f"\n{'='*60}")
-    print(f"  GazeConnect Floor Plan API Server")
-    print(f"  Engine: PyCairo v5.0 (refinement-aware)")
-    print(f"  Styles: {', '.join(sorted(VALID_STYLES))}")
-    print(f"  Formats: {', '.join(sorted(VALID_FORMATS))}")
-    print(f"  Listening: http://localhost:{port}")
-    print(f"{'='*60}\n")
+    if options["parent_pid"]:
+        floorplan_runtime.watch_parent(options["parent_pid"])
+    if options["idle_seconds"] > 0:
+        IDLE = floorplan_runtime.IdleWatch(options["idle_seconds"], compass_resources.busy)
+        IDLE.start()
+    print(f"GazeConnect floor-plan service on http://127.0.0.1:{port} (pid {os.getpid()}, "
+          f"parent {options['parent_pid'] or 'none'}, idle exit {int(options['idle_seconds']) or 'off'})", flush=True)
     # debug=False + use_reloader=False: prevents stat reloader from
     # spawning a child process that may crash silently in Electron
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+
+
+if __name__ == "__main__":
+    main()
