@@ -26,10 +26,16 @@ let browser;
     throw Error('Route not found');
   });
   await page.locator('#f-skip').waitFor();
-  await page.click('#f-skip');                 // Facing: the first answer.
+  await page.click('#f-skip');                 // Facing: SKIP keeps the prefilled West.
   await page.click('[id="fq-1-40 ft"]');       // A 40 ft plot, so a half cell can hold a passage (4'-6" clear).
   for(let i=0;i<8 && await page.locator('#f-skip').count();i++){await page.click('#f-skip');await page.waitForTimeout(100);}
   await page.locator('#strip-rooms').waitFor();
+  // SKIP kept the prefilled answer (West), not the question's first option (North) (REFINE_FIX_HANDOFF A1).
+  assert.match(await page.locator('.compass-road-info').innerText(),/\(West\) – 40 ft/);
+  // A refusal is shown on the road, not only spoken (A3).
+  await page.click('#cell-r4_c4');
+  assert.match(await page.locator('#compass-road-status').innerText(),/Press READY first/);
+  assert.equal(await page.locator('#compass-road-status').getAttribute('aria-live'),'polite');
   assert.equal(await page.locator('#strip-refine-map').count(),0);
   assert.equal(await page.locator('.compass-action-strip button').count(),5);
   assert.equal(await page.locator('#strip-refine').count(),1);
@@ -77,7 +83,18 @@ let browser;
   assert.equal(await page.locator('#assign-empty-0').getAttribute('data-gaze'),'true');
   await page.click('#assign-back');                                            // Back changes nothing.
   assert.equal(await page.locator('#refine-whole').isDisabled(),true);
-  await page.click('#refine-left');await page.click('#assign-next');await page.click('#assign-next');
+  // The picker built for halves (B3): a passage and a bathroom on page 1; a room that cannot go here (the porch,
+  // placed elsewhere and one per floor) last and disabled, with its reason; READY stays on across pages.
+  await page.click('#refine-left');
+  const page1 = await page.locator('.compass-room-choice').evaluateAll(cards => cards.map(c => c.id));
+  assert.ok(page1.some(id => id.startsWith('assign-passage-')) && page1.some(id => id.startsWith('assign-bathroom-')), page1.join(' '));
+  await page.click('#assign-ready');
+  while(await page.locator('#assign-next').isEnabled()) await page.click('#assign-next');
+  assert.equal(await page.locator('#assign-ready').getAttribute('aria-pressed'),'true','READY stays on while paging');
+  const porch = page.locator('[id^="assign-porch-"]');
+  assert.equal(await porch.isDisabled(),true); assert.match(await porch.innerText(),/One per floor: placed elsewhere/);
+  assert.equal(await porch.getAttribute('data-gaze'),'false','a disabled card never answers to gaze');
+  await page.click('#assign-back');await page.click('#refine-left');
   await page.locator('[id^="assign-passage-"]').click();
   await page.locator('.compass-refine-focus').waitFor();
   assert.match(await page.locator('#refine-left').innerText(),/Passage/);
@@ -90,21 +107,68 @@ let browser;
   assert.equal(await page.locator('#refine-whole').isEnabled(),true);
   await page.click('#refine-whole');                                           // Both empty: whole again at once.
   assert.equal(await page.locator('#refine-whole').isDisabled(),true);
-  await page.click('#refine-left');await page.click('#assign-next');await page.click('#assign-next');
+  await page.click('#refine-left');
   await page.locator('[id^="assign-passage-"]').click();
   await page.click('#refine-back');
   assert.match(await page.locator('#cell-r2_c3').innerText(),/PASSAGE/);
   assert.match(await page.locator('.compass-current-room').innerText(),/1 DIVIDED CELL/);
   await page.click('#strip-refine');
   assert.match(await page.locator('#strip-refine').innerText(),/^REFINE/);
-  // Placing a room over a divided cell changes nothing.
+  // Placing on a divided cell (B1): the cell opens the half chooser naming the armed room; the half gets the room
+  // by the same rules, and the map returns. Two selections from the armed map: the cell and the half.
   assert.match(await page.locator('.compass-road-info').innerText(),/2½ \/ 16 cells placed/);
-  await page.click('#strip-rooms');await page.locator('.compass-room-choice').first().click();
+  await page.click('#strip-rooms');await page.click('#menu-next');await page.click('#menu-ready');
+  await page.locator('[id^="m-bathroom-"]').click();
   if(await page.locator('#ready-road-left').getAttribute('aria-pressed')==='false')await page.click('#ready-road-left');
   await page.click('#cell-r2_c3');
-  assert.match(await page.locator('.compass-road-info').innerText(),/2½ \/ 16 cells placed/);
-  assert.match(await page.locator('#cell-r2_c3').innerText(),/PASSAGE/);
+  await page.locator('.compass-refine-focus').waitFor();
+  assert.match(await page.locator('.refine-header h1').innerText(),/Place Bathroom in:/);
+  assert.equal(await page.locator('[data-picker-mode="assign"]').count(),0,'no room list: the armed room is placed');
+  await page.click('#refine-right');
+  await page.locator('.compass-cell-grid').waitFor();
+  assert.equal(await page.locator('.compass-refine-focus').count(),0,'the map returns');
+  assert.match(await page.locator('#cell-r2_c3').innerText(),/PASSAGE[\s\S]*BATH/);
+  assert.match(await page.locator('.compass-road-info').innerText(),/3 \/ 16 cells placed/);
+  // A narrow half is placed with a warning on the map (B2): a 40 ft plot's half is 4'-6" clear; a kitchen needs 4'-11".
+  await page.click('#strip-rooms');await page.click('#menu-prev');await page.click('#menu-ready');
+  await page.locator('[id^="m-kitchen-"]').click();
+  if(await page.locator('#ready-road-left').getAttribute('aria-pressed')==='false')await page.click('#ready-road-left');
+  await page.click('#cell-r2_c3');await page.locator('.compass-refine-focus').waitFor();
+  await page.click('#refine-right');                                      // The bathroom's half: asked first, never silent.
+  assert.match(await page.locator('.refine-question p').innerText(),/Replace Bathroom with Kitchen \+ Store in the right half\? Bathroom has no other part/);
+  await page.click('#place-cancel');
+  assert.match(await page.locator('#refine-right').innerText(),/Bathroom/,'Cancel changes nothing');
+  await page.click('#refine-right');await page.click('#place-replace');
+  await page.locator('.compass-cell-grid').waitFor();
+  assert.match(await page.locator('#cell-r2_c3').innerText(),/KITCHEN[\s\S]*NARROW/);
+  assert.match(await page.locator('#compass-road-status').innerText(),/Right half: Kitchen \+ Store\. Narrow: 4'-6" clear; Kitchen \+ Store needs 4'-11"\. Bathroom removed\./);
+  assert.match(await page.locator('#cell-r2_c3').getAttribute('aria-label'),/right Kitchen \+ Store, narrow/);
+  // A fresh map: skipping every question keeps the prefilled 40 x 60 ft West plot (A1). A 20 ft plot says at the
+  // rail that its cells cannot be divided, and REFINE does not open (A4).
+  async function freshMap() {
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+    await page.reload(); await page.locator('#kb').waitFor();
+    await page.evaluate(() => {
+      const e=document.querySelector('#kb'); let f=e[Object.keys(e).find(k=>k.startsWith('__reactFiber$'))];
+      while(f){if(typeof f.memoizedProps?.onNavigate==='function'){f.memoizedProps.onNavigate('compass-map');return;}f=f.return;}
+      throw Error('Route not found');
+    });
+    await page.locator('#f-skip').waitFor();
+  }
+  const skipAll = async () => { for(let i=0;i<8 && await page.locator('#f-skip').count();i++){await page.click('#f-skip');await page.waitForTimeout(100);} await page.locator('#strip-rooms').waitFor(); };
+  await freshMap();
+  assert.match(await page.locator('#foundation-readiness').innerText(),/SKIP keeps West/);
+  await skipAll();
+  assert.match(await page.locator('.compass-road-info').innerText(),/\(West\) – 40 ft/);
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).ui.foundation);
+  assert.deepEqual([kept.facing, kept.plotWidth, kept.plotDepth], ['West', 40, 60], 'skipping every question keeps 40 x 60 West');
+  await freshMap();
+  await page.click('#f-skip'); await page.click('[id="fq-1-20 ft"]'); await skipAll();
+  assert.match(await page.locator('#strip-refine').innerText(),/HALVES TOO NARROW ON A 20 FT PLOT/);
+  await page.click('#strip-refine');
+  assert.match(await page.locator('#strip-refine').innerText(),/^REFINE/, 'Refine does not open on a 20 ft plot');
+  assert.match(await page.locator('#compass-road-status').innerText(),/under the 2'-6" a half needs/);
   assert.deepEqual(errors,[]);
   await browser.close();
-  console.log('PASS: five-action rail, room paging/READY/selection, two room placements, NEXT, Generate confirmation/cancel, floor switching, Back to Map; Refine: focus view, READY-gated room picker, Back, a half room, Undo as one step, whole cell, divided cell on the map, placement refused on it.');
+  console.log('PASS: five-action rail, room paging/READY/selection, two room placements, NEXT, Generate confirmation/cancel, floor switching, Back to Map, SKIP keeps answers, refusals on the road, no Refine on a 20 ft plot; Refine: focus view, READY-gated picker built for halves (page 1, READY across pages, disabled last), Back, a half room, Undo as one step, whole cell, divided cell on the map; placing on a divided cell: half chooser, replace asked, narrow warning.');
 })().catch(async e=>{console.error(e);await browser?.close();process.exitCode=1;});

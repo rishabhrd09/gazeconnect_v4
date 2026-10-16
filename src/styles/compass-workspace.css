@@ -105,6 +105,12 @@
 .refine-footer button:disabled { opacity: 1 !important; color: var(--ui-muted) !important; border-style: dashed !important; background: var(--ui-page) !important; }
 .refine-footer button[aria-pressed='true'] { background: var(--ui-selected) !important; }
 .compass-room-status[data-fit='no'] { color: var(--ui-ink) !important; font-weight: 700; }
+.compass-room-status[data-fit='warn'] { color: var(--ui-ink) !important; font-weight: 700; }
+/* A card that cannot be chosen for this half (16 Oct 2026): last on the list, dashed, with its reason. */
+.compass-room-grid .compass-room-choice:disabled { opacity: 1 !important; border-style: dashed !important; background: var(--ui-page) !important; color: var(--ui-muted) !important; }
+.refine-half-link { font-size: clamp(16px, 1.9vh, 21px); color: var(--ui-ink); font-weight: 650; }
+.refine-half-warning { font-size: clamp(16px, 1.9vh, 21px); color: var(--ui-ink); font-weight: 700; padding: 4px 12px; border-radius: 10px; border: 2px dashed var(--ui-border); }
+.split-cell-warning { font-size: clamp(10px, 1.2vh, 13px); font-weight: 800; letter-spacing: .06em; color: var(--ui-ink); }
 
 /* Divided cells on the map: two halves inside the cell's one gaze target, a line between different rooms. */
 .split-cell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; box-sizing: border-box; font-family: var(--ui-font); }

@@ -3,7 +3,8 @@
  * room of one half of a divided cell (assign mode, IMPLEMENTATION_PLAN.md §5.1 step 5).
  *
  * Large, stationary cards, eight to a page; a card answers to gaze only after READY, as before. In assign
- * mode the first card is "Leave empty", and every card says whether the room fits the half. A question
+ * mode the first card is "Leave empty", every card says whether the room fits the half, cards that cannot be
+ * chosen there come last and are disabled, and READY stays on across pages (16 Oct 2026). A question
  * that needs an answer (a separate second bedroom, a half too narrow, a room that would be cut in two)
  * replaces the cards with large deliberate answers; nothing changes until one is chosen.
  */
@@ -18,8 +19,8 @@ export interface PickerCard {
   status: string;
   selected?: boolean;
   disabled?: boolean;
-  /** Assign mode: whether the room fits the half ("Fits: 3'-3\" clear" / "Too narrow: needs 3'-11\""). */
-  fit?: { ok: boolean; text: string };
+  /** Assign mode: whether the room fits the half ("Fits: 3'-3\" clear"), fits with a warning ("Narrow: …"), or not. */
+  fit?: { ok: boolean; warn?: boolean; text: string };
 }
 
 export interface PickerQuestion {
@@ -88,7 +89,8 @@ export function CompassRoomPicker({ mode, title, floorLabel, subtitle, cards, pa
               <span className="compass-room-dot" style={{ background: card.color }} aria-hidden="true" />
               <span className="compass-room-name">{card.label}</span>
               <span className="compass-room-status">{card.status}</span>
-              {card.fit && <span className="compass-room-status" data-fit={card.fit.ok ? 'ok' : 'no'}>{card.fit.text}</span>}
+              {card.fit && <span className="compass-room-status" data-fit={card.fit.ok ? 'ok' : card.fit.warn ? 'warn' : 'no'}>
+                {card.fit.warn && <span aria-hidden="true">⚠ </span>}{card.fit.text}</span>}
             </GazeButton>;
           })}
         </div>

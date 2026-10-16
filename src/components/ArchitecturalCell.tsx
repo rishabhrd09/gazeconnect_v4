@@ -367,6 +367,8 @@ export interface SplitHalf {
   label: string | null;
   color: string | null;
   size: string;
+  /** Narrower than its room needs: placed with a warning (16 Oct 2026); the focus view gives the numbers. */
+  warning?: boolean;
 }
 
 /** A divided cell on the map: two halves inside the cell's single gaze target (IMPLEMENTATION_PLAN.md §5.1 step 8). */
@@ -380,6 +382,7 @@ export const SplitCellFace: React.FC<{ row: number; col: number; totalRows: numb
     <div style={{ background: h.color ? `color-mix(in srgb, ${h.color} 18%, var(--ui-surface))` : 'var(--ui-surface)' }}>
       <span>{h.label ? h.label.toUpperCase() : 'EMPTY'}</span>
       <span>{h.size}</span>
+      {h.warning && <b className="split-cell-warning">⚠ NARROW</b>}
     </div>
   );
   return (

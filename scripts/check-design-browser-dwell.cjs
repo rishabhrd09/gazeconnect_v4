@@ -1,8 +1,8 @@
 /** Synthetic gaze through the real browser cursor and dwell loop. Uses a virtual
  * clock and an isolated WebSocket boundary; captures activations before side effects.
  * This verifies software selection, not Tobii hardware latency or accuracy.
- * Compass screens, by DWELL_QA_SCREENS: compass-map, compass-nav, compass-rooms, compass-rooms-2, and (14 Oct 2026)
- * compass-refine, compass-refine-focus, compass-refine-assign. */
+ * Compass screens, by DWELL_QA_SCREENS: compass-map, compass-nav, compass-rooms, compass-rooms-2, (14 Oct 2026)
+ * compass-refine, compass-refine-focus, compass-refine-assign, and (16 Oct 2026) compass-place-half. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs=require('fs'),assert=require('assert/strict');
 (async()=>{
  const b=await chromium.launch({headless:true}),p=await b.newPage({viewport:{width:1366,height:768}});p.setDefaultTimeout(10000);const rows=[],errors=[];p.on('pageerror',e=>errors.push(e.message));
@@ -33,6 +33,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs
     await p.locator('#strip-rooms').evaluate(e=>e.click());await p.clock.runFor(300);
     if(screen==='compass-rooms-2'){await p.locator('#menu-next').evaluate(e=>e.click());await p.clock.runFor(300);}
     await p.locator('#menu-ready').evaluate(e=>e.click());
+   } else if(screen==='compass-place-half'){
+    // Placing on a divided cell (16 Oct 2026): divide r2_c2 with a passage on the left, arm the first room, look at
+    // the cell: the half chooser naming the armed room.
+    const click=async sel=>{await p.locator(sel).first().evaluate(e=>e.click());await p.clock.runFor(300);};
+    if(!/DONE/.test(await p.locator('#strip-refine').innerText()))await click('#strip-refine');
+    await click('#cell-r2_c2');await click('#refine-left');await click('#assign-ready');await click('[id^="assign-passage-"]');
+    await click('#refine-back');await click('#strip-refine');await click('#strip-rooms');await click('#menu-ready');await click('.compass-room-choice');
+    if(await p.locator('#ready-road-left').getAttribute('aria-pressed')==='false')await click('#ready-road-left');
+    await click('#cell-r2_c2');
    } else if(screen.startsWith('compass-refine')){
     // compass-refine: the map in Refine; -focus: one cell's two halves; -assign: the room picker for a half.
     if(!/DONE/.test(await p.locator('#strip-refine').innerText())){await p.locator('#strip-refine').evaluate(e=>e.click());await p.clock.runFor(300);}
@@ -46,13 +55,20 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');const fs
   for(const t of targets){
    // Compass deliberately disarms after 45 seconds. Re-arm through its real READY
    // control between independent cases rather than disabling that safety timer.
+   // Re-arm through READY before every case (disarm first if armed), so each case has the whole 45 s: on the
+   // Windows laptop (16 Oct 2026) the timer otherwise ended inside the 11th case, also on 1263eed.
    if(screen==='compass-nav'||screen==='compass-map') {
-    await p.evaluate(()=>{qa.capture=false;qa.sample=null;const ready=document.querySelector('#ready-road-left');if(ready?.getAttribute('aria-pressed')==='false')ready.click();});
+    await p.evaluate(()=>{qa.capture=false;qa.sample=null;const ready=document.querySelector('#ready-road-left');if(ready?.getAttribute('aria-pressed')==='true')ready.click();});
+    await p.clock.runFor(300);
+    await p.evaluate(()=>{const ready=document.querySelector('#ready-road-left');if(ready?.getAttribute('aria-pressed')==='false')ready.click();});
     await p.clock.runFor(500);
    }
-   // Refine on the map ends after the same 45 quiet seconds; re-enter it through its real control.
+   // Refine on the map ends after the same 45 quiet seconds. Leave and re-enter it through its real control before
+   // every case, so each case has the whole 45 s and the timer never ends Refine in the middle of a dwell.
    if(screen==='compass-refine') {
-    await p.evaluate(()=>{qa.capture=false;qa.sample=null;const b=document.querySelector('#strip-refine');if(b&&!/DONE/.test(b.innerText))b.click();});
+    await p.evaluate(()=>{qa.capture=false;qa.sample=null;const b=document.querySelector('#strip-refine');if(b&&/DONE/.test(b.innerText))b.click();});
+    await p.clock.runFor(300);
+    await p.evaluate(()=>{const b=document.querySelector('#strip-refine');if(b&&!/DONE/.test(b.innerText))b.click();});
     await p.clock.runFor(500);
    }
    await p.evaluate(t=>{qa.sample=null;window.dispatchEvent(new CustomEvent('gaze_lost'));qa.capture=true;qa.clicks=[];qa.started=Date.now();qa.sample={x:t.x,y:t.y};},t);for(let elapsed=0;elapsed<6400;elapsed+=256){await p.clock.runFor(256);if(await p.evaluate(()=>qa.clicks.length))break;}const clicks=await p.evaluate(()=>qa.clicks);rows.push({screen,target:t.id||t.text,clicks});

@@ -225,11 +225,22 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 // and last page), a divided cell, the WHOLE CELL question, and the map with the divided cell.
                 await run('compass-refine', async () => { await p.click('#back-map'); await p.click('#strip-refine'); });
                 await run('compass-refine-focus', async () => { await p.click('#cell-r2_c2'); await p.locator('.compass-refine-focus').waitFor(); });
+                // READY stays on across the picker's pages for a half (16 Oct 2026), and the passage is on page 1.
                 await run('compass-refine-assign', async () => { await p.click('#refine-left'); await p.click('#assign-ready'); });
-                await run('compass-refine-assign-3', async () => { await p.click('#assign-next'); await p.click('#assign-next'); await p.click('#assign-ready'); });
-                await run('compass-refine-divided', async () => { await p.locator('[id^="assign-passage-"]').click(); await p.locator('.compass-refine-focus').waitFor(); });
+                await run('compass-refine-assign-3', async () => { await p.click('#assign-next'); await p.click('#assign-next'); });
+                await run('compass-refine-divided', async () => { await p.click('#assign-prev'); await p.click('#assign-prev');
+                    await p.locator('[id^="assign-passage-"]').click(); await p.locator('.compass-refine-focus').waitFor(); });
                 await run('compass-refine-question', async () => { await p.click('#refine-whole'); await p.locator('.refine-question').waitFor(); });
                 await run('compass-refine-map', async () => { await p.click('#refine-whole-cancel'); await p.click('#refine-back'); });
+                // Placing on the divided cell (16 Oct 2026): the half chooser naming the armed room, its replace
+                // question, and a refusal shown on the road.
+                await run('compass-place-half', async () => { await p.click('#strip-refine'); await p.click('#strip-rooms'); await p.click('#menu-ready');
+                    await p.locator('.compass-room-choice').first().click();
+                    if (await p.locator('#ready-road-left').getAttribute('aria-pressed') === 'false') await p.click('#ready-road-left');
+                    await p.click('#cell-r2_c2'); await p.locator('.compass-refine-focus').waitFor(); });
+                await run('compass-place-question', async () => { await p.click('#refine-left'); await p.locator('.refine-question').waitFor(); });
+                await run('compass-road-notice', async () => { await p.click('#place-cancel'); await p.click('#refine-back');
+                    await p.click('#ready-road-left'); await p.click('#cell-r4_c4'); await p.locator('#compass-road-status[data-notice="true"]').waitFor(); });
                 await run('home-urgent', async () => { await route('settings'); await p.click('#sidebar-home'); await p.getByRole('button', { name: /^Urgent Needs \+ Quick Phrases/ }).click(); await p.getByRole('button', { name: 'Save Changes', exact: true }).click(); await p.getByRole('button', { name: 'Home', exact: true }).click(); });
                 await run('urgent-needs', async () => { await p.click('#dock-0'); });
                 // Restore the default Home for the independent Settings checks.

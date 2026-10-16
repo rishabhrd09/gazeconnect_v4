@@ -32,6 +32,7 @@ import {
   FloorPayload,
   generatePlanCandidates,
   PlanCandidate,
+  prewarmFloorplanService,
 } from '../utils/floorplanApi';
 import {
   GridCellKey,
@@ -54,9 +55,10 @@ import { getDirectionLabels, NORTH_ROSE_DEGREES } from '../utils/compassDirectio
 import { formatFeetShort, formatSize } from '../utils/feetInches';
 import { REPEATABLE, STAIR_HOSTS, cellOf, deriveV1, normalisePlan, regionsTouch } from '../utils/compassPlan';
 import {
-  AssignChoice, CompassActionV2, CompassStateV2, MIN_CLEAR_IN, PlaceOutcome, assignHalf, catalogueUses, cellView,
-  clearWidthIn, compassReducer, createInitialState, giveBothHalves, halvesUsable, inches, labelsOf, ownerOf, placeCell,
-  planFromState, plotInches, regionSizeIn, roomsOfUse, splitCell, voidProblem, wholeCell, wholeOptions,
+  AssignChoice, CompassActionV2, CompassStateV2, HALF_MIN_CLEAR_IN, MIN_CLEAR_IN, PlaceOutcome, Shortfall, assignHalf, catalogueUses,
+  cellView, clearWidthIn, compassReducer, createInitialState, giveBothHalves, halfClearRangeIn, halfLinksRoom, halfShortfall,
+  halvesUsable, inches, labelsOf, ownerOf, placeCell, planFromState, plotInches, regionSizeIn, roomsOfUse, shortfallText,
+  skippedAnswer, splitCell, voidProblem, wholeCell, wholeOptions,
 } from '../utils/compassReducer';
 import {
   DRAFT_KEYS, MIGRATED_KEY, ParsedDraft, V1_KEYS, backendCopy, bestDraft, draftFromState, draftScore, parseDraft,
@@ -96,6 +98,8 @@ const COMPASS_AUTOSAVE_MIN_INTERVAL_MS = 5000;
 const COMPASS_SNAPSHOT_MIN_INTERVAL_MS = 30000;
 /** The armed grid disarms, and Refine ends, after this long without a choice. */
 const COMPASS_IDLE_MS = 45000;
+/** How long a refusal stays on the road. */
+const MAP_NOTICE_MS = 6000;
 
 // ─── Room Library — 14 Ground Floor Components ───────────────
 
@@ -374,15 +378,17 @@ function legacySummary(legacy: CompassPlanV2['legacy'] | undefined): string {
   return [...found].join(', ');
 }
 
+/** "3 feet 9", for speech. */
+function feetWords(value: number): string {
+  const total = Math.round(value);
+  const feet = Math.floor(total / 12);
+  const rest = total - feet * 12;
+  return rest ? `${feet} feet ${rest}` : `${feet} feet`;
+}
+
 /** "3 feet 9 by 12 feet 6", for speech. */
 function sizeWords(widthIn: number, depthIn: number): string {
-  const words = (value: number) => {
-    const total = Math.round(value);
-    const feet = Math.floor(total / 12);
-    const rest = total - feet * 12;
-    return rest ? `${feet} feet ${rest}` : `${feet} feet`;
-  };
-  return `${words(widthIn)} by ${words(depthIn)}`;
+  return `${feetWords(widthIn)} by ${feetWords(depthIn)}`;
 }
 
 /** Owned cells, a divided half counting one half. */
@@ -622,6 +628,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const [pickerQuestion, setPickerQuestion] = useState<PickerQuestion | null>(null);
   const [pickerNotice, setPickerNotice] = useState('');
   const [refineTouch, setRefineTouch] = useState(0);
+  // A refusal or note on the map, shown on the road as well as spoken, so it is seen when the voice is off or
+  // unavailable (REFINE_FIX_HANDOFF A3). Cleared after MAP_NOTICE_MS.
+  const [mapNotice, setMapNotice] = useState<{ text: string; at: number } | null>(null);
+  // Placing on a divided cell (B1): the armed room's use while the half chooser is open, else null.
+  const [placeUse, setPlaceUse] = useState<string | null>(null);
 
   // Compass Map is a direct-work screen: open with gaze ready and nav hidden
   // so room placement can begin without a manual gaze-toggle round trip.
@@ -629,6 +640,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     setNavHidden(true);
     enableGaze();
   }, [enableGaze]);
+
+  // The floor-plan service starts in the background when the map opens, not at app launch, so the first GENERATE
+  // shows its image without waiting for the service (REFINE_FIX_HANDOFF D1). The Compass code stays lazy-loaded.
+  useEffect(() => { if (v2Enabled) prewarmFloorplanService(); }, [v2Enabled]);
 
   // Track Focus Lock state from Electron
   const [isFocusLocked, setIsFocusLocked] = useState(false);
@@ -873,15 +888,23 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     prevPhaseRef.current = state.phase;
   }, [state.phase, floor, state.componentQueue.length, coveragePercent, floorName, onSpeak]);
 
+  /** Speaks a map message and shows it on the road for MAP_NOTICE_MS (A3): never speech alone. */
+  const tell = useCallback((message: string) => { onSpeak(message); setMapNotice({ text: message, at: Date.now() }); }, [onSpeak]);
+  useEffect(() => {
+    if (!mapNotice) return undefined;
+    const t = setTimeout(() => setMapNotice(null), MAP_NOTICE_MS);
+    return () => clearTimeout(t);
+  }, [mapNotice]);
+
   // ── Auto-disarm 45s ─────────────────────────────────────
   useEffect(() => {
     if (!state.armed) return;
-    const t = setTimeout(() => { dispatch({ type: 'DISARM_GRID' }); onSpeak('Grid disarmed due to inactivity.'); }, COMPASS_IDLE_MS);
+    const t = setTimeout(() => { dispatch({ type: 'DISARM_GRID' }); tell('Grid disarmed due to inactivity.'); }, COMPASS_IDLE_MS);
     return () => clearTimeout(t);
-  }, [state.armed, onSpeak]);
+  }, [state.armed, tell]);
 
   const endRefine = useCallback((spoken?: string) => {
-    setRefineMode(false); setFocusCell(null); setFocusQuestion(null); setFocusMessage('');
+    setRefineMode(false); setFocusCell(null); setFocusQuestion(null); setFocusMessage(''); setPlaceUse(null);
     setAssignKey(null); setPickerQuestion(null); setPickerNotice('');
     if (spoken) onSpeak(spoken);
   }, [onSpeak]);
@@ -891,9 +914,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // Back, like the room menu, so they stay open. Leaving Refine never changes the map.
   useEffect(() => {
     if (!refineMode || focusCell || assignKey) return;
-    const t = setTimeout(() => endRefine('Refine ended after 45 quiet seconds.'), COMPASS_IDLE_MS);
+    // Not chosen by the person, so it is shown on the road as well as spoken (A3).
+    const t = setTimeout(() => { endRefine(); tell('Refine ended after 45 quiet seconds.'); }, COMPASS_IDLE_MS);
     return () => clearTimeout(t);
-  }, [refineMode, refineTouch, focusCell, assignKey, state.floors, endRefine]);
+  }, [refineMode, refineTouch, focusCell, assignKey, state.floors, endRefine, tell]);
   const touchRefine = () => setRefineTouch(n => n + 1);
 
   // ── dispatchWithSpeech ──────────────────────────────────
@@ -903,7 +927,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       case 'DISARM_GRID': onSpeak('Grid disarmed.'); break;
       case 'NEXT_ROOM': {
         if (!state.armed) {
-          onSpeak('Press READY first.');
+          tell('Press READY first.');
           break;
         }
         const currentHasCells = currentRoom ? roomsOfUse(floor, currentRoom.roomId).length > 0 : false;
@@ -925,7 +949,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       default: break;
     }
     dispatch(action);
-  }, [currentRoom, state, floor, onSpeak]);
+  }, [currentRoom, state, floor, onSpeak, tell]);
 
   // ── Keyboard Shortcuts ──────────────────────────────────
   useEffect(() => {
@@ -933,7 +957,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); if (!readOnlyDraft) dws({ type: 'UNDO' }); return; }
       if (e.key === 'Escape') {
         if (assignKey) { setAssignKey(null); setPickerQuestion(null); setPickerNotice(''); return; }
-        if (focusCell) { setFocusCell(null); setFocusQuestion(null); setFocusMessage(''); return; }
+        if (focusCell) { setFocusCell(null); setFocusQuestion(null); setFocusMessage(''); setPlaceUse(null); return; }
         if (menuOpen) { setMenuOpen(false); return; }
         if (refineMode) { endRefine('Refine done.'); return; }
         if (state.armed) dws({ type: 'DISARM_GRID' });
@@ -1122,7 +1146,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     try {
       plan = normalisePlan(planFromState(state));
     } catch {
-      onSpeak('The map could not be read. Please check the plot answers.');
+      tell('The map could not be read. Please check the plot answers.');
       return;
     }
     setStudioScope(scope);
@@ -1131,13 +1155,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     } else {
       // GAZECONNECT_COMPASS_V2=0: the original studio, which can draw only undivided maps.
       const payload = legacyPayload();
-      if (!payload) { onSpeak('This map has divided cells. The new Compass studio is needed to draw them.'); return; }
+      if (!payload) { tell('This map has divided cells. The new Compass studio is needed to draw them.'); return; }
       setCompiledPayload(payload);
       setPlanReviewSource(payload);
     }
     setShowCompassStudio(true);
     onSpeak(scope === 'ground' ? 'Opening the ground floor plan. Your first floor draft is kept.' : 'Opening both floors.');
-  }, [state, onSpeak, v2Enabled, legacyPayload]);
+  }, [state, onSpeak, tell, v2Enabled, legacyPayload]);
 
   const switchCompassFloor = (next: FloorType) => {
     if (next === state.currentFloor) return;
@@ -1147,7 +1171,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   // ── Placement: a dwell on a whole cell while a room is armed ──
   const commitPlacement = (outcome: PlaceOutcome, cellKey: GridCellKey) => {
-    if (outcome.kind === 'refused') { onSpeak(outcome.message); return; }
+    if (outcome.kind === 'refused') { tell(outcome.message); return; }
+    setMapNotice(null);
     if (outcome.kind === 'confirm-replace') {
       if (!currentRoom) return;
       setConfirmReplace({ cell: cellKey, oldLabel: outcome.victimLabel, oldColor: colourOf(outcome.victim.use), use: currentRoom.roomId });
@@ -1167,27 +1192,47 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const onCellClick = (cellKey: GridCellKey) => {
     if (overlayOpen) return;
     if (lockedCells.has(cellKey)) {
-      onSpeak('This cell has saved plan details. View them using Generate Plan.');
+      tell('This cell has saved plan details. View them using Generate Plan.');
       return;
     }
-    if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
+    if (readOnlyDraft) { tell('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
     if (refineMode) { openFocus(cellKey); return; }
     if (state.phase !== 'placement') return;
-    if (!state.armed) { onSpeak('Press READY first.'); return; }
+    if (!state.armed) { tell('Press READY first.'); return; }
     if (!currentRoom) return;
+    // A divided cell opens the half chooser naming the armed room: a room in a half is two selections from the
+    // armed map, cell and half (REFINE_FIX_HANDOFF B1). The half gets the room by the same rules as in Refine.
+    if (floor.splits.includes(cellKey)) { openPlaceHalf(cellKey, currentRoom); return; }
     commitPlacement(placeCell(state, cellKey, currentRoom.roomId, false, below), cellKey);
   };
 
+  const openPlaceHalf = (cell: CellKey, room: RoomComponent) => {
+    signalNavigation();
+    setMapNotice(null);
+    setPlaceUse(room.roomId); setFocusCell(cell); setFocusQuestion(null); setFocusMessage('');
+    onSpeak(`Place ${room.roomLabel}: choose the left half or the right half.`);
+  };
+
   // ── Refine (§5): a cell in focus, then the room for one of its halves ──
+  /** Why cells cannot be divided on this plot (20 and 25 ft: a half would be under 2'-6" clear), or ''. */
+  const narrowPlotReason = (() => {
+    if (halvesUsable(widthIn, depthIn)) return '';
+    const { narrowest, widest } = halfClearRangeIn(widthIn, depthIn);
+    return `On a ${pw} ft plot a half cell would be only ${inches(narrowest)} to ${inches(widest)} clear, under the 2'-6" a half needs. Cells stay whole on this plot.`;
+  })();
+
   const toggleRefine = () => {
     if (overlayOpen) return;
     if (refineMode) { endRefine('Refine done.'); return; }
-    if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
+    if (readOnlyDraft) { tell('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
     if (legacyLocked) {
       setShowConvertConfirm(true);
       onSpeak('This map has saved plan details from the earlier Refine Map. Convert it to the new map first?');
       return;
     }
+    // A plot too narrow for halves is said at the rail, before a cell is picked (A4). A map that already has
+    // divided cells (an older draft) still opens Refine, so they can be made whole again.
+    if (narrowPlotReason && !floor.splits.length) { tell(narrowPlotReason); return; }
     signalNavigation();
     if (state.armed) dispatch({ type: 'DISARM_GRID' });
     setRefineMode(true);
@@ -1206,6 +1251,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const closeFocus = () => {
     signalNavigation();
     setFocusCell(null); setFocusQuestion(null); setFocusMessage('');
+    if (placeUse) { setPlaceUse(null); onSpeak('Back to the map.'); return; }
     touchRefine();
     onSpeak('Back to the map. Look at another cell, or choose Done refining.');
   };
@@ -1220,10 +1266,27 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     if (!focusCell) return;
     const key = `${focusCell}.${half}` as RegionKey;
     touchRefine();
-    if (!floor.splits.includes(focusCell) && !halvesUsable(widthIn, depthIn)) {
-      const message = `On a ${pw} ft plot a half cell is only ${inches(clearWidthIn(key, widthIn, depthIn))} wide inside: too narrow for any room. The cell stays whole.`;
-      setFocusMessage(message);
-      onSpeak(`${message} Choose Back to map.`);
+    if (!floor.splits.includes(focusCell) && narrowPlotReason) {
+      setFocusMessage(narrowPlotReason);
+      onSpeak(`${narrowPlotReason} Choose Back to map.`);
+      return;
+    }
+    // Placing (B1): the armed room goes to this half at once; any question is asked here in the focus view. A half
+    // that holds another room is replaced only after a yes, as on a whole cell: a room is never removed silently.
+    if (placeUse) {
+      const owner = ownerOf(floor, key);
+      if (owner && owner.use !== placeUse) {
+        const name = libraryOf(placeUse)?.roomLabel || placeUse;
+        const gone = owner.regions.length === 1 ? ` ${labels[owner.id]} has no other part, so it is removed.` : '';
+        const text = `Replace ${labels[owner.id]} with ${name} in the ${half === 'L' ? 'left' : 'right'} half?${gone}`;
+        setFocusQuestion({ text, answers: [
+          { id: 'place-replace', label: `Yes, replace ${labels[owner.id]}`, deliberate: true, action: () => applyAssign({ type: 'use', use: placeUse }, key) },
+          { id: 'place-cancel', label: 'Cancel', action: () => setFocusQuestion(null) },
+        ] });
+        onSpeak(text);
+        return;
+      }
+      applyAssign({ type: 'use', use: placeUse }, key);
       return;
     }
     signalNavigation();
@@ -1239,24 +1302,41 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     return area(after) < area(before) ? ' The stair room is smaller now: the plan notes say whether its stair still fits, and UNDO puts it back.' : '';
   };
 
-  /** Commits a split and its half's room (or both halves) as one undoable step, then returns to the cell. */
-  const finishAssign = (outcome: { floor: FloorIntent; roomId: string | null; message: string }, key: RegionKey) => {
+  /** Commits a split and its half's room (or both halves) as one undoable step, then returns to the cell (Refine)
+   * or to the map (placing, B1). A narrow room's warning is part of the message (B2). */
+  const finishAssign = (outcome: { floor: FloorIntent; roomId: string | null; message: string; short?: Shortfall }, key: RegionKey,
+    removed = '') => {
     dispatch({ type: 'COMMIT_FLOOR', floor: outcome.floor, activeRoomId: outcome.roomId ?? state.activeRoomId });
     const otherSide = key.endsWith('.L') ? 'right' : 'left';
     const stair = stairNote(floor, outcome.floor);
     let spoken = outcome.message;
     if (outcome.roomId) {
       const size = regionSizeIn(key, widthIn, depthIn);
-      spoken = `${outcome.message.replace(/\.$/, '')}, ${sizeWords(size.width, size.depth)}.`;
+      const named = outcome.message.split('. ')[0].replace(/\.$/, '');
+      const narrow = outcome.short ? ` Narrow: ${feetWords(outcome.short.haveIn)} clear, where it needs ${feetWords(outcome.short.needIn)}.` : '';
+      spoken = `${named}, ${sizeWords(size.width, size.depth)}.${narrow}`;
     }
     signalNavigation();
-    setAssignKey(null); setPickerQuestion(null); setPickerNotice('');
-    setFocusMessage(`${outcome.message}${stair}`);
+    setAssignKey(null); setPickerQuestion(null); setPickerNotice(''); setFocusQuestion(null);
+    if (placeUse) {
+      setPlaceUse(null); setFocusCell(null); setFocusMessage('');
+      if (removed || outcome.short) setMapNotice({ text: `${outcome.message}${removed}`, at: Date.now() });
+      onSpeak(`${spoken}${removed}${stair}`);
+      return;
+    }
+    setFocusMessage(`${outcome.message}${removed}${stair}`);
     touchRefine();
-    onSpeak(`${spoken}${stair} Choose the ${otherSide} half, or go back to the map.`);
+    onSpeak(`${spoken}${removed}${stair} Choose the ${otherSide} half, or go back to the map.`);
   };
 
-  const refuse = (message: string) => { setPickerQuestion(null); setPickerNotice(message); onSpeak(message); };
+  /** A question or refusal goes where the person is: the room picker for a half, or the focus view (placing). */
+  const ask = (question: PickerQuestion) => { if (assignKey) setPickerQuestion(question); else setFocusQuestion(question); };
+  const unask = () => { setPickerQuestion(null); setFocusQuestion(null); };
+  const refuse = (message: string) => {
+    unask();
+    if (assignKey) setPickerNotice(message); else setFocusMessage(message);
+    onSpeak(message);
+  };
 
   const applyAssign = (choice: AssignChoice, key: RegionKey) => {
     if (!focusCell) return;
@@ -1275,40 +1355,55 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       if (whole.kind === 'commit') finishAssign(whole, key);
       else refuse('message' in whole ? whole.message : 'Not possible here.');
     };
+    // The way back without a change: another room in the picker; the halves again when placing (B1).
+    const cancel = { id: 'assign-other', label: placeUse ? 'Cancel' : 'Choose another room', action: unask };
     switch (outcome.kind) {
-      case 'commit':
-        finishAssign(outcome, key);
+      case 'commit': {
+        // A room whose only part was this half is gone: said, never silent.
+        const removed = wfloor.rooms.filter(r => !outcome.floor.rooms.some(n => n.id === r.id)).map(r => labelsOf(wfloor)[r.id]);
+        finishAssign(outcome, key, removed.length ? ` ${removed.join(' and ')} removed.` : '');
         return;
+      }
       case 'ask-separate':
-        setPickerQuestion({ text: outcome.message, answers: [
+        ask({ text: outcome.message, answers: [
           { id: 'assign-separate', label: `Make a separate ${outcome.label}`, deliberate: true,
             action: () => applyAssign({ type: 'use', use: outcome.use, separate: true }, key) },
-          { id: 'assign-other', label: 'Choose another room', action: () => setPickerQuestion(null) },
+          cancel,
         ] });
-        onSpeak(outcome.message);
+        onSpeak(outcome.short ? `${outcome.message.split('. Narrow')[0]}. It would be narrow: ${feetWords(outcome.short.haveIn)} clear.` : outcome.message);
         return;
       case 'too-narrow': {
-        const name = libraryOf(outcome.use)?.roomLabel || outcome.use;
-        setPickerQuestion({ text: outcome.message, answers: [
+        // Only a half under 2'-6" clear (B2). One question: it names the room the whole cell would become ("Bedroom 2").
+        const whole = giveBothHalves(st, focusCell, outcome.use);
+        const name = whole.kind === 'commit' && whole.roomId ? labelsOf(whole.floor)[whole.roomId] : libraryOf(outcome.use)?.roomLabel || outcome.use;
+        ask({ text: outcome.message, answers: [
           { id: 'assign-whole', label: `Use the whole cell for ${name}${replaces(outcome.use)}`, deliberate: true, action: () => wholeFor(outcome.use) },
-          { id: 'assign-other', label: 'Choose another room', action: () => setPickerQuestion(null) },
+          cancel,
         ] });
-        onSpeak(`${outcome.message} Use the whole cell, or choose another room.`);
+        onSpeak(`This half is only ${feetWords(outcome.haveIn)} clear. Use the whole cell for ${name}, or ${placeUse ? 'cancel' : 'choose another room'}.`);
         return;
       }
       case 'disconnects': {
+        // B4: the half that joins the rest of the room cannot be given away. The other half comes first, and only
+        // answers that would work are offered (both halves can cut the room in two as well, e.g. a middle cell).
         const otherSide = key.endsWith('.L') ? 'right' : 'left';
-        const answers: PickerQuestion['answers'] = [
+        const answers: PickerQuestion['answers'] = [];
+        if (assignHalf(st, otherKey, choice, below).kind !== 'disconnects') {
           // The other half is assigned by the same rules, so any question it raises is asked in turn.
-          { id: 'assign-other-half', label: `Give the ${otherSide} half instead`, deliberate: true, action: () => applyAssign(choice, otherKey) },
-        ];
-        if (choice.type === 'use') {
+          answers.push({ id: 'assign-other-half', label: `Give the ${otherSide} half instead`, deliberate: true, action: () => applyAssign(choice, otherKey) });
+        }
+        if (choice.type === 'use' && giveBothHalves(st, focusCell, choice.use).kind === 'commit') {
           answers.push({ id: 'assign-both-halves', label: `Give both halves to ${libraryOf(choice.use)?.roomLabel || choice.use}`,
             deliberate: true, action: () => wholeFor(choice.use) });
         }
-        answers.push({ id: 'assign-other', label: 'Choose another room', action: () => setPickerQuestion(null) });
-        setPickerQuestion({ text: outcome.message, answers });
-        onSpeak(outcome.message);
+        const offers = answers.map(a => a.id);
+        answers.push(cancel);
+        const text = offers.length === 2 ? outcome.message
+          : offers[0] === 'assign-other-half' ? `${outcome.victimLabel} would be cut in two. Give the ${otherSide} half instead.`
+            : offers[0] === 'assign-both-halves' ? `${outcome.victimLabel} would be cut in two. Give both halves instead.`
+              : `${outcome.victimLabel} would be cut in two by either half: it runs through this cell. Choose a cell at its end.`;
+        ask({ text, answers });
+        onSpeak(text);
         return;
       }
       default:
@@ -1355,6 +1450,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const q = FOUNDATION_QUESTIONS[state.foundationStep];
     if (!q) return null;
     const stepNum = state.foundationStep + 1;
+    // The answer already given (prefilled, or from the survey): marked on its option, and what SKIP keeps.
+    const kept = skippedAnswer(state.foundation, q.key, q.parse ? q.parse(q.options[0]) : q.options[0]);
+    const keptText = typeof kept.value === 'number' ? `${kept.value} ft` : String(kept.value);
 
     return (
       <div className="foundation-layout">
@@ -1363,7 +1461,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           <h1>{q.text}</h1>
           {q.subtext && <p>{q.subtext}</p>}
           <div id="foundation-readiness" className="foundation-readiness" role="status" aria-live="polite" aria-atomic="true">
-            {foundationReady ? 'Ready. Please choose an option.' : 'Click an option, or press READY to select with gaze.'}
+            {foundationReady ? 'Ready. Please choose an option.'
+              : `Click an option, or press READY to select with gaze.${kept.kept ? ` SKIP keeps ${keptText}.` : ''}`}
           </div>
           <div className="survey-question-count">Question {stepNum} of {FOUNDATION_QUESTIONS.length}</div>
           <div className="survey-step-track" aria-hidden="true">
@@ -1376,7 +1475,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
               style={{ '--choice-columns': q.columns } as React.CSSProperties}>
               {q.options.map(opt => (
                 <GazeButton key={`${state.foundationStep}-${opt}`} id={`fq-${state.foundationStep}-${opt}`}
-                  className="survey-choice" gazeEnabled={isGazeEnabled && foundationReady}
+                  className="survey-choice" selected={kept.kept && (q.parse ? q.parse(opt) : opt) === kept.value}
+                  gazeEnabled={isGazeEnabled && foundationReady}
                   gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode={!isWarm}
                   dwellCategory="surveyOption" onClick={() => handleFoundationAnswer(opt)}>
                   {opt}
@@ -1402,9 +1502,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <GazeButton id="f-skip" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
               isDarkMode={!isWarm} dwellCategory="backSkipButton"
               onClick={() => {
-                const dflt = q.parse ? q.parse(q.options[0]) : q.options[0];
-                dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: dflt, total: FOUNDATION_QUESTIONS.length });
-                onSpeak(`Skipped. Default: ${q.options[0]}.`);
+                // SKIP keeps the answer already given; the first option only when there is none (REFINE_FIX_HANDOFF A1).
+                dispatch({ type: 'SET_FOUNDATION', key: q.key as FoundationKey, value: kept.value, total: FOUNDATION_QUESTIONS.length });
+                onSpeak(kept.kept ? `Skipped. Kept ${keptText}.` : `Skipped. Default: ${keptText}.`);
                 if (state.foundationStep === FOUNDATION_QUESTIONS.length - 1) dispatch({ type: 'COMPLETE_FOUNDATION', queue: generateGFQueue(), numFloors: state.foundation.numFloors || 'Single Floor' });
               }}>SKIP →</GazeButton>
           </div>
@@ -1492,7 +1592,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <GazeButton id="strip-next" gazeEnabled={live && controlsUnlocked} disabled={refineMode} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 if (overlayOpen || refineMode) return;
-                if (!controlsUnlocked) { onSpeak('Press READY first.'); return; }
+                if (!controlsUnlocked) { tell('Press READY first.'); return; }
                 dws({ type: 'NEXT_ROOM' });
               }}
               style={{
@@ -1516,7 +1616,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 {refineMode ? 'DONE REFINING' : 'REFINE'}
               </div>
               <div style={{ fontSize: 'clamp(11px, 1.3vh, 14px)', fontWeight: 700, color: T_textSub, letterSpacing: '0.8px' }}>
-                {refineMode ? 'BACK TO PLACING ROOMS' : legacyLocked ? 'CONVERT THE MAP FIRST' : 'DIVIDE A CELL'}
+                {refineMode ? 'BACK TO PLACING ROOMS' : legacyLocked ? 'CONVERT THE MAP FIRST'
+                  : narrowPlotReason && !floor.splits.length ? `HALVES TOO NARROW ON A ${pw} FT PLOT` : 'DIVIDE A CELL'}
               </div>
             </GazeButton>}
 
@@ -1524,7 +1625,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             <GazeButton id="strip-generate" gazeEnabled={live && canPreviewPlan && !refineMode} disabled={refineMode} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
               onClick={() => {
                 if (overlayOpen || refineMode) return;
-                if (!canPreviewPlan) { onSpeak('Place a ground floor room first.'); return; }
+                if (!canPreviewPlan) { tell('Place a ground floor room first.'); return; }
                 setConfirmGenerate(true);
                 onSpeak('Choose ground floor only, or both floors.');
               }}
@@ -1570,8 +1671,10 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const half = (room: RoomIntent | null, key: string): SplitHalf => {
       const size = regionSizeIn(key, widthIn, depthIn);
       return { identity: room?.id || null, label: room ? shortNameOf(room) : null, color: room ? colourOf(room.use) : null,
-        size: formatSize(size.width / 12, size.depth / 12) };
+        size: formatSize(size.width / 12, size.depth / 12), warning: !!room && !!halfShortfall(floor, key, widthIn, depthIn) };
     };
+    const halfWords = (room: RoomIntent | null, key: string) =>
+      `${room ? labels[room.id] : 'empty'}${room && halfShortfall(floor, key, widthIn, depthIn) ? ', narrow' : ''}`;
     return (
       <GazeButton key={cellKey} id={`cell-${cellKey}`} gazeEnabled={cellGaze}
         className={refineMode ? 'compass-cell-refine' : undefined}
@@ -1581,7 +1684,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         onDwellComplete={() => setHoveredCell(null)}
         onClick={() => onCellClick(cellKey)}
         ariaLabel={view.split
-          ? `Row ${row}, column ${col}, divided: left ${view.left ? labels[view.left.id] : 'empty'}, right ${view.right ? labels[view.right.id] : 'empty'}`
+          ? `Row ${row}, column ${col}, divided: left ${halfWords(view.left, `${cellKey}.L`)}, right ${halfWords(view.right, `${cellKey}.R`)}`
           : `Row ${row}, column ${col}: ${owner ? labels[owner.id] : 'empty'}`}
         contentFill
         style={{
@@ -1807,7 +1910,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 gazeEnabled={isGazeEnabled && !overlayOpen && !readOnlyDraft} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => {
                   if (overlayOpen) return;
-                  if (readOnlyDraft) { onSpeak('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
+                  if (readOnlyDraft) { tell('This map was saved by a newer version of GazeConnect. It is read-only.'); return; }
                   if (state.armed) { dws({ type: 'DISARM_GRID' }); } else { dws({ type: 'ARM_GRID' }); }
                 }}
                 style={{
@@ -1835,7 +1938,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
           )}
 
           {/* Road label + live coverage counter (or the Refine instruction) */}
-          <div className="compass-road-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none', ...(refineMode || readOnlyDraft ? { maxWidth: '44%', textAlign: 'center' as const } : {}) }}>
+          {/* The road is a grid (READY | this | current room), so this column already has its width: a notice uses all of it. */}
+          <div className="compass-road-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none', ...(refineMode || readOnlyDraft ? { maxWidth: '44%', textAlign: 'center' as const } : mapNotice ? { textAlign: 'center' as const } : {}) }}>
             <span style={{
               color: isLight ? T_accent : isMix ? '#5E9CA8' : THEME.road,
               fontWeight: 800, fontSize: 'clamp(20px, 2.4vh, 27px)', letterSpacing: '0.6px',
@@ -1843,20 +1947,20 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             }}>
               {readOnlyDraft ? 'READ-ONLY MAP' : refineMode ? 'REFINE' : <>FRONT / ROAD ({facing}) &ndash; {pw} ft</>}
             </span>
-            {(readOnlyDraft || refineMode || state.phase === 'placement') && (
-              <span style={{
-                fontSize: 'clamp(14px, 1.6vh, 18px)',
-                fontWeight: 700,
-                color: isLight ? T_textSub : isMix ? '#C4B697' : 'rgba(56,189,248,0.6)',
-                letterSpacing: '0.4px',
-                lineHeight: 1.3,
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {readOnlyDraft ? 'Saved by a newer version of GazeConnect'
+            {/* One status line: a refusal or note (A3) while it is fresh, else the usual line. Announced politely. */}
+            <span id="compass-road-status" role="status" aria-live="polite" aria-atomic="true" data-notice={mapNotice ? 'true' : undefined} style={{
+              fontSize: 'clamp(14px, 1.6vh, 18px)',
+              fontWeight: 700,
+              color: mapNotice ? (isLight ? T_textMain : isMix ? '#FFFCF1' : '#F8FAFC') : isLight ? T_textSub : isMix ? '#C4B697' : 'rgba(56,189,248,0.6)',
+              letterSpacing: '0.4px',
+              lineHeight: 1.3,
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {mapNotice ? mapNotice.text
+                : readOnlyDraft ? 'Saved by a newer version of GazeConnect'
                   : refineMode ? 'Look at a cell to divide it into left and right halves'
-                    : <>{formatFeetShort(owned)} / {16} cells placed &middot; {coveragePercent}%</>}
-              </span>
-            )}
+                    : state.phase === 'placement' ? <>{formatFeetShort(owned)} / {16} cells placed &middot; {coveragePercent}%</> : null}
+            </span>
           </div>
 
           {/* CURRENT ROOM DISPLAY - Right portion of road, fills vertical height */}
@@ -2160,21 +2264,29 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     if (!focusCell || assignKey) return null;
     const v = cellView(floor, focusCell);
     const { row, col } = parseCellKey(focusCell);
-    // An undivided cell is shown as it would divide: both halves keep the cell's room.
+    // An undivided cell is shown as it would divide: both halves keep the cell's room. A narrow half carries its
+    // warning (B2); a half that joins the rest of its room says so, as giving it away would cut that room (B4).
+    const divided = v.split ? floor : splitCell(floor, focusCell);
     const face = (room: RoomIntent | null, key: string): HalfFace => {
       const size = regionSizeIn(key, widthIn, depthIn);
+      const short = room ? halfShortfall(divided, key, widthIn, depthIn) : null;
+      const link = halfLinksRoom(floor, key as RegionKey);
       return { label: room ? labels[room.id] : 'Empty', color: room ? colourOf(room.use) : null,
-        size: `${inches(size.width)} × ${inches(size.depth)}`, below: belowText(key) };
+        size: `${inches(size.width)} × ${inches(size.depth)}`, below: belowText(key),
+        warning: room && short ? shortfallText(room.use, short) : undefined,
+        link: link ? `Joins the rest of ${labels[link.id]}` : undefined };
     };
     const thumbnail: ThumbCell[] = RENDER_ORDER.map(key => {
       const c = cellView(floor, key);
       const colour = (room: RoomIntent | null) => (room ? colourOf(room.use) : null);
       return { key, split: c.split, colors: c.split ? [colour(c.left), colour(c.right)] : [colour(c.whole)] };
     });
+    const placing = placeUse ? libraryOf(placeUse)?.roomLabel || placeUse : null;
     return (
       <CompassRefineFocus
-        title="Divide a cell"
-        subtitle={`${floorName} · Row ${row} (${ROW_NAMES[row]}), Column ${col}`}
+        title={placing ? `Place ${placing} in:` : 'Divide a cell'}
+        subtitle={placing ? `The left half or the right half · ${floorName} · Row ${row}, Column ${col}`
+          : `${floorName} · Row ${row} (${ROW_NAMES[row]}), Column ${col}`}
         left={face(v.split ? v.left : v.whole, `${focusCell}.L`)}
         right={face(v.split ? v.right : v.whole, `${focusCell}.R`)}
         divided={v.split} thumbnail={thumbnail} focusKey={focusCell}
@@ -2197,35 +2309,52 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const size = regionSizeIn(assignKey, widthIn, depthIn);
     const { row, col } = parseCellKey(focusCell);
     const side = assignKey.endsWith('.L') ? 'LEFT' : 'RIGHT';
-    const cards: PickerCard[] = [{
-      id: 'empty', label: 'Leave empty', color: 'var(--ui-border)', selected: !current,
+    // Giving this half away cuts the room it joins to the rest of itself (B4): every card but that room says so.
+    const cuts = halfLinksRoom(wfloor, assignKey);
+    const cutText = cuts ? { ok: false, warn: true, text: `Cuts ${names[cuts.id]} in two` } : undefined;
+    const empty: PickerCard = {
+      id: 'empty', label: 'Leave empty', color: 'var(--ui-border)', selected: !current, fit: current ? cutText : undefined,
       status: current ? `Now: ${names[current.id]}` : '● THIS HALF IS EMPTY',
-    }];
-    for (const use of catalogueUses(floorId)) {
+    };
+    // Built for halves (B3): rooms that join a neighbour or fit come first, then narrow rooms (placed with a warning,
+    // B2), and last, disabled, rooms that cannot be placed here at all, each with its reason. The same rules as
+    // assignHalf, so a card never promises what choosing it refuses.
+    const ranked: Array<{ card: PickerCard; rank: number; by: number; order: number }> = [];
+    catalogueUses(floorId).forEach((use, order) => {
       const lib = libraryOf(use);
       const rooms = roomsOfUse(wfloor, use);
       const joins = rooms.find(r => r.regions.some(k => k !== assignKey && regionsTouch(assignKey, k)));
       const need = MIN_CLEAR_IN[use] || 0;
       const stairTaken = STAIR_HOSTS[floorId].has(use) && wfloor.rooms.some(r => STAIR_HOSTS[floorId].has(r.use) && r.use !== use);
-      // The same rules as assignHalf, in a few words, so a card never promises what choosing it refuses.
       let fit: PickerCard['fit'];
-      if (current?.use === use) fit = { ok: true, text: 'Already this room' };
-      else if (use === 'void') fit = voidProblem(below, [assignKey], state.choices)
-        ? { ok: false, text: 'Needs the living hall below' } : { ok: true, text: 'Makes the living hall below double height' };
-      else if (joins) fit = { ok: true, text: `Joins ${names[joins.id]}` };
-      else if (rooms.length && !REPEATABLE.has(use)) fit = { ok: false, text: 'One per floor: placed elsewhere' };
-      else if (stairTaken) fit = { ok: false, text: 'The stair is already placed' };
-      else fit = need && have < need ? { ok: false, text: `Too narrow: needs ${inches(need)}` } : { ok: true, text: `Fits: ${inches(have)} clear` };
-      cards.push({
-        id: use, label: lib?.roomLabel || use, color: colourOf(use), selected: current?.use === use, fit,
+      let rank = need ? 1 : 2;                 // 0 joins or is this room, 1 fits (indoor), 2 fits (outdoor), 3 narrow, 4 not here
+      let by = 0;
+      if (current?.use === use) { fit = { ok: true, text: 'Already this room' }; rank = 0; }
+      else if (use === 'void') {
+        const problem = voidProblem(below, [assignKey], state.choices);
+        fit = problem ? { ok: false, text: 'Needs the living hall below' } : { ok: true, text: 'Makes the living hall below double height' };
+        rank = problem ? 4 : 1;
+      } else if (joins) { fit = { ok: true, text: `Joins ${names[joins.id]}` }; rank = 0; }
+      else if (rooms.length && !REPEATABLE.has(use)) { fit = { ok: false, text: 'One per floor: placed elsewhere' }; rank = 4; }
+      else if (stairTaken) { fit = { ok: false, text: 'The stair is already placed' }; rank = 4; }
+      else if (have < HALF_MIN_CLEAR_IN) { fit = { ok: false, text: `Under 2'-6" clear` }; rank = 4; }
+      else if (need && have < need) { fit = { ok: false, warn: true, text: `Narrow: ${inches(have)} clear, needs ${inches(need)}` }; rank = 3; by = need - have; }
+      else fit = { ok: true, text: `Fits: ${inches(have)} clear` };
+      if (cutText && current?.use !== use && rank < 4) fit = cutText;
+      ranked.push({ rank, by, order, card: {
+        id: use, label: lib?.roomLabel || use, color: colourOf(use), selected: current?.use === use, fit, disabled: rank === 4,
         status: current?.use === use ? '● THIS HALF' : !rooms.length ? 'Not placed yet'
           : rooms.length === 1 ? 'Placed on this floor' : `${rooms.length} on this floor`,
-      });
-    }
+      } });
+    });
+    ranked.sort((a, b) => a.rank - b.rank || a.by - b.by || a.order - b.order);
+    const cards: PickerCard[] = [empty, ...ranked.map(r => r.card)];
+    // READY stays on across pages here (B3, decided 16 Oct 2026): the pause after each page change already keeps a
+    // passing look from choosing a card.
     return (
       <CompassRoomPicker mode="assign" title={`Room for the ${side} half`} floorLabel={floorId === 'first' ? '1ST FLOOR' : 'GROUND'}
         subtitle={`Row ${row}, Column ${col} · ${inches(size.width)} × ${inches(size.depth)}`}
-        cards={cards} page={assignPage} onPage={(next) => { setAssignPage(next); setAssignReady(false); touchRefine(); }}
+        cards={cards} page={assignPage} onPage={(next) => { setAssignPage(next); touchRefine(); }}
         ready={assignReady} onReady={() => { setAssignReady(!assignReady); touchRefine(); onSpeak(assignReady ? 'Ready mode off.' : 'Ready. Select a room for this half.'); }}
         onChoose={(card) => applyAssign(card.id === 'empty' ? { type: 'empty' } : { type: 'use', use: card.id }, assignKey)}
         onClose={() => { signalNavigation(); setAssignKey(null); setPickerQuestion(null); setPickerNotice(''); touchRefine(); onSpeak('Back to the cell. Nothing changed.'); }}

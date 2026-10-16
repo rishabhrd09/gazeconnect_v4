@@ -64,17 +64,66 @@ s = R.compassReducer(s, { type: 'COMMIT_FLOOR', floor: R.splitCell(s.floors.grou
 eq(R.cellView(s.floors.ground, 'r1_c1'), { key: 'r1_c1', split: true, whole: null, left: null, right: null });
 s = commit(s, R.assignHalf(s, 'r1_c1.L', { type: 'use', use: 'passage' }));
 eq(R.assignHalf(s, 'r1_c1.R', { type: 'use', use: 'living' }).kind, 'refused', 'one living hall per house');
+// A room narrower than its use needs is placed with a warning, not refused (B2, decided 16 Oct 2026).
 const narrow = R.assignHalf(state(30, 50, { splits: ['r2_c2'], rooms: [] }), 'r2_c2.L', { type: 'use', use: 'bathroom' });
-eq(narrow.kind, 'too-narrow');
+eq([narrow.kind, narrow.short, narrow.floor.rooms.map(r => r.id)], ['commit', { needIn: 47, haveIn: 39 }, ['g-bathroom-1']]);
+eq(narrow.message, "Left half: Bathroom. Narrow: 3'-3\" clear; Bathroom needs 3'-11\".");
+eq(R.halfShortfall(narrow.floor, 'r2_c2.L', 360, 600), { needIn: 47, haveIn: 39 }, 'the map marks the narrow half');
+eq(R.shortfallText('bathroom', { needIn: 47, haveIn: 39 }), "Bathroom: 3'-3\" clear, needs 3'-11\"");
+// Only a half under 2'-6" clear refuses: on a 25 ft plot (an older draft divided there) the side-wall half is 2'-1½".
+const edge = R.assignHalf(state(25, 60, { splits: ['r2_c1', 'r2_c2'], rooms: [] }), 'r2_c1.L', { type: 'use', use: 'passage' });
+eq([edge.kind, edge.haveIn], ['too-narrow', 25.5]);
+eq(R.assignHalf(state(25, 60, { splits: ['r2_c1', 'r2_c2'], rooms: [] }), 'r2_c2.L', { type: 'use', use: 'passage' }).kind, 'commit',
+  'an inside half of 2\'-7½" takes a passage, with a warning');
+// The map's width estimate: a half alone, a half beside a whole cell, two halves across a cell boundary.
+eq(R.roomClearWidthIn({ id: 'a', use: 'bedroom', regions: ['r2_c2.L'] }, 480, 720), 54);
+eq(R.roomClearWidthIn({ id: 'a', use: 'living', regions: ['r2_c2', 'r2_c3.L'] }, 480, 720), 174);
+eq(R.roomClearWidthIn({ id: 'a', use: 'bedroom', regions: ['r2_c2.R', 'r2_c3.L'] }, 480, 720), 114);
+eq(R.roomClearWidthIn({ id: 'a', use: 'bedroom', regions: ['r2_c4.R', 'r3_c4.R'] }, 480, 720), 48, 'stacked halves are one half wide');
+eq(R.halfShortfall({ splits: ['r2_c3'], rooms: [{ id: 'g-living-1', use: 'living', regions: ['r2_c2', 'r2_c3.L'] }] }, 'r2_c3.L', 480, 720), null,
+  'a half that widens a room is judged on the room');
 eq(R.assignHalf(state(30, 50, { splits: ['r2_c2'], rooms: [] }), 'r2_c2.L', { type: 'use', use: 'passage' }).kind, 'commit',
   "a 30 ft plot's half cell holds a 3'-3\" passage");
 eq(R.halvesUsable(300, 600), false, 'no room fits a half cell on a 25 ft plot');
+eq(R.halvesUsable(240, 600), false, 'nor on a 20 ft plot');
 eq(R.halvesUsable(360, 600), true);
+// The one size limit that refuses: a half under 2'-6" clear. On 25 ft the side-wall halves are 2'-1½" (16 Oct 2026).
+eq(R.HALF_MIN_CLEAR_IN, 30);
+eq(R.halfClearRangeIn(300, 600), { narrowest: 25.5, widest: 31.5 });
+eq(R.halfClearRangeIn(360, 600), { narrowest: 33, widest: 39 });
+// SKIP keeps the answer already given (prefilled or from the survey); the first option only when there is none (A1).
+const prefilled = { facing: 'West', plotWidth: 40, plotDepth: 60, plotType: 'Middle Plot', numFloors: 'Single Floor', numBedrooms: null, gatePosition: null };
+eq(R.skippedAnswer(prefilled, 'plotWidth', 20), { value: 40, kept: true }, 'skipping keeps the prefilled 40 ft');
+eq(R.skippedAnswer(prefilled, 'facing', 'North'), { value: 'West', kept: true });
+eq(R.skippedAnswer(prefilled, 'gatePosition', 'Left'), { value: 'Left', kept: false }, 'the first option only when nothing is set');
+let skipped = { ...R.createInitialState(queue('ground')), foundation: prefilled };
+for (const [key, first] of [['facing', 'North'], ['plotWidth', 20], ['plotDepth', 30], ['plotType', 'Corner Plot'], ['numFloors', 'Single Floor'], ['numBedrooms', '1'], ['gatePosition', 'Left']]) {
+  skipped = R.compassReducer(skipped, { type: 'SET_FOUNDATION', key, value: R.skippedAnswer(skipped.foundation, key, first).value, total: 7 });
+}
+eq([skipped.foundation.facing, skipped.foundation.plotWidth, skipped.foundation.plotDepth], ['West', 40, 60], 'skipping every question keeps 40 x 60 West');
+// A second bedroom in a narrow half is one question, with the size said in it (A2 with B2): never two questions.
+const second = state(40, 60, { splits: ['r3_c3'], rooms: [{ id: 'g-bedroom-1', use: 'bedroom', regions: ['r1_c1'] }] });
+const separate = R.assignHalf(second, 'r3_c3.L', { type: 'use', use: 'bedroom' });
+eq([separate.kind, separate.short], ['ask-separate', { needIn: 83, haveIn: 54 }]);
+eq(separate.message, "Bedroom is elsewhere on this floor. Make a separate Bedroom 2, or choose another room. Narrow: 4'-6\" clear; Bedroom needs 6'-11\".");
+eq(R.assignHalf(second, 'r3_c3.L', { type: 'use', use: 'bedroom', separate: true }).kind, 'commit', 'the answer places it');
+// B4: the half that joins the rest of a room is known before anything is chosen; the other half is free.
+const hall = { splits: [], rooms: [{ id: 'g-living-1', use: 'living', regions: ['r2_c2', 'r2_c3'] }] };
+eq(R.halfLinksRoom(hall, 'r2_c3.L')?.id, 'g-living-1', 'the left half of r2_c3 joins r2_c2');
+eq(R.halfLinksRoom(hall, 'r2_c3.R'), null);
+const kitchenLeft = R.assignHalf(state(40, 60, R.splitCell(hall, 'r2_c3')), 'r2_c3.L', { type: 'use', use: 'kitchen' });
+eq([kitchenLeft.kind, kitchenLeft.otherHalf], ['disconnects', 'r2_c3.R']);
+const kitchenRight = R.assignHalf(state(40, 60, R.splitCell(hall, 'r2_c3')), 'r2_c3.R', { type: 'use', use: 'kitchen' });
+eq([kitchenRight.kind, kitchenRight.short], ['commit', { needIn: 59, haveIn: 54 }], 'scenario 4: one extra selection, with a warning');
+// A cell in the middle of a three-cell room: both halves join it, so neither can be given away.
+const middle = { splits: [], rooms: [{ id: 'g-living-1', use: 'living', regions: ['r2_c2', 'r2_c3', 'r2_c4'] }] };
+eq([R.halfLinksRoom(middle, 'r2_c3.L')?.id, R.halfLinksRoom(middle, 'r2_c3.R')?.id], ['g-living-1', 'g-living-1']);
 // A repeated bedroom that does not touch asks; a touching one is extended.
 // On a 60 ft plot a half cell is 7'-6" (7'-0" clear): wide enough for a bedroom of its own.
 let t = state(60, 60, { splits: ['r3_c3'], rooms: [{ id: 'g-bedroom-1', use: 'bedroom', regions: ['r1_c1'] }] });
-eq(R.assignHalf(state(40, 60, t.floors.ground), 'r3_c3.L', { type: 'use', use: 'bedroom', separate: true }).kind, 'too-narrow',
-  'on a 40 ft plot the same half is too narrow for a separate bedroom');
+const narrowBedroom = R.assignHalf(state(40, 60, t.floors.ground), 'r3_c3.L', { type: 'use', use: 'bedroom', separate: true });
+eq([narrowBedroom.kind, narrowBedroom.short], ['commit', { needIn: 83, haveIn: 54 }],
+  'on a 40 ft plot the same half takes a separate bedroom with a warning (B2)');
 eq(R.assignHalf(t, 'r3_c3.L', { type: 'use', use: 'bedroom' }).kind, 'ask-separate');
 t = commit(t, R.assignHalf(t, 'r3_c3.L', { type: 'use', use: 'bedroom', separate: true }));
 eq(rooms(t)['g-bedroom-2'], 'r3_c3.L');

@@ -16,6 +16,8 @@ export interface HalfFace {
   color: string | null;   // owner colour, or null when empty
   size: string;           // "3'-9\" × 12'-6\""
   below?: string;         // first floor: "Below: Kitchen"
+  warning?: string;       // a narrow room: "Kitchen: 4'-6\" clear, needs 4'-11\"" (placed with a warning, 16 Oct 2026)
+  link?: string;          // "Joins the rest of Living Hall": giving this half away would cut that room in two
 }
 
 export interface ThumbCell {
@@ -59,6 +61,8 @@ function Half({ id, side, face, onSelect, enabled, lastEnabledTimestamp, isWarm 
       </span>
       <span className="refine-half-size">{face.size}</span>
       {face.below && <span className="refine-half-below">{face.below}</span>}
+      {face.link && <span className="refine-half-link">{face.link}</span>}
+      {face.warning && <span className="refine-half-warning"><span aria-hidden="true">⚠ </span>{face.warning}</span>}
     </GazeButton>
   );
 }

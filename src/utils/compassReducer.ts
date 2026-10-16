@@ -168,9 +168,17 @@ export function clearWidthIn(key: string, widthIn: number, depthIn: number): num
   return width - (atLeft ? 9 : 3) - (atRight ? 9 : 3);
 }
 
-/** Whether any room fits a half cell on this plot (a 30 ft plot gives a 3'-3" passage; 25 ft plots none). */
+/** No room is given a half narrower than this (2'-6" clear): the one size limit that refuses (decided 16 Oct 2026). */
+export const HALF_MIN_CLEAR_IN = 30;
+
+/** The narrowest and widest clear widths a half cell has on this plot (at the side wall, and inside). */
+export function halfClearRangeIn(widthIn: number, depthIn: number): { narrowest: number; widest: number } {
+  return { narrowest: clearWidthIn('r2_c1.L', widthIn, depthIn), widest: clearWidthIn('r2_c2.L', widthIn, depthIn) };
+}
+
+/** Whether cells may be divided on this plot: every half at least 2'-6" clear (30 ft plots and wider; 20 and 25 ft not). */
 export function halvesUsable(widthIn: number, depthIn: number): boolean {
-  return clearWidthIn('r2_c2.L', widthIn, depthIn) >= MIN_CLEAR_IN.passage;
+  return halfClearRangeIn(widthIn, depthIn).narrowest >= HALF_MIN_CLEAR_IN;
 }
 
 // ---- Placement mode (whole cells) ----------------------------------------------------------
@@ -270,12 +278,66 @@ export function splitCell(floor: FloorIntent, cell: CellKey): FloorIntent {
 
 export type AssignChoice = { type: 'empty' } | { type: 'use'; use: string; separate?: boolean };
 
+/** A room narrower than its use needs: placed with this warning, never refused (decided 16 Oct 2026, B2). */
+export interface Shortfall { needIn: number; haveIn: number }
+
 export type AssignOutcome =
-  | { kind: 'commit'; floor: FloorIntent; roomId: string | null; message: string }
-  | { kind: 'ask-separate'; use: string; label: string; message: string }
+  | { kind: 'commit'; floor: FloorIntent; roomId: string | null; message: string; short?: Shortfall }
+  | { kind: 'ask-separate'; use: string; label: string; message: string; short?: Shortfall }
   | { kind: 'refused'; message: string }
   | { kind: 'too-narrow'; use: string; needIn: number; haveIn: number; message: string }
   | { kind: 'disconnects'; victim: RoomIntent; victimLabel: string; message: string; otherHalf: RegionKey };
+
+/** "Bedroom: 4'-6" clear, needs 6'-11"", the warning shown on a narrow half. */
+export function shortfallText(use: string, short: Shortfall): string {
+  return `${library(use)}: ${inches(short.haveIn)} clear, needs ${inches(short.needIn)}`;
+}
+
+/**
+ * The map's estimate of a room's clear width: its widest run of regions side by side in one row, less a 9-inch
+ * outer wall at the plot edge and half a 6-inch partition inside. Only for warnings on the map; the floor-plan
+ * service decides the drawn size and writes the size-short note.
+ */
+export function roomClearWidthIn(room: RoomIntent, widthIn: number, depthIn: number): number {
+  const rows = new Map<number, Array<[number, number]>>();
+  for (const key of room.regions) {
+    const [x1, , x2] = regionRectIn(key, widthIn, depthIn);
+    const row = parseRegion(key).row;
+    rows.set(row, [...(rows.get(row) || []), [x1, x2]]);
+  }
+  let widest = 0;
+  for (const spans of rows.values()) {
+    spans.sort((a, b) => a[0] - b[0]);
+    let [start, end] = spans[0];
+    const measure = () => { widest = Math.max(widest, end - start - (start <= 0.5 ? 9 : 3) - (end >= widthIn - 0.5 ? 9 : 3)); };
+    for (const [x1, x2] of spans.slice(1)) {
+      if (x1 <= end + 0.5) end = Math.max(end, x2);
+      else { measure(); [start, end] = [x1, x2]; }
+    }
+    measure();
+  }
+  return widest;
+}
+
+/** The warning for a half whose room is narrower than its use needs, or null (B2). */
+export function halfShortfall(floor: FloorIntent, key: string, widthIn: number, depthIn: number): Shortfall | null {
+  const room = ownerOf(floor, key);
+  const need = room ? MIN_CLEAR_IN[room.use] || 0 : 0;
+  if (!room || !need) return null;
+  const have = roomClearWidthIn(room, widthIn, depthIn);
+  return have < need ? { needIn: need, haveIn: have } : null;
+}
+
+/**
+ * The room this half joins to the rest of itself (B4): giving the half away would cut that room in two. For an
+ * undivided cell, as if it were divided (both halves keep the cell's room).
+ */
+export function halfLinksRoom(floor: FloorIntent, key: RegionKey): RoomIntent | null {
+  const divided = splitCell(floor, cellOf(key) as CellKey);
+  const room = ownerOf(divided, key);
+  if (!room || room.regions.length < 2) return null;
+  return connected(room.regions.filter(k => k !== key)) ? null : room;
+}
 
 /** Gives one half (`key`, e.g. 'r2_c3.L') to a room of `use`, or leaves it empty (§5.3). */
 export function assignHalf(state: CompassStateV2, key: RegionKey, choice: AssignChoice, below?: FloorIntent): AssignOutcome {
@@ -315,26 +377,30 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
     const next = withRegions(base, target.id, [...target.regions, key]);
     return { kind: 'commit', floor: next, roomId: target.id, message: `${side === 'left' ? 'Left' : 'Right'} half: ${labelsOf(next)[target.id]}.` };
   }
-  if (same.length && !choice.separate) {
-    if (!REPEATABLE.has(use)) {
-      return { kind: 'refused', message: `${library(use)} is already on this floor; a house has one. Choose another room.` };
-    }
-    return { kind: 'ask-separate', use, label: `${library(use)} ${same.length + 1}`,
-      message: `${library(use)} is elsewhere on this floor. Make a separate ${library(use)} ${same.length + 1}, or choose another room.` };
+  if (same.length && !choice.separate && !REPEATABLE.has(use)) {
+    return { kind: 'refused', message: `${library(use)} is already on this floor; a house has one. Choose another room.` };
   }
   if (STAIR_HOSTS[floorId].has(use) && base.rooms.some(r => STAIR_HOSTS[floorId].has(r.use))) {
     return { kind: 'refused', message: 'Only one room on a floor can hold the stair.' };
   }
-  // A half that becomes a room on its own must be wide enough for it (extending a room is judged on the room).
+  // A half that becomes a room on its own is judged by its size before "a separate room?" is asked (A2), so a
+  // choice is never two questions. Only a half under 2'-6" clear is refused; a room narrower than its use needs is
+  // placed with a warning, as whole rooms are (B2, decided 16 Oct 2026). Extending a room is judged on the room.
   const need = MIN_CLEAR_IN[use] || 0;
   const have = clearWidthIn(key, widthIn, depthIn);
-  if (need && have < need) {
-    return { kind: 'too-narrow', use, needIn: need, haveIn: have,
-      message: `${library(use)} needs at least ${inches(need)} clear; this half gives about ${inches(have)}.` };
+  if (have < HALF_MIN_CLEAR_IN) {
+    return { kind: 'too-narrow', use, needIn: Math.max(need, HALF_MIN_CLEAR_IN), haveIn: have,
+      message: `This half is only ${inches(have)} clear; no room is given a half under 2'-6".` };
+  }
+  const short = need && have < need ? { needIn: need, haveIn: have } : undefined;
+  const narrow = short ? ` Narrow: ${inches(have)} clear; ${library(use)} needs ${inches(need)}.` : '';
+  if (same.length && !choice.separate) {
+    return { kind: 'ask-separate', use, label: `${library(use)} ${same.length + 1}`, short,
+      message: `${library(use)} is elsewhere on this floor. Make a separate ${library(use)} ${same.length + 1}, or choose another room.${narrow}` };
   }
   const created = withNewRoom(base, floorId, use, [key]);
-  return { kind: 'commit', floor: created.floor, roomId: created.id,
-    message: `${side === 'left' ? 'Left' : 'Right'} half: ${labelsOf(created.floor)[created.id]}.` };
+  return { kind: 'commit', floor: created.floor, roomId: created.id, short,
+    message: `${side === 'left' ? 'Left' : 'Right'} half: ${labelsOf(created.floor)[created.id]}.${narrow}` };
 }
 
 /** "Give both halves to B" (the answer to a cut-in-two refusal): both halves, then the cell made whole. */
@@ -391,6 +457,16 @@ export function wholeCell(floor: FloorIntent, cell: CellKey, owner: string | nul
 }
 
 // ---- Plot, plan, and the reducer ---------------------------------------------------------------
+
+/**
+ * What SKIP stores for a foundation question: the answer already there (prefilled, or from the survey), and only
+ * when there is none the question's first option. Skipping never replaces the plot the person or the survey gave
+ * (REFINE_FIX_HANDOFF A1: skipping every question used to store a 20 x 30 ft North plot).
+ */
+export function skippedAnswer(foundation: Foundation, key: keyof Foundation, firstOption: string | number): { value: string | number; kept: boolean } {
+  const current = foundation[key];
+  return current !== null && current !== undefined && current !== '' ? { value: current, kept: true } : { value: firstOption, kept: false };
+}
 
 export function plotInches(state: Pick<CompassStateV2, 'foundation'>): { widthIn: number; depthIn: number } {
   return { widthIn: Math.round((state.foundation.plotWidth || 40) * 12), depthIn: Math.round((state.foundation.plotDepth || 60) * 12) };
