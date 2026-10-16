@@ -189,3 +189,168 @@ proven handle wait; crash restarts are bounded (5, with backoff); OR-Tools and s
 the app runs (both absent from this venv, where all tests passed); `fonttools` is pinned in `constraints.txt`
 (already an ezdxf dependency); the installer build runs the frozen self-test twice, now including the v2 views,
 exports and the bundled fonts. After pulling, run `setup.bat` once (requirements changed).
+
+## Refine fixes, Outside and first-plan speed (16 Oct 2026, `REFINE_FIX_HANDOFF.md`)
+
+Done on the maintainer's 8 GB Windows laptop (7.9 GB RAM, 8 logical CPUs, one 1920 x 1080 display at 100 %
+scaling, Tobii Eye Tracker 5 services running), after `setup.bat` and on `1263eed`. The maintainer's decisions for
+Phase B: rooms too narrow for a half are placed with a warning (refused only under 2'-6" clear, the 20 and 25 ft
+plots, which offer no halves); READY stays on while paging the room list for a half.
+
+### How it was reproduced (Part 4)
+
+The real app, not a browser: `dist-electron/main.js` launched by Playwright through a test wrapper (a throwaway
+profile and health log, an off-screen window, the real floor-plan service on its own port), the interface from Vite,
+and gaze from a stand-in backend that streams window-fraction gaze frames at 60 Hz with fresh Tobii-like noise per
+frame, through the real GazeCursor and dwell. Every scenario step was a dwell, at the maintainer's own speed
+(Restful: map and cards 2.15 s, confirmations 2.4 s); setup that is not the scenario (a bedroom already placed) was a
+saved map. Speech is what the app sent to the backend. The maintainer's own GazeConnect was not running; nothing of
+theirs was touched. The physical Tobii and display scaling could not be exercised by the agent (below).
+
+| # | Scenario (before, `1263eed`) | On screen / spoken (exact) | Selections, time | Cause |
+|---|---|---|---|---|
+| 1 | No survey, SKIP all seven questions → REFINE → r2_c2 → LEFT HALF | Spoken "Skipped. Default: North." … "Default: 20 ft." … "Default: 30 ft."; road "FRONT / ROAD (North) – 20 ft"; focus "On a 20 ft plot a half cell is only 2'-0" wide inside: too narrow for any room. The cell stays whole." | 10, 42.4 s, to a dead end | R1 confirmed |
+| 2 | 30 x 50 plot, empty cell, LEFT → Bathroom (page 2) | Card "Too narrow: needs 3'-11"" (still selectable); question "Bathroom needs at least 3'-11" clear; this half gives about 3'-3"." → Use the whole cell / Choose another room | 6, 24.7 s, no bathroom in the half | R2 confirmed |
+| 3 | 40 x 60, Bedroom in r3_c1; LEFT of r3_c3 → Bedroom | "Bedroom is elsewhere on this floor. Make a separate Bedroom 2, or choose another room." then, after "Make a separate Bedroom 2", "Bedroom needs at least 6'-11" clear; this half gives about 4'-6"." | 7, 28.8 s, two questions for an impossible choice | R3 confirmed |
+| 4 | 40 x 60, Living Hall r2_c2 + r2_c3; LEFT of r2_c3 → Kitchen | Card said only "Too narrow: needs 4'-11""; question "Living Hall would be cut in two. Give the right half instead, or give both halves." (the right half then met the size refusal) | 5, 21.3 s | R4 confirmed |
+| 5 | Divided r2_c3; ROOMS → Bathroom → READY → look at r2_c3 | Nothing changed on screen (road, cell, any status); spoken only "This cell is divided. Use Refine to change it." | 6, 25.6 s | R5 confirmed |
+| 6 | A passage in one half, shortest route | REFINE, cell, LEFT, MORE, MORE, READY, Passage | 7, 25.5 s (3.8 s each: 2.15 s dwell + 1.2 s pause after each screen change) | R6 confirmed |
+| 7 | GENERATE → Ground floor only → Outside | Button "Outside · Needs more free memory", disabled; main's reply `{availableMb: 248, floorMb: 600, exterior: false, light: true}` (Task Manager: 235 MB available); nothing in the health log | first image 5.2 s after the choice (cold service) | O1 confirmed |
+
+Also confirmed or found on the laptop:
+
+- **R7 (Windows differences).** Speech is available: the Kokoro voice files verify, and the maintainer's own session
+  at 03:06-03:10 spoke (phonemizer lines in `tools/reports/main-console-20261016-030614.log`). Display scaling here
+  is 100 % (1920 x 1080, 96 DPI). The post-navigation pause is the same code on every platform (1.2 s, measured in
+  the 3.8 s per selection above). Tobii accuracy on the halves at 125 % and 150 % could not be checked: it needs a
+  person at the tracker, and changing Windows display scaling is not something the agent may do.
+- **O1, in numbers from the maintainer's session** (`health.jsonl`, 21:34-22:05 UTC, GazeConnect running): Windows'
+  available memory had a median of 335 MB (minimum 15 MB, maximum 991 MB) and was at least 600 MB in 3 % of
+  samples, so Outside was disabled nearly always; commit headroom never fell below 2.2 GB. At 150 MB, 200 MB, 300 MB
+  and 350 MB the shares were 88 %, 83 %, 62 % and 45 %: "cost + 300 MB" (C1 as proposed) would have allowed Outside
+  only about 35-45 % of the time, so the reserve was calibrated to 150 MB (below).
+- **New cause N1: numpy's OpenBLAS commits a buffer per CPU thread.** Measured by starting the service as Electron
+  does (`floorplan_server.py --parent-pid --idle-seconds 600`): private bytes rose from 26 MB to 260 MB on the first
+  model while the working set rose only from 36 MB to 51 MB; with `OPENBLAS_NUM_THREADS=1` the same run peaked at
+  78 MB private (48 MB after a drawing) with identical timings. The 288 MB "floorplan mb" in the health log was this
+  commit, not memory in use; the Outside view itself added 10-30 MB.
+- **New cause N2: the health log's `floorplan.mb` is private bytes only**, which on Windows overstated the service
+  four- to six-fold; it now also records the working set (`wsMb`).
+- **S1 (start).** On this laptop `vite build` alone takes 2.3 s and `tsc -p tsconfig.electron.json` 2.4 s (warm, into
+  a scratch folder). Measured as the maintainer starts the app (`start-dev.bat --quiet`, hardware mode, then
+  `stop-dev.bat`): 19.8 s from the command to the interface's first paint when the interface had to be rebuilt
+  (Electron started at 18.1 s), and 6.6 s with nothing to rebuild (Electron at 5.5 s; the 23 Sep measurement was
+  6.4 s). So a first launch after an update costs about 13 s more, once. What felt slow on 16 Oct was mostly
+  `setup.bat` (51 s here, 26 s of it the helper build) and, before it, a launch that stopped with "Setup is needed"
+  because the first setup had not finished.
+- **S2 (first plan), from the maintainer's session:** GENERATE at 03:09:09.6, service listening +1.2 s, health +1.4 s,
+  model +2.1 s, first image +2.75 s. Measured directly: ready 1.3 s, first model 0.57-0.62 s (imports), first plan
+  image 0.38-0.45 s, warm model 0.0 s, warm plan 0.03 s.
+- **Two 12 s `ui-stall` events at 21:38:52 and 21:39:04 UTC are not a fault of the app:** interface CPU was 0 % and
+  the main process normal, and the tracker reported no user present from 03:07:44 to 03:09:00 (the window was
+  covered while the maintainer was away); the service started only at 03:09:09.
+
+### What changed
+
+| Item | Change | Where | Check |
+|---|---|---|---|
+| A1 | SKIP keeps the answer already given (prefill or survey) and says "Skipped. Kept 40 ft."; the kept answer is marked on its option and in the status line ("SKIP keeps West."); the first option only when nothing is set | `compassReducer.ts` `skippedAnswer`; `CompassMapScreen.tsx` foundation | `check-compass-refine.cjs` (every question skipped keeps 40 x 60 West); `check-design-map-actions.cjs` (fresh map, skip all, draft holds West 40 x 60) |
+| A2 | A new room's size is judged before "a separate Bedroom 2?", so a choice is one question; "Use the whole cell for …" names the room it would make | `assignHalf`; screen | `check-compass-refine.cjs` |
+| A3 | Every refusal on the map also shows on the road: one status line (`#compass-road-status`, `role="status"`, polite), cleared after 6 s or by the next placement; also the 45-second ends | screen `tell`, road | `check-design-map-actions.cjs`; layout state `compass-road-notice` |
+| A4 | On 20 and 25 ft plots REFINE reads "HALVES TOO NARROW ON A 20 FT PLOT" and, chosen, says why and stays on the map | screen `narrowPlotReason` | `check-design-map-actions.cjs` (20 ft plot) |
+| C1 | The fixed 600 MB floor is replaced by a cost check for the size the studio asks for: cost = 4 B x width x height x 3 + 30 MB; allowed when available >= cost + 150 MB and commit free >= cost + 256 MB; otherwise the light size (1600 x 1000, no supersampling) is tried before refusing; 4 GB machines stay light | `electron/floorplanService.ts` `decideResources` | new `scripts/check-floorplan-resources.cjs` (18 checks), in `npm run check:compass` |
+| C2 | Memory is read again each time Outside is chosen; the button is never disabled; a refusal keeps the plan on screen, the caption says "Outside needs about 199 MB of free memory; 150 MB is free now. Close another program, then try again.", the button reads "Short of memory · Try again" | `CompassStudio.tsx`, `floorplanApi.ts`, `preload.ts`, `main.ts` | `check-compass-studio-v2.cjs` (refused, then drawn) |
+| C3 | A refused Outside writes `floorplan-resources` (total, available, commit free, cost, need, size) to the health log | `floorplanService.resources` | `check-floorplan-resources.cjs` |
+| D1 | The service starts in the background when the Compass map opens (never at launch); it still leaves after 10 idle minutes | `prewarmFloorplanService` (`floorplanApi.ts`), map screen | real app run (below) |
+| D2 | Once started, the service imports `compass_studio`, `compass_geometry`, `compass_plan2d`, `compass_text` and reads both plan fonts in a background thread (0.2-1.3 s here, 4.2 s with the laptop loaded by two test runs); `/api/health` reports `warmS` | `tools/floorplan_server.py` `warm_studio` | `test_compass_phase1.py` (only the studio's modules, never the legacy renderer or OR-Tools; fonts read) |
+| D3 | `floorplan-first-ready`, `floorplan-first-model` and `floorplan-first-image` events, each with `ms` and `sinceSpawnMs` (one name each: the health log keeps one event of a name within 2 s, which swallowed the image in a first version) | `floorplanService` | `check-floorplan-resources.cjs`; real app run (below) |
+| D4 | User guide: the first start after an update, Outside when memory is short, and every change above | `docs/floorplan-end-user-guide.md` | - |
+| N1 | One OpenBLAS thread for the service (set before numpy loads, and by Electron when it spawns it) | `floorplan_server.py`, `floorplanService.ts` | `test_compass_phase1.py`; measured above |
+| N2 | `wsMb` (working set) and `warmS` in the health log's `floorplan` section | `floorplanService.healthSnapshot` | - |
+| B1 | In placement, a divided cell opens the half chooser naming the armed room ("Place Bathroom in:"); the half gets the room by `assignHalf`, questions appear in the focus view, and the map returns; a half that holds another room is replaced only after "Yes, replace …" | screen `openPlaceHalf`, `onHalf` | `check-design-map-actions.cjs`; layout `compass-place-half`, `compass-place-question`; dwell `compass-place-half` |
+| B2 | A room narrower than its use needs is placed with a warning; only a half under 2'-6" clear is refused (20 and 25 ft plots offer no halves; an older draft divided there refuses a side-wall half). The warning: "⚠ NARROW" on the map (and ", narrow" in the cell's label), "Kitchen: 4'-6" clear, needs 4'-11"" in the focus view, "Narrow: …" in the message and on the road, and the kernel's `size-short` note in the studio | `assignHalf`, `halfShortfall`, `roomClearWidthIn`, `SplitCellFace`, `CompassRefineFocus` | `check-compass-refine.cjs`; `check-design-map-actions.cjs`; the service's `size-short` note checked against a kitchen half |
+| B3 | The picker for a half: Leave empty, rooms that join a neighbour (or are this room), rooms that fit (indoor first), narrow rooms (smallest shortfall first, "⚠ Narrow: …"), and last, disabled and dashed, rooms that cannot go there with the reason; READY stays on across pages | screen `renderAssign`, `CompassRoomPicker.tsx`, CSS | `check-design-map-actions.cjs` (passage and bathroom on page 1, READY across pages, porch disabled last) |
+| B4 | The focus view marks a half that joins the rest of a room ("Joins the rest of Living Hall"); the picker says "Cuts Living Hall in two" on that half; the question offers only answers that work, the other half first | `halfLinksRoom`; screen | `check-compass-refine.cjs` (including a middle cell, where neither half can go) |
+| - | Choosing another room for a half whose old room had no other part now says "Bathroom removed." (never silent) | screen `applyAssign` | `check-design-map-actions.cjs` |
+| N3 | New cause, found by the full studio check on the laptop: the studio released its last preview image on closing through `setImage(...)` in its unmount cleanup; React runs such an updater at once only when nothing else is pending, otherwise the update is dropped with the closing studio and the image stays in memory ("Closing releases the image" failed once in five runs; the post-matrix steps alone passed 4 of 4). Every image URL is now kept in a ref and released directly on closing | `CompassStudio.tsx` (`liveImages`) | `check-compass-studio-v2.cjs` (full matrix) |
+
+### Verified on the laptop after the fixes
+
+The same real-app harness, every step by dwell at the Restful speed (the laptop was also running the Python suite
+and the layout audit, so seconds are an upper bound):
+
+| # | Scenario (after) | On screen / spoken (exact) | Selections, time |
+|---|---|---|---|
+| 1 | No survey, SKIP all seven → REFINE → r2_c2 → LEFT HALF | "Skipped. Kept West." … "Kept 40 ft." … "Kept 60 ft." … "Default: Left."; road "FRONT / ROAD (West) – 40 ft"; the draft holds West 40 x 60; the room picker for the half opens | 10, 41.4 s, picker open (was a dead end) |
+| 1b | 20 x 50 plot, REFINE | Rail "REFINE · HALVES TOO NARROW ON A 20 FT PLOT"; chosen, the road and speech say "On a 20 ft plot a half cell would be only 1'-6" to 2'-0" clear, under the 2'-6" a half needs. Cells stay whole on this plot."; Refine does not open | 1, 5.7 s (A4: at the rail) |
+| 2 | 30 x 50, LEFT → Bathroom (page 2) | Card "⚠ Narrow: 3'-3" clear, needs 3'-11""; placed: "Left half: Bathroom. Narrow: 3'-3" clear; Bathroom needs 3'-11"."; the half shows "⚠ Bathroom: 3'-3" clear, needs 3'-11""; spoken in words | 6, 23.0 s, placed with a warning |
+| 3 | 40 x 60, Bedroom placed; LEFT of r3_c3 → Bedroom | One question: "Bedroom is elsewhere on this floor. Make a separate Bedroom 2, or choose another room. Narrow: 4'-6" clear; Bedroom needs 6'-11"." → "Make a separate Bedroom 2" → "Left half: Bedroom 2. Narrow: …" | 7, 29.1 s, one question (was two and no room) |
+| 4 | 40 x 60, Living Hall over two cells; LEFT of r2_c3 → Kitchen | Before choosing: the left half says "Joins the rest of Living Hall", the Kitchen card "⚠ Cuts Living Hall in two"; question "Living Hall would be cut in two. Give the right half instead, or give both halves." → "Give the right half instead" → "Right half: Kitchen + Store. Narrow: 4'-6" clear; Kitchen + Store needs 4'-11"." | 7, 29.2 s: one extra selection, no dead end |
+| 5 | Divided r2_c3; ROOMS → Bathroom → READY → r2_c3 | "Place Bathroom in: The left half or the right half"; RIGHT HALF → the map returns with PASSAGE \| BATH; spoken "Right half: Bathroom, 5 feet by 15 feet." | 2 selections, 8.1 s from the armed map (B1 target: 2) |
+| 6 | A passage in one half, shortest route | REFINE, cell, LEFT, READY, Passage (page 1) | 5, 17.9 s: 4 after REFINE (B5 target: 4); was 7, 25.5 s |
+| 7 | GENERATE → Ground floor only → Outside | Button "Outside · The house from the street", enabled; drawn in 3.4 s; main's reading `{availableMb: 251, commitFreeMb: 4030, costMb: 44, needMb: 194, 1500 x 800, exterior: true}`; Task Manager 249 MB available | Outside drawn on the same laptop and memory that refused it |
+
+The first plan and Outside on a quieter laptop (the same harness, the map open 11 s before GENERATE): the service,
+started when the map opened, was ready 2.8 s after its spawn; after "Ground floor only" the first plan image was on
+screen in 0.7 s (`floorplan-first-model` 394 ms, `floorplan-first-image` 266 ms), against 2.75 s in the maintainer's
+own session, which started the service at GENERATE. In the same run Windows had only 48-156 MB available (Task
+Manager 48 MB), and Outside was refused as designed: the plan stayed on screen, the caption read "Outside needs
+about 191 MB of free memory; 130 MB is free now. Close another program, then try again.", the button "Short of
+memory · Try again", and the health log `{"ev":"floorplan-resources","decision":"refused","totalMb":7919,
+"availableMb":130,"commitFreeMb":3682,"costMb":41,"needMb":191,"width":1450,"height":650}`. Earlier, at about 250 MB
+available, the same laptop drew it (row 7).
+
+The service in the real app (Part 6): opening the Compass map started it in the background
+(`floorplan-first-ready` 1.9 s after the spawn on a quiet laptop, 4.8 s with two test runs beside it); with the map
+left alone it wrote `floorplan-idle-exit` exactly 10 minutes after it started, both of its processes (the venv
+launcher and the interpreter) were gone, and it was not started again. Its memory in the health log after the
+fixes: 45.6 MB private, 23.1 MB working set, peak 55.3 MB (was 271-298 MB private).
+
+Deviations from the handoff, each deliberate:
+
+- **C1's reserve is 150 MB, not 300 MB**, because 300 MB fails the handoff's own "done when" on this laptop (see O1
+  above); the cost estimate is the handoff's, conservative against the 10-30 MB measured. Commit headroom (256 MB) is
+  checked as well, so no allocation can fail. One constant (`OUTSIDE_RESERVE_MB`) if the maintainer wants it changed.
+- **A2 and B2 together:** with the maintainer's B2 decision, a narrow half is no longer a question, so A2's "one
+  question" is the separate-room question carrying the size warning; the "Use the whole cell for Bedroom 2" answer
+  remains only for a half under 2'-6" (an older draft divided on a 25 ft plot).
+- **Plots offered halves:** "every half at least 2'-6" clear", which gives the same answer as before for every plot
+  width the foundation offers (20 and 25 ft no, 30 ft and wider yes).
+- **Placing on an occupied half asks first** ("Replace Bathroom with Kitchen + Store in the right half? Bathroom has no
+  other part, so it is removed."), as a whole cell does; Refine's picker now says "… removed." when its choice
+  removes a room, which it used to do silently.
+- **A divided cell stays one gaze target on the map:** the Tobii measurement the handoff asks for before splitting it
+  could not be made here.
+- **D2 warms imports and fonts; the first model is still about 0.4-0.6 s on this laptop** because building the plan
+  itself takes that long (a different plan, after the warm-up, took 0.39 s); that is the plan's work, not loading.
+
+Checks run on this laptop (all against the changed code unless said):
+
+- `npm run check:compass` parts: plan 68, Refine rules 87, saved legacy plans 3, transport 16, saving 23, memory 18: pass.
+- `node scripts/check-design-map-actions.cjs`: pass (Playwright's headless shell through a local `PLAYWRIGHT_MODULE` shim).
+- `node scripts/check-compass-studio-v2.cjs`, full matrix (1366 and 1920, Focus and Serene, three themes) against
+  the real floor-plan service: 100 studio screens, 5,697 gaze target probes, pass (after the N3 fix; before it, the
+  final "Closing releases the image" failed once, see N3).
+- `node scripts/check-design-browser-dwell.cjs` on all eight Compass screens (map 22, nav 10, rooms 13, rooms-2 14,
+  refine 18, refine-focus 4, refine-assign 13, place-half 6 selections): pass, after a fix to the check itself: the
+  45-second quiet timer could end READY or Refine inside the 11th case, which also failed on `1263eed` here (run from
+  a temporary worktree); each case now re-arms through the real control first.
+- `scripts/check-design-layout.cjs`: 12 combinations (1366 and 1920, Focus and Serene, Dark, Warm and Midnight Navy),
+  82 screens each, including `compass-place-half`, `compass-place-question` and `compass-road-notice`: 0 issues in
+  every combination (984 screens). A measurement outside the audit then found the longest road message (a 20 ft
+  plot's reason) squeezed into 207 px and reaching the road's bottom edge at 1366 x 768: an old inline 44 % width
+  cap applied inside the road's grid column. A notice now uses the whole column (two lines, inside the road, clear of
+  READY and the room box at 1366 x 768 and 1920 x 1080), and the audit was run again for those screens.
+- `python -m unittest discover -s tests` (from `python/`): 257 tests, all pass except `test_ml_training_data`
+  (`torch` is not installed; unchanged).
+- `npm run lint` cannot run in this checkout: there is no ESLint configuration (unchanged). `tsc --noEmit` for the
+  interface and `tsc -p tsconfig.electron.json` pass.
+
+Not checked here:
+
+- **The Tobii itself.** Every gaze step above was synthetic gaze through the real cursor; no person used the tracker.
+  The maintainer should run scenarios 1-7 by eye, at 100 %, 125 % and 150 % display scaling (the agent may not
+  change Windows display settings), and decide then whether a divided cell's halves can be separate targets.
+- **The installer.** `build-installer.bat` and the frozen self-test were not run; the frozen service picks up the
+  thread limit and the warm-up from `floorplan_server.py`, which the installer's entry imports first.
+- **A cold start after a reboot** (antivirus scanning the bundle): measured warm here only.
