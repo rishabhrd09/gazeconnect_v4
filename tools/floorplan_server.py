@@ -13,6 +13,13 @@
 """
 
 import os
+
+# numpy's OpenBLAS commits a work buffer for every CPU thread when it loads: on the 8 GB Windows laptop (16 Oct 2026,
+# 8 threads) that was about 225 MB of private memory that was never touched, so the service stood at 275 MB of commit
+# for a 50-65 MB working set. Plans use small arrays: one thread draws them as fast. Set before anything imports numpy.
+for _threads in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS'):
+    os.environ.setdefault(_threads, '1')
+
 import io
 import sys
 import json
@@ -73,6 +80,25 @@ MIME_MAP = {"png": "image/png", "pdf": "application/pdf", "svg": "image/svg+xml"
 MIME_MAP_V5 = {**MIME_MAP, "dxf": "application/dxf"}
 STARTED_AT = time.time()
 IDLE = None   # floorplan_runtime.IdleWatch once main() runs with --idle-seconds.
+WARM = {'seconds': None, 'error': None}   # The background warm-up (warm_studio), for /api/health.
+
+
+def warm_studio():
+    """Loads what the first plan needs (the studio's modules and the plan fonts) in the background, so the first
+    request after a start pays no import time (REFINE_FIX_HANDOFF D2). Only the Compass studio's own modules: never
+    the legacy renderer, OR-Tools or pandas. The process already runs below normal priority; a failure is only
+    reported, and the first request then imports as before."""
+    started = time.perf_counter()
+    try:
+        import compass_studio   # noqa: F401  (compass_geometry, compass_schema, compass_resources)
+        import compass_plan2d   # noqa: F401
+        import compass_text
+        compass_text.face(False)
+        compass_text.face(True)
+    except Exception as error:   # pragma: no cover - reported, never fatal
+        WARM['error'] = str(error)[:200]
+        print(f'Background warm-up failed: {error}', flush=True)
+    WARM['seconds'] = round(time.perf_counter() - started, 2)
 
 
 def _touch():
@@ -149,7 +175,8 @@ def health():
     return jsonify({"status": "ok", "engine": "pycairo", "version": "4.0", "pid": os.getpid(), "ppid": os.getppid(),
                     "uptimeS": round(time.time() - STARTED_AT), "memory": floorplan_runtime.process_memory(),
                     "jobs": compass_resources.state(),
-                    "idleS": round(IDLE.idle_for()) if IDLE is not None else None})
+                    "idleS": round(IDLE.idle_for()) if IDLE is not None else None,
+                    "warmS": WARM['seconds']})
 
 
 # Compass presentation is isolated from survey fusion and the legacy viewer.
@@ -626,6 +653,9 @@ def main(argv=None):
         IDLE.start()
     print(f"GazeConnect floor-plan service on http://127.0.0.1:{port} (pid {os.getpid()}, "
           f"parent {options['parent_pid'] or 'none'}, idle exit {int(options['idle_seconds']) or 'off'})", flush=True)
+    # Health answers at once; the first plan's imports load beside it (D2).
+    import threading
+    threading.Thread(target=warm_studio, name='warm-studio', daemon=True).start()
     # debug=False + use_reloader=False: prevents stat reloader from
     # spawning a child process that may crash silently in Electron
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)

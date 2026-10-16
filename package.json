@@ -36,7 +36,7 @@
     "check:calm-video": "node scripts/check-calm-video.cjs",
     "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs",
     "check:add-to-message": "node scripts/check-add-to-message.cjs",
-    "check:compass": "node scripts/check-compass-plan.cjs && node scripts/check-compass-refine.cjs && node scripts/check-advanced-floors.cjs && node scripts/check-floorplan-transport.cjs && node scripts/check-floorplan-save.cjs",
+    "check:compass": "node scripts/check-compass-plan.cjs && node scripts/check-compass-refine.cjs && node scripts/check-advanced-floors.cjs && node scripts/check-floorplan-transport.cjs && node scripts/check-floorplan-save.cjs && node scripts/check-floorplan-resources.cjs",
     "check:compass-browser": "node scripts/check-design-map-actions.cjs && node scripts/check-compass-studio-v2.cjs"
   },
   "dependencies": {

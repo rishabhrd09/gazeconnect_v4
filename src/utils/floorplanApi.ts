@@ -56,6 +56,16 @@ async function ensureFloorplanServerReady(): Promise<void> {
   return floorplanBootPromise;
 }
 
+/**
+ * Starts the floor-plan service in the background when the Compass map opens (REFINE_FIX_HANDOFF D1), so the first
+ * GENERATE does not wait for it. Never at app launch; the service still leaves after ten idle minutes, and the next
+ * plan starts it again. Nothing waits on this, and a failure here is retried by the first plan request.
+ */
+export function prewarmFloorplanService(): void {
+  if (!(window as any).electronAPI?.floorplan?.ensureServer) return;
+  void ensureFloorplanServerReady();
+}
+
 export type FloorPlanStyle = 'modern' | 'autocad' | 'blueprint' | 'presentation';
 export type FloorPlanFormat = 'png' | 'pdf' | 'svg';
 export type FloorSelect = 'ground' | 'first' | 'all';
@@ -665,11 +675,17 @@ export async function saveCompassFile(plan: unknown, options: StudioRenderOption
   return { ok: true };
 }
 
-export interface FloorplanResources { totalMb: number; availableMb: number; floorMb: number; light: boolean; exterior: boolean; }
+/** Memory for the heavier views, as electron/floorplanService.ts decides it (decideResources). */
+export interface FloorplanResources {
+  totalMb: number; availableMb: number; commitFreeMb: number | null;
+  /** The Outside view at width x height: what it may take, and the free memory it needs (cost and reserve). */
+  costMb: number; needMb: number; width: number; height: number;
+  light: boolean; exterior: boolean;
+}
 
-/** Memory for the heavier views (electron/floorplanService.ts); null outside Electron. */
-export async function getFloorplanResources(): Promise<FloorplanResources | null> {
+/** Memory for the heavier views, read now; null outside Electron. `outside: true` is the check made when Outside is chosen. */
+export async function getFloorplanResources(request?: { width: number; height: number; outside?: boolean }): Promise<FloorplanResources | null> {
   const query = (window as any).electronAPI?.floorplan?.resources;
   if (!query) return null;
-  try { return await query(); } catch { return null; }
+  try { return await query(request); } catch { return null; }
 }

@@ -77,7 +77,8 @@ const api = {
     request: (input: { endpoint: string; body?: string }) => ipcRenderer.invoke('floorplan:request', input),
     // Gaze-safe download: the app names the file and writes it to Documents\GazeConnect Plans\<date>.
     save: (input: { endpoint: string; body: string; fileName: string }) => ipcRenderer.invoke('floorplan:save', input),
-    resources: () => ipcRenderer.invoke('floorplan:resources'),
+    // Memory for the heavier views; with `outside: true` it is the check made when the person chooses Outside.
+    resources: (request?: { width?: number; height?: number; outside?: boolean }) => ipcRenderer.invoke('floorplan:resources', request),
   },
 
   // Settings persistence

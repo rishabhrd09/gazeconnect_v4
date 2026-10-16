@@ -71,12 +71,16 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
   const [imageError, setImageError] = useState('');
   const [imageRetry, setImageRetry] = useState(0);
   const [resources, setResources] = useState<FloorplanResources | null>(null);
+  // The last refusal of Outside (short of memory), shown with its numbers until Outside is chosen again (C2).
+  const [outsideShort, setOutsideShort] = useState<FloorplanResources | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
   const drawingRef = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
   const speak = useRef(onSpeak); speak.current = onSpeak;
   const spokenFirst = useRef(false);
+  // Every image URL made and not yet released, so closing releases them without going through state (below).
+  const liveImages = useRef(new Set<string>());
 
   useEffect(() => { alive.current = true; signalNavigation(); return () => { alive.current = false; }; }, [signalNavigation]);
   useEffect(() => { void getFloorplanResources().then(r => { if (alive.current) setResources(r); }); }, []);
@@ -95,8 +99,10 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
   }, [studioPlan, retry, legacyLocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const light = !!resources?.light;
-  const outsideAllowed = !resources || resources.exterior;
   const hasFirst = !!summary?.floorsDrawn.includes('first');
+  const outsideShortText = outsideShort
+    ? `Outside needs about ${outsideShort.needMb} MB of free memory; ${outsideShort.availableMb} MB is free now. Close another program, then try again.`
+    : '';
 
   useEffect(() => {
     if (!summary || page !== 'view') return undefined;
@@ -109,7 +115,11 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
     }, controller.signal).then(blob => {
       if (controller.signal.aborted || !blob) return;
       url = URL.createObjectURL(blob);
-      setImage(previous => { if (previous) URL.revokeObjectURL(previous); return url; });
+      liveImages.current.add(url);
+      setImage(previous => {
+        if (previous && previous !== url) { URL.revokeObjectURL(previous); liveImages.current.delete(previous); }
+        return url;
+      });
       if (!spokenFirst.current) {
         spokenFirst.current = true;
         speak.current(`${FLOOR_NAMES[floor]} plan is ready.`);
@@ -119,8 +129,13 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
     return () => controller.abort();
   }, [summary, page, view, floor, preset, drawingTheme, studioPlan, light, imageRetry]);
 
-  // One decoded image at a time; the last one is released when the studio closes.
-  useEffect(() => () => { setImage(previous => { if (previous) URL.revokeObjectURL(previous); return ''; }); }, []);
+  // One decoded image at a time; every one still held is released when the studio closes. Directly, not through
+  // setImage: a state update queued while the studio closes is dropped with it, and on the laptop (16 Oct 2026) an
+  // image was then never released (check-compass-studio-v2 "Closing releases the image", once in five runs).
+  useEffect(() => () => {
+    for (const url of liveImages.current) URL.revokeObjectURL(url);
+    liveImages.current.clear();
+  }, []);
 
   const notes = useMemo<StudioNote[]>(() => [...(summary?.notes || [])]
     .filter(n => scope === 'all' || n.floor !== 'first')
@@ -130,8 +145,24 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
 
   const go = (next: Page) => { signalNavigation(); setPage(next); setNotesPage(0); setExportMessage(''); };
   const chooseView = (next: StudioView) => {
-    signalNavigation(); setView(next);
-    speak.current(next === 'outside' ? `Outside, ${PRESETS[preset].label}.` : `${VIEW_NAMES[next]}, ${FLOOR_NAMES[floor]}.`);
+    signalNavigation();
+    if (next !== 'outside') {
+      setOutsideShort(null); setView(next); speak.current(`${VIEW_NAMES[next]}, ${FLOOR_NAMES[floor]}.`);
+      return;
+    }
+    // Memory is read again each time Outside is chosen, for the size it would be drawn at (C2): a short moment
+    // never leaves a permanently dead button. Outside Electron there is no reading, and Outside is drawn.
+    void getFloorplanResources({ ...imageSize(drawingRef.current, false), outside: true }).then(reply => {
+      if (!alive.current) return;
+      if (reply && !reply.exterior) {
+        setOutsideShort(reply);
+        speak.current(`Outside needs about ${reply.needMb} megabytes of free memory; ${reply.availableMb} are free now. Close another program, then try again.`);
+        return;
+      }
+      setOutsideShort(null);
+      if (reply) setResources(reply);
+      setView('outside'); speak.current(`Outside, ${PRESETS[preset].label}.`);
+    });
   };
   const switchFloor = () => {
     const next: Floor = floor === 'ground' ? 'first' : 'ground';
@@ -193,7 +224,7 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
   const caption = loading ? 'Drawing your plan from the Compass map…'
     : error || (page === 'downloads' ? 'Files are saved without a dialog, in Documents › GazeConnect Plans.'
       : page === 'notes' ? 'Preliminary checks. Review them with your architect.'
-        : rendering && !image ? 'Drawing…' : `${plotText}${problems ? ` · ${problems} note${problems === 1 ? '' : 's'} to review` : ' · no conflicts found'}`);
+        : outsideShortText || (rendering && !image ? 'Drawing…' : `${plotText}${problems ? ` · ${problems} note${problems === 1 ? '' : 's'} to review` : ' · no conflicts found'}`));
 
   return <div className="compass-plan-studio design-surface" role="dialog" aria-modal="true" aria-label="Compass plan studio">
     <header className="studio-header">
@@ -223,8 +254,8 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
         <aside className="studio-tools" aria-label="Views">
           {button('view-plan', <>Plan<small>Rooms, walls and sizes</small></>, () => chooseView('plan'), false, view === 'plan')}
           {button('view-top', <>Top view<small>From above, furnished</small></>, () => chooseView('top'), false, view === 'top')}
-          {button('view-outside', <>Outside<small>{outsideAllowed ? 'The house from the street' : 'Needs more free memory'}</small></>,
-            () => chooseView('outside'), !outsideAllowed, view === 'outside')}
+          {button('view-outside', <>Outside<small>{outsideShort ? 'Short of memory · Try again' : 'The house from the street'}</small></>,
+            () => chooseView('outside'), false, view === 'outside')}
           {view === 'outside'
             ? button('angle', <>Next angle<small>Now: {PRESETS[preset].label} →</small></>, nextAngle, rendering)
             : button('floor', <>{FLOOR_NAMES[floor]}<small>{hasFirst ? `Show ${floor === 'ground' ? 'first' : 'ground'} floor →` : 'Only this floor'}</small></>,

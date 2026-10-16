@@ -34,8 +34,11 @@ let browser;
     URL.createObjectURL = b => { const u = create(b); window.qaBlobs.add(u); return u; };
     URL.revokeObjectURL = u => { window.qaBlobs.delete(u); revoke(u); };
     const theme = sessionStorage.getItem('qa-theme'); if (theme) localStorage.setItem('gc-theme', theme);
-    // No electronAPI.floorplan: downloads go through the browser, as in the UI-only preview.
-    window.electronAPI = {on: () => () => {}, off: () => {}, settings: {load: async () => JSON.parse(sessionStorage.getItem('qa-profile') || 'null'), save: async d => { sessionStorage.setItem('qa-profile', JSON.stringify(d)); return {success: true}; }}};
+    // electronAPI.floorplan has only `resources` (the memory reading, null unless a test sets one): drawings and
+    // downloads go through the browser, as in the UI-only preview.
+    window.qaResourceRequests = [];
+    window.electronAPI = {on: () => () => {}, off: () => {}, settings: {load: async () => JSON.parse(sessionStorage.getItem('qa-profile') || 'null'), save: async d => { sessionStorage.setItem('qa-profile', JSON.stringify(d)); return {success: true}; }},
+      floorplan: {resources: async request => { window.qaResourceRequests.push(request || null); return JSON.parse(sessionStorage.getItem('qa-memory') || 'null'); }}};
   });
   await page.goto(BASE); await page.locator('#kb').waitFor();
 
@@ -152,6 +155,23 @@ let browser;
   await open(); await page.click('#confirm-gen-yes'); await drawing();
   assert.match(await heading(), /GROUND FLOOR ONLY/); assert.equal(await page.locator('#compass-studio-floor').isEnabled(), false);
   await audit('ground-only');
+  // Outside short of memory (REFINE_FIX_HANDOFF C2): memory is read when Outside is chosen; a refusal keeps the plan,
+  // gives the numbers and offers Try again on the same, never disabled, button. When memory is back it draws.
+  const memory = (availableMb, exterior) => ({totalMb: 7919, availableMb, commitFreeMb: 3000, costMb: 49, needMb: 199, width: 1600, height: 1000, light: true, exterior});
+  await page.evaluate(m => sessionStorage.setItem('qa-memory', JSON.stringify(m)), memory(150, false));
+  const planImage = await imageSrc();
+  await page.click('#compass-studio-view-outside');
+  await page.waitForFunction(() => /Short of memory · Try again/.test(document.querySelector('#compass-studio-view-outside')?.innerText || ''));
+  assert.match(await page.locator('.studio-caption').innerText(), /Outside needs about 199 MB of free memory; 150 MB is free now/);
+  assert.equal(await page.locator('#compass-studio-view-outside').isDisabled(), false, 'never a dead button');
+  assert.match(await heading(), /Ground floor · Plan/, 'the plan stays on screen');
+  await audit('outside-short');
+  await page.evaluate(m => sessionStorage.setItem('qa-memory', JSON.stringify(m)), memory(400, true));
+  await page.click('#compass-studio-view-outside'); await drawing(planImage);
+  assert.match(await heading(), /Outside · Front left/);
+  assert.doesNotMatch(await page.locator('#compass-studio-view-outside').innerText(), /Short of memory/);
+  assert.deepEqual(await page.evaluate(() => window.qaResourceRequests.filter(r => r && r.outside).length), 2, 'read again each time Outside is chosen');
+  await page.evaluate(() => sessionStorage.removeItem('qa-memory'));
   // A newer view replaces an older one; only the newest image is kept, and closing releases it.
   let delayed = 0;
   await page.route('**/api/floorplan/compass/v2/render', async route => { if (++delayed === 1) await new Promise(r => setTimeout(r, 1200)); await route.continue().catch(() => {}); });

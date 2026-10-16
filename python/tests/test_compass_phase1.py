@@ -194,6 +194,28 @@ class RuntimeTests(unittest.TestCase):
         loaded = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=60)
         self.assertEqual(loaded.stdout.strip(), '[]', loaded.stderr)
 
+    def test_background_warm_up_loads_only_the_studio(self):
+        """REFINE_FIX_HANDOFF D2: the first plan's imports and fonts load in the background after the start, and
+        never the legacy renderer, OR-Tools or pandas. numpy is limited to one OpenBLAS thread (16 Oct 2026)."""
+        import subprocess
+        tools = str(Path(__file__).resolve().parents[2] / 'tools')
+        code = ('import os, sys, json; sys.path[:0]=[%r]; os.environ.pop("OPENBLAS_NUM_THREADS", None); import floorplan_server as s; '
+                's.warm_studio(); print(json.dumps({"warm": s.WARM, "threads": os.environ.get("OPENBLAS_NUM_THREADS"), '
+                '"studio": [m for m in ("compass_studio","compass_geometry","compass_plan2d","compass_text") if m in sys.modules], '
+                '"legacy": [m for m in ("ortools","pandas","gazeconnect_floorplan_v5","floorplan_fusion_v1","compass_presentation",'
+                '"gazeplan_engine_v5.engine") if m in sys.modules], "fonts": s.compass_text.face.cache_info().currsize '
+                'if hasattr(s, "compass_text") else sys.modules["compass_text"].face.cache_info().currsize}))') % tools
+        run = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=120)
+        result = json.loads(run.stdout.strip().splitlines()[-1])
+        self.assertIsNone(result['warm']['error'], run.stderr)
+        self.assertIsInstance(result['warm']['seconds'], float)
+        self.assertEqual(result['studio'], ['compass_studio', 'compass_geometry', 'compass_plan2d', 'compass_text'])
+        self.assertEqual(result['legacy'], [])
+        self.assertEqual(result['fonts'], 2, 'both plan fonts are read')
+        self.assertEqual(result['threads'], '1')
+        from floorplan_server import app
+        self.assertIn('warmS', app.test_client().get('/api/health').get_json())
+
 
 class LifetimeTests(unittest.TestCase):
     def test_service_ends_with_its_parent_and_when_idle(self):
