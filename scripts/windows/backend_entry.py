@@ -1,8 +1,14 @@
 """Frozen backend entry point with an offline packaged-dependency smoke check."""
-import json
-import multiprocessing
-import sys
-from pathlib import Path
+import os
+
+# One OpenBLAS thread, set before anything imports numpy (the self-test loads the voice before main); see main.py.
+for _threads in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS'):
+    os.environ.setdefault(_threads, '1')
+
+import json  # noqa: E402
+import multiprocessing  # noqa: E402
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 
 def self_test():

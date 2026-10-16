@@ -351,6 +351,8 @@ Not checked here:
 - **The Tobii itself.** Every gaze step above was synthetic gaze through the real cursor; no person used the tracker.
   The maintainer should run scenarios 1-7 by eye, at 100 %, 125 % and 150 % display scaling (the agent may not
   change Windows display settings), and decide then whether a divided cell's halves can be separate targets.
-- **The installer.** `build-installer.bat` and the frozen self-test were not run; the frozen service picks up the
-  thread limit and the warm-up from `floorplan_server.py`, which the installer's entry imports first.
+- **The installer.** `build-installer.bat` and the frozen self-test were not run on 16 Oct for this change. The
+  frozen service gets the thread limit from Electron's spawn and from `floorplan_server.py`; the entry's `--self-test`
+  imported shapely (numpy) before `floorplan_server` and so committed the 225 MB anyway (274.8 MB private in
+  `check-windows.bat`), until `scripts/windows/floorplan_entry.py` set the limit first as well (then 50.1 MB).
 - **A cold start after a reboot** (antivirus scanning the bundle): measured warm here only.

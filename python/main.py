@@ -18,8 +18,16 @@ Architecture:
     Electron (React) <--> WebSocket <--> Python Backend <--> Tobii SDK
 """
 
-import asyncio
 import os
+
+# numpy's OpenBLAS commits a work buffer for every CPU thread when it loads: measured 16 Oct 2026 on the 8 GB laptop
+# (8 threads), about 225 MB of private memory per process that loads it, never touched (the voice worker stood at
+# 404 MB private for 154 MB in use). The backend's arrays are small, so one thread is as fast. Set before anything
+# imports numpy; the spawned voice and prediction workers inherit it.
+for _threads in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS'):
+    os.environ.setdefault(_threads, '1')
+
+import asyncio
 import socket
 import sys
 import datetime

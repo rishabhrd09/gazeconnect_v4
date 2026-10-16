@@ -1,8 +1,14 @@
 """Frozen floor-plan service; network binding is loopback only."""
-import io
-import json
 import os
-import sys
+
+# One OpenBLAS thread, set before anything imports numpy: self_test imports shapely (numpy) before floorplan_server,
+# which sets the same default (see there; about 225 MB less commit on the 8-thread laptop, 16 Oct 2026).
+for _threads in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS'):
+    os.environ.setdefault(_threads, '1')
+
+import io  # noqa: E402
+import json  # noqa: E402
+import sys  # noqa: E402
 
 
 def self_test():
