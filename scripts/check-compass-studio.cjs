@@ -89,13 +89,15 @@ let browser;
     if(size[0]===1920 || process.env.COMPASS_QA_SMALL)await page.screenshot({path:path.join(out,`${mode}-${theme}-3d.png`)});
     await page.click('#compass-studio-inspect');await page.locator('.studio-drawing img').waitFor();assert.match(await page.locator('#compass-studio-inspect').innerText(),/View 2 of 4/);
     await page.click('#compass-studio-details');await audit(label+'-rooms');
+    // Rooms are listed in the saved plan's order (sorted by room id since 14 Oct 2026), not the draft's.
+    const secondRoom=(await page.locator('#compass-studio-room-1 span').first().innerText()).trim();
     await page.click('#compass-studio-room-0');await page.locator('.studio-drawing img').waitFor();await audit(label+'-room-3d');
     assert.equal(await page.locator('#compass-studio-zoom-out').isEnabled(),false);
     await page.click('#compass-studio-zoom-in');await page.click('#compass-studio-zoom-in');
     assert.equal(await page.locator('#compass-studio-zoom-in').isEnabled(),false);
     await audit(label+'-room-zoom');
     await page.click('#compass-studio-zoom-out');await page.click('#compass-studio-zoom-out');
-    await page.click('#compass-studio-next');await page.locator('.studio-drawing img').waitFor();assert.match(await page.locator('.studio-heading').innerText(),/Master Bedroom/);
+    await page.click('#compass-studio-next');await page.locator('.studio-drawing img').waitFor();assert.ok((await page.locator('.studio-heading').innerText()).includes(secondRoom),`Next room opens ${secondRoom}`);
     await page.click('#compass-studio-back');await page.locator('.studio-drawing img').waitFor();
     await page.click('#compass-studio-view');await audit(label+'-view-choice');
     await page.click('#compass-studio-styles');await audit(label+'-finishes');

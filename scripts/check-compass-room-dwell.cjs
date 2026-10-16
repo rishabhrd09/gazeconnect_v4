@@ -46,7 +46,12 @@ let browser;
  }
  await audit();
  await dwell('compass-studio-details',false);await audit();
- await dwell('compass-studio-room-2',false);await drawing();assert.match(await page.locator('.studio-heading').innerText(),/Staircase/);await audit();
+ // Rooms are listed in the saved plan's order (sorted by room id since 14 Oct 2026): page on to the Staircase card.
+ const staircase=()=>page.evaluate(()=>[...document.querySelectorAll('[id^="compass-studio-room-"]')].find(e=>/Staircase/.test(e.innerText))?.id);
+ let stairs=await staircase();
+ for(let n=0;!stairs&&n<3;n++){await dwell('compass-studio-detail-next',false);await audit();stairs=await staircase();}
+ assert.ok(stairs,'Staircase room card');
+ await dwell(stairs,false);await drawing();assert.match(await page.locator('.studio-heading').innerText(),/Staircase/);await audit();
  await dwell('compass-studio-zoom-in',false);assert.match(await page.locator('.studio-caption').innerText(),/130%/);await audit();
  await dwell('compass-studio-zoom-out',false);await dwell('compass-studio-inspect',false);await drawing();assert.match(await page.locator('#compass-studio-inspect').innerText(),/View 2/);
  await dwell('compass-studio-back',false);await drawing();
