@@ -6,15 +6,23 @@
  * the rest; the floor-plan service by its own report while it runs), the computer's available
  * and committed memory, the main process's worst event-loop
  * delay, the interface's heartbeat and frame delay, and the page's oldest unanswered script.
- * Events (a stuck page, a page rebuilt, a process gone, a stall) are written as they happen.
- * After a freeze the lines before it say which part stopped first; a gap between lines is the
- * main process itself standing still.
+ * Events (a stuck page, a page rebuilt, a process gone, a stall, the computer sleeping and
+ * waking) are written as they happen. After a freeze the lines before it say which part stopped
+ * first; a gap between lines is the main process itself standing still, or the computer asleep
+ * (a `resume` line follows it).
+ *
+ * Stalls are only what the app did not mean (16 Oct 2026, the maintainer's log of 10-16 Oct):
+ * all three `main-stall` events were Windows Modern Standby to the second, and most of 124
+ * `ui-stall` events were ~60 s gaps with no frame delay: Chromium running a hidden interface's
+ * timers once a minute (a covered window or a dark screen, which `isVisible()` cannot see). So
+ * `ui-stall` needs the interface visible at both beats, and a wake starts every measure again;
+ * see `uiBeat` and `resumed`.
  *
  * The log is about the app, never about the person: pages are recorded by kind (a YouTube video,
  * another YouTube page, another site), never by address or title. Files are capped
  * (MAX_FILE_BYTES each, KEEP_FILES kept); see `write` for why lines are written synchronously.
  */
-import { app } from 'electron';
+import { app, powerMonitor } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -24,6 +32,11 @@ const LAG_PROBE_MS = 100;
 const MAIN_STALL_GAP_MS = 12000;
 /** The interface beats every 2 s; this long without one means it stood still. */
 const UI_STALL_GAP_MS = 6000;
+/**
+ * On waking, the late timers and Windows' `resume` arrive in either order: a stall seen first
+ * waits this long for a `resume` before it is written as it is.
+ */
+const RESUME_GRACE_MS = 5000;
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const KEEP_FILES = 6;
 const EVENT_REPEAT_MS = 2000;
@@ -40,8 +53,12 @@ export type PageHealth = {
   hidden?: boolean;
 };
 
-/** `uiVisible`: the window is on screen (hidden to the tray, its timers are slowed: no stall). */
+/**
+ * `uiVisible`: the window is on screen (hidden to the tray, its timers are slowed: no stall). It
+ * cannot tell a covered window or a dark screen; the heartbeat's own visibility does (`uiBeat`).
+ */
 type Roles = { uiPid: number; pagePid: number; uiVisible: boolean };
+type PendingStall = { name: string; at: number; data: Record<string, unknown> };
 
 const mb = (kb: number | undefined) => Math.round((kb || 0) / 1024);
 
@@ -55,7 +72,13 @@ export class HealthRecorder {
   private lastSampleAt = 0;
   private startedAt = 0;
   private uiBeatAt = 0;
+  private uiBeatVisible = false;
   private uiLagMs = 0;
+  private suspendAt = 0;
+  private resumeAt = 0;
+  private pending: PendingStall[] = [];
+  private graceTimer: NodeJS.Timeout | null = null;
+  private unwatchPower: (() => void) | null = null;
   private fd: number | null = null;
   private size = 0;
   private readonly lastEventAt = new Map<string, number>();
@@ -88,6 +111,7 @@ export class HealthRecorder {
     }, LAG_PROBE_MS);
     this.timer = setInterval(() => this.sample(), HEALTH_SAMPLE_MS);
     this.event('start', { version: app.getVersion(), electron: process.versions.electron });
+    this.unwatchPower = this.watchPower();
   }
 
   stop(): void {
@@ -95,22 +119,38 @@ export class HealthRecorder {
     if (this.lagTimer) clearInterval(this.lagTimer);
     this.timer = null;
     this.lagTimer = null;
+    this.unwatchPower?.();
+    this.unwatchPower = null;
+    this.settle(false);   // a stall still waiting for a `resume` is written as it is
     this.close();
   }
 
-  /** The interface's heartbeat, with its worst frame delay since the last one. */
-  uiBeat(frameLagMs: unknown): void {
+  /**
+   * The interface's heartbeat, with its worst frame delay since the last one and whether it
+   * stayed visible since then (preload.ts). A hidden interface has its timers slowed to once a
+   * minute, so a gap counts as `ui-stall` only between two visible beats while main also thinks
+   * the window is on screen.
+   */
+  uiBeat(frameLagMs: unknown, visible: unknown = false): void {
     const now = Date.now();
-    if (this.uiBeatAt > 0 && now - this.uiBeatAt > UI_STALL_GAP_MS && this.roles().uiVisible) {
-      this.event('ui-stall', { gapMs: now - this.uiBeatAt });
+    const shown = visible === true;
+    const since = this.uiBeatAt;
+    if (since > 0 && now - since > UI_STALL_GAP_MS && this.uiBeatVisible && shown && this.roles().uiVisible) {
+      this.stall('ui-stall', since, now);
     }
     this.uiBeatAt = now;
+    this.uiBeatVisible = shown;
     const lag = Number(frameLagMs);
     if (Number.isFinite(lag) && lag >= 0) this.uiLagMs = Math.max(this.uiLagMs, Math.min(600000, Math.round(lag)));
   }
 
   /** Something happened. The same event more often than every 2 s is counted, not written each time. */
   event(name: string, data: Record<string, unknown> = {}): void {
+    this.record(name, data, Date.now());
+  }
+
+  /** `event`, stamped with when it happened (a stall written after waiting for a `resume`). */
+  private record(name: string, data: Record<string, unknown>, at: number): void {
     if (!this.file) return;
     const now = Date.now();
     const last = this.lastEventAt.get(name) || 0;
@@ -121,15 +161,89 @@ export class HealthRecorder {
     this.lastEventAt.set(name, now);
     const repeats = this.suppressed.get(name) || 0;
     this.suppressed.delete(name);
-    this.write({ at: new Date(now).toISOString(), ev: name, ...(repeats ? { repeats } : {}), ...data });
+    this.write({ at: new Date(at).toISOString(), ev: name, ...(repeats ? { repeats } : {}), ...data });
+  }
+
+  /**
+   * Nothing from `since` to `now`. Measured from a wake (`resumed` set `since`), it is written at
+   * once with `afterResume: true`; otherwise it waits up to RESUME_GRACE_MS for a `resume` still
+   * on its way, which marks it the same: kept and marked rather than dropped, as Modern Standby
+   * may send no `suspend` and a real freeze can end in a sleep.
+   */
+  private stall(name: string, since: number, now: number): void {
+    const data = { gapMs: now - since };
+    if (this.resumeAt > 0 && this.resumeAt >= since) {
+      this.record(name, { ...data, afterResume: true }, now);
+      return;
+    }
+    this.pending.push({ name, at: now, data });
+    if (!this.graceTimer) this.graceTimer = setTimeout(() => this.settle(false), RESUME_GRACE_MS);
+  }
+
+  /** Writes the stalls waiting for a `resume`, marked if one came. */
+  private settle(afterResume: boolean): void {
+    if (this.graceTimer) clearTimeout(this.graceTimer);
+    this.graceTimer = null;
+    for (const stall of this.pending.splice(0)) {
+      this.record(stall.name, afterResume ? { ...stall.data, afterResume: true } : stall.data, stall.at);
+    }
+  }
+
+  /**
+   * The computer sleeping and waking, and the screen locked and unlocked, as events. Windows
+   * stops the whole app in standby, so without this the time asleep reads as a stall.
+   */
+  private watchPower(): () => void {
+    const onSuspend = () => {
+      this.suspendAt = Date.now();
+      this.event('suspend');
+    };
+    const onResume = () => this.resumed();
+    const onLock = () => this.event('lock-screen');
+    const onUnlock = () => this.event('unlock-screen');
+    try {
+      powerMonitor.on('suspend', onSuspend);
+      powerMonitor.on('resume', onResume);
+      powerMonitor.on('lock-screen', onLock);
+      powerMonitor.on('unlock-screen', onUnlock);
+    } catch {
+      return () => undefined;   // no power events rather than no log
+    }
+    return () => {
+      powerMonitor.removeListener('suspend', onSuspend);
+      powerMonitor.removeListener('resume', onResume);
+      powerMonitor.removeListener('lock-screen', onLock);
+      powerMonitor.removeListener('unlock-screen', onUnlock);
+    };
+  }
+
+  /**
+   * The computer woke. Every measure starts again from now (the samples, the delay probe, the
+   * heartbeat), so the time asleep is not a stall; the `resume` line says how long it was quiet.
+   * A stall already seen and waiting is this wake's: it is written with `afterResume: true`.
+   */
+  private resumed(): void {
+    const now = Date.now();
+    this.settle(true);
+    this.event('resume', {
+      sinceSampleMs: now - this.lastSampleAt,
+      ...(this.suspendAt ? { sleptMs: now - this.suspendAt } : {}),
+    });
+    this.suspendAt = 0;
+    this.resumeAt = now;
+    this.lastSampleAt = now;
+    this.lastProbeAt = now;
+    this.maxLagMs = 0;
+    if (this.uiBeatAt > 0) this.uiBeatAt = now;
+    this.uiLagMs = 0;
   }
 
   private sample(): void {
     try {
       const now = Date.now();
-      const gap = now - this.lastSampleAt;
+      const since = this.lastSampleAt;
       this.lastSampleAt = now;
-      if (gap > MAIN_STALL_GAP_MS) this.event('main-stall', { gapMs: gap });
+      if (now - since > MAIN_STALL_GAP_MS) this.stall('main-stall', since, now);
       const { uiPid, pagePid } = this.roles();
       const procs: Record<string, { mb: number; cpu: number; n?: number }> = {};
       for (const metric of app.getAppMetrics()) {

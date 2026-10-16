@@ -3229,7 +3229,8 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     console.log('GazeConnect Pro starting...');
 
-    // The health log first, so a slow start is recorded too (healthRecorder.ts).
+    // The health log first, so a slow start is recorded too (healthRecorder.ts). It also
+    // listens for the computer sleeping and waking, which needs the app ready.
     health.start();
 
     // 0. The embedded browser's own session: safety rules first, and a disk cache
@@ -3261,10 +3262,11 @@ app.on('child-process-gone', (_event, details) => {
   health.event('process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode });
 });
 
-// The interface's heartbeat for the health log, every 2 s with its worst frame delay.
-// Only the interface window may send it; web pages have no way to reach it at all.
-ipcMain.on('health:beat', (event, frameLagMs: unknown) => {
-  if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents) health.uiBeat(frameLagMs);
+// The interface's heartbeat for the health log, every 2 s with its worst frame delay and whether
+// it stayed visible since the last one (preload.ts). Only the interface window may send it; web
+// pages have no way to reach it at all.
+ipcMain.on('health:beat', (event, frameLagMs: unknown, visible: unknown) => {
+  if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents) health.uiBeat(frameLagMs, visible);
 });
 
 app.on('window-all-closed', () => {

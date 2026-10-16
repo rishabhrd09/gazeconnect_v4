@@ -28,6 +28,14 @@ function isValidChannel(channel: string): boolean {
   return (validEventChannels as readonly string[]).includes(channel);
 }
 
+// A covered window, a dark screen or a locked one hides the interface, and Chromium then runs its
+// timers as seldom as once a minute: a late heartbeat is not a stall if the interface was hidden at
+// any moment since the last one, even if it is visible again when the beat is sent.
+let hiddenSinceBeat = false;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') hiddenSinceBeat = true;
+});
+
 // ============================================
 // EXPOSED API
 // ============================================
@@ -61,9 +69,14 @@ const api = {
     rendererReady: () => ipcRenderer.invoke('app:renderer-ready'),
   },
 
-  // The interface's heartbeat for the health log (electron/healthRecorder.ts): one-way, a number only.
+  // The interface's heartbeat for the health log (electron/healthRecorder.ts): one-way, a number
+  // and whether the interface stayed visible since the last beat (read here, not by the caller).
   health: {
-    beat: (frameLagMs: number) => ipcRenderer.send('health:beat', Number(frameLagMs) || 0),
+    beat: (frameLagMs: number) => {
+      const visible = document.visibilityState === 'visible' && !hiddenSinceBeat;
+      hiddenSinceBeat = document.visibilityState !== 'visible';
+      ipcRenderer.send('health:beat', Number(frameLagMs) || 0, visible);
+    },
   },
 
   // Feature switches read once at start. GAZECONNECT_COMPASS_V2=0 returns the Compass map to the
