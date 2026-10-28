@@ -21,6 +21,7 @@ for _threads in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS'):
     os.environ.setdefault(_threads, '1')
 
 import io
+import re
 import sys
 import json
 import base64
@@ -30,6 +31,7 @@ import time
 import traceback
 import shutil
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -69,7 +71,30 @@ def _legacy():
 # ── App Setup ──────────────────────────────────────────────
 
 app = Flask(__name__)
-CORS(app, origins=[r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$"])
+LOOPBACK_ORIGIN = r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
+CORS(app, origins=[LOOPBACK_ORIGIN])
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def refuse_web_pages():
+    """Only the app answers here (28 Oct 2026). Flask-CORS decides only who may read an answer: a web page in
+    Chrome or Edge, or in the embedded browser, could still POST a render (get_json(force=True) reads a text/plain
+    body, which needs no preflight) and keep the laptop drawing, and a page on a DNS-rebound name could read the
+    answers too. Callers: the app's main process (electron/floorplanTransport.ts, Node's http to 127.0.0.1: no
+    Origin, no Sec-Fetch headers), the tests (Flask's test client, urllib) and, in development, the interface
+    served on localhost / 127.0.0.1 (floorplanApi.ts falls back to fetch when electronAPI.floorplan is missing)."""
+    if (urlsplit("//" + (request.host or "")).hostname or "") not in LOOPBACK_HOSTS:
+        return jsonify({"success": False, "error": "Not served to this host."}), 403
+    origin = request.headers.get("Origin")
+    if origin is not None:
+        if not re.match(LOOPBACK_ORIGIN, origin):
+            return jsonify({"success": False, "error": "Not served to web pages."}), 403
+    elif request.headers.get("Sec-Fetch-Site", "none") not in ("none", "same-origin", "same-site"):
+        return jsonify({"success": False, "error": "Not served to web pages."}), 403
+
+
+if hasattr(app, "before_request"):   # registered before _touch, so a refused request is not activity
+    app.before_request(refuse_web_pages)
 
 TEMP_DIR = Path(tempfile.gettempdir()) / "gazeconnect_floorplans"
 TEMP_DIR.mkdir(exist_ok=True)
