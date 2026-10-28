@@ -442,6 +442,33 @@ def watch_parent_process(parent_pid: int, on_gone) -> threading.Thread:
     return thread
 
 # ============================================
+# CONNECTION ORIGINS
+# ============================================
+
+def allowed_origins() -> List[Optional[str]]:
+    """The Origin headers the WebSocket accepts; any other is refused with HTTP 403.
+
+    Browsers apply no CORS to WebSockets, so without this list any web page open
+    in Chrome or Edge could connect to this port, speak, change screens and
+    settings, and read everything the backend broadcasts. What each real client
+    sends, measured 6 Oct 2026 (Electron 44, Chrome and Edge 154):
+      * the interface loaded from dist/index.html -- the installed app, and
+        start-dev.bat's default -- sends 'file://';
+      * the development server (start-dev.bat --hot, npm run dev) sends
+        'http://localhost:<port>' or 'http://127.0.0.1:<port>', the port the
+        launcher chose, read here exactly as `electron/main.ts` reads it;
+      * Python clients (python/tests/test_port_contract.py,
+        tools/gaze_live_observer.py) send no Origin at all.
+    'null' is never accepted: a local file opened in Chrome or Edge sends it, and
+    so can any website, from a sandboxed frame or a data: page.
+    """
+    try:
+        vite_port = int(os.environ.get('GAZECONNECT_VITE_PORT', '')) or 5173
+    except ValueError:
+        vite_port = 5173
+    return [None, 'file://', f'http://localhost:{vite_port}', f'http://127.0.0.1:{vite_port}']
+
+# ============================================
 # TOBII INTEGRATION (via TobiiHelper .NET)
 # ============================================
 
@@ -3523,7 +3550,9 @@ class GazeConnectBackend:
                 server = await websockets.serve(
                     self._websocket_handler,
                     self.config.websocket_host,
-                    actual_port
+                    actual_port,
+                    # The interface and local tools only: a web page gets HTTP 403.
+                    origins=allowed_origins(),
                 )
             except OSError as e:
                 # The port was taken between the check above and this bind.
