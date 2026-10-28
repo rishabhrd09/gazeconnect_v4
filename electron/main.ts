@@ -1209,7 +1209,7 @@ function startTobiiHelper(): void {
   if (isDev) {
     // Development: use the build output (built with -r win-x64)
     helperPath = path.join(__dirname, '..', 'tobii-helper', 'TobiiGazeHelper',
-      'bin', 'Release', 'net8.0-windows', 'win-x64', 'TobiiGazeHelper.exe');
+      'bin', 'Release', 'net10.0-windows', 'win-x64', 'TobiiGazeHelper.exe');
   } else {
     // Production: bundled in resources
     helperPath = path.join(process.resourcesPath, 'tobii-helper', 'TobiiGazeHelper.exe');

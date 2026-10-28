@@ -40,7 +40,7 @@ try {
             } finally { $env:PYTHONPATH = $previousPythonPath }
             if (-not $Simulate) {
                 Invoke-Checked $VenvPython @((Join-Path $ProjectRoot 'scripts\verify_windows_bundle.py'), 'source', '--root', $ProjectRoot)
-                Require-File (Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net8.0-windows\win-x64\TobiiGazeHelper.exe')
+                Require-File (Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net10.0-windows\win-x64\TobiiGazeHelper.exe')
             }
         }
         $ports = @(8765, 5050)

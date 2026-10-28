@@ -48,7 +48,7 @@ function Assert-BuildTools {
     # Match the current dependency floor; use a supported Node LTS for release work.
     Invoke-Checked 'node.exe' @((Join-Path $PSScriptRoot 'check_node.cjs'))
     $sdks = & dotnet.exe --list-sdks
-    if ($LASTEXITCODE -ne 0 -or -not ($sdks -match '^8\.')) { throw 'Install the .NET 8 SDK (latest serviced patch) for this helper target.' }
+    if ($LASTEXITCODE -ne 0 -or -not ($sdks -match '^10\.')) { throw 'Install the .NET 10 SDK (latest serviced patch) for this helper target.' }
 }
 function Assert-FreePorts([int[]]$Ports) {
     # Inspect listeners only. Never kill a process by name or by its port.
@@ -131,7 +131,7 @@ function Test-HelperUpToDate {
     # .NET build is incremental already, but starting it costs about five seconds
     # on every launch and the helper changes rarely. Touch a source file, or delete
     # its bin folder, to force a rebuild.
-    $exe = Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net8.0-windows\win-x64\TobiiGazeHelper.exe'
+    $exe = Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net10.0-windows\win-x64\TobiiGazeHelper.exe'
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { return $false }
     $built = (Get-Item -LiteralPath $exe).LastWriteTimeUtc
     $buildable = @('.cs', '.csproj', '.props', '.targets', '.dll', '.json')

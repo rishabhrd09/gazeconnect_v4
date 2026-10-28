@@ -6,7 +6,7 @@ AAC (Augmentative & Alternative Communication) app for ALS/MND patients using To
 ## Architecture
 - **Frontend**: Electron 44 + React 18 + TypeScript + Vite 5 (Node.js 22.12+ for development, Electron 44's floor)
 - **Backend**: Python 3.10+ (asyncio WebSocket server on port 8765)
-- **Eye Tracking**: .NET 8 x64 self-contained TobiiGazeHelper (TCP port 5555)
+- **Eye Tracking**: .NET 10 x64 self-contained TobiiGazeHelper (TCP port 5555)
 - **TTS**: offline Kokoro-82M v1.0 ONNX CPU, af_heart only (spawned Python worker; no system/browser voice fallback)
 
 ## Key Constraints
@@ -159,7 +159,7 @@ AAC (Augmentative & Alternative Communication) app for ALS/MND patients using To
 - `python/data/smart_bigrams.json` — Legacy engine: pre-computed 1,339 word-pair frequencies (36KB)
 - `python/ml/` — Legacy engine: CIFG-LSTM neural model (1.9MB ONNX) + inference + fusion
 - `electron/` — Electron main process + preload
-- `tobii-helper/` — .NET 8 eye tracker bridge (C#); reports the Tobii engine's own state (`status` lines) and recovers a stalled stream, see `tobii-helper/README.md`
+- `tobii-helper/` — .NET 10 eye tracker bridge (C#); reports the Tobii engine's own state (`status` lines) and recovers a stalled stream, see `tobii-helper/README.md`
 
 ## Word Prediction System (v4, deterministic)
 - **Default engine**: `python/services/deterministic_prediction/`, a port of the GazeCompass deterministic predictor (pinned `de33a95`, stage-level parity with 0 mismatches). No network, LLM, neural model, randomness or clock: the same draft, learned state and slot lineage always give the same slots. Details: `docs/deterministic-prediction/README.md`

@@ -74,7 +74,7 @@ try {
                 Invoke-Checked 'dotnet.exe' @('build', $TobiiProject, '-c', 'Release', '-r', 'win-x64', '--nologo')
             }
         }
-        Require-File (Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net8.0-windows\win-x64\TobiiGazeHelper.exe')
+        Require-File (Join-Path $ProjectRoot 'tobii-helper\TobiiGazeHelper\bin\Release\net10.0-windows\win-x64\TobiiGazeHelper.exe')
     }
     $env:GAZE_SIMULATE = if ($Simulate) { '1' } else { '0' }
     if (-not $env:GAZE_DEBUG) { $env:GAZE_DEBUG = '0' }

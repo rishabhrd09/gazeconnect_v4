@@ -8,7 +8,7 @@ GazeConnect is a communication aid, not a dependable emergency notification syst
 
 Target: **Windows 10 / 11, x64**. Hardware tracking has been used successfully on the maintainer's Windows 10 laptop. Each new release still needs validation on Windows with the tracker connected; a browser preview or macOS build cannot validate the drivers or installer.
 
-For development, install Git, Node.js x64 (22.12 or newer, which Electron 44 requires; Node 22 is the validation baseline), Python x64 (3.12 is the validation baseline; minimum 3.10), and the latest serviced .NET 8 SDK used by the current bridge. For hardware use, install Tobii Experience and calibrate the tracker there first.
+For development, install Git, Node.js x64 (22.12 or newer, which Electron 44 requires; Node 22 is the validation baseline), Python x64 (3.12 is the validation baseline; minimum 3.10), and the latest serviced .NET 10 SDK used by the current bridge. For hardware use, install Tobii Experience and calibrate the tracker there first.
 
 ```powershell
 git clone https://github.com/rishabhrd09/gazeconnect_v4.git
@@ -79,7 +79,7 @@ Floor-plan service   → generated plans (started lazily on port 5050)
 | Personalization | `src/services/CustomizationService.ts` | Phrases, people, boards, persisted settings |
 | Floor plans | `tools/` | Survey/map processing and plan generation |
 
-The current stack is Electron 28, React 18, TypeScript, Vite 5, Python and .NET 8. The active bridge uses the Tobii **Interaction Library**; the presence of Stream Engine interop files does not mean that path is active. Gaze processing combines signal conditioning, calibration/mapping, filtering and target selection. Changing one stage requires measuring the whole chain, including unintended activations and response time.
+The current stack is Electron 28, React 18, TypeScript, Vite 5, Python and .NET 10. The active bridge uses the Tobii **Interaction Library**; the presence of Stream Engine interop files does not mean that path is active. Gaze processing combines signal conditioning, calibration/mapping, filtering and target selection. Changing one stage requires measuring the whole chain, including unintended activations and response time.
 
 Local word prediction combines n-grams, smart bigrams, personalization and optional ONNX neural reranking. Prediction guardrails apply across output paths. Datamuse enrichment is off by default. See [prediction architecture](docs/word-prediction-system-complete-guide.md), and `python/services/word_prediction.py` for the current implementation.
 

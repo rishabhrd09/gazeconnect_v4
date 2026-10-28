@@ -113,7 +113,7 @@ def verify_stage(root: Path, packaged: bool = False) -> dict[str, str]:
     runtime = json.loads(require_file(helper / "TobiiGazeHelper.runtimeconfig.json").read_text(encoding="utf-8-sig"))["runtimeOptions"]
     if runtime.get("framework") or runtime.get("frameworks") or not runtime.get("includedFrameworks"):
         raise ValueError("Tobii helper is framework-dependent; self-contained runtime is mandatory")
-    if runtime.get("tfm") != "net8.0":
+    if runtime.get("tfm") != "net10.0":
         raise ValueError("Unexpected helper runtime target; review target/support policy before release")
     verify_assets(python / "backend/_internal")
     for name in ("backend", "floorplan"):

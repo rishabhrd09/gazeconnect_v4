@@ -60,7 +60,7 @@ class BundleValidationTests(unittest.TestCase):
         for name in ("coreclr.dll", "hostpolicy.dll"):
             pe(self.helper / name)
         self.config = self.helper / "TobiiGazeHelper.runtimeconfig.json"
-        self.config.write_text(json.dumps({"runtimeOptions": {"tfm": "net8.0", "includedFrameworks": [{"name": "Microsoft.NETCore.App", "version": "8.0.0"}]}}))
+        self.config.write_text(json.dumps({"runtimeOptions": {"tfm": "net10.0", "includedFrameworks": [{"name": "Microsoft.NETCore.App", "version": "10.0.0"}]}}))
         for name, exe in (("backend", "GazeConnectBackend"), ("floorplan", "GazeConnectFloorplan")):
             root = self.root / "python-dist" / name
             pe(root / (exe + ".exe"))
@@ -98,7 +98,7 @@ class BundleValidationTests(unittest.TestCase):
 
     def test_framework_dependent_stage_rejected(self):
         self.stage()
-        self.config.write_text(json.dumps({"runtimeOptions": {"tfm": "net8.0", "framework": {"name": "Microsoft.NETCore.App", "version": "8.0.0"}}}))
+        self.config.write_text(json.dumps({"runtimeOptions": {"tfm": "net10.0", "framework": {"name": "Microsoft.NETCore.App", "version": "10.0.0"}}}))
         with self.assertRaisesRegex(ValueError, "framework-dependent"):
             bundle.verify_stage(self.root)
 

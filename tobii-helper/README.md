@@ -2,7 +2,7 @@
 
 A Windows x64 bridge from the legacy Tobii.Interaction SDK to GazeConnect's Python backend over loopback TCP port 5555. It receives SDK callbacks at the rate delivered by the hardware/driver; the application must not assume every tracker always delivers a fixed sample rate.
 
-The project targets **.NET 8**, publishes its own runtime and deliberately disables trimming and single-file publishing for compatibility with vendor reflection/native loading. Microsoft's .NET 8 support ends on **10 November 2026**; a supported successor and hardware verification are required before shipping beyond that date. The change from .NET 6 still needs a native Windows build and Tobii smoke test.
+The project targets **.NET 10** (LTS, supported by Microsoft until **14 November 2028**), publishes its own runtime and deliberately disables trimming and single-file publishing for compatibility with vendor reflection/native loading. The Tobii.Interaction assemblies are .NET Framework 4.8 builds. On .NET 10 (28 Oct 2026, runtime 10.0.14) they load, the `Host` connects to the Tobii engine and reports the tracker's state, and the status messages on port 5555 have the same fields, order and number formatting as the .NET 8 build's. The live-tracker checks that .NET 8 passed on 20 Sep 2026 (sample rate, six-point alignment, unplug and reconnect) and a long run still have to be done on .NET 10 before shipping; .NET 8 support ends on **10 November 2026**.
 
 ## Local build inputs
 
@@ -32,7 +32,7 @@ dotnet build tobii-helper\TobiiGazeHelper\TobiiGazeHelper.csproj -c Release -r w
 dotnet publish tobii-helper\TobiiGazeHelper\TobiiGazeHelper.csproj -c Release -r win-x64 --self-contained true -o tobii-dist
 ```
 
-Development output: `TobiiGazeHelper/bin/Release/net8.0-windows/win-x64/TobiiGazeHelper.exe`.
+Development output: `TobiiGazeHelper/bin/Release/net10.0-windows/win-x64/TobiiGazeHelper.exe`.
 
 Use `build-installer.bat` for a complete installer candidate, including Python and frontend assets. End users of a validated installer should not need Node, Python or a separately installed .NET runtime. They still need the compatible Tobii device driver/Experience installation and successful display setup/calibration. A development machine's successful build does not verify those clean-machine requirements.
 

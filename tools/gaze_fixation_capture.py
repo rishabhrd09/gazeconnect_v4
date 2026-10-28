@@ -35,7 +35,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = (ROOT / 'tobii-helper' / 'TobiiGazeHelper' / 'bin' / 'Release' /
-          'net8.0-windows' / 'win-x64' / 'TobiiGazeHelper.exe')
+          'net10.0-windows' / 'win-x64' / 'TobiiGazeHelper.exe')
 REPORTS = ROOT / 'tools' / 'reports'
 HELPER_PORT = 5555
 MAX_ROWS = 40000          # ~20 minutes at 33 Hz; the run is far shorter.
