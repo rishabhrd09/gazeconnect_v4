@@ -10,10 +10,17 @@ import re
 import time
 import logging
 import xml.etree.ElementTree as ET
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from datetime import datetime, timezone
 
+from .html_scan import TAG, image_sources
+
 logger = logging.getLogger('GazeConnect.News')
+
+# A feed is 15-50 KB (measured 28 Oct 2026); more is cut, and the cut feed is not parsed.
+MAX_FEED_BYTES = 2_000_000
+# Only an item's first characters are shown (200), so only these are scanned for markup.
+MAX_DESCRIPTION_CHARS = 20_000
 
 # ─── RSS Feed Sources ─────────────────────────────────────
 RSS_FEEDS = {
@@ -135,7 +142,7 @@ class NewsService:
         all_items = []
 
         try:
-            import aiohttp
+            from .safe_fetch import fetch as fetch_public, public_session
         except ImportError:
             logger.warning("aiohttp not installed — news unavailable. Run: pip install aiohttp")
             return []
@@ -143,22 +150,23 @@ class NewsService:
         async def _fetch_one_feed(session, feed_info):
             items = []
             try:
-                async with session.get(feed_info['url']) as resp:
-                    if resp.status == 200:
-                        xml_text = await resp.text()
-                        items = self._parse_rss(xml_text, feed_info['name'], feed_info.get('positive_filter', False))
-                        logger.info(f"Fetched {len(items)} items from {feed_info['name']}")
-                    else:
-                        logger.warning(f"{feed_info['name']} returned status {resp.status}")
+                # Public internet addresses only, each redirect checked, at most MAX_FEED_BYTES.
+                feed = await fetch_public(session, feed_info['url'], MAX_FEED_BYTES)
+                if feed.status == 200 and feed.truncated:
+                    logger.warning(f"{feed_info['name']} sent more than {MAX_FEED_BYTES} bytes; not read")
+                elif feed.status == 200:
+                    # Off the event loop; the XML is given as bytes so its own encoding declaration is used.
+                    items = await asyncio.to_thread(
+                        self._parse_rss, feed.body, feed_info['name'], feed_info.get('positive_filter', False))
+                    logger.info(f"Fetched {len(items)} items from {feed_info['name']}")
+                else:
+                    logger.warning(f"{feed_info['name']} returned status {feed.status}")
             except Exception as e:
                 logger.warning(f"Failed to fetch {feed_info['name']}: {e}")
             return items
 
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=8),
-                headers={'User-Agent': 'GazeConnect/1.0'}
-            ) as session:
+            async with public_session(8, headers={'User-Agent': 'GazeConnect/1.0'}) as session:
                 tasks = [_fetch_one_feed(session, feed) for feed in feeds]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 for res in results:
@@ -197,7 +205,7 @@ class NewsService:
 
         return filtered
 
-    def _parse_rss(self, xml_text: str, source_name: str, positive_filter: bool = False) -> List[Dict]:
+    def _parse_rss(self, xml_text: Union[bytes, str], source_name: str, positive_filter: bool = False) -> List[Dict]:
         """Parse RSS XML into structured items."""
         items = []
         try:
@@ -213,7 +221,7 @@ class NewsService:
                     if not title.strip():
                         continue
 
-                    description = self._get_text(item_el, 'description') or ''
+                    description = (self._get_text(item_el, 'description') or '')[:MAX_DESCRIPTION_CHARS]
                     link = self._get_text(item_el, 'link') or ''
                     pub_date = self._get_text(item_el, 'pubDate') or ''
 
@@ -226,11 +234,9 @@ class NewsService:
                         if media is not None:
                             image_url = media.get('url')
                     if not image_url:
-                        img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', description)
-                        if img_match:
-                            image_url = img_match.group(1)
+                        image_url = next(image_sources(description), None)
 
-                    clean_desc = re.sub(r'<[^>]+>', '', description)[:200].strip()
+                    clean_desc = TAG.sub('', description)[:200].strip()
 
                     items.append({
                         'title': title.strip(),

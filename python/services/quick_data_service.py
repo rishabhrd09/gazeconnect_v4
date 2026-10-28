@@ -6,6 +6,7 @@ AAC-friendly pre-render data cards for weather, cricket, and market data.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from typing import Dict, Optional
@@ -13,10 +14,13 @@ from typing import Dict, Optional
 logger = logging.getLogger('GazeConnect.QuickData')
 
 try:
-    import aiohttp
+    from .safe_fetch import fetch as fetch_public, public_session
     AIOHTTP_AVAILABLE = True
 except ImportError:
     AIOHTTP_AVAILABLE = False
+
+# The largest card's answer is 38 KB (weather, measured 28 Oct 2026); more is cut, and a cut answer is not used.
+MAX_SNAPSHOT_BYTES = 2_000_000
 
 
 class QuickDataService:
@@ -39,10 +43,8 @@ class QuickDataService:
             return self._cache or self._empty_snapshot(cached=False)
 
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10),
-                headers={'User-Agent': 'GazeConnect/1.0 (QuickData)'}
-            ) as session:
+            # Public internet addresses only, each redirect checked, at most MAX_SNAPSHOT_BYTES per answer.
+            async with public_session(10, headers={'User-Agent': 'GazeConnect/1.0 (QuickData)'}) as session:
                 weather_task = self._fetch_weather(session)
                 cricket_task = self._fetch_cricket(session)
                 gold_task = self._fetch_yahoo_quote(session, 'GC=F', label='Gold Futures')
@@ -106,10 +108,10 @@ class QuickDataService:
     async def _fetch_weather(self, session) -> Dict:
         try:
             url = f"https://wttr.in/{self._city}?format=j1"
-            async with session.get(url) as response:
-                if response.status != 200:
-                    return {'ok': False, 'message': f'Weather status {response.status}'}
-                payload = await response.json(content_type=None)
+            answer = await fetch_public(session, url, MAX_SNAPSHOT_BYTES)
+            if answer.status != 200 or answer.truncated:
+                return {'ok': False, 'message': f'Weather status {answer.status}'}
+            payload = json.loads(answer.body)
 
             current = (payload.get('current_condition') or [{}])[0]
             return {
@@ -128,10 +130,10 @@ class QuickDataService:
     async def _fetch_cricket(self, session) -> Dict:
         try:
             url = "https://site.api.espn.com/apis/site/v2/sports/cricket/scoreboard"
-            async with session.get(url) as response:
-                if response.status != 200:
-                    return {'ok': False, 'message': f'Cricket status {response.status}'}
-                payload = await response.json(content_type=None)
+            answer = await fetch_public(session, url, MAX_SNAPSHOT_BYTES)
+            if answer.status != 200 or answer.truncated:
+                return {'ok': False, 'message': f'Cricket status {answer.status}'}
+            payload = json.loads(answer.body)
 
             events = payload.get('events') or []
             if not events:
@@ -178,10 +180,10 @@ class QuickDataService:
     async def _fetch_yahoo_quote(self, session, symbol: str, label: str) -> Dict:
         try:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
-            async with session.get(url) as response:
-                if response.status != 200:
-                    return {'ok': False, 'message': f'{label} status {response.status}'}
-                payload = await response.json(content_type=None)
+            answer = await fetch_public(session, url, MAX_SNAPSHOT_BYTES)
+            if answer.status != 200 or answer.truncated:
+                return {'ok': False, 'message': f'{label} status {answer.status}'}
+            payload = json.loads(answer.body)
 
             result = ((payload.get('chart') or {}).get('result') or [None])[0]
             if not result:

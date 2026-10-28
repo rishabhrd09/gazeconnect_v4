@@ -5,6 +5,7 @@ Fetches a web page asynchronously and extracts readable text for AAC-friendly re
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -12,13 +13,20 @@ from html import unescape
 from typing import Dict, Optional
 from urllib.parse import urlparse
 
+from .html_scan import TAG, first_block, image_sources, meta_content, strip_blocks
+
 logger = logging.getLogger('GazeConnect.Article')
 
 try:
-    import aiohttp
+    from .safe_fetch import fetch as fetch_public, public_session
     AIOHTTP_AVAILABLE = True
 except ImportError:
     AIOHTTP_AVAILABLE = False
+
+# A news article's page is 50-700 KB (measured 28 Oct 2026); more is cut, not refused.
+MAX_ARTICLE_BYTES = 2_000_000
+ARTICLE_TYPES = ('text/html', 'application/xhtml+xml', 'text/plain')
+MAX_CACHED_ARTICLES = 50
 
 
 class ArticleService:
@@ -54,20 +62,19 @@ class ArticleService:
             return self._cached_or_empty(url, cached_entry)
 
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=12),
-                headers={'User-Agent': 'GazeConnect/1.0 (ReaderView)'}
-            ) as session:
-                async with session.get(url, allow_redirects=True) as response:
-                    if response.status != 200:
-                        logger.warning("Article fetch status %s for %s", response.status, url)
-                        return self._cached_or_empty(url, cached_entry)
-                    html = await response.text(errors='ignore')
-        except Exception as exc:
+            # Public internet addresses only, each redirect checked, the page cut at MAX_ARTICLE_BYTES.
+            async with public_session(12, headers={'User-Agent': 'GazeConnect/1.0 (ReaderView)'}) as session:
+                page = await fetch_public(session, url, MAX_ARTICLE_BYTES, content_types=ARTICLE_TYPES)
+            if page.status != 200 or not page.body:
+                logger.warning("Article fetch status %s for %s", page.status, url)
+                return self._cached_or_empty(url, cached_entry)
+            html = page.body.decode(page.charset or 'utf-8', errors='ignore')
+        except Exception as exc:  # refused address, network error, unknown charset
             logger.warning("Article fetch failed for %s: %s", url, exc)
             return self._cached_or_empty(url, cached_entry)
 
-        article = self._extract_article(url, html)
+        # Off the event loop: the gaze stream keeps its pace while a large page is read.
+        article = await asyncio.to_thread(self._extract_article, url, html)
         if not article.get('text'):
             return self._cached_or_empty(url, cached_entry)
 
@@ -75,6 +82,8 @@ class ArticleService:
             'article': article,
             'fetched_at': time.time(),
         }
+        while len(self._cache) > MAX_CACHED_ARTICLES:  # the oldest first; the backend runs for weeks
+            self._cache.pop(next(iter(self._cache)))
         return {**article, 'cached': False}
 
     def _cached_or_empty(self, url: str, cached_entry: Optional[Dict]) -> Dict:
@@ -119,39 +128,31 @@ class ArticleService:
             'fallback': False,
         }
 
+    # Pages come from the internet and may be malformed on purpose, so every scan
+    # below takes time proportional to the page's size (services/html_scan.py).
     def _extract_title(self, html: str) -> str:
-        meta_patterns = [
-            r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\']',
-            r'<meta[^>]+name=["\']twitter:title["\'][^>]+content=["\'](.*?)["\']',
-        ]
-        for pattern in meta_patterns:
-            match = re.search(pattern, html, flags=re.IGNORECASE | re.DOTALL)
-            if match:
-                return unescape(match.group(1)).strip()
+        lower = html.lower()
+        for attr, value in (('property', 'og:title'), ('name', 'twitter:title')):
+            content = meta_content(html, attr, value, lower)
+            if content:
+                return unescape(content).strip()
 
-        title_match = re.search(r'<title[^>]*>(.*?)</title>', html, flags=re.IGNORECASE | re.DOTALL)
-        if title_match:
-            raw = unescape(title_match.group(1)).strip()
+        title = first_block(html, 'title', lower)
+        if title is not None:
+            raw = unescape(title).strip()
             return re.sub(r'\s+', ' ', raw)
         return ''
 
     def _pick_content_block(self, html: str) -> str:
-        cleaned = re.sub(r'(?is)<script[^>]*>.*?</script>', ' ', html)
-        cleaned = re.sub(r'(?is)<style[^>]*>.*?</style>', ' ', cleaned)
-        cleaned = re.sub(r'(?is)<noscript[^>]*>.*?</noscript>', ' ', cleaned)
-        cleaned = re.sub(r'(?is)<svg[^>]*>.*?</svg>', ' ', cleaned)
+        cleaned = html
+        for name in ('script', 'style', 'noscript', 'svg'):
+            cleaned = strip_blocks(cleaned, name)
 
-        article_match = re.search(r'(?is)<article[^>]*>(.*?)</article>', cleaned)
-        if article_match:
-            return article_match.group(1)
-
-        main_match = re.search(r'(?is)<main[^>]*>(.*?)</main>', cleaned)
-        if main_match:
-            return main_match.group(1)
-
-        body_match = re.search(r'(?is)<body[^>]*>(.*?)</body>', cleaned)
-        if body_match:
-            return body_match.group(1)
+        lower = cleaned.lower()
+        for name in ('article', 'main', 'body'):
+            block = first_block(cleaned, name, lower)
+            if block is not None:
+                return block
         return cleaned
 
     def _to_readable_text(self, block_html: str) -> str:
@@ -161,7 +162,7 @@ class ArticleService:
             '\n',
             normalized,
         )
-        normalized = re.sub(r'(?is)<[^>]+>', ' ', normalized)
+        normalized = TAG.sub(' ', normalized)
         normalized = unescape(normalized)
         normalized = normalized.replace('\r', '\n')
         normalized = re.sub(r'[ \t]+', ' ', normalized)
@@ -179,9 +180,8 @@ class ArticleService:
         return text
 
     def _extract_images(self, block_html: str, base_url: str) -> list:
-        matches = re.findall(r'(?is)<img[^>]+src=["\']([^"\']+)["\']', block_html)
         images = []
-        for src in matches:
+        for src in image_sources(block_html):
             if not src:
                 continue
             if src.startswith('//'):
