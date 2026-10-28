@@ -11,7 +11,7 @@ Install the following before cloning:
 | Tool | Version | Purpose | Install |
 |------|---------|---------|---------|
 | **Node.js** | 18+ | Electron + React frontend | https://nodejs.org |
-| **Python** | 3.10+ | Backend server | https://python.org (check "Add to PATH") |
+| **Python** | 3.13 x64 (3.12 accepted) | Backend server | https://python.org (3.13.17, the last 3.13 Windows installer; PATH is not needed, setup uses the `py` launcher) |
 | **Git** | Latest | Version control | https://git-scm.com |
 | **.NET 6.0 SDK** | 6.0+ | Tobii eye tracker bridge | https://dotnet.microsoft.com/download/dotnet/6.0 |
 | **Tobii Experience** | Latest | Eye tracker drivers | https://gaming.tobii.com/getstarted |
@@ -30,7 +30,7 @@ cd gazeconnect_v4
 
 `setup.bat` performs the following:
 1. Installs Node.js packages exactly as `package-lock.json` (`npm ci --ignore-scripts`: no package install scripts run), skipped when `node_modules` already matches it, then downloads Electron's program and checks it against the locked checksums, so the first launch never downloads anything
-2. Creates the Python virtual environment (`python/.venv/`) from Python 3.12 x64, found through the `py` launcher rather than PATH order, and rebuilds one that is broken or made with an unsupported Python
+2. Creates the Python virtual environment (`python/.venv/`) from Python 3.13 x64 (then 3.12), found through the `py` launcher rather than PATH order, and rebuilds one that is broken, made with an unsupported Python, or made with 3.12 once 3.13 is installed
 3. Installs Python dependencies from `requirements.txt` at the versions pinned in `python/constraints.txt`, then checks them (`pip check`, imports)
 4. Verifies the Tobii DLLs in `tobii-helper/TobiiGazeHelper/lib/` and builds the .NET TobiiGazeHelper project (skipped with `--simulate`)
 
@@ -269,9 +269,9 @@ The protected-file diff should be empty unless the task explicitly targeted one 
 
 ## Troubleshooting
 
-### "Python 3.10+ x64 was not found" or "pip failed"
+### "Python 3.12 or 3.13 x64 was not found" or "pip failed"
 
-- Install Python 3.12 x64 from python.org with its "py launcher" option, or run `.\setup.bat -Python C:\path\to\python.exe`
+- Install Python 3.13 x64 from python.org with its "py launcher" option, or run `.\setup.bat -Python C:\path\to\python.exe`
 - Re-run `setup.bat`
 
 ### "Setup is needed" when launching

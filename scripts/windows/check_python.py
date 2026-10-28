@@ -6,7 +6,10 @@ import platform
 import struct
 import sys
 
-MINIMUM = (3, 10)
+# 3.13 is the validation baseline (scripts/windows/Common.ps1). The pinned numpy 2.5 needs 3.12 or
+# newer, and kokoro-onnx 0.6.1 declares Requires-Python <3.14.
+MINIMUM = (3, 12)
+BELOW = (3, 14)
 
 
 def describe():
@@ -21,7 +24,7 @@ def describe():
         'base_executable': getattr(sys, '_base_executable', sys.executable),
         'in_venv': sys.prefix != sys.base_prefix,
     }
-    info['supported'] = (sys.version_info[:2] >= MINIMUM and info['bits'] == 64
+    info['supported'] = (MINIMUM <= sys.version_info[:2] < BELOW and info['bits'] == 64
                          and info['machine'].lower() in ('amd64', 'x86_64'))
     return info
 
@@ -39,7 +42,7 @@ def main():
         return
     if not info['supported']:
         raise RuntimeError(
-            f"Python 3.10+ x64 is required (Python 3.12 x64 is the validation baseline), but "
+            f"Python 3.12 or 3.13 x64 is required (Python 3.13 x64 is the validation baseline), but "
             f"{info['executable']} is Python {info['python']} ({info['bits']}-bit, {info['machine']}).")
     if args.pyinstaller:
         import PyInstaller

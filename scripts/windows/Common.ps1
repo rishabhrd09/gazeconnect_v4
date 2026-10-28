@@ -8,7 +8,7 @@ $script:PackageLock = Join-Path $ProjectRoot 'package-lock.json'
 $script:PythonRequirements = Join-Path $ProjectRoot 'requirements.txt'
 # Exact package versions validated with $PythonBaseline x64; see the file's header.
 $script:PythonConstraints = Join-Path $ProjectRoot 'python\constraints.txt'
-$script:PythonBaseline = '3.12'
+$script:PythonBaseline = '3.13'
 # Installed beside the requirements: the installer build needs it, the app does not.
 $script:PyInstallerSpec = 'pyinstaller>=6,<7'
 # Written by setup only after a complete, verified install, and read by the launchers instead of
@@ -256,8 +256,9 @@ function Get-PythonProbe {
 function Find-BasePython {
     # The interpreter python\.venv is made from. PATH order alone is not trusted: on the
     # maintainer's machine an older Python 3.9 comes first there. Order: -Python or
-    # GAZECONNECT_PYTHON when given (then nothing else), the validated 3.12 through the py
-    # launcher, the other supported versions, then each python.exe on PATH.
+    # GAZECONNECT_PYTHON when given (then nothing else), the validated 3.13 through the py
+    # launcher, then 3.12, then each python.exe on PATH. 3.10 and 3.11 are no longer accepted
+    # (3.10 ended in Oct 2026; the pinned numpy 2.5 needs 3.12), nor 3.14 (kokoro-onnx 0.6.1).
     param([string]$Requested)
     # A virtual environment's interpreter (an activated venv on PATH, python\.venv itself) is
     # replaced by the Python it was made from: a rebuild would otherwise delete what it runs.
@@ -269,14 +270,14 @@ function Find-BasePython {
     if ($Requested) {
         $probe = $null
         if (Test-Path -LiteralPath $Requested -PathType Leaf) { $probe = Resolve-Base (Get-PythonProbe $Requested) }
-        if (-not $probe -or -not $probe.supported) { throw "The requested Python '$Requested' did not run as Python 3.10+ x64." }
+        if (-not $probe -or -not $probe.supported) { throw "The requested Python '$Requested' did not run as Python 3.12 or 3.13 x64." }
         return $probe
     }
     # A probe must never install anything (the py launcher can offer winget or the Store).
     Remove-Item Env:PYLAUNCHER_ALLOW_INSTALL -ErrorAction SilentlyContinue
     $rejected = @{}
     if (Get-Command 'py.exe' -ErrorAction SilentlyContinue) {
-        foreach ($tag in @('-3.12-64', '-3.11-64', '-3.10-64', '-3.13-64', '-3-64')) {
+        foreach ($tag in @('-3.13-64', '-3.12-64')) {
             $probe = Resolve-Base (Get-PythonProbe 'py.exe' @($tag))
             if ($probe -and $probe.supported) { return $probe }
             if ($probe) { $rejected[[string]$probe.executable] = $probe }
@@ -291,7 +292,7 @@ function Find-BasePython {
     if ($rejected.Count -gt 0) {
         $found = ' Found only: ' + (($rejected.Values | ForEach-Object { "Python $($_.python) ($($_.bits)-bit) at $($_.executable)" }) -join '; ') + '.'
     }
-    throw ("Python 3.10+ x64 was not found.$found Install Python $PythonBaseline x64 from python.org (keep its " +
+    throw ("Python 3.12 or 3.13 x64 was not found.$found Install Python $PythonBaseline x64 from python.org (keep its " +
         "'py launcher' option), or pass -Python <path to python.exe>, then run setup.bat again.")
 }
 
@@ -304,7 +305,7 @@ function Get-VenvProblem {
     }
     $probe = Get-PythonProbe $VenvPython
     if (-not $probe) { return 'cannot start (the Python it was made from was probably uninstalled or moved)' }
-    if (-not $probe.supported) { return "was made with Python $($probe.python) ($($probe.bits)-bit); 3.10+ x64 is required" }
+    if (-not $probe.supported) { return "was made with Python $($probe.python) ($($probe.bits)-bit); 3.12 or 3.13 x64 is required" }
     return $null
 }
 

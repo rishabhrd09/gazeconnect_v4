@@ -12,6 +12,8 @@ from pathlib import Path  # noqa: E402
 
 
 def self_test():
+    import platform
+    import ssl
     import aiohttp
     import comtypes
     import pyautogui
@@ -26,7 +28,10 @@ def self_test():
     model = NeuralPredictor()
     if not model.load():
         raise RuntimeError("Bundled neural model failed to load")
-    print(json.dumps({"self_test": "passed", "neural_model": "loaded", "assets": "present",
+    # The news and article readers need the bundled OpenSSL; loading Windows' certificates proves it, offline.
+    ssl.create_default_context()
+    print(json.dumps({"self_test": "passed", "python": platform.python_version(), "openssl": ssl.OPENSSL_VERSION,
+                      "neural_model": "loaded", "assets": "present",
                       "deterministic_prediction": deterministic_self_test(), "local_voice": voice_self_test()}))
 
 

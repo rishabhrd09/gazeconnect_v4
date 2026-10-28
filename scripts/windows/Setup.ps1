@@ -18,6 +18,16 @@ try {
     # Decide about python\.venv before the long npm step, so a missing Python fails in seconds.
     $venvProblem = Get-VenvProblem
     if ($Force -and -not $venvProblem) { $venvProblem = 'is rebuilt from scratch (--force)' }
+    if (-not $venvProblem -and -not $Python -and -not $env:GAZECONNECT_PYTHON) {
+        # A working venv on the other supported Python is kept only until the validated one is installed.
+        $current = Get-PythonProbe $VenvPython
+        if ($current -and ('{0}.{1}' -f $current.version[0], $current.version[1]) -ne $PythonBaseline) {
+            $validated = Get-PythonProbe 'py.exe' @("-$PythonBaseline-64")
+            if ($validated -and $validated.supported) {
+                $venvProblem = "was made with Python $($current.python) and is rebuilt with the validated Python $($validated.python)"
+            }
+        }
+    }
     $base = $null
     if ($venvProblem) { $base = Find-BasePython $Python }
 
@@ -45,9 +55,10 @@ try {
         Invoke-Checked $base.executable @('-m', 'venv', $VenvDir)
     }
     $venv = Get-PythonProbe $VenvPython
-    if (-not $venv -or -not $venv.supported) { throw 'python\.venv does not run as Python 3.10+ x64 after creation.' }
+    if (-not $venv -or -not $venv.supported) { throw 'python\.venv does not run as Python 3.12 or 3.13 x64 after creation.' }
+    # pip is named so that its pin in the constraints applies too (the venv starts with the bundled one).
     $pipInstall = @('-m', 'pip', 'install', '--disable-pip-version-check', '--require-virtualenv', '--no-input',
-        '-r', $PythonRequirements, $PyInstallerSpec)
+        '-r', $PythonRequirements, $PyInstallerSpec, 'pip')
     if (('{0}.{1}' -f $venv.version[0], $venv.version[1]) -eq $PythonBaseline) {
         $pipInstall += @('-c', $PythonConstraints)
         Write-Host "  Python $($venv.python): installing the validated versions pinned in python\constraints.txt."

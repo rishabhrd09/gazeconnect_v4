@@ -25,7 +25,7 @@ The final installer contains everything. Users do not need to install Python, No
 |------|---------|-------------|
 | Windows 10/11 | x64 | - |
 | Node.js | 18+ | `node --version` |
-| Python | 3.10+ | `python --version` |
+| Python | 3.13 x64 (3.12 accepted) | `py -0p` |
 | .NET 6.0 SDK | 6.0+ | `dotnet --version` |
 | Project setup complete | - | `.\setup.bat` has been run |
 
@@ -235,11 +235,11 @@ electron-builder requires an icon file at `build/icon.ico`.
 
 **Fix**: Run `python create_icon.py` to generate a placeholder icon.
 
-### "Python 3.10+ x64 was not found" or "pip failed"
+### "Python 3.12 or 3.13 x64 was not found" or "pip failed"
 
-`setup.bat` looks for Python 3.12 x64 through the `py` launcher first, so an older `python` earlier on PATH is skipped rather than used. The message lists the interpreters it found and rejected.
+`setup.bat` looks for Python 3.13 x64, then 3.12, through the `py` launcher first, so an older `python` earlier on PATH is skipped rather than used. 3.10, 3.11 and 3.14 are refused (kokoro-onnx 0.6.1 does not install on 3.14). The message lists the interpreters it found and rejected.
 
-**Fix**: Install Python 3.12 x64 from python.org (keep the "py launcher" option), or run `.\setup.bat -Python C:\path\to\python.exe`. Re-run `setup.bat`; it rebuilds a `python\.venv` that was made with an unsupported Python.
+**Fix**: Install Python 3.13 x64 from python.org (3.13.17 is the last release with a Windows installer; keep the "py launcher" option), or run `.\setup.bat -Python C:\path\to\python.exe`. Re-run `setup.bat`; it rebuilds a `python\.venv` that was made with an unsupported Python.
 
 ### ". was unexpected at this time"
 

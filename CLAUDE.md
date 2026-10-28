@@ -5,7 +5,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 
 ## Architecture
 - **Frontend**: Electron 44 + React 18 + TypeScript + Vite 5 (Node.js 22.12+ for development)
-- **Backend**: Python 3.10+ (asyncio WebSocket server on port 8765)
+- **Backend**: Python 3.13 x64 (3.12 accepted; asyncio WebSocket server on port 8765)
 - **Eye Tracking**: .NET 10 x64 self-contained TobiiGazeHelper (TCP port 5555)
 - **TTS**: pyttsx3 (SAPI5) + browser SpeechSynthesis fallback
 
@@ -23,7 +23,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - overflow:hidden is intentional — content must fit, not scroll
 
 ## Development Commands
-- `.\setup.bat` — Prepare the checkout (`--simulate` skips the helper build, `--force` reinstalls). Python comes from the `py` launcher (3.12 first), never PATH order; pinned versions live in `python/constraints.txt`. `start-dev.bat` stops with "Setup is needed" until setup has verified the current requirements (details in AGENTS.md)
+- `.\setup.bat` — Prepare the checkout (`--simulate` skips the helper build, `--force` reinstalls). Python comes from the `py` launcher (3.13 first, then 3.12), never PATH order; pinned versions live in `python/constraints.txt`. `start-dev.bat` stops with "Setup is needed" until setup has verified the current requirements (details in AGENTS.md)
 - `npm run dev` — Start Vite dev server (UI only, for rapid iteration)
 - `.\start-dev.bat` — Full app (Electron + Python + Tobii)
 - `.\start-dev.bat --simulate` — Without eye tracker (mouse-as-gaze mode)

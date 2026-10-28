@@ -8,7 +8,7 @@ GazeConnect is a communication aid, not a dependable emergency notification syst
 
 Target: **Windows 10 / 11, x64**. Hardware tracking has been used successfully on the maintainer's Windows 10 laptop. Each new release still needs validation on Windows with the tracker connected; a browser preview or macOS build cannot validate the drivers or installer.
 
-For development, install Git, Node.js x64 (22.12 or newer, which Electron 44 requires; Node 22 is the validation baseline), Python x64 (3.12 is the validation baseline; minimum 3.10), and the latest serviced .NET 10 SDK used by the current bridge. For hardware use, install Tobii Experience and calibrate the tracker there first.
+For development, install Git, Node.js x64 (22.12 or newer, which Electron 44 requires; Node 22 is the validation baseline), Python x64 (3.13 is the validation baseline, 3.13.17 the last python.org installer for it; 3.12 also works), and the latest serviced .NET 10 SDK used by the current bridge. For hardware use, install Tobii Experience and calibrate the tracker there first.
 
 ```powershell
 git clone https://github.com/rishabhrd09/gazeconnect_v4.git
@@ -18,7 +18,7 @@ cd gazeconnect_v4
 .\start-dev.bat
 ```
 
-`setup.bat` prepares Node dependencies (exactly `package-lock.json`), the Python environment (`python\.venv`, with the validated versions pinned in `python/constraints.txt`), and the Tobii helper. It picks Python 3.12 x64 through the `py` launcher rather than whichever `python` comes first on PATH (`-Python <path to python.exe>` or `GAZECONNECT_PYTHON` chooses another), rebuilds a `python\.venv` that is broken or was made with an unsupported Python, and skips what is already verified, so running it again is quick; `--force` reinstalls everything. `start-dev.bat` checks in milliseconds that the last setup still matches the requirements and asks for `setup.bat` when it does not. `copy-tobii-dlls.bat` refreshes helper libraries from a local Tobii installation when needed. See [bridge setup](tobii-helper/README.md).
+`setup.bat` prepares Node dependencies (exactly `package-lock.json`), the Python environment (`python\.venv`, with the validated versions pinned in `python/constraints.txt`), and the Tobii helper. It picks Python 3.13 x64 (then 3.12) through the `py` launcher rather than whichever `python` comes first on PATH (`-Python <path to python.exe>` or `GAZECONNECT_PYTHON` chooses another), rebuilds a `python\.venv` that is broken, was made with an unsupported Python, or was made with 3.12 once 3.13 is installed, and skips what is already verified, so running it again is quick; `--force` reinstalls everything. `start-dev.bat` checks in milliseconds that the last setup still matches the requirements and asks for `setup.bat` when it does not. `copy-tobii-dlls.bat` refreshes helper libraries from a local Tobii installation when needed. See [bridge setup](tobii-helper/README.md).
 
 `check-windows.bat` runs finite checks without starting gaze tracking. It checks dependencies, the prediction model, floor-plan renderer/solver, DLL inputs and required ports, and writes a report to `tools/reports/`. Close a running GazeConnect app before this check. Use `-Simulate` to omit hardware build checks. Do not copy a macOS `node_modules` or Python virtual environment to Windows; let setup create Windows dependencies.
 
