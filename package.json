@@ -31,6 +31,7 @@
     "check:browser-gaze-safety": "node scripts/check-browser-gaze-safety.cjs",
     "check:browser-safety": "node scripts/check-browser-safety.cjs",
     "check:health": "node scripts/check-health-stalls.cjs",
+    "check:keep-awake": "node scripts/check-keep-awake.cjs",
     "check:page-scroll": "node scripts/check-page-scroll.cjs",
     "check:youtube-page": "node scripts/check-youtube-page.cjs",
     "check:search-keyboard": "node scripts/check-search-keyboard.cjs && node scripts/check-search-suggestions.cjs",

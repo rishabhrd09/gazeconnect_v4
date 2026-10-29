@@ -46,6 +46,7 @@ import {
 import { PageWorkTracker } from './browser/pageWork';
 import { buildPageScrollScript, isPageScrollDirection, type PageScrollResult } from './browser/pageScroll';
 import { HealthRecorder, type PageHealth } from './healthRecorder';
+import { KeepAwake } from './keepAwake';
 import { installStdioGuard } from './stdioGuard';
 
 // First, before anything logs: a launching console that goes away must cost
@@ -178,6 +179,13 @@ const health = new HealthRecorder(
     };
   },
   () => floorplanService.healthSnapshot(),
+);
+// The screen stays on while the interface is on screen (keepAwake.ts): Windows never counts the
+// eyes as use. A development run may let it sleep with GAZECONNECT_KEEP_SCREEN_ON=0; the
+// installed app always keeps it on.
+const keepAwake = new KeepAwake(
+  (held, data) => health.event('keep-awake', { held, ...data }),
+  app.isPackaged || process.env.GAZECONNECT_KEEP_SCREEN_ON !== '0',
 );
 let pageScrollInFlight = false;
 const blockedNoticeAt = new Map<string, number>();
@@ -1763,6 +1771,9 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Held from the first show until the window is hidden to the tray, minimised or closed.
+  keepAwake.watch(mainWindow);
 }
 
 // ============================================
@@ -3289,6 +3300,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  keepAwake.stop('quit');
   health.event('quit');
   health.stop();
   runtimeRetryTimers.forEach(timer => clearTimeout(timer));

@@ -201,6 +201,38 @@ Open Task Manager and check that these processes are running:
 - `GazeConnectBackend` (Python)
 - `TobiiGazeHelper` (only if eye tracker is connected)
 
+### Screen and power for someone who uses only their eyes
+
+Windows counts only the keyboard, mouse and touch as use, never the eyes. Left alone it dims the
+screen, turns it off and puts the laptop into standby after the times in Settings > System > Power &
+battery > Screen, sleep & hibernate timeouts (on the maintainer's laptop: 10 minutes on mains, 3 on
+battery). In standby the eye tracker turns off and GazeConnect stops: Urgent Needs cannot be reached,
+and nothing done with the eyes wakes the laptop again; only a key press does.
+
+So GazeConnect keeps the screen on while its window is on screen, on mains and on battery. The screen
+can still go dark, and nothing done with the eyes brings it back, when:
+- GazeConnect is closed to the notification area, minimised or closed (Windows' own timeouts apply
+  again from that moment);
+- the lid is closed, the power button is pressed, or Windows is locked (Win+L);
+- the battery is nearly empty (Windows' critical battery action still applies);
+- Windows Update restarts the laptop (set active hours in Settings > Windows Update).
+
+Tobii's own "Stay awake" (Tobii Experience) also keeps the laptop awake, but only while the tracker
+sees someone: out of its sight for longer than the timeout (a head turned away, slid down in bed,
+perhaps eyes closed to rest), the screen goes off. GazeConnect does not depend on it.
+
+Keep the charger connected. The battery is only a short buffer for a power cut; check its health with
+`powercfg /batteryreport` (FULL CHARGE CAPACITY against DESIGN CAPACITY). On 28 Oct 2026 the
+maintainer's laptop held 7.5 of 40 Wh (19 %) and in practice ran only 5-10 minutes once unplugged: on
+such a laptop GazeConnect is gone soon after a power cut, so replace the battery or add a small UPS.
+
+If the screen still turns off while GazeConnect is on screen, a power policy may be ignoring programs
+that ask to keep the screen on ("Allow display required policy"). In an administrator terminal,
+`powercfg /requests` lists GazeConnect under DISPLAY while it holds the screen on, and the app's health
+log (`logs\health\health.jsonl` in GazeConnect's folder under `%APPDATA%`) has a `keep-awake` line for
+every change. Until that is fixed, set "turn off my screen" and "make my device sleep" to Never when
+plugged in.
+
 ---
 
 ## Build Output Reference
