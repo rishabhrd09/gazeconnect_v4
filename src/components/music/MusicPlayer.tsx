@@ -6,12 +6,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { MusicChoice, MusicCompass, MusicEdge, type MusicGaze } from './MusicCompass';
-import { formatTime, type MusicCategory, type MusicSong } from './musicLibrary';
-
-/** Where a song's file is served: public/music beside the interface (dev server and built app). */
-export function songUrl(song: MusicSong): string {
-  return `${import.meta.env.BASE_URL}music/${song.file.split('/').map(encodeURIComponent).join('/')}`;
-}
+import { formatTime, songUrl, type MusicPlaylist, type MusicSong } from './musicLibrary';
 
 /** Stop and release the file (the element is reused for the next song). */
 export function stopAudio(audio: HTMLAudioElement): void {
@@ -21,9 +16,9 @@ export function stopAudio(audio: HTMLAudioElement): void {
 }
 
 const NowPlaying: React.FC<{
-  audio: HTMLAudioElement; song: MusicSong; categoryTitle: string; index: number; count: number;
+  audio: HTMLAudioElement; song: MusicSong; playlistTitle: string; index: number; count: number;
   status: 'playing' | 'paused' | 'finished' | 'failed';
-}> = ({ audio, song, categoryTitle, index, count, status }) => {
+}> = ({ audio, song, playlistTitle, index, count, status }) => {
   const [time, setTime] = useState({ elapsed: 0, total: song.seconds });
   useEffect(() => {
     const update = () => setTime({
@@ -41,7 +36,7 @@ const NowPlaying: React.FC<{
 
   return (
     <section className="music-now" aria-label="Now playing">
-      <div className="music-now-eyebrow">Now Playing <span aria-hidden="true">&middot;</span> {categoryTitle}</div>
+      <div className="music-now-eyebrow">Now Playing <span aria-hidden="true">&middot;</span> {playlistTitle}</div>
       <h1 className="music-now-title music-serif">{song.title}</h1>
       {song.artist && <div className="music-now-artist">{song.artist}</div>}
       <div className="music-now-progress">
@@ -62,15 +57,15 @@ const NowPlaying: React.FC<{
 
 interface MusicPlayerProps {
   audio: HTMLAudioElement;
-  category: MusicCategory;
+  playlist: MusicPlaylist;
   index: number;
   onChangeIndex: (index: number) => void;
   onLeave: () => void;
   gaze: MusicGaze;
 }
 
-export const MusicPlayer: React.FC<MusicPlayerProps> = ({ audio, category, index, onChangeIndex, onLeave, gaze }) => {
-  const songs = category.songs;
+export const MusicPlayer: React.FC<MusicPlayerProps> = ({ audio, playlist, index, onChangeIndex, onLeave, gaze }) => {
+  const songs = playlist.songs;
   const song = songs[Math.min(Math.max(0, index), songs.length - 1)];
   const last = songs.length - 1;
   const [playing, setPlaying] = useState(false);
@@ -135,7 +130,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({ audio, category, index
         </MusicEdge>
       )}
       left={<MusicChoice id="music-player-previous" gaze={gaze} tone="left" glyph="previous" label="Previous" onSelect={previous} />}
-      center={<NowPlaying audio={audio} song={song} categoryTitle={category.title} index={index} count={songs.length} status={status} />}
+      center={<NowPlaying audio={audio} song={song} playlistTitle={playlist.title} index={index} count={songs.length} status={status} />}
       right={<MusicChoice id="music-player-next" gaze={gaze} tone="right" glyph="next" label="Next" onSelect={next} />}
       bottom={(
         <MusicEdge>

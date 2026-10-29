@@ -43,6 +43,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `python/data/smart_bigrams.json` — Legacy engine: pre-computed 1,339 word-pair frequencies (36KB)
 - `python/ml/` — Legacy engine: CIFG-LSTM neural model (1.9MB ONNX) + inference + fusion
 - `electron/` — Electron main process + preload
+- `electron/music/` — Music library: songs a caregiver adds in Settings > Music, kept outside the app in `Music\GazeConnect Pro` and played as `gcmusic://songs/<file>`. The installer ships no songs (they are not ours to give away); never bundle any (details in AGENTS.md)
 - `tobii-helper/` — .NET 10 eye tracker bridge (C#)
 
 ## Word Prediction System (v4, deterministic)

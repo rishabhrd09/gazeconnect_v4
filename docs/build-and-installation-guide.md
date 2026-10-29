@@ -154,6 +154,10 @@ electron-builder takes all previous outputs and wraps them into a single NSIS in
 | Tobii DLLs | In tobii-helper folder | ~5MB |
 | **Total installer** | NSIS compressed | **~125MB** |
 
+The installer carries no songs: they are not ours to give away. A local `public/music` folder left from
+before 29 Oct 2026 is never packaged (`package.json` build `files` leaves out `dist/music`). Each family
+adds its own songs in Settings > Music (see "Adding songs" below).
+
 ---
 
 ## Distribution
@@ -200,6 +204,29 @@ Open Task Manager and check that these processes are running:
 - `GazeConnect Pro` (Electron)
 - `GazeConnectBackend` (Python)
 - `TobiiGazeHelper` (only if eye tracker is connected)
+
+### Adding songs
+
+The Music screen plays only the songs added on this computer. In Settings > Music (with the mouse):
+- **Add a folder of songs...** copies every song in the chosen folder. Each folder inside it becomes a
+  playlist of the same name, or fills the playlist that already has that name (a folder called
+  `krishna` fills Shri Krishna). Titles come from the songs' own tags, else their file names.
+- **Add songs...** on a playlist copies the songs chosen into that playlist.
+- Playlists can be added, renamed, moved up or down and removed; songs can be renamed, moved up or down,
+  moved to another playlist and removed. Removed song files go to the Recycle Bin.
+
+A new installation starts with four empty playlists (Bollywood, Shri Krishna, Chalisa, Devotional). The
+person sees only playlists that have songs, two at a time in the order set here, so nothing on the Music
+screen is a title that cannot play.
+
+The songs are kept outside the app, in the Windows Music folder: `Music\GazeConnect Pro` (the `songs`
+folder holds the files, `library.json` the playlists and names). They stay through updates and
+reinstalls; to move them to another computer, copy that whole folder to the same place there. Settings >
+Music shows the folder and opens it. MP3, M4A, AAC, OGG, Opus, WAV, FLAC and WebM songs play.
+
+For the maintainer, `node scripts/import-music.cjs "<folder>"` does what "Add a folder of songs" does
+(`--dry-run` shows what it would add). On 29 Oct 2026 Papa's 25 songs were added this way from
+`D:\music_aac_songs\music_aac_songs` (all 25 copies checked identical).
 
 ### Screen and power for someone who uses only their eyes
 

@@ -1,20 +1,21 @@
 /**
- * Music — songs from the maintainer's music folder, chosen by gaze.
- * =================================================================
- * Music -> Indian Music (Bollywood, Krishna, More) or Other (coming soon) -> a playlist, four songs
- * a page -> the player. Every page keeps the shared navigation bar (Home, Keyboard, Back, gaze on /
- * off) and has its own Back. The songs are the imported ones only (src/components/music); an empty
- * playlist says so. The audio element lives here, so leaving Music (Home, Keyboard, Urgent Needs,
- * anything) stops the music, as does Leave in the player.
+ * Music — the songs a caregiver added in Settings > Music, chosen by gaze.
+ * ========================================================================
+ * Music opens on the playlists, two a page (left and right; More above turns the page) -> a
+ * playlist, four songs a page -> the player. Every page keeps the shared navigation bar (Home,
+ * Keyboard, Back, gaze on / off) and has its own Back. Only playlists with songs that can play are
+ * shown (src/components/music/musicLibrary.ts), so no title here leads nowhere; with none, the page
+ * says where songs are added. The audio element lives here, so leaving Music (Home, Keyboard,
+ * Urgent Needs, anything) stops the music, as does Leave in the player.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { GlobalNavBar } from '../components/GlobalNavBar';
 import { useGazeControl } from '../components/core/GazeControlToggle';
 import { MusicChoice, MusicCompass, MusicEdge, MusicRest, type MusicGaze } from '../components/music/MusicCompass';
 import { MusicPlayer, stopAudio } from '../components/music/MusicPlayer';
 import {
-  CATEGORIES_PER_MORE_PAGE, PRIMARY_INDIAN, SONGS_PER_PAGE, clampPage, countLabel, findCategory, formatTime,
-  morePlaylists, pageCount, pageItems, pageOfSong, readLibrary, type MusicCategory,
+  PLAYLISTS_PER_PAGE, SONGS_PER_PAGE, clampPage, countLabel, formatTime, loadMusicLibrary,
+  pageCount, pageItems, pageOfSong, playablePlaylists, type MusicPlaylist,
 } from '../components/music/musicLibrary';
 
 interface MusicScreenProps {
@@ -24,37 +25,32 @@ interface MusicScreenProps {
   showHindi?: boolean;
 }
 
-/** Where a playlist's Back leads. */
-type PlaylistOrigin = { name: 'indian' } | { name: 'more'; page: number };
-
+/** `from`: the page of playlists a playlist was opened from (where its Back leads). */
 type MusicView =
-  | { name: 'landing' }
-  | { name: 'other' }
-  | { name: 'indian' }
-  | { name: 'more'; page: number }
-  | { name: 'playlist'; categoryId: string; page: number; from: PlaylistOrigin }
-  | { name: 'player'; categoryId: string; index: number; from: PlaylistOrigin };
+  | { name: 'playlists'; page: number }
+  | { name: 'playlist'; playlistId: string; page: number; from: number }
+  | { name: 'player'; playlistId: string; index: number; from: number };
 
 const viewKey = (view: MusicView): string => {
   switch (view.name) {
-    case 'more': return `more-${view.page}`;
-    case 'playlist': return `playlist-${view.categoryId}-${view.page}`;
+    case 'playlists': return `playlists-${view.page}`;
+    case 'playlist': return `playlist-${view.playlistId}-${view.page}`;
     // Not the song: the player stays put while Previous, Next and the next song change it.
-    case 'player': return `player-${view.categoryId}`;
-    default: return view.name;
+    case 'player': return `player-${view.playlistId}`;
   }
 };
-
-const songsLabel = (category: MusicCategory) => (
-  category.songs.length ? countLabel(category.songs.length, 'song', 'songs') : 'No songs yet'
-);
 
 function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
   const { isGazeEnabled, lastEnabledTimestamp, signalNavigation } = useGazeControl();
   const gaze: MusicGaze = { gazeEnabled: isGazeEnabled, gazeEnabledTimestamp: lastEnabledTimestamp, isDarkMode };
-  const library = useMemo(() => readLibrary(), []);
-  const extras = useMemo(() => morePlaylists(library), [library]);
-  const [view, setView] = useState<MusicView>({ name: 'landing' });
+  // null while the list is read (a few milliseconds); then only what can play.
+  const [playlists, setPlaylists] = useState<MusicPlaylist[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadMusicLibrary().then(library => { if (live) setPlaylists(playablePlaylists(library?.playlists ?? [])); });
+    return () => { live = false; };
+  }, []);
+  const [view, setView] = useState<MusicView>({ name: 'playlists', page: 0 });
   const [audio] = useState(() => {
     const element = new Audio();
     element.preload = 'auto';
@@ -74,19 +70,19 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
     setView(current => (current.name === 'player' ? { ...current, index } : current));
   }, []);
 
-  const openPlaylist = (categoryId: string, from: PlaylistOrigin) => go({ name: 'playlist', categoryId, page: 0, from });
-  const backFromPlaylist = (from: PlaylistOrigin) => go(from.name === 'indian' ? { name: 'indian' } : { name: 'more', page: from.page });
+  const list = playlists ?? [];
+  const findPlaylist = (id: string) => list.find(playlist => playlist.id === id) ?? null;
 
   const back = (): void => {
     switch (view.name) {
-      case 'landing': onNavigate('home'); return;
-      case 'other':
-      case 'indian': go({ name: 'landing' }); return;
-      case 'more': go(view.page > 0 ? { name: 'more', page: view.page - 1 } : { name: 'indian' }); return;
-      case 'playlist': backFromPlaylist(view.from); return;
+      case 'playlists':
+        if (view.page > 0) go({ name: 'playlists', page: view.page - 1 });
+        else onNavigate('home');
+        return;
+      case 'playlist': go({ name: 'playlists', page: view.from }); return;
       case 'player':
         stopAudio(audio);
-        go({ name: 'playlist', categoryId: view.categoryId, page: pageOfSong(view.index), from: view.from });
+        go({ name: 'playlist', playlistId: view.playlistId, page: pageOfSong(view.index), from: view.from });
         return;
     }
   };
@@ -100,77 +96,41 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
 
   const renderView = () => {
     switch (view.name) {
-      case 'landing': {
-        const indianCount = library.filter(category => category.songs.length > 0).length;
-        return (
-          <MusicCompass
-            left={<MusicChoice id="music-landing-indian" gaze={gaze} tone="left" label="Indian Music"
-              sub={indianCount ? countLabel(indianCount, 'playlist', 'playlists') : 'No songs yet'}
-              onSelect={() => go({ name: 'indian' })} />}
-            center={<MusicRest label="Music" />}
-            right={<MusicChoice id="music-landing-other" gaze={gaze} tone="right" label="Other" sub="Coming soon"
-              onSelect={() => go({ name: 'other' })} />}
-            bottom={backChoice()}
-          />
-        );
-      }
-
-      case 'other':
-        return (
-          <MusicCompass
-            message={(
-              <div className="music-message">
-                <MusicRest label="Other Music" />
-                <p className="music-message-title music-serif">Coming soon</p>
-              </div>
-            )}
-            bottom={backChoice()}
-          />
-        );
-
-      case 'indian': {
-        const [leftId, rightId] = PRIMARY_INDIAN.map(category => category.id);
-        const left = findCategory(library, leftId)!;
-        const right = findCategory(library, rightId)!;
-        const names = extras.map(category => category.title);
-        return (
-          <MusicCompass
-            top={extras.length > 0 ? (
-              <MusicEdge>
-                <MusicChoice id="music-indian-more" gaze={gaze} tone="accent" shape="edge" glyph="more" label="More"
-                  sub={names.length <= 3 ? names.join(', ') : countLabel(names.length, 'playlist', 'playlists')}
-                  onSelect={() => go({ name: 'more', page: 0 })} />
-              </MusicEdge>
-            ) : undefined}
-            left={<MusicChoice id={`music-indian-${left.id}`} gaze={gaze} tone="left" label={left.title}
-              sub={songsLabel(left)} onSelect={() => openPlaylist(left.id, { name: 'indian' })} />}
-            center={<MusicRest label="Indian Music" />}
-            right={<MusicChoice id={`music-indian-${right.id}`} gaze={gaze} tone="right" label={right.title}
-              sub={songsLabel(right)} onSelect={() => openPlaylist(right.id, { name: 'indian' })} />}
-            bottom={backChoice()}
-          />
-        );
-      }
-
-      case 'more': {
-        const page = clampPage(view.page, extras.length, CATEGORIES_PER_MORE_PAGE);
-        const shown = pageItems(extras, page, CATEGORIES_PER_MORE_PAGE);
-        const hasNext = page < pageCount(extras.length, CATEGORIES_PER_MORE_PAGE) - 1;
-        const choice = (category: MusicCategory | undefined, tone: 'left' | 'right') => category && (
-          <MusicChoice id={`music-more-${category.id}`} gaze={gaze} tone={tone} label={category.title}
-            sub={songsLabel(category)} onSelect={() => openPlaylist(category.id, { name: 'more', page })} />
+      case 'playlists': {
+        if (playlists === null) return <MusicCompass center={<MusicRest label="Music" />} bottom={backChoice()} />;
+        if (list.length === 0) {
+          return (
+            <MusicCompass
+              message={(
+                <div className="music-message" role="status">
+                  <MusicRest label="Music" />
+                  <p className="music-message-title music-serif">No songs yet</p>
+                  <p className="music-empty-note">A caregiver can add songs in Settings, under Music.</p>
+                </div>
+              )}
+              bottom={backChoice()}
+            />
+          );
+        }
+        const page = clampPage(view.page, list.length, PLAYLISTS_PER_PAGE);
+        const shown = pageItems(list, page, PLAYLISTS_PER_PAGE);
+        const hasNext = page < pageCount(list.length, PLAYLISTS_PER_PAGE) - 1;
+        const choice = (playlist: MusicPlaylist | undefined, tone: 'left' | 'right') => playlist && (
+          <MusicChoice id={`music-open-${playlist.id}`} gaze={gaze} tone={tone} label={playlist.title}
+            sub={countLabel(playlist.songs.length, 'song', 'songs')}
+            onSelect={() => go({ name: 'playlist', playlistId: playlist.id, page: 0, from: page })} />
         );
         return (
           <MusicCompass
             top={hasNext ? (
               <MusicEdge>
-                <MusicChoice id="music-more-next" gaze={gaze} tone="accent" shape="edge" glyph="more" label="More"
-                  sub={pageItems(extras, page + 1, CATEGORIES_PER_MORE_PAGE).map(category => category.title).join(', ')}
-                  onSelect={() => go({ name: 'more', page: page + 1 })} />
+                <MusicChoice id="music-playlists-more" gaze={gaze} tone="accent" shape="edge" glyph="more" label="More"
+                  sub={pageItems(list, page + 1, PLAYLISTS_PER_PAGE).map(playlist => playlist.title).join(', ')}
+                  onSelect={() => go({ name: 'playlists', page: page + 1 })} />
               </MusicEdge>
             ) : undefined}
             left={choice(shown[0], 'left')}
-            center={<MusicRest label="More Indian Music" />}
+            center={<MusicRest label={page === 0 ? 'Music' : 'More Music'} />}
             right={choice(shown[1], 'right')}
             bottom={backChoice()}
           />
@@ -178,10 +138,10 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
       }
 
       case 'playlist': {
-        const category = findCategory(library, view.categoryId) ?? { id: view.categoryId, title: 'Songs', songs: [] };
-        const pages = pageCount(category.songs.length, SONGS_PER_PAGE);
-        const page = clampPage(view.page, category.songs.length, SONGS_PER_PAGE);
-        const songs = pageItems(category.songs, page, SONGS_PER_PAGE);
+        const playlist = findPlaylist(view.playlistId) ?? { id: view.playlistId, title: 'Songs', songs: [] };
+        const pages = pageCount(playlist.songs.length, SONGS_PER_PAGE);
+        const page = clampPage(view.page, playlist.songs.length, SONGS_PER_PAGE);
+        const songs = pageItems(playlist.songs, page, SONGS_PER_PAGE);
         const turn = (to: number) => go({ ...view, page: to });
         return (
           <MusicCompass
@@ -189,10 +149,10 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
             headerRow
             top={(
               <header className="music-playlist-head">
-                <h1 className="music-playlist-title music-serif">{category.title}</h1>
-                {category.songs.length > 0 && (
+                <h1 className="music-playlist-title music-serif">{playlist.title}</h1>
+                {playlist.songs.length > 0 && (
                   <span className="music-playlist-meta">
-                    Page {page + 1} of {pages} <span aria-hidden="true">&middot;</span> {countLabel(category.songs.length, 'song', 'songs')}
+                    Page {page + 1} of {pages} <span aria-hidden="true">&middot;</span> {countLabel(playlist.songs.length, 'song', 'songs')}
                   </span>
                 )}
               </header>
@@ -201,10 +161,10 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
               <MusicChoice id="music-playlist-previous-page" gaze={gaze} tone="left" glyph="chevronLeft" label="Previous Page"
                 onSelect={() => turn(page - 1)} />
             ) : undefined}
-            center={category.songs.length === 0 ? (
+            center={playlist.songs.length === 0 ? (
               <div className="music-empty" role="status">
-                <p className="music-empty-title music-serif">No songs in {category.title} yet</p>
-                <p className="music-empty-note">Add them to the music folder, then import it again.</p>
+                <p className="music-empty-title music-serif">No songs in {playlist.title} yet</p>
+                <p className="music-empty-note">A caregiver can add songs in Settings, under Music.</p>
               </div>
             ) : (
               <div className="music-songs">
@@ -215,7 +175,7 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
                     <MusicChoice key={song.id} id={`music-song-${song.id}`} gaze={gaze} tone="plain" shape="song"
                       dwellCategory="phraseButton" label={song.title} sub={detail || undefined}
                       ariaLabel={`Play ${song.title}`}
-                      onSelect={() => go({ name: 'player', categoryId: category.id, index, from: view.from })} />
+                      onSelect={() => go({ name: 'player', playlistId: playlist.id, index, from: view.from })} />
                   );
                 })}
               </div>
@@ -230,12 +190,12 @@ function MusicScreen({ onNavigate, isDarkMode = true }: MusicScreenProps) {
       }
 
       case 'player': {
-        const category = findCategory(library, view.categoryId);
-        if (!category || category.songs.length === 0) return null;
+        const playlist = findPlaylist(view.playlistId);
+        if (!playlist || playlist.songs.length === 0) return null;
         return (
           <MusicPlayer
             audio={audio}
-            category={category}
+            playlist={playlist}
             index={view.index}
             onChangeIndex={changeSong}
             onLeave={back}

@@ -27,7 +27,21 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
             return send.call(this, raw);
         };
         speechSynthesis.speak = () => {};
-        window.electronAPI = { on: () => () => {}, off: () => {}, settings: { load: async () => JSON.parse(sessionStorage.getItem('qa-profile') || 'null'), save: async d => { sessionStorage.setItem('qa-profile', JSON.stringify(d)); return { success: true }; } } };
+        // A music library like Papa's (29 Oct 2026: songs come from Settings > Music): 16 Bollywood songs, three in
+        // each of the others, and a fifth playlist so More shows; `qa-music-empty` measures a library with no songs.
+        const qaSongs = (prefix, titles) => titles.map((title, i) => ({ id: `${prefix}-${i}`, title, seconds: 180 + i * 17, file: `${prefix}-${i}.mp3` }));
+        const qaMusic = [
+            { id: 'bollywood', title: 'Bollywood', songs: qaSongs('b', ['Mere Sapnon Ki Rani', 'Roop Tera Mastana', 'Yeh Shaam Mastani', 'Pal Pal Dil Ke Paas',
+                'Kora Kagaz Tha Yeh Man Mera', 'Chingari Koi Bhadke', 'Musafir Hoon Yaaron', 'O Saathi Re', 'Ek Ajnabee Haseena Se', 'Zindagi Ke Safar Mein Guzar Jaate Hain Jo Makaam',
+                'Tere Bina Zindagi Se Koi', 'Aanewala Pal Janewala Hai', 'Rimjhim Gire Sawan', 'Chala Jata Hoon', 'Kuch To Log Kahenge', 'Mere Naina Sawan Bhadon']) },
+            { id: 'krishna', title: 'Shri Krishna', songs: qaSongs('k', ['Mere Man Mera Radhe Krishna', 'Radha Krishna Naamawali', 'Tum Hi Tum Krishna']) },
+            { id: 'chalisa', title: 'Chalisa', songs: qaSongs('c', ['Shri Hanuman Chalisa', 'Shri Shiv Chalisa', 'Shri Durga Chalisa']) },
+            { id: 'devotional', title: 'Devotional', songs: qaSongs('d', ['Om Jai Jagdish Hare', 'Gayatri Mantra', 'Achyutam Keshavam']) },
+            { id: 'ghazals', title: 'Ghazals', songs: qaSongs('g', ['Chupke Chupke Raat Din']) },
+        ];
+        const qaMusicReply = async () => ({ ok: true, folder: 'C:\\Users\\Papa\\Music\\GazeConnect Pro', playlists: sessionStorage.getItem('qa-music-empty') ? [] : qaMusic });
+        window.electronAPI = { on: () => () => {}, off: () => {}, settings: { load: async () => JSON.parse(sessionStorage.getItem('qa-profile') || 'null'), save: async d => { sessionStorage.setItem('qa-profile', JSON.stringify(d)); return { success: true }; } },
+            music: { list: qaMusicReply } };
     });
     // Geometry checks must never send speech/automation to the patient's backend.
     const QA_NEWS_CATEGORIES = [['positive_india', 'Good News'], ['india_official', 'India Today'], ['health_als', 'ALS Research'], ['cricket', 'Cricket'], ['science', 'Science']]
@@ -208,11 +222,14 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 await run('weather', async () => { await route('web'); await p.click('#hub-search'); await p.click('#qs-local_weather'); });
                 await run('cricket', async () => { await route('web'); await p.click('#hub-search'); await p.click('#qs-cricket_score'); });
                 await run('social-service', async () => { await route('web'); await p.click('#hub-social'); await p.click('#soc-linkedin'); });
-                await run('music-playlists', async () => { await route('music'); await p.click('#music-landing-indian'); });
-                await run('music-more', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-more'); });
-                await run('music-songs', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); });
-                await run('music-songs-2', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); await p.click('#music-playlist-next-page'); });
-                await run('music-player', async () => { await route('music'); await p.click('#music-landing-indian'); await p.click('#music-indian-bollywood'); await p.locator('[id^="music-song-"]').first().click(); });
+                // Music opens on the playlists (29 Oct 2026), two a page.
+                await run('music-more', async () => { await route('music'); await p.click('#music-playlists-more'); });
+                await run('music-more-2', async () => { await route('music'); await p.click('#music-playlists-more'); await p.click('#music-playlists-more'); });
+                await run('music-songs', async () => { await route('music'); await p.click('#music-open-bollywood'); });
+                await run('music-songs-2', async () => { await route('music'); await p.click('#music-open-bollywood'); await p.click('#music-playlist-next-page'); });
+                await run('music-player', async () => { await route('music'); await p.click('#music-open-bollywood'); await p.locator('[id^="music-song-"]').first().click(); });
+                await run('music-empty', async () => { await p.evaluate(() => sessionStorage.setItem('qa-music-empty', '1')); await route('music'); await p.locator('#music-view .music-message').waitFor(); });
+                await p.evaluate(() => sessionStorage.removeItem('qa-music-empty'));
                 // A 40 ft plot (14 Oct 2026), so a half cell can hold a room and the Refine picker opens.
                 await run('compass-map', async () => { await route('compass-map'); await p.locator('#f-skip').waitFor(); await p.click('#f-skip'); await p.click('[id="fq-1-40 ft"]'); for (let i = 0; i < 8 && await p.locator('#f-skip').count(); i++) {
                     await p.click('#f-skip');
@@ -245,7 +262,7 @@ const gazeProbe = require('./design-gaze-probe.cjs')(process.env.DESIGN_QA_SOURC
                 await run('urgent-needs', async () => { await p.click('#dock-0'); });
                 // Restore the default Home for the independent Settings checks.
                 await p.evaluate(() => { const d = JSON.parse(sessionStorage.getItem('qa-profile')); d.settings.homeEmergencyLaunchMode = 'quick'; sessionStorage.setItem('qa-profile', JSON.stringify(d)); });
-                for (const id of ['gaze', 'voice', 'display', 'home', 'quickwords', 'phrases', 'medical', 'alertmode', 'people', 'activities', 'websearch', 'dictionary', 'backup', 'reset', 'about'])
+                for (const id of ['gaze', 'voice', 'display', 'home', 'quickwords', 'phrases', 'medical', 'alertmode', 'people', 'activities', 'music', 'websearch', 'dictionary', 'backup', 'reset', 'about'])
                     await run('settings-' + id, async () => { await route('settings'); await p.click('#sidebar-' + id); });
                 console.log(prefix, 'done');
                 fs.writeFileSync(OUT + '/audit.json', JSON.stringify({ rows, failures, errors }, null, 2));

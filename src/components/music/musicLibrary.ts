@@ -1,77 +1,90 @@
 /**
- * Music: the song list (written by scripts/import-music.cjs from the maintainer's music folder)
- * and the rules the Music screens follow. No titles are made up here: a song or playlist exists
- * only if the imported folder had it.
+ * Music: the library the caregiver fills in Settings > Music (29 Oct 2026; electron/music keeps it
+ * in the Music folder, outside the app) and the rules the Music screens follow. The app carries no
+ * songs of its own: Papa sees only playlists that have songs whose files are there, so nothing on
+ * the Music screen is a title that cannot play.
  */
-import importedLibrary from './musicLibrary.json';
 
 export interface MusicSong {
   id: string;
   title: string;
   artist?: string;
-  /** From the music folder's own list; the player shows the file's real length once it loads. */
+  /** From the file's tags or the folder's own list; the player shows the file's real length once it loads. */
   seconds?: number;
-  /** Path under public/music. */
+  /** File name in the library's songs folder. */
   file: string;
+  /** The file is no longer in the folder (Settings says so; the Music screen leaves it out). */
+  missing?: boolean;
 }
 
-export interface MusicCategory {
+export interface MusicPlaylist {
   id: string;
   title: string;
   songs: MusicSong[];
 }
 
+export interface MusicLibraryState {
+  /** Where the songs are kept, for Settings to show. */
+  folder: string;
+  playlists: MusicPlaylist[];
+}
+
 /** At most four songs on a page. */
 export const SONGS_PER_PAGE = 4;
 
-/** Indian Music offers these two first, left and right; any other playlist is under More. */
-export const PRIMARY_INDIAN = [
-  { id: 'bollywood', title: 'Bollywood' },
-  { id: 'krishna', title: 'Krishna' },
-] as const;
-
-/** Playlists on one More page: left and right. */
-export const CATEGORIES_PER_MORE_PAGE = 2;
+/** Playlists on one page: left and right (More, above, turns the page). */
+export const PLAYLISTS_PER_PAGE = 2;
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
-/** The imported list, keeping only well-formed entries (a hand-edited file cannot break the screens). */
-export function readLibrary(raw: unknown = importedLibrary): MusicCategory[] {
-  const categories = (raw as { categories?: unknown })?.categories;
-  if (!Array.isArray(categories)) return [];
+/** The library as main sent it, keeping only well-formed entries (a damaged answer cannot break the screens). */
+export function readLibrary(raw: unknown): MusicPlaylist[] {
+  const playlists = (raw as { playlists?: unknown })?.playlists;
+  if (!Array.isArray(playlists)) return [];
   const seen = new Set<string>();
-  const out: MusicCategory[] = [];
-  for (const category of categories) {
-    const { id, title, songs } = (category ?? {}) as Record<string, unknown>;
+  const out: MusicPlaylist[] = [];
+  for (const playlist of playlists) {
+    const { id, title, songs } = (playlist ?? {}) as Record<string, unknown>;
     if (!isText(id) || seen.has(id)) continue;
     seen.add(id);
     const list: MusicSong[] = (Array.isArray(songs) ? songs : [])
       .map(song => (song ?? {}) as Record<string, unknown>)
-      .filter(song => isText(song.id) && isText(song.title) && isText(song.file) && !/^[a-z]:|^[\\/]|\.\./i.test(String(song.file)))
+      .filter(song => isText(song.id) && isText(song.title) && isText(song.file) && !/[\\/]|^\.|\.\./.test(String(song.file)))
       .map(song => ({
         id: String(song.id),
         title: String(song.title).trim(),
         ...(isText(song.artist) ? { artist: String(song.artist).trim() } : {}),
         ...(Number(song.seconds) > 0 ? { seconds: Math.round(Number(song.seconds)) } : {}),
         file: String(song.file),
+        ...(song.missing === true ? { missing: true } : {}),
       }));
     out.push({ id, title: isText(title) ? title.trim() : id, songs: list });
   }
   return out;
 }
 
-/** A playlist by id; a primary one the folder did not have comes back empty (the screen says so). */
-export function findCategory(library: MusicCategory[], id: string): MusicCategory | null {
-  const found = library.find(category => category.id === id);
-  if (found) return found;
-  const primary = PRIMARY_INDIAN.find(category => category.id === id);
-  return primary ? { id: primary.id, title: primary.title, songs: [] } : null;
+/** What Papa sees: the playlists that have songs he can play, each with only those songs, in order. */
+export function playablePlaylists(playlists: MusicPlaylist[]): MusicPlaylist[] {
+  return playlists
+    .map(playlist => ({ ...playlist, songs: playlist.songs.filter(song => !song.missing) }))
+    .filter(playlist => playlist.songs.length > 0);
 }
 
-/** Every other playlist that has songs, in the folder's order: what More shows. */
-export function morePlaylists(library: MusicCategory[]): MusicCategory[] {
-  const primaryIds: readonly string[] = PRIMARY_INDIAN.map(category => category.id);
-  return library.filter(category => !primaryIds.includes(category.id) && category.songs.length > 0);
+/** The library from main; null where there is none (the interface outside the app). */
+export async function loadMusicLibrary(): Promise<MusicLibraryState | null> {
+  const api = typeof window !== 'undefined' ? (window as any).electronAPI?.music : undefined;
+  if (!api?.list) return null;
+  try {
+    const reply = await api.list();
+    return reply?.ok ? { folder: String(reply.folder || ''), playlists: readLibrary(reply) } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where a song's file is played from (electron/music/musicService.ts answers it). */
+export function songUrl(song: MusicSong): string {
+  return `gcmusic://songs/${encodeURIComponent(song.file)}`;
 }
 
 export function pageCount(itemCount: number, perPage: number): number {

@@ -108,6 +108,23 @@ const api = {
     import: () => ipcRenderer.invoke('customization:import'),
   },
 
+  // The music library (electron/music): its playlists, and the changes Settings > Music makes.
+  // Every call answers with the whole library again; songs play from gcmusic://songs/<file>.
+  music: {
+    list: () => ipcRenderer.invoke('music:list'),
+    addFiles: (playlistId: string) => ipcRenderer.invoke('music:add-files', playlistId),
+    addFolder: () => ipcRenderer.invoke('music:add-folder'),
+    createPlaylist: (title: string) => ipcRenderer.invoke('music:create-playlist', title),
+    renamePlaylist: (id: string, title: string) => ipcRenderer.invoke('music:rename-playlist', id, title),
+    movePlaylist: (id: string, delta: number) => ipcRenderer.invoke('music:move-playlist', id, delta),
+    removePlaylist: (id: string) => ipcRenderer.invoke('music:remove-playlist', id),
+    renameSong: (songId: string, title: string) => ipcRenderer.invoke('music:rename-song', songId, title),
+    moveSong: (songId: string, delta: number) => ipcRenderer.invoke('music:move-song', songId, delta),
+    setSongPlaylist: (songId: string, playlistId: string) => ipcRenderer.invoke('music:set-song-playlist', songId, playlistId),
+    removeSong: (songId: string) => ipcRenderer.invoke('music:remove-song', songId),
+    openFolder: () => ipcRenderer.invoke('music:open-folder'),
+  },
+
   // Mouse Only Mode
   mouseOnlyMode: {
     get: () => ipcRenderer.invoke('mouse-only-mode:get'),

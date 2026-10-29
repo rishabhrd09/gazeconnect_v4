@@ -30,6 +30,8 @@ import DictionaryPanel from '../components/settings/panels/DictionaryPanel';
 import QuickWordsPanel from '../components/settings/panels/QuickWordsPanel';
 import AlertModePanel from '../components/settings/panels/AlertModePanel';
 import WebSearchPanel from '../components/settings/panels/WebSearchPanel';
+import MusicPanel from '../components/settings/panels/MusicPanel';
+import { MusicNoteIcon } from '../components/music/MusicNoteIcon';
 import { SettingsDirtyContext } from '../components/settings/shared/unsavedChanges';
 import { isGazeSpellLook } from '../config/look';
 import GroupedSettingsLayout from '../components/settings/grouped/GroupedSettingsLayout';
@@ -74,6 +76,7 @@ const SECTIONS: SidebarSection[] = [
   { id: 'quickwords', label: 'Quick Words', icon: ChatBubblesIcon },
   { id: 'alertmode', label: 'Urgent Needs', icon: SettingsIcon },
   { id: 'activities', label: 'Activities', icon: TVIcon },
+  { id: 'music', label: 'Music', icon: MusicNoteIcon },
   { id: 'websearch', label: 'Web Search', icon: WebSearchIcon },
 ];
 
@@ -301,6 +304,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       case 'alertmode': return <AlertModePanel isDarkMode={isDarkMode} />;
       case 'activities': return <ActivitiesPanel isDarkMode={isDarkMode} />;
       case 'websearch': return <WebSearchPanel isDarkMode={isDarkMode} />;
+      case 'music': return <MusicPanel isDarkMode={isDarkMode} />;
       case 'appsettings': return <AppSettingsPanel isDarkMode={isDarkMode} />;
       case 'dictionary': return <DictionaryPanel isDarkMode={isDarkMode} />;
       default: return null;

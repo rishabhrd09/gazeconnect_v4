@@ -47,6 +47,7 @@ import { PageWorkTracker } from './browser/pageWork';
 import { buildPageScrollScript, isPageScrollDirection, type PageScrollResult } from './browser/pageScroll';
 import { HealthRecorder, type PageHealth } from './healthRecorder';
 import { KeepAwake } from './keepAwake';
+import { MusicService, registerMusicScheme } from './music/musicService';
 import { installStdioGuard } from './stdioGuard';
 
 // First, before anything logs: a launching console that goes away must cost
@@ -59,6 +60,9 @@ installStdioGuard(() => {
     return null;
   }
 });
+
+// Before the app is ready: the player's gcmusic:// addresses (music/musicService.ts).
+registerMusicScheme();
 
 // ============================================
 // GLOBALS
@@ -187,6 +191,8 @@ const keepAwake = new KeepAwake(
   (held, data) => health.event('keep-awake', { held, ...data }),
   app.isPackaged || process.env.GAZECONNECT_KEEP_SCREEN_ON !== '0',
 );
+// The songs a caregiver adds in Settings > Music, kept in the Music folder (music/musicService.ts).
+const musicService = new MusicService(() => mainWindow);
 let pageScrollInFlight = false;
 const blockedNoticeAt = new Map<string, number>();
 let lastBrowserGazeFrameAt = 0;
@@ -1986,6 +1992,9 @@ function setupIpcHandlers(): void {
     }
   });
 
+  // The music library (Settings > Music, and the Music screen's list).
+  musicService.registerIpc();
+
   // Customization data persistence
   const customizationPath = path.join(app.getPath('userData'), 'customization.json');
 
@@ -3247,6 +3256,8 @@ if (!gotTheLock) {
     // 0. The embedded browser's own session: safety rules first, and a disk cache
     //    that cannot grow without bound on the patient's laptop.
     void capBrowserCache(getBrowserSession());
+    // The interface's own session plays the music library's songs (never the pages' session).
+    musicService.registerProtocol();
 
     // 1. Start Tobii Helper first (needs time to init TCP server)
     startTobiiHelper();
