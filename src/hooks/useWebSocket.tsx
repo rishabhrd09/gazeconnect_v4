@@ -16,6 +16,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { GazeFreshness } from '../utils/gazeSafety';
 import { getLatencyReport } from '../utils/gazeTelemetry';
 import type { SentenceSuggestion, WordPredictionMeta } from '../utils/wordPredictionSlots';
+import type { PhrasePredictionItem } from '../utils/predictionContext';
 
 const DEBUG_GAZE_LOGS = false;
 
@@ -131,7 +132,8 @@ export interface WebSocketContextValue {
   // NLP/TTS Methods
   getPredictions: (text: string, length_hint?: number, lang?: string, options?: PredictionRequestOptions) => void;
   /** Household configuration for word prediction (board phrases, configured words). */
-  setPredictionContext: (phrases: string[], words: string[]) => void;
+  setPredictionContext: (phrases: string[], words: string[], phraseItems?: PhrasePredictionItem[]) => void;
+  learnPhrase: (textBefore: string, textAfter: string) => void;
   /** Explicit Delete Word: forget a just-accepted prediction the person removed. */
   undoWordLearning: (textBefore: string, textAfter: string) => void;
   getPhrases: (category?: string) => void;
@@ -301,7 +303,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const listenersRef = useRef<Set<(data: GazeData) => void>>(new Set());
   const predictionRequestIdRef = useRef(0);
   const latestPredictionRequestIdRef = useRef(0);
-  const predictionContextRef = useRef<{ phrases: string[]; words: string[] } | null>(null);
+  const predictionContextRef = useRef<{ phrases: string[]; words: string[]; phrase_items?: PhrasePredictionItem[] } | null>(null);
 
   // Subscribe Gaze
   const subscribeGaze = useCallback((callback: (data: GazeData) => void) => {
@@ -329,9 +331,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       reset_lineage: options?.resetLineage === true,
     });
   }, [send]);
-  const setPredictionContext = useCallback((phrases: string[], words: string[]) => {
-    predictionContextRef.current = { phrases, words };
-    send('set_prediction_context', { phrases, words });
+  const setPredictionContext = useCallback((phrases: string[], words: string[], phraseItems?: PhrasePredictionItem[]) => {
+    predictionContextRef.current = { phrases, words, phrase_items: phraseItems ?? [] };
+    send('set_prediction_context', predictionContextRef.current);
+  }, [send]);
+  const learnPhrase = useCallback((textBefore: string, textAfter: string) => {
+    send('accept_phrase', { text_before: textBefore, text_after: textAfter });
   }, [send]);
   const undoWordLearning = useCallback((textBefore: string, textAfter: string) => {
     send('undo_word_learning', { text_before: textBefore, text_after: textAfter });
@@ -756,6 +761,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     registerTargets: (targets) => send('register_targets', { targets }),
     getPredictions,
     setPredictionContext,
+    learnPhrase,
     undoWordLearning,
     getPhrases: (category) => send('get_phrases', { category }),
     expandAbbreviation: (abbrev) => send('expand_abbreviation', { abbrev }),

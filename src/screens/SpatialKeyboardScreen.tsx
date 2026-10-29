@@ -28,12 +28,11 @@ interface SpatialKeyboardProps {
   expandAbbreviation?: (abbrev: string) => void;
   abbreviationExpansion?: string | null;
   learnWord?: (word: string, textBefore?: string, textAfter?: string) => void;
-  learnSentence?: (sentence: string) => void;
 }
 
 const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
   onNavigate, onSpeak, onTextChange, initialText = '', getPredictions,
-  predictions = [], predictionMeta, connected = true, learnWord, learnSentence,
+  predictions = [], predictionMeta, connected = true, learnWord,
 }) => {
   const [text, setText] = useState(initialText);
   const textRef = useRef(initialText);
@@ -98,7 +97,6 @@ const SpatialKeyboardScreen: React.FC<SpatialKeyboardProps> = ({
   const speak = () => {
     if (textRef.current.trim()) {
       onSpeak(textRef.current);
-      learnSentence?.(textRef.current);
     }
   };
   const toggleFullscreen = async () => {

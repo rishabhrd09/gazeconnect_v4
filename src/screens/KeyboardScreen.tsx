@@ -10,6 +10,7 @@ import { DWELL_GROUPS, FAMILIAR_KEYBOARD_TIMING, normalizeKeyboardFeel } from '.
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import GazeButton from '../components/core/GazeButton';
 import KeyboardMessageDisplay from '../components/shared/KeyboardMessageDisplay';
+import PhraseSuggestionsPanel from '../components/keyboard/PhraseSuggestionsPanel';
 import {
   KeyBtn,
   QWERTY_ROWS,
@@ -39,7 +40,7 @@ import {
   WORD_SLOT_COUNT,
   acceptSentenceSuggestion,
   acceptWordPrediction,
-  isShortSentence,
+  inlineSentenceSuggestion,
   predictionsAreFresh,
   presentWordSlots,
   wordFitsText,
@@ -116,7 +117,7 @@ interface KeyboardScreenProps {
   expandAbbreviation?: (abbrev: string) => void;
   abbreviationExpansion?: string | null;
   learnWord?: (word: string, textBefore?: string, textAfter?: string) => void;
-  learnSentence?: (sentence: string) => void;
+  learnPhrase?: (textBefore: string, textAfter: string) => void;
   undoWordLearning?: (textBefore: string, textAfter: string) => void;
   sentencePredictions?: SentenceSuggestion[];
   /** Backend connection; a request made while disconnected is repeated on reconnect. */
@@ -227,22 +228,54 @@ const PhraseSuggestionButton: React.FC<{
   gazeEnabledTimestamp: number;
   familiarFeel: boolean;
   onSelect: (suggestion: SentenceSuggestion) => void;
-}> = React.memo(({ suggestion, selectable, isDarkMode, gazeEnabled, gazeEnabledTimestamp, familiarFeel, onSelect }) => {
+  hasSuggestions: boolean;
+  onBrowse: () => void;
+}> = React.memo(({ suggestion, selectable, isDarkMode, gazeEnabled, gazeEnabledTimestamp, familiarFeel, onSelect, hasSuggestions, onBrowse }) => {
   const { sentenceSuggestionBg, sentenceSuggestionText } = getKeyboardHierarchyColors(isDarkMode);
-  if (!suggestion) {
+  const [fits, setFits] = useState(false);
+  const contentRef = useRef<HTMLSpanElement>(null);
+  const copyRef = useRef<HTMLSpanElement>(null);
+  const phraseText = suggestion?.text;
+  React.useLayoutEffect(() => {
+    if (!phraseText) return;
+    let live = true;
+    const measure = () => {
+      const copy = copyRef.current, content = contentRef.current, button = content?.closest('button');
+      if (!live || !copy || !content || !button) return;
+      const previous = copy.textContent, clamp = copy.style.webkitLineClamp;
+      copy.textContent = phraseText;
+      copy.style.webkitLineClamp = 'unset';
+      const style = getComputedStyle(button);
+      const available = button.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+      const usable = content.scrollHeight <= available + 1 && copy.scrollWidth <= content.clientWidth + 1;
+      copy.textContent = previous;
+      copy.style.webkitLineClamp = clamp;
+      setFits(usable);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    const button = contentRef.current?.closest('button');
+    if (button) observer.observe(button);
+    void document.fonts.ready.then(measure);
+    return () => { live = false; observer.disconnect(); };
+  }, [phraseText, fits]);
+  const inline = !!suggestion && fits;
+  if (!suggestion && !hasSuggestions) {
     return <div className="keyboard-phrase-slot keyboard-phrase-slot-empty" aria-hidden="true" style={{ backgroundColor: sentenceSuggestionBg }} />;
   }
   return (
     <GazeButton
+      key={inline ? 'insert' : 'browse'}
       id="phrase-suggestion-0"
       className="keyboard-phrase-slot"
-      ariaLabel={`Insert phrase ${suggestion.text}`}
+      ariaLabel={inline ? (suggestion.requires_confirmation ? 'Review phrase: ' : 'Add phrase: ') + suggestion.text : 'Browse suggested phrases'}
       dwellCategory="predictionButton"
       mouseDwellOnsetMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.onset : undefined}
       gazeEnabled={gazeEnabled}
       gazeEnabledTimestamp={gazeEnabledTimestamp}
       disabled={!selectable}
-      onClick={() => onSelect(suggestion)}
+      onClick={() => inline ? onSelect(suggestion) : onBrowse()}
+      contentFill
       style={{
         width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(10px, 1vw, 18px)',
         border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
@@ -251,12 +284,14 @@ const PhraseSuggestionButton: React.FC<{
         textAlign: 'center', overflow: 'hidden', cursor: selectable ? 'pointer' : 'default',
       }}
     >
-      <span style={{
+      <span ref={contentRef} style={{ display: 'block', width: '100%', alignSelf: 'center' }}>
+      <span className="keyboard-phrase-action-label">{inline ? (suggestion.requires_confirmation ? 'Review phrase' : 'Add phrase') : 'Suggested'}</span>
+      <span ref={copyRef} style={{
         display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
         overflow: 'hidden', whiteSpace: 'normal', maxWidth: '100%',
       }}>
-        {suggestion.text}
-      </span>
+        {inline ? suggestion.text : 'Phrases'}
+      </span></span>
     </GazeButton>
   );
 });
@@ -265,7 +300,7 @@ const PhraseSuggestionButton: React.FC<{
 const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   onNavigate, onSpeak, onTextChange, initialText = '', isDarkMode = true,
   showHindi = false, getPredictions, predictions = [], wordSlots = null, predictionMeta = null,
-  expandAbbreviation, abbreviationExpansion, learnWord, learnSentence, undoWordLearning,
+  expandAbbreviation, abbreviationExpansion, learnWord, learnPhrase, undoWordLearning,
   sentencePredictions = [], onNavHiddenChange, connected = true,
 }) => {
   const [text, setText] = useState(initialText);
@@ -282,6 +317,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   const [wordLengthHint, setWordLengthHint] = useState<number | null>(null);
   const [keyboardMode, setKeyboardMode] = useState<'english' | 'hindi' | 'numbers'>('english');
   const [hindiPage, setHindiPage] = useState<1 | 2>(1);
+  const [phrasePanel, setPhrasePanel] = useState<{ draft: string; suggestions: SentenceSuggestion[]; review?: SentenceSuggestion } | null>(null);
   const [quickWordsOpen, setQuickWordsOpen] = useState(false);
   const [quickWordChoices, setQuickWordChoices] = useState<string[] | null>(null);
   const [, setPredictionTelemetry] = useState<PredictionTelemetrySnapshot>(() => loadPredictionTelemetry());
@@ -295,7 +331,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     showNavSuggestionBg,
     showNavSuggestionText,
   } = getKeyboardHierarchyColors(isDarkMode);
-  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze } = useGazeControl();
+  const { isGazeEnabled, lastEnabledTimestamp, toggleGaze, signalNavigation } = useGazeControl();
   const { hasRealGaze } = useRealGaze();
   const { isLight, isWarm } = useTheme();
   const { data: { quickWords, settings } } = useCustomization();
@@ -404,7 +440,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
       case 'shift': setIsShift(p => !p); break;
       case 'speak':
         if (text.trim()) {
-          onSpeak(text); learnSentence?.(text);
+          onSpeak(text);
         }
         break;
       case 'quickWords':
@@ -475,7 +511,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
         }
         if (isShift) setIsShift(false); break;
     }
-  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, learnSentence, recordPredictionTelemetry, showHindi, onNavigate, undoWordLearning]);
+  }, [text, isShift, onSpeak, onTextChange, expandAbbreviation, recordPredictionTelemetry, showHindi, onNavigate, undoWordLearning]);
 
   const handlePrediction = useCallback((word: string, rank?: number) => {
     const normalizedWord = word.trim();
@@ -503,7 +539,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     setText(n); onTextChange?.(n);
 
     if (isPhrasePrediction) {
-      learnSentence?.(normalizedWord);
+      learnPhrase?.(text, n);
     } else {
       learnWord?.(word);
     }
@@ -512,24 +548,40 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
       charsSaved,
       { rank, lang: keyboardMode === 'hindi' ? 'hi' : 'en' },
     );
-  }, [text, onTextChange, learnSentence, learnWord, recordPredictionTelemetry, keyboardMode]);
+  }, [text, onTextChange, learnPhrase, learnWord, recordPredictionTelemetry, keyboardMode]);
 
-  const handleSentenceSelect = useCallback((suggestion: SentenceSuggestion) => {
+  const openPhrasePanel = useCallback((review?: SentenceSuggestion) => {
+    const current = textRef.current;
+    if (!connected || !predictionsAreFresh(predictionMeta, current)) return;
+    const suggestions = sentencePredictions.filter(s => acceptSentenceSuggestion(current, s, true) !== null);
+    if (!suggestions.length) return;
+    signalNavigation();
+    setPhrasePanel({ draft: current, suggestions: [...suggestions], review });
+  }, [connected, predictionMeta, sentencePredictions, signalNavigation]);
+  const closePhrasePanel = useCallback(() => { signalNavigation(); setPhrasePanel(null); setIsExpanded(false); }, [signalNavigation]);
+  useEffect(() => {
+    if (phrasePanel && (!connected || phrasePanel.draft !== text)) closePhrasePanel();
+  }, [phrasePanel, connected, text, closePhrasePanel]);
+
+  const handleSentenceSelect = useCallback((suggestion: SentenceSuggestion, reviewed = false) => {
     const current = textRef.current;
     if (!predictionsAreFresh(predictionMeta, current)) return;
-    const nextText = acceptSentenceSuggestion(current, suggestion);
+    if (!connected) return;
+    if (suggestion.requires_confirmation && !reviewed) { openPhrasePanel(suggestion); return; }
+    const nextText = acceptSentenceSuggestion(current, suggestion, reviewed);
     if (nextText === null) return;
+    if (phrasePanel) closePhrasePanel();
     const trimmed = current.trimEnd();
     textRef.current = nextText;
     setText(nextText);
     onTextChange?.(nextText);
-    learnSentence?.(suggestion.text);
+    learnPhrase?.(current, nextText);
     recordPredictionTelemetry(
       trimmed.length === 0 ? 'starter' : 'sentence',
       Math.max(0, nextText.trim().length - trimmed.length),
       { rank: 0, lang: keyboardMode === 'hindi' ? 'hi' : 'en' },
     );
-  }, [predictionMeta, onTextChange, learnSentence, recordPredictionTelemetry, keyboardMode]);
+  }, [predictionMeta, onTextChange, learnPhrase, recordPredictionTelemetry, keyboardMode, connected, openPhrasePanel, phrasePanel, closePhrasePanel]);
 
   // Word slots: insert the displayed word exactly once, and only while it still
   // completes the draft it was computed for.
@@ -640,10 +692,10 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
   // release) keeps its local list in the same slots.
   const slotWords = keyboardMode === 'hindi' && predictions.length === 0 ? hindiPredictions : predictions;
   const slots = presentWordSlots(keyboardMode === 'hindi' ? null : wordSlots, slotWords, predictionMeta?.text ?? text);
-  const slotsSelectable = predictionsAreFresh(predictionMeta, text);
+  const slotsSelectable = connected && predictionsAreFresh(predictionMeta, text);
   const phraseSuggestion = useMemo(
-    () => (sentencePredictions || []).find(s => isShortSentence(s.text)) ?? null,
-    [sentencePredictions]
+    () => inlineSentenceSuggestion(sentencePredictions, text),
+    [sentencePredictions, text]
   );
 
   return (
@@ -666,7 +718,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
 
       {/* 2. PREDICTIONS ROW or CLOSE DISPLAY button */}
       {isExpanded ? (
-        <GazeButton
+        <div className="expanded-display-actions"><GazeButton
           id="close-expanded-display"
           onClick={() => setIsExpanded(false)}
           dwellCategory="navigationButton"
@@ -706,7 +758,13 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           }}>
             Close Display
           </span>
-        </GazeButton>
+        </GazeButton><GazeButton id="browse-suggested-phrases" gazeEnabled={isGazeEnabled}
+          gazeEnabledTimestamp={lastEnabledTimestamp} dwellCategory="navigationButton"
+          disabled={!slotsSelectable || !sentencePredictions.length} onClick={() => openPhrasePanel()}
+          style={{ height: 'clamp(132px, 15vh, 176px)', minHeight: '80px', background: 'var(--design-panel, var(--ui-surface))',
+            color: 'var(--design-ink, var(--ui-ink))', fontSize: 'clamp(24px, 3vw, 38px)', fontWeight: 800 }}>
+          Suggested phrases
+        </GazeButton></div>
       ) : (
         <div className="keyboard-prediction-bar keyboard-word-row keyboard-word-row-top" aria-label="Word suggestions 1 to 5 and a phrase">
           {slots.slice(0, TOP_WORD_SLOTS).map((word, index) => (
@@ -716,11 +774,11 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
               familiarFeel={familiarFeel}
               onSelect={handleWordSlot} />
           ))}
-          <PhraseSuggestionButton key={`phrase:${phraseSuggestion?.mode ?? ''}:${phraseSuggestion?.text ?? ''}`}
+          <PhraseSuggestionButton key={JSON.stringify(['phrase', text, phraseSuggestion?.mode, phraseSuggestion?.text])}
             suggestion={phraseSuggestion} selectable={slotsSelectable} isDarkMode={isDarkMode}
             gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
             familiarFeel={familiarFeel}
-            onSelect={handleSentenceSelect} />
+            onSelect={handleSentenceSelect} hasSuggestions={sentencePredictions.length > 0} onBrowse={() => openPhrasePanel()} />
         </div>
       )}
 
@@ -1074,6 +1132,11 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           </div>
         )
       }
+
+      {phrasePanel && <PhraseSuggestionsPanel key={JSON.stringify([phrasePanel.draft, phrasePanel.review?.text])}
+        draft={phrasePanel.draft} suggestions={phrasePanel.suggestions} review={phrasePanel.review}
+        gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+        onAccept={handleSentenceSelect} onClose={closePhrasePanel} />}
 
       {/* Quick Words Overlay */}
       <QuickWordsOverlay

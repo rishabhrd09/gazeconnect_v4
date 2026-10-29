@@ -163,7 +163,7 @@ const InnerApp: React.FC = () => {
   const predictionContextSignature = predictionContext ? predictionContextKey(predictionContext) : '';
   useEffect(() => {
     if (predictionContext && ws.isConnected) {
-      setPredictionContextRef.current(predictionContext.phrases, predictionContext.words);
+      setPredictionContextRef.current(predictionContext.phrases, predictionContext.words, predictionContext.phraseItems);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [predictionContextSignature, ws.isConnected]);
@@ -386,7 +386,7 @@ const InnerApp: React.FC = () => {
           wordSlots={ws.wordSlots} predictionMeta={ws.predictionMeta}
           sentencePredictions={ws.sentencePredictions}
           expandAbbreviation={ws.expandAbbreviation} abbreviationExpansion={ws.abbreviationExpansion}
-          learnWord={ws.learnWord} learnSentence={ws.learnSentence}
+          learnWord={ws.learnWord} learnPhrase={ws.learnPhrase}
           undoWordLearning={ws.undoWordLearning} connected={ws.isConnected}
         />;
       case 'spatial':
@@ -401,7 +401,6 @@ const InnerApp: React.FC = () => {
           expandAbbreviation={ws.expandAbbreviation}
           abbreviationExpansion={ws.abbreviationExpansion}
           learnWord={ws.learnWord}
-          learnSentence={ws.learnSentence}
         />;
       case 'phrases': return <PhrasesScreen {...common} addToMessage={addToMessage} />;
       case 'settings':

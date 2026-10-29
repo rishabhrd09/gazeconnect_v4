@@ -40,7 +40,9 @@
     "check:word-slots": "node scripts/check-word-prediction-slots.cjs && node scripts/check-zone-board.cjs",
     "check:add-to-message": "node scripts/check-add-to-message.cjs",
     "check:compass": "node scripts/check-compass-plan.cjs && node scripts/check-compass-refine.cjs && node scripts/check-advanced-floors.cjs && node scripts/check-floorplan-transport.cjs && node scripts/check-floorplan-save.cjs && node scripts/check-floorplan-resources.cjs",
-    "check:compass-browser": "node scripts/check-design-map-actions.cjs && node scripts/check-compass-studio-v2.cjs"
+    "check:compass-browser": "node scripts/check-design-map-actions.cjs && node scripts/check-compass-studio-v2.cjs",
+    "check:phrase-suggestions": "node scripts/check-phrase-suggestions.cjs",
+    "check:phrase-ui": "node scripts/check-phrase-ui.cjs"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -66,7 +68,7 @@
   "build": {
     "appId": "com.gazeconnect.pro",
     "productName": "GazeConnect Pro",
-    "copyright": "Copyright \u00a9 2025 GazeConnect Team",
+    "copyright": "Copyright © 2025 GazeConnect Team",
     "directories": {
       "output": "release",
       "buildResources": "build"

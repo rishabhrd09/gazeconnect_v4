@@ -16,6 +16,8 @@ export type { WebSearchData, WebSearchTarget, WebSearchHistoryEntry } from '../c
 export interface Phrase {
   en: string;
   hi: string;
+  /** Suggestion preferences only; the authored board phrase stays unchanged. */
+  prediction?: { enabled?: boolean; keywords?: string[]; priority?: number };
 }
 
 // ============================================

@@ -250,7 +250,7 @@ class PredictionLearningStore:
             previous_count = self._accepted.get(token, 0)
             changes = self._count([token])
             # The draft keeps the inserted spelling ("call Papa "); the token is normalised.
-            inserted = text_after is not None and text_after[-(len(token) + 1):].lower() == f'{token} '
+            inserted = text_after is not None and text_after[-(len(token) + 1):].lower().replace('’', "'") == f'{token} '
             if text_before is not None and inserted:
                 end = len(text_after) - 1
                 self._journal.append({'word': token, 'start': end - len(token), 'end': end,
@@ -269,6 +269,29 @@ class PredictionLearningStore:
             self._count(tokens)
             return len(tokens)
 
+    def record_accepted_phrase(self, before: str, after: str) -> int:
+        """Learn only newly accepted words, with the normal Delete Word journal.
+
+        Confirmed text shared by both drafts is not counted a second time.
+        Sentence history is learned separately, only when Speak is selected.
+        """
+        if before == after or len(after) > 8192:
+            return 0
+        common = 0
+        for left, right in zip(before, after):
+            if left != right:
+                break
+            common += 1
+        unfinished = re.search(r"[A-Za-z']+$", before[:common])
+        start = unfinished.start() if unfinished else common
+        accepted = 0
+        for match in re.finditer(r"[A-Za-z]+(?:['’][A-Za-z]+)?", after):
+            if match.end() <= start:
+                continue
+            accepted += bool(self.record_accepted_word(normalize_word(match.group()), before,
+                after[:match.end()] + ' ', words_in(after[:match.start()])))
+        return accepted
+
     def undo_removed_words(self, text_before: str, text_after: str) -> List[str]:
         """Explicit Delete Word: forget acceptances whose word was just removed."""
         if not text_before.startswith(text_after) or len(text_after) >= len(text_before):
@@ -278,7 +301,7 @@ class PredictionLearningStore:
             kept = []
             # Unwind newest first so repeated acceptances restore recency in order.
             for entry in reversed(self._journal):
-                removed = entry['end'] > len(text_after) and text_before[entry['start']:entry['end']].lower() == entry['word']
+                removed = entry['end'] > len(text_after) and text_before[entry['start']:entry['end']].lower().replace('’', "'") == entry['word']
                 if not removed:
                     kept.append(entry)
                     continue

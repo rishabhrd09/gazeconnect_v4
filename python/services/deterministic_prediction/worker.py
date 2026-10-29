@@ -79,6 +79,26 @@ def compose_ten(five: List[str], ten: List[str]) -> List[str]:
     return [*five, *[word for word in ten if word not in shown]][:MAX_WORD_SLOTS]
 
 
+def keyboard_priority_slots(eng: DeterministicPredictionEngine, ranked: List[str], prefix: str,
+                            previous: Optional[SnapshotLineage]) -> List[Optional[str]]:
+    """Keep the current best five on top; stabilize positions within each row.
+
+    Whole-board stability can strand a promoted word below the letters. A
+    change in row priority must override its old position. Five/six-slot
+    consumers and the pinned reference engine keep their original behavior.
+    """
+    slots: List[Optional[str]] = []
+    for start in (0, MAX_WORD_CANDIDATES):
+        candidates = ranked[start:start + MAX_WORD_CANDIDATES]
+        lineage = None
+        if previous is not None:
+            previous_slots = previous.candidate_slots if previous.candidate_slots is not None else previous.candidates
+            lineage = SnapshotLineage(previous.prefix, previous.candidates[start:start + MAX_WORD_CANDIDATES],
+                                     tuple(previous_slots[start:start + MAX_WORD_CANDIDATES]))
+        slots.extend(eng.stabilize_candidate_slots(candidates, prefix, lineage, MAX_WORD_CANDIDATES))
+    return slots
+
+
 def predict(request: Dict[str, Any]) -> Dict[str, Any]:
     """One snapshot. `request` keys: draft, slot_count, composition, lineage, state, phrases."""
     started = time.perf_counter()
@@ -110,9 +130,10 @@ def predict(request: Dict[str, Any]) -> Dict[str, Any]:
     else:
         wide = five
         ranked = five.candidates
-    slots = eng.stabilize_candidate_slots(ranked, stages.prefix, previous, slot_count)
+    slots = (keyboard_priority_slots(eng, ranked, stages.prefix, previous) if slot_count == MAX_WORD_SLOTS
+             else eng.stabilize_candidate_slots(ranked, stages.prefix, previous, slot_count))
     scores = {entry.word: entry.score for entry in stages.ranked_all}
-    return {
+    result = {
         'prefix': stages.prefix,
         'ranked': ranked,
         'slots': slots,
@@ -122,3 +143,17 @@ def predict(request: Dict[str, Any]) -> Dict[str, Any]:
         'policy': _POLICY_NAME,
         'compute_ms': round((time.perf_counter() - started) * 1000, 3),
     }
+    context = request.get('phrase_context')
+    if context is not None:
+        # Phrase work shares the existing isolated worker and latest-only gate,
+        # but it neither scores nor supplies any word candidate.
+        try:
+            from ..phrase_prediction import suggest_phrases
+            phrase_started = time.perf_counter()
+            result['sentences'] = suggest_phrases(draft, context, request.get('phrases') or (), request.get('phrase_items') or ())
+            result['phrase_compute_ms'] = round((time.perf_counter() - phrase_started) * 1000, 3)
+        except Exception:
+            # A phrase failure must never discard a valid word board.
+            result['sentences'] = []
+            result['phrase_error'] = True
+    return result

@@ -38,14 +38,17 @@ class LineageTests(unittest.TestCase):
     def predict(self, text, client=None, reset=False):
         return self.service.predict_sync(client or self.client, text, 10, reset)
 
-    def test_slots_persist_while_the_same_word_grows(self):
+    def test_slots_persist_within_the_current_priority_row_while_the_word_grows(self):
         first = self.predict('i need w')
         second = self.predict('i need wa')
         self.assertFalse(first['lineage'])
         self.assertTrue(second['lineage'])
         for index, word in enumerate(first['slots']):
-            if word and word in second['ranked']:
+            row = second['ranked'][:5] if index < 5 else second['ranked'][5:]
+            if word and word in row:
                 self.assertEqual(second['slots'][index], word, f'{word} moved')
+        self.assertEqual(set(filter(None, second['slots'][:5])), set(second['ranked'][:5]))
+        self.assertEqual(set(filter(None, second['slots'][5:])), set(second['ranked'][5:]))
 
     def test_any_other_edit_starts_a_fresh_board(self):
         self.predict('i need wa')

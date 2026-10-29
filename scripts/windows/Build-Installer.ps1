@@ -68,6 +68,7 @@ try {
         '--add-data', ((Join-Path $ProjectRoot 'python\services\deterministic_prediction\assets') + ';services/deterministic_prediction/assets'),
         '--add-data', ((Join-Path $ProjectRoot 'python\services\deterministic_prediction\english_only_policy.v1.json') + ';services/deterministic_prediction'),
         '--hidden-import', 'services.deterministic_prediction.worker',
+        '--hidden-import', 'services.phrase_prediction', '--hidden-import', 'services.phrase_starters',
         '--add-data', ((Join-Path $ProjectRoot 'python\data\smart_bigrams.json') + ';data'),
         '--add-data', ((Join-Path $ProjectRoot 'python\ml\trained_models\gazeconnect_lm_quantized.onnx') + ';ml/trained_models'),
         '--add-data', ((Join-Path $ProjectRoot 'python\ml\trained_models\vocabulary.json') + ';ml/trained_models'),

@@ -272,6 +272,11 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
     }));
   }, []);
 
+  const updatePrediction = useCallback((catId: string, phIdx: number, value: NonNullable<Phrase['prediction']>) => {
+    setEditCats(prev => prev.map(c => c.id === catId ? { ...c, phrases: c.phrases.map((p, i) =>
+      i === phIdx ? { ...p, prediction: { ...p.prediction, ...value } } : p) } : c));
+  }, []);
+
   const addPhrase = useCallback((catId: string) => {
     setEditCats(prev => prev.map(c => {
       if (c.id !== catId) return c;
@@ -515,12 +520,12 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
                     <div
                       key={phIdx}
                       style={{
-                        display: 'flex', gap: 10, alignItems: 'center',
+                        display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'stretch',
                         padding: '5px 0',
                         borderBottom: phIdx < cat.phrases.length - 1 ? `1px solid ${colors.border.main}33` : 'none',
                       }}
                     >
-                      <input
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><input
                         className="pp-input"
                         value={phrase.en}
                         onChange={e => updatePhrase(cat.id, phIdx, 'en', e.target.value)}
@@ -535,7 +540,25 @@ const PhrasesPanel: React.FC<PhrasesPanelProps> = ({ isDarkMode }) => {
                         disabled={cat.phrases.length <= 1}
                       >
                         &#x2715;
-                      </button>
+                      </button></div>
+                      <details style={{ color: colors.text.secondary, fontSize: 14 }}>
+                        <summary style={{ cursor: 'pointer', padding: '5px 0' }}>Suggestion preferences</summary>
+                        <div style={{ display: 'grid', gap: 10, padding: '10px 0' }}>
+                          <label><input type="checkbox" checked={phrase.prediction?.enabled !== false}
+                            onChange={e => updatePrediction(cat.id, phIdx, { enabled: e.target.checked })} /> Offer while typing</label>
+                          <label>Keywords (separate with commas)
+                            <input className="pp-input" value={(Array.isArray(phrase.prediction?.keywords) ? phrase.prediction.keywords : []).join(',')} maxLength={320}
+                              onChange={e => updatePrediction(cat.id, phIdx, { keywords: e.target.value.split(',').slice(0, 8) })}
+                              placeholder="For example: glasses, spectacles" />
+                          </label>
+                          <label>Preference among matching phrases
+                            <select className="pp-input" value={phrase.prediction?.priority ?? 0}
+                              onChange={e => updatePrediction(cat.id, phIdx, { priority: Number(e.target.value) })}>
+                              <option value={0}>Normal</option><option value={3}>Preferred</option><option value={5}>Most preferred</option>
+                            </select>
+                          </label>
+                        </div>
+                      </details>
                     </div>
                   ))}
 

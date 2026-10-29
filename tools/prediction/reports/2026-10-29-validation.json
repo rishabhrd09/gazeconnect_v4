@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-29",
+  "baselineCommit": "e34cde0",
+  "scope": "Local source and synthetic profiles; Mac desktop startup and read-only predictions also verified; no Windows packaging, patient tracker or speaker playback test",
+  "passed": {
+    "deterministicPythonTests": 69,
+    "phraseAndPredictionPipelinePythonTests": 37,
+    "backendPortContractPythonTests": 11,
+    "pythonTypescriptPhraseContracts": 148,
+    "wordAndZoneBoardChecks": 94,
+    "dwellAndPreferenceChecks": 24,
+    "gazeSafetyChecks": 62,
+    "keyboardStatesAudited": 144,
+    "keyboardElementComparisons": 21456,
+    "phraseUiCombinations": 24,
+    "originalUiTargetComparisons": 2208,
+    "productionGazePickerPhraseAndReviewControls": true,
+    "longPhraseVisibilityAndInlineOverflowFallback": true,
+    "caregiverPreferencesSaveReload": true,
+    "liveWorkerToKeyboardCombinations": 24,
+    "sourceFrozenPredictionSelfTest": true,
+    "settingsAndLookChecks": 26,
+    "typescript": true,
+    "uiBuild": true,
+    "electronBuild": true,
+    "gitDiffCheck": true,
+    "liveBottomToTopPromotions": 120,
+    "priorityRowReplay": {
+      "boards": 8667,
+      "changedRankingsOrScores": 0,
+      "beforeWrongRowBoards": 57,
+      "afterWrongRowBoards": 0,
+      "intentionalSlotChanges": 61
+    },
+    "screenshotMaintenanceLetterSequence": true,
+    "macFastRestartClosedConnection": true,
+    "windowsProbeStillDisallowsSocketReuse": true,
+    "macDesktopBackendAndPredictionConnection": true
+  },
+  "limitations": [
+    "ESLint unavailable: no project configuration in this checkout",
+    "Windows/Python 3.13 packaging and native TTS/Tobii patient sessions remain to validate",
+    "Synthetic configured-phrase recall does not measure unseen-conversation accuracy or patient speed",
+    "Word scoring and existing content filters intentionally unchanged"
+  ],
+  "deferred": [
+    "Automatic message-display suggestions (plan point 5)",
+    "LLM generation"
+  ]
+}

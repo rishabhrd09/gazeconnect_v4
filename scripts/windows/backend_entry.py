@@ -47,8 +47,9 @@ def deterministic_self_test():
     with tempfile.TemporaryDirectory() as state_dir:
         store = PredictionLearningStore(Path(state_dir))
         store.load()
-        inline = WordPredictionService(store, execution="inline").predict_sync("self-test", "i need wa", 10, True)
-        service = WordPredictionService(store, execution="process")
+        phrase_context = lambda text: {}
+        inline = WordPredictionService(store, execution="inline", phrase_context=phrase_context).predict_sync("self-test", "i need wa", 10, True)
+        service = WordPredictionService(store, execution="process", phrase_context=phrase_context)
         service.start()
         try:
             worker = asyncio.run(asyncio.wait_for(service.predict("self-test", "i need wa", 10, True), 60))
@@ -56,7 +57,9 @@ def deterministic_self_test():
             service.shutdown()
     if not inline["ranked"] or worker is None or worker["slots"] != inline["slots"]:
         raise RuntimeError("Deterministic word prediction self-test failed")
-    return {"assets": len(verified), "slots": inline["slots"]}
+    if worker.get("sentences") != inline.get("sentences") or not any(s["text"] == "I need water" for s in worker.get("sentences", [])):
+        raise RuntimeError("Literal phrase prediction self-test failed")
+    return {"assets": len(verified), "slots": inline["slots"], "phrase_prediction": "passed"}
 
 
 if __name__ == "__main__":

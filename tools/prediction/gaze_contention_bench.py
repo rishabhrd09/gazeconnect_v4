@@ -79,16 +79,16 @@ async def typing_task(mode: str, stop: asyncio.Event, interval_s: float, round_t
             context['sentences'].predict(draft.strip(), top_k=3) if len(draft.strip()) >= 2 else None
         else:
             result = await context['service'].predict('bench', draft, 10)
-            if result is not None and len(draft.strip()) >= 2:
+            if result is not None and not context.get('worker_phrases') and len(draft.strip()) >= 2:
                 context['sentences'].predict(draft.strip(), top_k=6)
         round_trips.append((time.perf_counter() - started) * 1000)
         await asyncio.sleep(interval_s)
 
 
-async def run_mode(mode: str, seconds: float, interval_ms: float) -> dict:
+async def run_mode(mode: str, seconds: float, interval_ms: float, worker_phrases: bool = False) -> dict:
     from services.sentence_prediction import SentencePredictor
     temp = Path(tempfile.mkdtemp())
-    context = {'sentences': SentencePredictor(temp)}
+    context = {'sentences': SentencePredictor(temp), 'worker_phrases': worker_phrases}
     if mode == 'legacy-inline':
         from services.word_prediction import WordPredictionEngine
         context['legacy'] = WordPredictionEngine(str(temp))
@@ -97,7 +97,10 @@ async def run_mode(mode: str, seconds: float, interval_ms: float) -> dict:
         from services.deterministic_prediction.service import WordPredictionService
         store = PredictionLearningStore(temp / 'patient_data')
         store.load()
-        service = WordPredictionService(store, execution=mode)
+        phrase_context = (lambda text: {'history': [{'text': 'Please adjust my pillow', 'count': 2}] * 500}) if worker_phrases else None
+        service = WordPredictionService(store, execution=mode, phrase_context=phrase_context)
+        if worker_phrases:
+            service.set_context(['Please bring household item ' + str(i) for i in range(2000)], [])
         service.start()
         await service.predict('bench', 'warm up', 10)  # includes worker start-up
         context['service'] = service
@@ -137,13 +140,14 @@ def main() -> None:
     parser.add_argument('--interval-ms', type=float, default=150)
     parser.add_argument('--modes', default='idle,legacy-inline,inline,thread,process')
     parser.add_argument('--out', type=Path)
+    parser.add_argument('--worker-phrases', action='store_true', help='Include maximum-sized synthetic phrase inputs in the isolated worker')
     args = parser.parse_args()
     report = {
         'python': sys.version.split()[0], 'platform': platform.platform(), 'cpu_count': os.cpu_count(),
-        'interval_ms': args.interval_ms, 'seconds_per_mode': args.seconds, 'results': [],
+        'interval_ms': args.interval_ms, 'seconds_per_mode': args.seconds, 'workerPhrases': args.worker_phrases, 'results': [],
     }
     for mode in args.modes.split(','):
-        result = asyncio.run(run_mode(mode, args.seconds, args.interval_ms))
+        result = asyncio.run(run_mode(mode, args.seconds, args.interval_ms, args.worker_phrases))
         report['results'].append(result)
         print(json.dumps(result))
     if args.out:

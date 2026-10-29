@@ -376,18 +376,26 @@ def ensure_port_available(host: str, port: int) -> None:
     usually a stale backend from an earlier launch, with its own state and no
     eye tracker. That failure is silent, which is worse than not starting.
 
-    The probe deliberately sets no SO_REUSEADDR: on Windows that option lets a
-    second socket bind a port that is already listening, which is exactly the
-    situation being detected.
+    Windows must not use SO_REUSEADDR: there it can let a second socket bind
+    an occupied port. POSIX needs it to match asyncio's server binding and
+    allow a quick restart while closed connections remain in TIME_WAIT. A
+    live listener is still refused; SO_REUSEPORT is never enabled.
     """
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
+        if os.name != 'nt':
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind((host, port))
     except OSError as exc:
+        recovery = (
+            'run status-dev.bat to see what holds it, then stop-dev.bat'
+            if os.name == 'nt' else
+            f'quit the other copy of GazeConnect; inspect the listener with '
+            f'lsof -nP -iTCP:{port} -sTCP:LISTEN'
+        )
         raise PortInUseError(
             f"Port {port} is already in use, so the backend did not start. "
-            f"Another GazeConnect backend is the usual reason: run status-dev.bat to see "
-            f"what holds it, then stop-dev.bat. ({exc})"
+            f"Another GazeConnect backend is the usual reason: {recovery}. ({exc})"
         ) from exc
     finally:
         probe.close()
@@ -915,6 +923,7 @@ class GazeConnectBackend:
                 store,
                 execution=self.config.prediction_execution,
                 content_items=self.prediction.caregiver_content_items,
+                phrase_context=self._phrase_prediction_context,
             )
         self.sentence_predictor = SentencePredictor(
             data_dir=Path(self.config.data_dir) / 'patient_data'
@@ -1872,7 +1881,8 @@ class GazeConnectBackend:
                     slot_count=data.get('slot_count'),
                     reset_lineage=bool(data.get('reset_lineage', False)),
                 ),
-                'set_prediction_context': lambda: self._set_prediction_context(websocket, data.get('phrases', []), data.get('words', [])),
+                'set_prediction_context': lambda: self._set_prediction_context(websocket, data.get('phrases', []), data.get('words', []), data.get('phrase_items', [])),
+                'accept_phrase': lambda: self._accept_phrase(data),
                 'undo_word_learning': lambda: self._undo_word_learning(data.get('text_before'), data.get('text_after')),
                 'reset_word_learning': lambda: self._reset_word_learning(websocket),
                 'get_phrases': lambda: self._get_phrases(websocket, data.get('category')),
@@ -2343,7 +2353,7 @@ class GazeConnectBackend:
             ],
             # Presentation slots: fixed positions, None = deliberately empty.
             'word_slots': result['slots'],
-            'sentences': self._deterministic_sentences(text),
+            'sentences': result['sentences'] if 'sentences' in result else self._deterministic_sentences(text),
             'request_id': request_id,
             'prediction': {
                 'engine': DETERMINISTIC_ENGINE_VERSION,
@@ -2354,47 +2364,39 @@ class GazeConnectBackend:
             },
         }
 
-    def _deterministic_sentences(self, text: str) -> List[Dict[str, Any]]:
-        """Phrase-level suggestions, separate from word slots, English-only.
-
-        modes: 'replace_token' (abbreviation expansion replaces the typed
-        shortcut), 'complete_or_append' (sentence completes the typed text when
-        it starts with it, otherwise is appended), 'append' (starters).
-        """
-        suggestions: List[Dict[str, Any]] = []
-        seen: Set[str] = set()
-
-        def push(item: Dict[str, Any]) -> None:
-            key = item['text'].strip().lower()
-            if not key or key in seen or contains_blocked_prediction_word(item['text']):
-                return
-            if not self._english_only.allows(item['text']):
-                return
-            seen.add(key)
-            suggestions.append(item)
-
-        token_match = re.search(r'(\S+)$', text)
-        if token_match and not text[-1:].isspace():
-            token = token_match.group(1)
-            expansion = self.prediction.expand_abbreviation(token)
-            if expansion:
-                push({'text': expansion, 'score': 2.0, 'source': 'abbreviation', 'mode': 'replace_token', 'token': token})
+    def _phrase_prediction_context(self, text: str) -> Dict[str, Any]:
+        """Bounded, immutable inputs for phrase scoring in the existing worker."""
+        token = re.search(r'(\S+)$', text) if not text[-1:].isspace() else None
+        expansion = self.prediction.expand_abbreviation(token.group()) if token else None
         topic_boosts = self._session_topics.get_boosts(text)
-        stripped = text.strip()
-        if not stripped:
-            for item in self._get_starter_predictions(topic_boosts=topic_boosts, top_k=8):
-                push({'text': item['word'], 'score': item['score'], 'source': item['source'], 'mode': 'append'})
-        elif len(stripped) >= 2:
-            for sp in self.sentence_predictor.predict(stripped, top_k=6, topic_boosts=topic_boosts):
-                push({'text': sp.text, 'score': sp.score, 'source': sp.source, 'mode': 'complete_or_append'})
-            if self.config.enable_neural_sentence_continuation and len(suggestions) < 3:
-                words = stripped.split()
-                context = ' '.join(words[:-1]) if not text.endswith(' ') and len(words) >= 2 else stripped
-                if len(context.split()) >= 2:
-                    continuation = self.prediction.predict_sentence_neural(context, num_words=4)
-                    if continuation and len(continuation.strip()) >= 3:
-                        push({'text': f"{context} {continuation}".strip(), 'score': 0.5, 'source': 'neural', 'mode': 'complete_or_append'})
-        return suggestions[:4]
+        return {
+            'history': [dict(row) for row in sorted(self.sentence_predictor.history,
+                key=lambda row: (row.get('count', 0), row.get('last_used', 0)), reverse=True)[:500]],
+            'topic_boosts': topic_boosts,
+            'empty_starters': self._get_starter_predictions(topic_boosts=topic_boosts, top_k=12),
+            'abbreviation': {'text': expansion, 'token': token.group()} if expansion and token else None,
+        }
+
+    def _deterministic_sentences(self, text: str) -> List[Dict[str, Any]]:
+        """Shared synchronous path for tools and recovery, never a second ranker."""
+        from services.phrase_prediction import suggest_phrases
+        try:
+            return suggest_phrases(text, self._phrase_prediction_context(text),
+                self.word_service._phrases if self.word_service else (),
+                self.word_service._phrase_items if self.word_service else ())
+        except Exception:
+            logger.warning('Phrase recovery failed; the word board is unchanged.', exc_info=True)
+            return []
+
+    def _accept_phrase(self, data: Dict[str, Any]) -> None:
+        """An accepted edit learns its new words, not a message never spoken."""
+        before, after = data.get('text_before'), data.get('text_after')
+        if not isinstance(before, str) or not isinstance(after, str) or max(len(before), len(after)) > 8192:
+            return
+        if contains_blocked_prediction_word(after) or not self._english_only.allows(after):
+            return
+        if self.word_service is not None:
+            self.prediction.store.record_accepted_phrase(before, after)
 
     def _learn_word(self, data: Dict[str, Any]) -> None:
         """A word the person explicitly accepted (prediction selected / Zone Board confirmed)."""
@@ -2422,11 +2424,12 @@ class GazeConnectBackend:
         self.prediction.store.save()
         self._send(websocket, 'word_learning_reset', {'success': True})
 
-    def _set_prediction_context(self, websocket, phrases: Any, words: Any) -> None:
+    def _set_prediction_context(self, websocket, phrases: Any, words: Any, phrase_items: Any = None) -> None:
         """Household configuration from the renderer: board phrases and configured words."""
         if self.word_service is None or not isinstance(phrases, list):
             return
         counts = self.word_service.set_context(phrases, words if isinstance(words, list) else [])
+        self.word_service.set_phrase_items(phrase_items if isinstance(phrase_items, list) else [])
         self._send(websocket, 'prediction_context_set', counts)
 
     def _get_predictions_legacy(
@@ -2792,8 +2795,6 @@ class GazeConnectBackend:
             spoken_file = chat_dir / f'spoken_{date_str}.log'
             with open(spoken_file, 'a', encoding='utf-8') as f:
                 f.write(f'[{time_str}] {text}\n')
-            # Also learn from this message immediately for predictions
-            self._learn_sentence(text)
             logger.info(f"Spoken message saved to {spoken_file}")
         except Exception as e:
             logger.error(f"Failed to save chat message: {e}")
@@ -2802,6 +2803,8 @@ class GazeConnectBackend:
         """Speak text via TTS."""
         if text:
             self.tts.speak(text)
+            # Prediction learning is independent of optional transcript files.
+            self._learn_sentence(text)
             self._save_chat_message(text)
             if self.logger:
                 self.logger.log_speak(text)

@@ -1,0 +1,67 @@
+{
+  "protocol": "existing shared held-out sets, 0-2 letter strict prefixes; synthetic fresh/configured/learned profiles; exact anchored ten-slot outputs and lineage; no hardware claim",
+  "inputSha256": "299d2b8ba2477f39d277a81928bff1f38ea93ffa5bf601947e88132eca72bfd1",
+  "limitPerSet": 60,
+  "outputSha256": "0a5e0bd4f582fbfecf521731166d39b6c67f1e62394eb98c591e43f0baa5074d",
+  "wordBoards": 8667,
+  "metrics": {
+    "fresh/aacEvalSentences": {
+      "cases": 693,
+      "top5": 424,
+      "top10": 478
+    },
+    "fresh/independentTatoeba": {
+      "cases": 1199,
+      "top5": 702,
+      "top10": 819
+    },
+    "fresh/secondIndependent": {
+      "cases": 1198,
+      "top5": 540,
+      "top10": 631
+    },
+    "configured/aacEvalSentences": {
+      "cases": 693,
+      "top5": 421,
+      "top10": 476
+    },
+    "configured/independentTatoeba": {
+      "cases": 1199,
+      "top5": 697,
+      "top10": 816
+    },
+    "configured/secondIndependent": {
+      "cases": 1198,
+      "top5": 531,
+      "top10": 630
+    },
+    "learned/aacEvalSentences": {
+      "cases": 693,
+      "top5": 418,
+      "top10": 474
+    },
+    "learned/independentTatoeba": {
+      "cases": 1199,
+      "top5": 690,
+      "top10": 811
+    },
+    "learned/secondIndependent": {
+      "cases": 1198,
+      "top5": 528,
+      "top10": 626
+    }
+  },
+  "wordComputeMs": {
+    "p50": 1.151,
+    "p95": 2.023
+  },
+  "comparison": {
+    "changedWordBoards": 0,
+    "examples": [],
+    "baselineOutputSha256": "0a5e0bd4f582fbfecf521731166d39b6c67f1e62394eb98c591e43f0baa5074d",
+    "baselineComputeMs": {
+      "p50": 1.159,
+      "p95": 2.045
+    }
+  }
+}

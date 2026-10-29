@@ -1,0 +1,43 @@
+{
+  "python": "3.11.15",
+  "platform": "macOS-26.3.1-arm64-arm-64bit",
+  "cpu_count": 18,
+  "interval_ms": 150.0,
+  "seconds_per_mode": 15.0,
+  "workerPhrases": true,
+  "results": [
+    {
+      "mode": "idle",
+      "frames": 985,
+      "gaze_late_ms": {
+        "p50": 1.06,
+        "p95": 1.111,
+        "p99": 1.133,
+        "max": 1.241,
+        "over_5ms_pct": 0.0,
+        "over_15ms_pct": 0.0
+      },
+      "predictions": 0,
+      "prediction_round_trip_ms": {}
+    },
+    {
+      "mode": "process",
+      "frames": 985,
+      "gaze_late_ms": {
+        "p50": 1.057,
+        "p95": 1.116,
+        "p99": 1.145,
+        "max": 1.193,
+        "over_5ms_pct": 0.0,
+        "over_15ms_pct": 0.0
+      },
+      "predictions": 92,
+      "prediction_round_trip_ms": {
+        "p50": 13.038,
+        "p95": 15.404,
+        "p99": 16.564,
+        "mean": 13.209
+      }
+    }
+  ]
+}

@@ -12,6 +12,12 @@ smart bigrams and ONNX reranker) is kept only as a rollback.
   - Keystroke savings rise from 0.374 (4 visible legacy slots) to 0.589 (10 slots, production context).
   - [Full report](evaluation.md).
 
+The 29 October 2026 phrase update keeps this word engine and its assets unchanged.
+Literal phrase matching now runs in the same isolated worker, uses saved content
+and reviewed starters, and validates explicit edits. See
+[implementation and verification](phrase-improvements-2026-10-29.md).
+The message-display suggestion feature and LLM work remain deferred.
+
 ## Contents
 
 1. [Architecture and message contract](#architecture-and-message-contract)
@@ -79,13 +85,23 @@ The existing envelope is unchanged: `type`, fields and `request_id`.
 
 Phrase suggestion `mode` values:
 - `replace_token`: an abbreviation expansion that replaces the typed shortcut `token`.
-- `complete_or_append`: a sentence that completes the draft when it starts with it, and is otherwise appended.
+- `complete_sentence`: a literal completion of the active sentence; earlier text is preserved.
+- `replace_sentence`: a keyword expansion requiring explicit replacement review.
+- `complete_or_append`: legacy-compatible completion/append behavior (rollback clients only).
 - `append`: a starter.
 
+The new literal/replacement modes also carry `matched_text`, a UTF-16
+`replacement_start`, and `result_text`. The renderer rechecks the draft and
+preserved prefix. `replace_sentence` carries `requires_confirmation: true`.
+Up to twelve distinct phrase edits are available; the inline cell still shows
+one short choice. Expand → Suggested phrases opens the full paged chooser.
+
 Other messages:
-- **`set_prediction_context`** sends `{phrases, words}`, the household context, and is answered with `prediction_context_set` `{phrases, words}` counts. The renderer (`src/utils/predictionContext.ts`) sends it on connect and whenever the caregiver's configuration changes:
+- **`set_prediction_context`** sends `{phrases, words, phrase_items?}`, the household context, and is answered with `prediction_context_set` `{phrases, words}` counts. The renderer (`src/utils/predictionContext.ts`) sends it on connect and whenever the caregiver's configuration changes:
   - `phrases` (up to 2,000): enabled board phrases. The engine uses them as `phraseTexts`.
   - `words` (up to 200): People names and single-word Quick and Core Words. The engine uses them as caregiver `contentItems`.
+- **`accept_phrase`** `{text_before, text_after}` learns the new words through the undo journal, without adding spoken-sentence history.
+- `phrase_items` contains optional phrase-only enable/keyword/preference metadata; it never changes word-scoring inputs.
 - **`learn_word`** gains `text_before` and `text_after` (see Learning).
 - **`undo_word_learning`** `{text_before, text_after}` is sent by Delete Word.
 - **`reset_word_learning`** is answered with `word_learning_reset`.
@@ -115,7 +131,8 @@ Alternatives were rejected:
 ### Slot behaviour
 
 - **Positions come from the backend.** `presentWordSlots` keeps them. A slot is `null` rather than padded; it would otherwise hold a duplicate, a multi-word item or a word that doesn't complete the typed prefix.
-- **Empty slots stay in place, disabled and dimmed.** Nothing shifts.
+- **Current priority determines the row (29 Oct 2026).** The first five current word choices always occupy the top row. A bottom-row word that enters those five moves up; a word that leaves them moves down if it remains among the ten choices. Existing positions are kept within each row where possible. Whole-board stability must never strand a priority word below the letters. With five or fewer choices, all are on top. Scoring, candidate selection and the single-row five/six-slot consumers are unchanged.
+- **Empty slots are disabled and dimmed.** Row priority takes precedence over a word's old slot.
 - **Stale guard.** Slots are selectable only for the exact draft they were computed for (`prediction.text === draft`). They dim after 300 ms, so a normal round trip does not flicker.
 - **Reconnects.** While the backend is disconnected, nothing is requested. On reconnect, the keyboard requests the current draft again on a fresh board, because a restarted backend has no lineage. This was verified by stopping and restarting the backend mid-word.
 - **Dwell never carries over.** Each slot button is keyed `index:word`, so a changed word is a new element with fresh dwell progress, whether selected by mouse or gaze. `GazeCursor` tracks element identity and checks `isConnected`.
@@ -123,7 +140,7 @@ Alternatives were rejected:
   - The handler rechecks freshness and prefix fit against the current text.
   - It inserts exactly `acceptPredictedWord(draft, word)`: replace the unfinished word, then one space.
   - The renderer's insertion is checked against the engine's on the same reference-generated cases (`insertion_contract.v1.json`).
-- **Dwell timing.** Word slots and the phrase cell use the same `predictionButton` category as before (Words/suggestions, 1000 ms). Dwell groups are unchanged (500/1000/1250/1500/2000 ms) and `check:dwell-groups` passes.
+- **Dwell timing.** Word slots and the phrase cell use `predictionButton`, the selected timing set’s suggestion duration (1.1× its key time). The ten timing sets, onset/cooldown rules and gaze safeguards are unchanged; `check:dwell-groups` passes.
 - **Word label size.** Labels auto-fit using the slot's own width (`100cqw`), capped at `clamp(34px, 3.6vw, 52px)`.
 - **Zone Board.** It keeps six slots. Small integration fixes:
   - backend order is preserved (no re-sort by score);
@@ -274,7 +291,7 @@ Learning comes only from committed actions:
 
 - **Isolation.** The engine runs in a single spawned worker process: `ProcessPoolExecutor(max_workers=1)`, with an initializer that loads and warms the tables. Prediction therefore never blocks the asyncio gaze loop and never adds GC pauses to it. `thread` and `inline` modes exist for tests and constrained fallbacks.
 - **Scheduling.** Latest-only per client: at most one request computing and one waiting. Superseded requests are dropped, and a result that arrives after a newer request is discarded rather than sent.
-- **Lineage.** A slot position persists only while the same unfinished word grows after an unchanged confirmed text. Any deletion, finished word, changed context, navigation (`reset_lineage`) or disconnect starts a fresh board. Only delivered snapshots enter the lineage chain.
+- **Lineage.** A slot position persists within its current priority row only while the same unfinished word grows after unchanged confirmed text. The current first five choices take precedence over a prior bottom-row position. Any deletion, finished word, changed context, navigation (`reset_lineage`) or disconnect starts a fresh board. Only delivered snapshots enter the lineage chain.
 - **Disconnects.** Lineage and in-flight work for the client are dropped, work queued behind a closed connection is not computed, and nothing is sent to a closed connection.
 - **Worker crash.** A request that hits a dead worker is answered on a thread, and the next request respawns the worker (`BrokenProcessPool` recovery is tested).
 - **Worker lifetime.** Electron stops the backend with a hard kill (TerminateProcess on Windows), which skips executor shutdown. Before this fix, the worker was measured surviving as an orphan. The worker now watches its parent's sentinel and exits within about 200 ms. This is tested with a real hard kill.

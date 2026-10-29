@@ -5,8 +5,9 @@ Responsibilities:
     default; thread or inline are available for tests and fallback);
   * latest-only scheduling per client: at most one computation in flight and
     one waiting, older requests are dropped rather than queued;
-  * slot lineage: slot positions persist only while the SAME unfinished word
-    grows after an unchanged confirmed text. Any other edit, a new word, a
+  * slot lineage: positions persist within a priority row only while the SAME
+    unfinished word grows after unchanged confirmed text. The current best five
+    always occupy the top keyboard row. Any other edit, a new word, a
     sentence boundary, a replacement, navigation (explicit reset) or a
     disconnect starts a fresh board;
   * the learned-state snapshot and phrase data travel with each request, so a
@@ -73,9 +74,13 @@ class WordPredictionService:
         policy: str = 'gazeconnect',
         asset_dir: Optional[Path] = None,
         content_items: Optional[Any] = None,
+        phrase_context: Optional[Any] = None,
     ):
         self.store = store
         self._content_items = content_items or (lambda: [])
+        self._phrase_context = phrase_context
+        self._phrase_context_failed = False
+        self._phrase_items: List[Dict[str, Any]] = []
         self.execution = execution
         self.composition = composition
         self.policy_name = policy
@@ -158,6 +163,21 @@ class WordPredictionService:
     def set_phrases(self, phrases: Sequence[Any]) -> int:
         return self.set_context(phrases, self._configured_words)['phrases']
 
+    def set_phrase_items(self, items: Sequence[Any]) -> None:
+        """Phrase-only metadata. Never passed into the word scoring inputs."""
+        cleaned = []
+        for item in list(items)[:MAX_PHRASES]:
+            if not isinstance(item, dict):
+                continue
+            text = item.get('text')
+            if not isinstance(text, str) or not text.strip() or not self.english_only.allows(text):
+                continue
+            keywords = item.get('keywords', [])
+            cleaned.append({'text': text[:MAX_PHRASE_CHARS], 'enabled': item.get('enabled') is not False,
+                            'priority': item.get('priority', 0),
+                            'keywords': [k[:40] for k in keywords[:8] if isinstance(k, str)] if isinstance(keywords, list) else []})
+        self._phrase_items = cleaned
+
     def content_items(self) -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []
         seen = set()
@@ -180,6 +200,16 @@ class WordPredictionService:
         if (previous is not None and previous.confirmed == confirmed and previous.prefix and prefix and
                 len(prefix) >= len(previous.prefix) and prefix.startswith(previous.prefix)):
             lineage = {'prefix': previous.prefix, 'candidates': previous.candidates, 'slots': previous.slots}
+        phrase_context = None
+        if self._phrase_context:
+            try:
+                phrase_context = self._phrase_context(text)
+                self._phrase_context_failed = False
+            except Exception:
+                phrase_context = {}
+                if not self._phrase_context_failed:
+                    logger.warning('Phrase context unavailable; word prediction continues.', exc_info=True)
+                self._phrase_context_failed = True
         return {
             'draft': text,
             'slot_count': slot_count,
@@ -188,6 +218,8 @@ class WordPredictionService:
             'state': self.store.snapshot(),
             'phrases': list(self._phrases),
             'content_items': self.content_items(),
+            'phrase_context': phrase_context,
+            'phrase_items': self._phrase_items,
         }
 
     def _remember(self, client: Any, text: str, result: Dict[str, Any]) -> None:

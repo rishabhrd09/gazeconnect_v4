@@ -111,11 +111,11 @@ class SentencePredictor:
                 sl = item['text'].lower()
                 if sl in seen_texts:
                     continue
-                    if any(w.startswith(last_word) for w in sl.split()):
-                        count = item.get('count', 1)
-                        base_score = 0.5 * min(count, 5)
-                        scored.append((self._topic_score(base_score, item['text'], None, topic_boosts), item['text'], 'keyword'))
-                    seen_texts.add(sl)
+                if any(w.startswith(last_word) for w in sl.split()):
+                    count = item.get('count', 1)
+                    base_score = 0.5 * min(count, 5)
+                    scored.append((self._topic_score(base_score, item['text'], None, topic_boosts), item['text'], 'keyword'))
+                seen_texts.add(sl)
 
         # 4. Fuzzy: match last typed word in middle of history sentences
         #    Only triggers for meaningful input (3+ char last word, 2+ count)

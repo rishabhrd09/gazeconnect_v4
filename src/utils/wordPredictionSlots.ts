@@ -4,8 +4,8 @@
  * Three kinds of suggestion, three different edits. Each is tested on its own in
  * scripts/check-word-prediction-slots.cjs rather than routed through one helper:
  *   - word slot:      replace ONLY the unfinished word, then one space
- *   - sentence:       complete the typed text when the sentence starts with it,
- *                     otherwise append it after the typed text
+ *   - sentence:       complete the active sentence, keeping confirmed text;
+ *                     keyword replacements require explicit review
  *   - abbreviation:   replace the typed shortcut token with its expansion
  */
 
@@ -21,7 +21,7 @@ export interface WordPredictionMeta {
   lineage?: boolean;
 }
 
-export type SentenceMode = 'complete_or_append' | 'append' | 'replace_token';
+export type SentenceMode = 'complete_or_append' | 'append' | 'replace_token' | 'complete_sentence' | 'replace_sentence';
 
 export interface SentenceSuggestion {
   text: string;
@@ -30,6 +30,10 @@ export interface SentenceSuggestion {
   mode?: SentenceMode;
   /** For replace_token: the shortcut the expansion was computed for. */
   token?: string;
+  matched_text?: string;
+  replacement_start?: number;
+  result_text?: string;
+  requires_confirmation?: boolean;
 }
 
 /** The unfinished word as the prediction engine reads it (NFKC, ’ -> ', letters and apostrophes). */
@@ -60,9 +64,28 @@ export function wordFitsText(text: string, word: string): boolean {
 }
 
 /** Returns the new text, or null when the suggestion no longer applies to `text`. */
-export function acceptSentenceSuggestion(text: string, suggestion: SentenceSuggestion): string | null {
+export function acceptSentenceSuggestion(text: string, suggestion: SentenceSuggestion, replacementReviewed = false): string | null {
   const phrase = suggestion.text.trim();
   if (!phrase) return null;
+  if (suggestion.matched_text !== undefined && suggestion.matched_text !== text) return null;
+  if (suggestion.requires_confirmation && !replacementReviewed) return null;
+  if (suggestion.mode === 'complete_sentence' || suggestion.mode === 'replace_sentence') {
+    const start = suggestion.replacement_start;
+    const result = suggestion.result_text;
+    if (!Number.isSafeInteger(start) || start! < 0 || start! > text.length || typeof result !== 'string'
+      || suggestion.matched_text !== text || !result.startsWith(text.slice(0, start))) return null;
+    if (start! > 0 && /[\uD800-\uDBFF]/.test(text[start! - 1])) return null;
+    if (suggestion.mode === 'replace_sentence') {
+      return replacementReviewed && suggestion.requires_confirmation === true
+        && result === text.slice(0, start) + phrase + ' ' ? result : null;
+    }
+    const active = text.slice(start);
+    const confirmed = active.replace(/[A-Za-z'’]+$/, '');
+    if (!result.slice(start).startsWith(confirmed) || result.trimEnd() === text.trimEnd()) return null;
+    const normalize = (value: string) => value.normalize('NFKC').replace(/’/g, "'").replace(/\s+/g, ' ').toLowerCase();
+    if (!normalize(result.slice(start)).startsWith(normalize(active))) return null;
+    return result;
+  }
   if (suggestion.mode === 'replace_token') {
     const token = text.match(/(\S+)$/)?.[1] ?? '';
     if (!token || (suggestion.token && token.toLowerCase() !== suggestion.token.toLowerCase())) return null;
@@ -106,6 +129,13 @@ export function presentWordSlots(
 /** Slots are selectable only for the draft they were computed for. */
 export function predictionsAreFresh(meta: WordPredictionMeta | null | undefined, text: string): boolean {
   return !meta || meta.text === text;
+}
+
+/** Prefer a usable literal completion; keyword rewrites are reviewed separately. */
+export function inlineSentenceSuggestion(suggestions: ReadonlyArray<SentenceSuggestion>, text: string): SentenceSuggestion | null {
+  const eligible = suggestions.filter(s => acceptSentenceSuggestion(text, s, s.requires_confirmation === true) !== null);
+  const literal = eligible.filter(s => !s.requires_confirmation);
+  return (literal.length ? literal : eligible).find(s => isShortSentence(s.text)) ?? null;
 }
 
 /** Short phrase buttons only: long sentence suggestions were confusing on the keyboard. */

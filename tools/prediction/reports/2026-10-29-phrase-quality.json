@@ -1,0 +1,1799 @@
+{
+  "scope": "26 synthetic probes; configured-content recall measured on 20 cases; first/second sentences; no fresh held-out corpus or hardware claim",
+  "configuredRecallCounts": {
+    "cases": 20,
+    "beforeTop1": 1,
+    "afterTop1": 16,
+    "beforeAny4": 3,
+    "afterAny4": 20,
+    "afterAny12": 20
+  },
+  "cases": [
+    {
+      "draft": "Could ",
+      "expected": "Could you bring my glasses",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Could you help me please",
+          "score": 0.8,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Could you adjust my pillow",
+          "score": 0.8,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Could you check my oxygen",
+          "score": 0.8,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Could you call the doctor",
+          "score": 0.8,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Could you bring my glasses",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you bring my glasses "
+        },
+        {
+          "text": "Could you help me please",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you help me please "
+        },
+        {
+          "text": "Could you adjust my pillow",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you adjust my pillow "
+        },
+        {
+          "text": "Could you check my oxygen",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you check my oxygen "
+        },
+        {
+          "text": "Could you call the doctor",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you call the doctor "
+        },
+        {
+          "text": "Could you turn me slowly",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you turn me slowly "
+        },
+        {
+          "text": "Could you",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could you "
+        },
+        {
+          "text": "Could I have",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "Could ",
+          "replacement_start": 0,
+          "result_text": "Could I have "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Could ",
+      "expected": "Could you bring my glasses",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Could you help me please",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Could you adjust my pillow",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Could you check my oxygen",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Could you call the doctor",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Could you bring my glasses",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you bring my glasses "
+        },
+        {
+          "text": "Could you help me please",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you help me please "
+        },
+        {
+          "text": "Could you adjust my pillow",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you adjust my pillow "
+        },
+        {
+          "text": "Could you check my oxygen",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you check my oxygen "
+        },
+        {
+          "text": "Could you call the doctor",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you call the doctor "
+        },
+        {
+          "text": "Could you turn me slowly",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you turn me slowly "
+        },
+        {
+          "text": "Could you",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you "
+        },
+        {
+          "text": "Could I have",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could I have "
+        }
+      ]
+    },
+    {
+      "draft": "Could you bring my gl",
+      "expected": "Could you bring my glasses",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Could you bring my glasses",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Could you bring my gl",
+          "replacement_start": 0,
+          "result_text": "Could you bring my glasses "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Could you bring my gl",
+      "expected": "Could you bring my glasses",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Could you bring my glasses",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Could you bring my gl",
+          "replacement_start": 11,
+          "result_text": "I am cold. Could you bring my glasses "
+        }
+      ]
+    },
+    {
+      "draft": "Please ",
+      "expected": "Please adjust my cushion",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Please do suction",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please change my position",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Please check my cushion",
+          "score": 32.3,
+          "source": "history",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please check my cushion "
+        },
+        {
+          "text": "Please adjust my cushion",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please adjust my cushion "
+        },
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please turn on the bedside lamp "
+        },
+        {
+          "text": "Please do suction",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please do suction "
+        },
+        {
+          "text": "Please change my position",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please change my position "
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please call the doctor "
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please give me medicine "
+        },
+        {
+          "text": "Please turn on the fan",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please turn on the fan "
+        },
+        {
+          "text": "Please close the door",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please close the door "
+        },
+        {
+          "text": "Please turn off the light",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please turn off the light "
+        },
+        {
+          "text": "Please give me water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please give me water "
+        },
+        {
+          "text": "Please check my BP",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please check my BP "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Please ",
+      "expected": "Please adjust my cushion",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Please do suction",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please change my position",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Please check my cushion",
+          "score": 32.3,
+          "source": "history",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please check my cushion "
+        },
+        {
+          "text": "Please adjust my cushion",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please adjust my cushion "
+        },
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn on the bedside lamp "
+        },
+        {
+          "text": "Please do suction",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please do suction "
+        },
+        {
+          "text": "Please change my position",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please change my position "
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please call the doctor "
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please give me medicine "
+        },
+        {
+          "text": "Please turn on the fan",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn on the fan "
+        },
+        {
+          "text": "Please close the door",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please close the door "
+        },
+        {
+          "text": "Please turn off the light",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn off the light "
+        },
+        {
+          "text": "Please give me water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please give me water "
+        },
+        {
+          "text": "Please check my BP",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please check my BP "
+        }
+      ]
+    },
+    {
+      "draft": "Please adjust my cu",
+      "expected": "Please adjust my cushion",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Please adjust my cushion",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please adjust my cu",
+          "replacement_start": 0,
+          "result_text": "Please adjust my cushion "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Please adjust my cu",
+      "expected": "Please adjust my cushion",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Please adjust my cushion",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please adjust my cu",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please adjust my cushion "
+        }
+      ]
+    },
+    {
+      "draft": "I ",
+      "expected": "I do not want visitors",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "I do not want visitors",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I do not want visitors "
+        },
+        {
+          "text": "I want warm water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want warm water "
+        },
+        {
+          "text": "I want cold water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want cold water "
+        },
+        {
+          "text": "I want to change position",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want to change position "
+        },
+        {
+          "text": "I want medicine",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want medicine "
+        },
+        {
+          "text": "I want to rest",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want to rest "
+        },
+        {
+          "text": "I want to eat",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want to eat "
+        },
+        {
+          "text": "I want to go to toilet",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want to go to toilet "
+        },
+        {
+          "text": "I want black tea",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want black tea "
+        },
+        {
+          "text": "I want to sleep",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want to sleep "
+        },
+        {
+          "text": "I want to sit up",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want to sit up "
+        },
+        {
+          "text": "I want milk",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I ",
+          "replacement_start": 0,
+          "result_text": "I want milk "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. I ",
+      "expected": "I do not want visitors",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "I do not want visitors",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I do not want visitors "
+        },
+        {
+          "text": "I want warm water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want warm water "
+        },
+        {
+          "text": "I want cold water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want cold water "
+        },
+        {
+          "text": "I want to change position",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want to change position "
+        },
+        {
+          "text": "I want medicine",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want medicine "
+        },
+        {
+          "text": "I want to rest",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want to rest "
+        },
+        {
+          "text": "I want to eat",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want to eat "
+        },
+        {
+          "text": "I want to go to toilet",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want to go to toilet "
+        },
+        {
+          "text": "I want black tea",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want black tea "
+        },
+        {
+          "text": "I want to sleep",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want to sleep "
+        },
+        {
+          "text": "I want to sit up",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want to sit up "
+        },
+        {
+          "text": "I want milk",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I ",
+          "replacement_start": 11,
+          "result_text": "I am cold. I want milk "
+        }
+      ]
+    },
+    {
+      "draft": "I do not want vi",
+      "expected": "I do not want visitors",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "I do not want visitors",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I do not want vi",
+          "replacement_start": 0,
+          "result_text": "I do not want visitors "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. I do not want vi",
+      "expected": "I do not want visitors",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "I do not want visitors",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. I do not want vi",
+          "replacement_start": 11,
+          "result_text": "I am cold. I do not want visitors "
+        }
+      ]
+    },
+    {
+      "draft": "Please ",
+      "expected": "Please turn on the bedside lamp",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Please do suction",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please change my position",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Please check my cushion",
+          "score": 32.3,
+          "source": "history",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please check my cushion "
+        },
+        {
+          "text": "Please adjust my cushion",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please adjust my cushion "
+        },
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please turn on the bedside lamp "
+        },
+        {
+          "text": "Please do suction",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please do suction "
+        },
+        {
+          "text": "Please change my position",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please change my position "
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please call the doctor "
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please give me medicine "
+        },
+        {
+          "text": "Please turn on the fan",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please turn on the fan "
+        },
+        {
+          "text": "Please close the door",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please close the door "
+        },
+        {
+          "text": "Please turn off the light",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please turn off the light "
+        },
+        {
+          "text": "Please give me water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please give me water "
+        },
+        {
+          "text": "Please check my BP",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please ",
+          "replacement_start": 0,
+          "result_text": "Please check my BP "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Please ",
+      "expected": "Please turn on the bedside lamp",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Please do suction",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please change my position",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Please check my cushion",
+          "score": 32.3,
+          "source": "history",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please check my cushion "
+        },
+        {
+          "text": "Please adjust my cushion",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please adjust my cushion "
+        },
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn on the bedside lamp "
+        },
+        {
+          "text": "Please do suction",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please do suction "
+        },
+        {
+          "text": "Please change my position",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please change my position "
+        },
+        {
+          "text": "Please call the doctor",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please call the doctor "
+        },
+        {
+          "text": "Please give me medicine",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please give me medicine "
+        },
+        {
+          "text": "Please turn on the fan",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn on the fan "
+        },
+        {
+          "text": "Please close the door",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please close the door "
+        },
+        {
+          "text": "Please turn off the light",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn off the light "
+        },
+        {
+          "text": "Please give me water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please give me water "
+        },
+        {
+          "text": "Please check my BP",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please check my BP "
+        }
+      ]
+    },
+    {
+      "draft": "Please turn on the bedside la",
+      "expected": "Please turn on the bedside lamp",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please turn on the bedside la",
+          "replacement_start": 0,
+          "result_text": "Please turn on the bedside lamp "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Please turn on the bedside la",
+      "expected": "Please turn on the bedside lamp",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Please turn on the bedside la",
+          "replacement_start": 11,
+          "result_text": "I am cold. Please turn on the bedside lamp "
+        }
+      ]
+    },
+    {
+      "draft": "Call ",
+      "expected": "Call Rishabh",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Call ambulance",
+          "score": 1.7550000000000001,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Call Rishabh",
+          "score": 1.3,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Call mummy",
+          "score": 1.3,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Call the doctor",
+          "score": 1.3,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Call Rishabh",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Rishabh "
+        },
+        {
+          "text": "Call mummy",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call mummy "
+        },
+        {
+          "text": "Call the doctor",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call the doctor "
+        },
+        {
+          "text": "Call the nurse",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call the nurse "
+        },
+        {
+          "text": "Call Parakh",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Parakh "
+        },
+        {
+          "text": "Call Bhawana",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Bhawana "
+        },
+        {
+          "text": "Call Nilesh",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Nilesh "
+        },
+        {
+          "text": "Call Durgesh",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Durgesh "
+        },
+        {
+          "text": "Call Rahul",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Rahul "
+        },
+        {
+          "text": "Call Caretaker",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call Caretaker "
+        },
+        {
+          "text": "Call bhaiya",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call bhaiya "
+        },
+        {
+          "text": "Call ambulance",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Call ",
+          "replacement_start": 0,
+          "result_text": "Call ambulance "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Call ",
+      "expected": "Call Rishabh",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Tell bhaiya to call me",
+          "score": 1.0530000000000002,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Tell Rishabh to call me",
+          "score": 1.0530000000000002,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Call Rishabh",
+          "score": 1.0530000000000002,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Call mummy",
+          "score": 1.0530000000000002,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Call Rishabh",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Rishabh "
+        },
+        {
+          "text": "Call mummy",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call mummy "
+        },
+        {
+          "text": "Call the doctor",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call the doctor "
+        },
+        {
+          "text": "Call the nurse",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call the nurse "
+        },
+        {
+          "text": "Call Parakh",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Parakh "
+        },
+        {
+          "text": "Call Bhawana",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Bhawana "
+        },
+        {
+          "text": "Call Nilesh",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Nilesh "
+        },
+        {
+          "text": "Call Durgesh",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Durgesh "
+        },
+        {
+          "text": "Call Rahul",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Rahul "
+        },
+        {
+          "text": "Call Caretaker",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Caretaker "
+        },
+        {
+          "text": "Call bhaiya",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call bhaiya "
+        },
+        {
+          "text": "Call ambulance",
+          "score": 20.0,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call ",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call ambulance "
+        }
+      ]
+    },
+    {
+      "draft": "Call Ri",
+      "expected": "Call Rishabh",
+      "group": "configured",
+      "suggestions": [
+        {
+          "text": "Call Rishabh",
+          "score": 1.3,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Call Rishabh",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Call Ri",
+          "replacement_start": 0,
+          "result_text": "Call Rishabh "
+        }
+      ]
+    },
+    {
+      "draft": "I am cold. Call Ri",
+      "expected": "Call Rishabh",
+      "group": "configured",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Call Rishabh",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "I am cold. Call Ri",
+          "replacement_start": 11,
+          "result_text": "I am cold. Call Rishabh "
+        }
+      ]
+    },
+    {
+      "draft": "i need wa",
+      "expected": "I need water",
+      "group": "regression",
+      "suggestions": [
+        {
+          "text": "I need water",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "I need water",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "i need wa",
+          "replacement_start": 0,
+          "result_text": "i need water "
+        }
+      ]
+    },
+    {
+      "draft": "I need water ",
+      "expected": null,
+      "group": "regression",
+      "suggestions": [
+        {
+          "text": "I need water",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "I want warm water",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "I want cold water",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please give me water",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": []
+    },
+    {
+      "draft": "suction",
+      "expected": "I need suction",
+      "group": "regression",
+      "suggestions": [
+        {
+          "text": "I need suction",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please do suction",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Help me with suction",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Need suction",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Help me with suction",
+          "score": 10.175,
+          "source": "template",
+          "mode": "replace_sentence",
+          "matched_text": "suction",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "Help me with suction "
+        },
+        {
+          "text": "TT suction needed now",
+          "score": 10.175,
+          "source": "template",
+          "mode": "replace_sentence",
+          "matched_text": "suction",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "TT suction needed now "
+        },
+        {
+          "text": "Oral suction needed",
+          "score": 10.175,
+          "source": "template",
+          "mode": "replace_sentence",
+          "matched_text": "suction",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "Oral suction needed "
+        },
+        {
+          "text": "I need suction",
+          "score": 10.0,
+          "source": "template",
+          "mode": "replace_sentence",
+          "matched_text": "suction",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "I need suction "
+        },
+        {
+          "text": "Please do suction",
+          "score": 10.0,
+          "source": "template",
+          "mode": "replace_sentence",
+          "matched_text": "suction",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "Please do suction "
+        },
+        {
+          "text": "Need suction",
+          "score": 10.0,
+          "source": "template",
+          "mode": "replace_sentence",
+          "matched_text": "suction",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "Need suction "
+        }
+      ]
+    },
+    {
+      "draft": "cushion",
+      "expected": "Please adjust my cushion",
+      "group": "regression",
+      "suggestions": [],
+      "after": [
+        {
+          "text": "Please check my cushion",
+          "score": 16.15,
+          "source": "history",
+          "mode": "replace_sentence",
+          "matched_text": "cushion",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "Please check my cushion "
+        },
+        {
+          "text": "Please adjust my cushion",
+          "score": 15.0,
+          "source": "configured",
+          "mode": "replace_sentence",
+          "matched_text": "cushion",
+          "replacement_start": 0,
+          "requires_confirmation": true,
+          "result_text": "Please adjust my cushion "
+        }
+      ]
+    },
+    {
+      "draft": "i do not",
+      "expected": "I do not want",
+      "group": "regression",
+      "suggestions": [
+        {
+          "text": "Pain medicine not working",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Medicine is not working",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Wait I am not finished",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Do not worry about me",
+          "score": 0.81,
+          "source": "keyword",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "I do not want visitors",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "i do not",
+          "replacement_start": 0,
+          "result_text": "i do not want visitors "
+        },
+        {
+          "text": "I do not want",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "i do not",
+          "replacement_start": 0,
+          "result_text": "i do not want "
+        },
+        {
+          "text": "I do not like",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "i do not",
+          "replacement_start": 0,
+          "result_text": "i do not like "
+        },
+        {
+          "text": "I do not understand",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "i do not",
+          "replacement_start": 0,
+          "result_text": "i do not understand "
+        },
+        {
+          "text": "I do not know",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "i do not",
+          "replacement_start": 0,
+          "result_text": "i do not know "
+        }
+      ]
+    },
+    {
+      "draft": "Please turn o",
+      "expected": "Please turn on the fan",
+      "group": "regression",
+      "suggestions": [
+        {
+          "text": "Please turn on the fan",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        },
+        {
+          "text": "Please turn off the light",
+          "score": 1.35,
+          "source": "template",
+          "mode": "complete_or_append"
+        }
+      ],
+      "after": [
+        {
+          "text": "Please turn on the bedside lamp",
+          "score": 30.0,
+          "source": "configured",
+          "mode": "complete_sentence",
+          "matched_text": "Please turn o",
+          "replacement_start": 0,
+          "result_text": "Please turn on the bedside lamp "
+        },
+        {
+          "text": "Please turn on the fan",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please turn o",
+          "replacement_start": 0,
+          "result_text": "Please turn on the fan "
+        },
+        {
+          "text": "Please turn off the light",
+          "score": 20.35,
+          "source": "template",
+          "mode": "complete_sentence",
+          "matched_text": "Please turn o",
+          "replacement_start": 0,
+          "result_text": "Please turn off the light "
+        },
+        {
+          "text": "Please turn on",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "Please turn o",
+          "replacement_start": 0,
+          "result_text": "Please turn on "
+        },
+        {
+          "text": "Please turn off",
+          "score": 10.0,
+          "source": "starter",
+          "mode": "complete_sentence",
+          "matched_text": "Please turn o",
+          "replacement_start": 0,
+          "result_text": "Please turn off "
+        }
+      ]
+    }
+  ]
+}

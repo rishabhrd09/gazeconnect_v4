@@ -1,0 +1,29 @@
+/* Deliberately opened phrase chooser; no normal keyboard rectangle is changed. */
+.keyboard-screen .phrase-panel {
+  position: absolute; inset: 0; z-index: 45;
+  display: flex; flex-direction: column; gap: clamp(14px, 2vh, 24px);
+  padding: clamp(20px, 3vh, 36px) clamp(24px, 5vw, 96px);
+  background: var(--design-page, var(--ui-page)); color: var(--design-ink, var(--ui-ink));
+  font-family: inherit; overflow: hidden;
+}
+.keyboard-screen .phrase-panel h2 { margin: 0; font-size: clamp(26px, 3.5vh, 40px); font-weight: 800; }
+.keyboard-screen .phrase-panel-choices { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(3, minmax(80px, 1fr)); gap: clamp(12px, 2vh, 22px); }
+.keyboard-screen .phrase-panel button {
+  width: 100% !important; height: 100% !important; min-height: 80px !important;
+  background: var(--design-card, var(--ui-surface)) !important;
+  color: var(--design-ink, var(--ui-ink)) !important;
+  border: 1px solid var(--design-border, var(--ui-border)) !important;
+  border-radius: 14px; padding: clamp(12px, 1.8vh, 22px) !important;
+  font-size: clamp(24px, 3.1vh, 36px); font-weight: 800; line-height: 1.25;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.keyboard-screen .phrase-panel-choice-label { display: block; font-size: clamp(16px, 1.9vh, 22px); font-weight: 600; margin-bottom: 6px; color: var(--design-muted, var(--ui-muted)); }
+.keyboard-screen .phrase-panel-navigation { display: flex; gap: clamp(14px, 2vw, 28px); height: clamp(88px, 12vh, 130px); flex-shrink: 0; }
+.keyboard-screen .phrase-panel-navigation > button { flex: 1; }
+.keyboard-screen .phrase-panel-page { text-align: center; font-size: clamp(16px, 2vh, 22px); }
+.keyboard-screen .phrase-review-copy { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(12px, 2vh, 24px); }
+.keyboard-screen .phrase-review-copy p { margin: 0; font-size: clamp(20px, 2.8vh, 30px); overflow-wrap: anywhere; }
+.keyboard-screen .phrase-review-result { font-size: clamp(26px, 4vh, 46px); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.keyboard-screen .keyboard-phrase-action-label { display: block; font-size: clamp(16px, 1.8vh, 20px); line-height: 1.2; margin-bottom: 3px; }
+.keyboard-screen .expanded-display-actions { display: flex; gap: clamp(14px, 2vw, 28px); flex-shrink: 0; }
+.keyboard-screen .expanded-display-actions > button { flex: 1; }

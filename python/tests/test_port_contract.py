@@ -26,6 +26,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'python'))
@@ -81,7 +82,34 @@ class EnsurePortAvailableTest(unittest.TestCase):
             holder.close()
         message = str(caught.exception)
         self.assertIn(str(port), message)
-        self.assertIn('status-dev.bat', message, 'the message must say how to look')
+        self.assertIn('status-dev.bat' if os.name == 'nt' else 'lsof', message, 'the message must say how to look')
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX socket reuse rules')
+    def test_closed_connection_does_not_block_a_fast_restart(self):
+        # The server closes first, leaving its local port in TIME_WAIT. This
+        # reproduced the Mac failure even though no process was listening.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind(('127.0.0.1', 0))
+            port = server.getsockname()[1]
+            server.listen(1)
+            with socket.create_connection(('127.0.0.1', port)) as client:
+                with server.accept()[0] as accepted:
+                    accepted.shutdown(socket.SHUT_WR)
+                    self.assertEqual(client.recv(1), b'')
+        main.ensure_port_available('127.0.0.1', port)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as next_server:
+            next_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            next_server.bind(('127.0.0.1', port))
+            next_server.listen(1)
+            with self.assertRaises(main.PortInUseError):
+                main.ensure_port_available('127.0.0.1', port)
+
+    def test_windows_probe_still_never_enables_socket_reuse(self):
+        with mock.patch('main.socket.socket') as make_socket, mock.patch('main.os.name', 'nt'):
+            main.ensure_port_available('127.0.0.1', 12345)
+        make_socket.return_value.setsockopt.assert_not_called()
+        make_socket.return_value.bind.assert_called_once_with(('127.0.0.1', 12345))
 
 
 def start_stand_in_parent():

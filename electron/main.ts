@@ -1402,9 +1402,14 @@ const PORT_IN_USE_EXIT_CODE = 3;
 let reportedBackendPortInUse = false;
 
 function reportBackendPortInUse(): void {
+  const recovery = process.platform === 'win32'
+    ? 'Close the other copy of GazeConnect, or run stop-dev.bat (status-dev.bat shows what is holding '
+      + 'the port), then start the app again.'
+    : 'Quit the other copy of GazeConnect with Command+Q, then start the app again.\n\n'
+      + 'To inspect what is listening, run this in Terminal:\n'
+      + 'lsof -nP -iTCP:8765 -sTCP:LISTEN';
   const message = 'Another GazeConnect backend is already using port 8765, so this one stopped.\n\n'
-    + 'Close the other copy of GazeConnect, or run stop-dev.bat (status-dev.bat shows what is holding '
-    + 'the port), then start the app again.';
+    + recovery;
   console.error(`[Python] ${message.replace(/\n+/g, ' ')}`);
   if (reportedBackendPortInUse || isQuitting) return;
   reportedBackendPortInUse = true;

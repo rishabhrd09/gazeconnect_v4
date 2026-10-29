@@ -1,0 +1,116 @@
+{
+  "protocol": "existing shared held-out sets, 0-2 letter strict prefixes; synthetic fresh/configured/learned profiles; exact anchored ten-slot outputs and lineage; no hardware claim",
+  "inputSha256": "299d2b8ba2477f39d277a81928bff1f38ea93ffa5bf601947e88132eca72bfd1",
+  "limitPerSet": 60,
+  "outputSha256": "2c8f429ee65dcd2301656aea88a59e72c6f8686df44f91e2304cb85f98a26100",
+  "wordBoards": 8667,
+  "metrics": {
+    "fresh/aacEvalSentences": {
+      "cases": 693,
+      "top5": 424,
+      "top10": 478
+    },
+    "fresh/independentTatoeba": {
+      "cases": 1199,
+      "top5": 702,
+      "top10": 819
+    },
+    "fresh/secondIndependent": {
+      "cases": 1198,
+      "top5": 540,
+      "top10": 631
+    },
+    "configured/aacEvalSentences": {
+      "cases": 693,
+      "top5": 421,
+      "top10": 476
+    },
+    "configured/independentTatoeba": {
+      "cases": 1199,
+      "top5": 697,
+      "top10": 816
+    },
+    "configured/secondIndependent": {
+      "cases": 1198,
+      "top5": 531,
+      "top10": 630
+    },
+    "learned/aacEvalSentences": {
+      "cases": 693,
+      "top5": 418,
+      "top10": 474
+    },
+    "learned/independentTatoeba": {
+      "cases": 1199,
+      "top5": 690,
+      "top10": 811
+    },
+    "learned/secondIndependent": {
+      "cases": 1198,
+      "top5": 528,
+      "top10": 626
+    }
+  },
+  "wordComputeMs": {
+    "p50": 1.183,
+    "p95": 1.944
+  },
+  "comparison": {
+    "changedWordBoards": 61,
+    "examples": [
+      "learned\u001flineage:call ris",
+      "learned\u001flineage:call rishabh",
+      "learned\u001flineage:call ri",
+      "fresh\u001flineage:please adjust my",
+      "learned\u001flineage:please adjust my pillow",
+      "fresh\u001flineage:i don't want",
+      "fresh\u001flineage:please adjust my pillo",
+      "configured\u001flineage:please adjust my pill",
+      "learned\u001flineage:i ne",
+      "fresh\u001flineage:call ris",
+      "learned\u001flineage:call rishab",
+      "fresh\u001flineage:i need wat",
+      "learned\u001flineage:cal",
+      "fresh\u001flineage:please adjust my pill",
+      "learned\u001flineage:pleas",
+      "learned\u001flineage:call rish",
+      "configured\u001flineage:call ris",
+      "learned\u001flineage:i do",
+      "configured\u001flineage:i don't want",
+      "learned\u001flineage:i need wate"
+    ],
+    "baselineOutputSha256": "0a5e0bd4f582fbfecf521731166d39b6c67f1e62394eb98c591e43f0baa5074d",
+    "baselineComputeMs": {
+      "p50": 1.159,
+      "p95": 2.045
+    },
+    "mode": "row-promotion",
+    "changedRankingOrScoreBoards": 0,
+    "beforePriorityRowViolations": 57,
+    "afterPriorityRowViolations": 0
+  },
+  "uiVerification": {
+    "combinations": 24,
+    "realBottomToTopPromotions": 120,
+    "changedWordTargetsRemounted": true,
+    "errors": 0,
+    "scope": "isolated real backend, temporary profiles, native speech disabled; no hardware claim"
+  },
+  "screenshotRegression": {
+    "confirmedText": "plots and money left suction awkward crazy situation mainte ",
+    "typedPrefixes": [
+      "m",
+      "ma",
+      "mai",
+      "main",
+      "maint",
+      "mainte"
+    ],
+    "finalTopRowWords": [
+      "maintenance",
+      "maintenances"
+    ],
+    "finalBottomRowWords": [],
+    "rowMembershipCheckedAfterEveryLetter": true
+  }
+}
