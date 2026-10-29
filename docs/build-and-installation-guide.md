@@ -192,6 +192,15 @@ Do NOT share: `win-unpacked/`, `builder-debug.yml`, `builder-effective-config.ya
 4. The app installs to `C:\Users\<Name>\AppData\Local\Programs\GazeConnect Pro`
 5. A desktop shortcut and Start Menu entry are created
 
+### Installing a new build on this computer
+
+Double-click `install-latest.bat` in the project folder. It takes the newest build in `release\`, checks
+that the installer is the exact file the build made (its SHA-256 against the build's own
+`installer-sha256.json`; a changed or damaged installer is never run), shows its version, when and from
+which commit it was built, asks before closing a running GazeConnect and before installing, and then
+starts the installer with your own rights. Nothing is downloaded. `install-latest.bat --check` does the
+checks and installs nothing. Settings, phrases and the music library are kept across an installation.
+
 ### Running the installed app
 
 - Double-click the "GazeConnect Pro" desktop shortcut, or

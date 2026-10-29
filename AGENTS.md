@@ -139,7 +139,8 @@ AAC (Augmentative & Alternative Communication) app for ALS/MND patients using To
 - `.\stop-dev.bat` — Close the running development app from any terminal (only processes from this checkout). `--force` additionally stops a program outside the checkout that holds 8765 or 5555, after naming it
 - `.\status-dev.bat` — What is running from this checkout and who holds each port; changes nothing (exit 0 ready, 1 running, 2 a fixed port is held by something else)
 - Launch port handling: a previous GazeConnect (this checkout or the installed app) is closed automatically; the interface server (5173-5183) and floor plan server (5050-5060) take the next free port; backend 8765 and helper 5555 stay fixed, and a foreign program holding them is named, never stopped.
-- `.\build-installer.bat` — Build production .exe installer
+- `.\build-installer.bat` — Build production .exe installer; its `build-manifest.json` records the commit it was built from (`gitCommit`) and how many tracked files differed (`gitUncommittedChanges`)
+- `.\install-latest.bat` — Install the newest build in `release\` (`scripts\windows\Install-Latest.ps1`): refuses an installer whose SHA-256 is not the one the build recorded in `installer-sha256.json`, or an incomplete build folder; shows version, build time, commit and signature; asks before closing a running GazeConnect and before installing; runs the installer with the user's own rights and downloads nothing. `--check` does every check and installs nothing (use it from agents)
 - `.\check-windows.bat` — Finite Windows dependency, DLL and port readiness checks after setup
 
 ## Runtime Logging Safety

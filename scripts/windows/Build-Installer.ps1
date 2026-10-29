@@ -121,6 +121,10 @@ try {
         status = $(if ($Distribution) { 'approved-by-external-release-record' } else { 'LOCAL-VALIDATION-CANDIDATE-NOT-FOR-DISTRIBUTION' })
         node = (& node.exe --version); dotnetSdk = (& dotnet.exe --version)
         python = (& $VenvPython --version); pythonPackages = @(& $VenvPython -m pip freeze)
+        # The commit this installer was built from, and how many tracked files differed from it
+        # (install-latest.bat shows both). cmd discards git's stderr, as PowerShell 5.1 would raise it.
+        gitCommit = [string](& cmd.exe /d /c "git -C `"$ProjectRoot`" rev-parse HEAD 2>nul")
+        gitUncommittedChanges = @(& cmd.exe /d /c "git -C `"$ProjectRoot`" status --porcelain --untracked-files=no 2>nul").Count
         packageLockSha256 = (Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'package-lock.json') -Algorithm SHA256).Hash
         vendorSha256 = [ordered]@{}
         knownValidationLimit = 'Build self-tests do not certify clean-machine install, hardware performance, signing, security, or vendor license scope.'

@@ -29,6 +29,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - `.\start-dev.bat` — Full app (Electron + Python + Tobii)
 - `.\start-dev.bat --simulate` — Without eye tracker (mouse-as-gaze mode)
 - `.\build-installer.bat` — Build production .exe installer
+- `.\install-latest.bat` — Install the newest build in `release\` after checking its SHA-256 against the build's record (asks first; `--check` only checks)
 
 ## File Structure
 - `src/screens/` — 20 screen files. Active routes are defined in `src/App.tsx`; `AlertModeScreen` renders out-of-band and `CalibrationScreen` exists but is not currently routed.
