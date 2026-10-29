@@ -9,10 +9,11 @@ try {
     # Never freeze a python\.venv that setup.bat did not verify against the pinned requirements.
     Assert-DependenciesReady -PythonOnly
     # The installer ships this interpreter, its OpenSSL included: only the validated version, whose
-    # venv setup.bat installed with the pinned constraints.
-    $venvPython = [string](Get-SetupStampValue $PythonStamp 'python')
-    if (-not $venvPython.StartsWith("$PythonBaseline.")) {
-        throw ("python\.venv is Python $venvPython; installers are built only with the validated Python " +
+    # venv setup.bat installed with the pinned constraints. (Not $venvPython: PowerShell names ignore
+    # case, and that one would replace $VenvPython, the interpreter's path.)
+    $venvVersion = [string](Get-SetupStampValue $PythonStamp 'python')
+    if (-not $venvVersion.StartsWith("$PythonBaseline.")) {
+        throw ("python\.venv is Python $venvVersion; installers are built only with the validated Python " +
             "$PythonBaseline x64. Install it from python.org and run .\setup.bat --force.")
     }
     Require-File (Join-Path $ProjectRoot 'package-lock.json')
