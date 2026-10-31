@@ -70,11 +70,14 @@ def summary(source):
 
 
 def render(source, view, floor='ground', fmt='png', theme='warm', preset='front-left', width=1600, height=1000, export=False,
-           light=False):
+           light=False, fit='contain'):
+    """`fit='width'` (the full screen's fill-width view) draws the plan or top view as tall as filling the width needs."""
     if view not in VIEWS or fmt not in FORMATS[view]:
         raise ValueError('Unsupported view or format.')
     if theme not in THEMES:
         raise ValueError('Unsupported theme.')
+    if fit not in ('contain', 'width'):
+        raise ValueError('Unsupported fit.')
     plan, _ = plan_of(source)
     model = model_for(plan)
     if view != 'outside' and floor not in model['floors']:
@@ -85,14 +88,14 @@ def render(source, view, floor='ground', fmt='png', theme='warm', preset='front-
     set_deadline(DEADLINES[view])
     if view == 'plan':
         import compass_plan2d
-        return compass_plan2d.render_screen(model, floor, theme, width, height), model
+        return compass_plan2d.render_screen(model, floor, theme, width, height, fit=fit), model
     if view == 'sheet':
         import compass_plan2d
         floors = list(model['floors']) if fmt == 'pdf' else [floor]
         return compass_plan2d.render_sheet(model, floors, fmt), model
     if view == 'top':
         import compass_top
-        return compass_top.render(model, floor, theme, width, height), model
+        return compass_top.render(model, floor, theme, width, height, fit=fit), model
     if view == 'outside':
         import compass_perspective
         if preset not in compass_perspective.PRESETS:

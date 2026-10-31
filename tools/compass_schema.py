@@ -74,7 +74,7 @@ STAIR_HOSTS = {'ground': frozenset({'staircase', 'diningStaircase'}), 'first': f
 VOID_BELOW = frozenset({'living', 'dining', 'staircase', 'diningStaircase'})
 ALIASES = {'commonBath': 'bathroom', 'masterbed': 'masterBed'}
 
-_REGION = re.compile(r'^r([1-4])_c([1-4])(?:\.(L|R))?$')
+_REGION = re.compile(r'^r([1-4])_c([1-4])(?:\.(L|R|T|B))?$')
 _ID = re.compile(r'^(g|f)-([A-Za-z_][A-Za-z0-9_]*)-([1-9][0-9]{0,2})$')
 
 
@@ -100,19 +100,34 @@ def region_rect_in(key: str, width_in: int, depth_in: int) -> Tuple[float, float
     row, col, half = parse_region(key)
     cw, cd = width_in / COLS, depth_in / ROWS
     x1, x2 = (col - 1) * cw, col * cw
+    y1, y2 = (row - 1) * cd, row * cd
     if half == 'L':
         x2 = x1 + cw / 2
     elif half == 'R':
         x1 = x1 + cw / 2
-    return (x1, (row - 1) * cd, x2, row * cd)
+    if half == 'T':
+        y1 += cd / 2
+    elif half == 'B':
+        y2 -= cd / 2
+    return (x1, y1, x2, y2)
+
+
+def split_direction(floor: dict, cell: str) -> str:
+    return floor.get('splitDirections', {}).get(cell, 'left-right')
+
+
+def cell_regions(floor: dict, cell: str) -> List[str]:
+    if cell not in floor.get('splits', []):
+        return [cell]
+    sides = ('T', 'B') if split_direction(floor, cell) == 'top-bottom' else ('L', 'R')
+    return [f'{cell}.{h}' for h in sides]
 
 
 def floor_regions(floor: dict) -> List[str]:
     """Every region of a floor in map order: whole cells, or the two halves of a divided cell."""
-    splits = set(floor.get('splits') or [])
     out = []
     for cell in CELLS:
-        out.extend([f'{cell}.L', f'{cell}.R'] if cell in splits else [cell])
+        out.extend(cell_regions(floor, cell))
     return out
 
 
@@ -120,16 +135,28 @@ def regions_touch(a: str, b: str) -> bool:
     """True when two regions of one floor share an edge of positive length."""
     ra, ca, ha = parse_region(a)
     rb, cb, hb = parse_region(b)
-    if (ra, ca) == (rb, cb):
-        return {ha, hb} == {'L', 'R'}
-    # Horizontal neighbours (same row): touch only across the shared vertical line.
-    if ra == rb and abs(ca - cb) == 1:
-        left, right = (ha, hb) if ca < cb else (hb, ha)
-        return left in (None, 'R') and right in (None, 'L')
-    # Front/back neighbours: any overlap of their x-extents.
-    if ca == cb and abs(ra - rb) == 1:
-        return ha is None or hb is None or ha == hb
-    return False
+    # Preserve the original fast path on existing left/right maps.
+    if ha not in ('T', 'B') and hb not in ('T', 'B'):
+        if (ra, ca) == (rb, cb):
+            return {ha, hb} == {'L', 'R'}
+        if ra == rb and abs(ca - cb) == 1:
+            left, right = (ha, hb) if ca < cb else (hb, ha)
+            return left in (None, 'R') and right in (None, 'L')
+        return ca == cb and abs(ra - rb) == 1 and (ha is None or hb is None or ha == hb)
+    ax, ay, ax2, ay2 = region_rect_in(a, 8, 8)
+    bx, by, bx2, by2 = region_rect_in(b, 8, 8)
+    return (((ax2 == bx or bx2 == ax) and min(ay2, by2) > max(ay, by))
+            or ((ay2 == by or by2 == ay) and min(ax2, bx2) > max(ax, bx)))
+
+
+def regions_overlap(a: str, b: str) -> bool:
+    ax, ay, ax2, ay2 = region_rect_in(a, 8, 8)
+    bx, by, bx2, by2 = region_rect_in(b, 8, 8)
+    return min(ax2, bx2) > max(ax, bx) and min(ay2, by2) > max(ay, by)
+
+
+def regions_below(key: str, floor: dict) -> List[str]:
+    return [k for k in cell_regions(floor, cell_of(key)) if regions_overlap(key, k)]
 
 
 def components(regions: Iterable[str]) -> List[List[str]]:
@@ -197,8 +224,8 @@ def normalise(plan: dict) -> dict:
         raise PlanError('A Compass plan is required.')
     if len(json.dumps(plan, allow_nan=False).encode()) > MAX_JSON_BYTES:
         raise PlanError('This plan is too large.')
-    if plan.get('schema') != SCHEMA or plan.get('version') != VERSION:
-        raise PlanError('This is not a version 2 Compass plan.')
+    if plan.get('schema') != SCHEMA or type(plan.get('version')) is not int or plan['version'] not in (2, 3):
+        raise PlanError('This is not a supported Compass plan (version 2 or 3).')
     plot = plan.get('plot')
     if not isinstance(plot, dict):
         raise PlanError('Plot details are missing.')
@@ -237,7 +264,16 @@ def normalise(plan: dict) -> dict:
         splits = sorted(set(floor.get('splits', [])))
         if any(s not in CELLS for s in splits):
             raise PlanError('A divided cell is not a map cell.')
-        valid_regions = set(floor_regions({'splits': splits}))
+        directions = {}
+        if 'splitDirections' in floor:
+            if plan['version'] != 3 or not isinstance(floor['splitDirections'], dict):
+                raise PlanError('Split directions need a version 3 Compass plan.')
+            for cell, direction in sorted(floor['splitDirections'].items()):
+                if cell not in splits or direction not in ('left-right', 'top-bottom'):
+                    raise PlanError('A split direction must name a divided cell and one direction.')
+                if direction == 'top-bottom':
+                    directions[cell] = direction
+        valid_regions = set(floor_regions({'splits': splits, 'splitDirections': directions}))
         rooms, owner = [], {}
         if len(floor.get('rooms', [])) > MAX_ROOMS:
             raise PlanError(f'A floor can have at most {MAX_ROOMS} rooms.')
@@ -263,6 +299,8 @@ def normalise(plan: dict) -> dict:
             seen_ids.add(rid)
             rooms.append({'id': rid, 'use': use, 'regions': regions})
         out_floors[name] = {'splits': splits, 'rooms': sorted(rooms, key=lambda r: r['id'])}
+        if directions:
+            out_floors[name]['splitDirections'] = directions
     choices = plan.get('choices', {}) or {}
     if not isinstance(choices, dict):
         raise PlanError('Invalid layout choices.')
@@ -275,7 +313,7 @@ def normalise(plan: dict) -> dict:
         if choices['kitchen'] not in ('open', 'closed'):
             raise PlanError('kitchen is open or closed.')
         out_choices['kitchen'] = choices['kitchen']
-    out = {'schema': SCHEMA, 'version': VERSION, 'plot': out_plot, 'storeys': plan['storeys'],
+    out = {'schema': SCHEMA, 'version': plan['version'], 'plot': out_plot, 'storeys': plan['storeys'],
            'floors': out_floors, 'choices': out_choices}
     if isinstance(plan.get('legacy'), dict):
         out['legacy'] = copy.deepcopy(plan['legacy'])
@@ -314,7 +352,7 @@ def check(plan: dict) -> List[dict]:
             if room['use'] != 'void':
                 continue
             for key in room['regions']:
-                below = [ground_owner.get(k) for k in _covering(key, ground_owner)]
+                below = [ground_owner.get(k) for k in regions_below(key, floors['ground'])]
                 ok = below and all(b is not None and (b['use'] in VOID_BELOW or (b['use'] == 'drawing' and drawing_open))
                                    for b in below)
                 if not ok:
@@ -322,18 +360,6 @@ def check(plan: dict) -> List[dict]:
                                         'A double-height space needs the living hall (or dining or stair hall) below it.',
                                         [room['id']], [key]))
     return notes
-
-
-def _covering(key: str, ground_owner: dict) -> List[str]:
-    """Ground regions under a first-floor region: the same key, its whole cell, or both halves of it."""
-    cell = cell_of(key)
-    if key in ground_owner:
-        return [key]
-    if cell in ground_owner:
-        return [cell]
-    if '.' in key:
-        return [key]
-    return [f'{cell}.L', f'{cell}.R']
 
 
 def intent_hash(plan: dict) -> str:

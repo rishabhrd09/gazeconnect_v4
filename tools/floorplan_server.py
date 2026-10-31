@@ -307,7 +307,7 @@ def compass_v2_render():
                     "fmt": data.get("format", "png"), "theme": data.get("theme", "warm"),
                     "preset": data.get("preset", "front-left"), "width": data.get("width", 1600),
                     "height": data.get("height", 1000), "export": bool(data.get("export", False)),
-                    "light": bool(data.get("light", False))}
+                    "light": bool(data.get("light", False)), "fit": data.get("fit", "contain")}
         job_id = str(data.get("jobId") or "")
         produce = lambda: studio_render(data["plan"], **settings)[0]
         if job_id:

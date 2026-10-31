@@ -97,7 +97,7 @@ def north_vector(facing: str) -> Tuple[float, float]:
 def where(key: str) -> str:
     """'Row 2 · Column 3, left half': how a region is spoken and written."""
     row, col, half = schema.parse_region(key)
-    return f'Row {row} · Column {col}' + {'L': ', left half', 'R': ', right half', None: ''}[half]
+    return f'Row {row} · Column {col}' + {'L': ', left half', 'R': ', right half', 'T': ', top half', 'B': ', bottom half', None: ''}[half]
 
 
 # ---- Small exact helpers ---------------------------------------------------------------------
@@ -884,14 +884,15 @@ def _reach_adjustment(floor, room, reached):
         blocker = rooms[region['owner']]
         if blocker.zone not in ('private', 'wet'):
             continue
-        for half in ('L', 'R'):
+        for half in ('L', 'R', 'T', 'B'):
             passage = f'{key}.{half}'
-            keep = f'{key}.{"R" if half == "L" else "L"}'
+            keep = f'{key}.{ {"L": "R", "R": "L", "T": "B", "B": "T"}[half] }'
             touches_room = any(schema.regions_touch(passage, k) for k in room.regions)
             touches_reach = any(schema.regions_touch(passage, k) for rid in reachable for k in rooms[rid].regions)
             if touches_room and touches_reach:
-                sides = {'L': 'left', 'R': 'right'}
+                sides = {'L': 'left', 'R': 'right', 'T': 'top', 'B': 'bottom'}
                 return {'action': 'split', 'floor': floor['name'], 'cell': key,
+                        **({'direction': 'top-bottom'} if half in ('T', 'B') else {}),
                         'halves': {half: 'passage', keep[-1]: blocker.use},
                         'text': f'Divide {where(key)}: {sides[keep[-1]]} half {blocker.label}, '
                                 f'{sides[half]} half Passage, to reach {room.label}.'}
@@ -1023,8 +1024,11 @@ def _void(model, notes):
             if room.zone == 'public':
                 room.double_height = True
         ground['overhead'].append({'room': void.id, 'polygon': void.polygon})
-        if plot['W'] < 30 * U and any('.' in k for k in void.regions):
+        if any(k.endswith(('.L', '.R')) for k in void.regions) and plot['W'] < 30 * U:
             notes.append(note('narrow-void', 'warning', 'A half-cell double height on a plot under 30 ft is very narrow.',
+                              [void.id], void.regions, floor='first'))
+        elif any(k.endswith(('.T', '.B')) for k in void.regions) and min(plot['W'] / 4, plot['D'] / 8) < 3.75 * U:
+            notes.append(note('narrow-void', 'warning', 'A top/bottom half-cell double height is very narrow on this plot.',
                               [void.id], void.regions, floor='first'))
         # Tall glazing on the void's outer edges, continued down the ground-floor facade below.
         for run in first['runs']:
@@ -1090,14 +1094,15 @@ def _void_split_adjustment(model, void, cut):
     for key in sorted(void.regions):
         if '.' in key:
             continue
-        for half in ('R', 'L'):
+        for half in ('R', 'L', 'T', 'B'):
             passage = f'{key}.{half}'
-            other = 'L' if half == 'R' else 'R'
+            other = {'L': 'R', 'R': 'L', 'T': 'B', 'B': 'T'}[half]
             joins_cut = any(schema.regions_touch(passage, k) for r in cut for k in r.regions)
             joins_reach = any(schema.regions_touch(passage, k) for r in reached if r.zone in ('public', 'circulation') for k in r.regions)
             if joins_cut and joins_reach:
-                sides = {'L': 'left', 'R': 'right'}
+                sides = {'L': 'left', 'R': 'right', 'T': 'top', 'B': 'bottom'}
                 return {'action': 'split', 'floor': 'first', 'cell': key, 'halves': {other: 'void', half: 'passage'},
+                        **({'direction': 'top-bottom'} if half in ('T', 'B') else {}),
                         'text': f'Divide {where(key)}: {sides[other]} half Open to below, {sides[half]} half Passage.'}
     return None
 

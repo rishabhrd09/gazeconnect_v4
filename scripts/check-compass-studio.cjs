@@ -77,7 +77,7 @@ let browser;
     await page.setViewportSize({width:size[0],height:size[1]});await open(mode,theme);
     assert.equal(await page.locator('#confirm-gen-both').isEnabled(),false);
     await audit(label+'-scope');
-    const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).floors);
+    const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup_v3')).floors);
     await page.click('#confirm-gen-yes');await page.locator('.studio-drawing img').waitFor();
     assert.match(await page.locator('.studio-heading').innerText(),/PLAN 1 OF 4/);
     await audit(label+'-2d');
@@ -116,7 +116,7 @@ let browser;
     }
     await page.click('#compass-studio-back');await page.click('#compass-studio-back');
     assert.equal(await page.locator('.compass-plan-studio').count(),0);
-    const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).floors);
+    const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('compass_persistent_backup_v3')).floors);
     assert.deepEqual(after,before,'Preview must preserve both floors and the active draft');
   }
   // An eight-room, irregular plan includes real stair treads, fittings and windows.

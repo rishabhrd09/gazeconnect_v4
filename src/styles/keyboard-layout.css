@@ -82,8 +82,8 @@
 }
 
 /* ===== Ten word slots =====
-   Five slots and one phrase cell above the letters, five slots below the action
-   row, in both navigation states. Heights are variables so short viewports can
+   Five equal slots above the letters (five words, or four and a phrase), five
+   slots below the action row, in both navigation states. Heights are variables so short viewports can
    tighten non-letter rows while every gaze target stays at least 80 CSS px.
    At 820 px and taller only the new lower row changes the layout. */
 .keyboard-screen {
@@ -104,8 +104,10 @@
   padding: 0;
   overflow: hidden;
 }
+/* Five equal slots, in line with the row below (29 Oct 2026, maintainer request): five words, or
+   four and a phrase on the right (KeyboardScreen, arrangeWordRows). */
 .keyboard-screen .keyboard-word-row-top {
-  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.45fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   height: var(--kb-top-row);
   min-height: var(--kb-top-row);
   border-radius: 14px;
@@ -127,12 +129,26 @@
   border-radius: 10px;
   opacity: 0.55;
 }
+/* Word and phrase suggestions in Atkinson Hyperlegible Next, made for low vision, whatever the
+   design's own font (29 Oct 2026, maintainer request: larger and clearer; Manrope drew I and l
+   alike). The id outranks the design layer's `.design-surface *` font rule. Weight 700 is cleaner
+   than 800 at 72 px; Midnight Navy keeps its own Iris weights. */
+#root .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot),
+#root .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) * {
+  font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif !important;
+}
+:root:not([data-theme='midnight-navy']) #root .keyboard-screen :is(.keyboard-word-slot, .keyboard-phrase-slot) :is(button, span) {
+  font-weight: 700 !important;
+}
+:root:not([data-theme='midnight-navy']) #root .keyboard-screen .keyboard-phrase-slot .keyboard-phrase-action-label {
+  font-weight: 600 !important;
+}
 /* Clip sideways only: a line box of 1.1 cut the tails of g, p and y (27 Sep 2026). 1.35 holds
    the whole glyph and still sits well inside the slot. */
 .keyboard-screen .keyboard-word-slot-label { display: block; max-width: 100%; overflow-x: clip; overflow-y: visible; line-height: 1.35; }
-/* Slots wait for the response to the latest keystroke before they can be
-   selected; the delay keeps that brief wait from flickering. */
-.keyboard-screen .keyboard-word-slot-stale { opacity: 0.55 !important; transition: opacity 120ms linear 300ms; }
+/* Slots and the phrase wait for the response to the latest keystroke before they
+   can be selected; the delay keeps that brief wait from flickering. */
+.keyboard-screen :is(.keyboard-word-slot-stale, .keyboard-phrase-slot-stale) { opacity: 0.55 !important; transition: opacity 120ms linear 300ms; }
 @media (max-height: 820px) {
   :root[data-theme] .keyboard-screen.keyboard-nav-visible .keyboard-message:not(.keyboard-message-expanded) {
     height: clamp(96px, 12.8vh, 138px);

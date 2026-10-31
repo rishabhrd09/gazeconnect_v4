@@ -46,6 +46,32 @@
 .compass-plan-studio .studio-empty p { max-width: 900px; line-height: 1.5; }
 .compass-plan-studio .studio-error-actions { display: flex; gap: 24px; width: 70%; }
 .compass-plan-studio .studio-image-status { padding: 28px; text-align: center; font-size: 26px; }
+/* Full screen (29 Oct 2026, maintainer request): the whole drawing as large as the screen allows, with Exit full
+   screen, the three views, the floors drawn (Next angle for Outside) and the gaze card in one row of 104 px targets
+   at the bottom. Not the corner zoom retired on 14 Oct: always the whole drawing. */
+.compass-plan-studio.studio-full { padding: clamp(12px, 1.6vh, 20px) clamp(12px, 1.2vw, 24px) 28px; }
+.compass-plan-studio .studio-full-main { flex: 1; min-height: 0; display: flex; position: relative; gap: clamp(12px, 1.4vw, 24px); }
+.compass-plan-studio .studio-full-main .studio-drawing { flex: 1; min-width: 0; }
+/* Plan and Top view: Up, Whole plan (or Larger plan) and Down beside the drawing. Filled, the image spans the
+   drawing's width (the plan about three quarters of the screen) and moves under it; whole, it is fitted as before. */
+.compass-plan-studio .studio-full-pan {
+  flex: 0 0 clamp(130px, 10vw, 200px); display: grid; grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.4vw, 24px);
+}
+.compass-plan-studio .studio-drawing-fill { align-items: flex-start; }
+.compass-plan-studio .studio-drawing-fill img { height: auto; transition: transform 250ms ease-out; }
+.compass-plan-studio .studio-full-bar {
+  flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1.3fr); grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column;
+  gap: clamp(12px, 1.4vw, 24px); height: clamp(104px, 12vh, 136px);
+}
+.compass-plan-studio .studio-full-bar .studio-button { font-size: clamp(20px, 1.8vw, 30px) !important; }
+.compass-plan-studio .studio-full-status {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 80%; margin: 0;
+  padding: 12px 22px; border-radius: 14px; border: 1px solid var(--design-border); background: var(--design-panel);
+  font-size: clamp(18px, 1.6vw, 24px); line-height: 1.35; text-align: center;
+}
+.compass-plan-studio .studio-icon-label { display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
+.compass-plan-studio .studio-icon-label svg { width: 1em; height: 1em; flex-shrink: 0; }
 /* At laptop heights keep targets at 104 px by trimming decoration, never keys. */
 @media (max-height: 850px) {
   .compass-plan-studio { padding-top: 16px; gap: 10px; }

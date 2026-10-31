@@ -595,6 +595,8 @@ export interface StudioRenderOptions {
   export?: boolean;
   /** A light machine (electron/floorplanService.ts resources): downloads are drawn without supersampling. */
   light?: boolean;
+  /** 'width' (the full screen's fill-width plan and top view): as tall as filling `width` needs; `height` is ignored. */
+  fit?: 'contain' | 'width';
 }
 
 let studioJobCounter = 0;

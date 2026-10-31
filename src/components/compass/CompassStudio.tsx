@@ -6,11 +6,14 @@
  * and Plan notes. It no longer offers alternative layouts, corner zoom, room views, rotation or
  * exterior finishes (decided 14 Oct 2026). Every image is a still drawn by the floor-plan service from
  * the same PlanModel; a newer request replaces an older one, and nothing here ever changes the map.
+ * Full screen (29 Oct 2026, maintainer request) shows the whole drawing as large as the screen allows, with
+ * the same views, floors and angles in one row at the bottom. It is not the retired corner zoom.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import GazeButton from '../core/GazeButton';
 import { GazeToggleCardFace } from '../core/GazeToggleCardFace';
 import { useGazeControl } from '../core/GazeControlToggle';
+import { FullscreenIcon, MinimizeIcon } from '../icons/Icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DWELL_GROUPS, type DwellAction } from '../../config/dwellTimeConfig';
 import { useDwellTime } from '../../contexts/DwellTimeContext';
@@ -75,7 +78,19 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
   const [outsideShort, setOutsideShort] = useState<FloorplanResources | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
+  // Full screen. Each entry draws the view again for the larger drawing area; leaving keeps that image, which
+  // only gets smaller.
+  const [full, setFull] = useState(false);
+  const [fullDraw, setFullDraw] = useState(0);
+  const fullRef = useRef(full); fullRef.current = full;
+  // Fill width (29 Oct 2026, maintainer request): in full screen the plan and top view span about three quarters of
+  // the screen's width, drawn as tall as that needs and moved with Up and Down; Whole plan draws all of it fitted to
+  // the screen again.
+  const [fill, setFill] = useState(true);
+  const [pan, setPan] = useState({ y: 0, max: 0 });
   const drawingRef = useRef<HTMLDivElement>(null);
+  const fullMainRef = useRef<HTMLElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const alive = useRef(true);
   const speak = useRef(onSpeak); speak.current = onSpeak;
   const spokenFirst = useRef(false);
@@ -112,6 +127,7 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
     const size = imageSize(drawingRef.current, light);
     renderCompassView(studioPlan, {
       view, floor, format: 'png', theme: drawingTheme, preset: PRESETS[preset].id, ...size,
+      ...(fullRef.current && fill && view !== 'outside' ? { fit: 'width' as const } : {}),
     }, controller.signal).then(blob => {
       if (controller.signal.aborted || !blob) return;
       url = URL.createObjectURL(blob);
@@ -127,7 +143,7 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
     }).catch(e => { if (!controller.signal.aborted) setImageError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (!controller.signal.aborted) setRendering(false); });
     return () => controller.abort();
-  }, [summary, page, view, floor, preset, drawingTheme, studioPlan, light, imageRetry]);
+  }, [summary, page, view, floor, preset, drawingTheme, studioPlan, light, imageRetry, fullDraw, fill]);
 
   // One decoded image at a time; every one still held is released when the studio closes. Directly, not through
   // setImage: a state update queued while the studio closes is dropped with it, and on the laptop (16 Oct 2026) an
@@ -144,6 +160,21 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
   const notePages = Math.max(1, Math.ceil(notes.length / 3));
 
   const go = (next: Page) => { signalNavigation(); setPage(next); setNotesPage(0); setExportMessage(''); };
+  /** Memory for Outside at the size it would now be drawn at (C2); a refusal keeps the image on screen and says why.
+   *  In full screen Outside has the whole area: the plan's Up, Down and Whole plan strip is not shown with it. */
+  const outsideFits = async () => {
+    const area = full ? fullMainRef.current : drawingRef.current;
+    const reply = await getFloorplanResources({ ...imageSize(area, false), outside: true });
+    if (!alive.current) return false;
+    if (reply && !reply.exterior) {
+      setOutsideShort(reply);
+      speak.current(`Outside needs about ${reply.needMb} megabytes of free memory; ${reply.availableMb} are free now. Close another program, then try again.`);
+      return false;
+    }
+    setOutsideShort(null);
+    if (reply) setResources(reply);
+    return true;
+  };
   const chooseView = (next: StudioView) => {
     signalNavigation();
     if (next !== 'outside') {
@@ -152,26 +183,51 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
     }
     // Memory is read again each time Outside is chosen, for the size it would be drawn at (C2): a short moment
     // never leaves a permanently dead button. Outside Electron there is no reading, and Outside is drawn.
-    void getFloorplanResources({ ...imageSize(drawingRef.current, false), outside: true }).then(reply => {
-      if (!alive.current) return;
-      if (reply && !reply.exterior) {
-        setOutsideShort(reply);
-        speak.current(`Outside needs about ${reply.needMb} megabytes of free memory; ${reply.availableMb} are free now. Close another program, then try again.`);
-        return;
-      }
-      setOutsideShort(null);
-      if (reply) setResources(reply);
+    void outsideFits().then(fits => {
+      if (!fits) return;
       setView('outside'); speak.current(`Outside, ${PRESETS[preset].label}.`);
     });
   };
-  const switchFloor = () => {
-    const next: Floor = floor === 'ground' ? 'first' : 'ground';
-    signalNavigation(); setFloor(next); speak.current(`${FLOOR_NAMES[next]}.`);
-  };
+  const chooseFloor = (next: Floor) => { signalNavigation(); setFloor(next); speak.current(`${FLOOR_NAMES[next]}.`); };
+  const switchFloor = () => chooseFloor(floor === 'ground' ? 'first' : 'ground');
   const nextAngle = () => {
     const next = (preset + 1) % PRESETS.length;
-    signalNavigation(); setPreset(next); speak.current(`Outside, ${PRESETS[next].label}.`);
+    signalNavigation();
+    const turn = () => { setPreset(next); speak.current(`Outside, ${PRESETS[next].label}.`); };
+    // Full screen draws Outside larger than the plan screen does, so memory is read first there too (C2).
+    if (full) void outsideFits().then(fits => { if (fits) turn(); });
+    else turn();
   };
+  const enterFull = () => { signalNavigation(); setFill(true); setPan({ y: 0, max: 0 }); setFull(true); };
+  const leaveFull = () => { signalNavigation(); setFull(false); };
+  // Up and Down move the filled plan by most of a screen, keeping a little of the last view for orientation.
+  const move = (direction: 1 | -1) => {
+    const step = Math.round((drawingRef.current?.clientHeight || 600) * 0.7);
+    setPan(p => ({ ...p, y: Math.max(0, Math.min(p.max, p.y + direction * step)) }));
+  };
+  const toggleFill = () => { signalNavigation(); setFill(f => !f); setPan(p => ({ ...p, y: 0 })); };
+  const filling = full && fill && view !== 'outside';
+  // How far the filled image reaches below the drawing area: measured when it loads, the area resizes, or the mode
+  // or image changes. A plan that fits needs no movement.
+  const measurePan = React.useCallback(() => {
+    const box = drawingRef.current, picture = imageRef.current;
+    const max = filling && box && picture ? Math.max(0, Math.round(picture.offsetHeight - box.clientHeight)) : 0;
+    setPan(p => (p.max === max && p.y <= max ? p : { y: Math.min(p.y, max), max }));
+  }, [filling]);
+  React.useLayoutEffect(() => {
+    if (!full) return undefined;
+    measurePan();
+    const observer = new ResizeObserver(measurePan);
+    if (drawingRef.current) observer.observe(drawingRef.current);
+    return () => observer.disconnect();
+  }, [full, image, measurePan]);
+  // Entering full screen draws the view again for the larger drawing area. Outside reads memory first (C2) and,
+  // refused, keeps the image it has, enlarged.
+  useEffect(() => {
+    if (!full) return;
+    if (view !== 'outside') { setFullDraw(n => n + 1); return; }
+    void outsideFits().then(fits => { if (fits) setFullDraw(n => n + 1); });
+  }, [full]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fileStem = `Compass-${(summary?.modelHash || 'plan').slice(0, 8)}`;
   async function download(kind: 'image' | 'sheet' | 'cad') {
@@ -226,14 +282,51 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
       : page === 'notes' ? 'Preliminary checks. Review them with your architect.'
         : outsideShortText || (rendering && !image ? 'Drawing…' : `${plotText}${problems ? ` · ${problems} note${problems === 1 ? '' : 's'} to review` : ' · no conflicts found'}`));
 
+  const gazeToggle = <button id="compass-studio-gaze-toggle" className="gaze-button gaze-toggle gaze-switch-card" data-gaze="true"
+    data-gaze-toggle="true" data-gaze-always="true" data-snap-priority="3" data-gaze-context="gazetoggle"
+    data-gaze-dwell-ms={String(DWELL_GROUPS.deliberate.ms)} aria-pressed={isGazeEnabled}
+    aria-label={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'} onClick={toggleGaze}><GazeToggleCardFace on={isGazeEnabled} /></button>;
+  const drawing = <div className={`studio-drawing${filling ? ' studio-drawing-fill' : ''}`} ref={drawingRef}>
+    {image ? <img ref={imageRef} alt={`${heading}. ${plotText}.`} src={image} onLoad={measurePan}
+      style={filling ? { transform: `translateY(${-pan.y}px)` } : undefined} /> : null}
+    {(!image || imageError) && <div className="studio-image-status">{imageError || (rendering ? 'Drawing…' : '')}
+      {imageError && button('render-retry', 'Try again', () => setImageRetry(x => x + 1))}</div>}
+  </div>;
+
+  // Full screen: the drawing (for Plan and Top view with Up, Whole plan and Down beside it), then one row of
+  // targets: Exit full screen, the three views, the floors drawn (Next angle for Outside) and the gaze card.
+  if (full && page === 'view' && summary && !legacyLocked) {
+    return <div className="compass-plan-studio studio-full design-surface" role="dialog" aria-modal="true" aria-label="Compass plan studio, full screen">
+      <main className="studio-full-main" ref={fullMainRef}>
+        {drawing}
+        {view !== 'outside' && <aside className="studio-full-pan" aria-label="Plan size">
+          {fill ? button('full-up', '↑ Up', () => move(-1), pan.y <= 0) : <span />}
+          {button('full-fit', fill ? <>Whole plan<small>See all of it</small></> : <>Larger plan<small>Fill the width</small></>, toggleFill)}
+          {fill ? button('full-down', '↓ Down', () => move(1), pan.y >= pan.max) : <span />}
+        </aside>}
+        {outsideShortText && <p className="studio-full-status" role="status">{outsideShortText}</p>}
+      </main>
+      <footer className="studio-full-bar" aria-label="Views and floors">
+        {button('full-exit', <span className="studio-icon-label"><MinimizeIcon size={30} />Exit full screen</span>, leaveFull, false, false, 'backSkipButton')}
+        {button('full-plan', 'Plan', () => chooseView('plan'), false, view === 'plan')}
+        {button('full-top', 'Top view', () => chooseView('top'), false, view === 'top')}
+        {button('full-outside', <>Outside{outsideShort ? <small>Low memory</small> : null}</>, () => chooseView('outside'), false, view === 'outside')}
+        {view === 'outside'
+          ? button('full-angle', <>Next angle<small>{PRESETS[preset].label} →</small></>, nextAngle, rendering)
+          : <>
+            {button('full-floor-ground', FLOOR_NAMES.ground, () => chooseFloor('ground'), !hasFirst, floor === 'ground')}
+            {hasFirst && button('full-floor-first', FLOOR_NAMES.first, () => chooseFloor('first'), false, floor === 'first')}
+          </>}
+        {gazeToggle}
+      </footer>
+    </div>;
+  }
+
   return <div className="compass-plan-studio design-surface" role="dialog" aria-modal="true" aria-label="Compass plan studio">
     <header className="studio-header">
       {button('back', page === 'view' ? '← Back to map' : '← Back to plan', page === 'view' ? onClose : () => go('view'), false, false, 'backSkipButton')}
       <div className="studio-heading"><p>{scope === 'ground' ? 'GROUND FLOOR ONLY' : 'YOUR HOUSE'}</p><h1>{heading}</h1></div>
-      <button id="compass-studio-gaze-toggle" className="gaze-button gaze-toggle gaze-switch-card" data-gaze="true"
-        data-gaze-toggle="true" data-gaze-always="true" data-snap-priority="3" data-gaze-context="gazetoggle"
-        data-gaze-dwell-ms={String(DWELL_GROUPS.deliberate.ms)} aria-pressed={isGazeEnabled}
-        aria-label={isGazeEnabled ? 'Pause gaze' : 'Enable gaze'} onClick={toggleGaze}><GazeToggleCardFace on={isGazeEnabled} /></button>
+      {gazeToggle}
     </header>
     <div className="studio-caption" role="status">{caption}</div>
     {legacyLocked ? <main className="studio-empty">
@@ -246,11 +339,7 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
       {!loading && <div className="studio-error-actions">{button('retry', 'Try again', () => setRetry(x => x + 1))}</div>}
     </main> : <>
       {page === 'view' && <main className="studio-main">
-        <div className="studio-drawing" ref={drawingRef}>
-          {image ? <img alt={`${heading}. ${plotText}.`} src={image} /> : null}
-          {(!image || imageError) && <div className="studio-image-status">{imageError || (rendering ? 'Drawing…' : '')}
-            {imageError && button('render-retry', 'Try again', () => setImageRetry(x => x + 1))}</div>}
-        </div>
+        {drawing}
         <aside className="studio-tools" aria-label="Views">
           {button('view-plan', <>Plan<small>Rooms, walls and sizes</small></>, () => chooseView('plan'), false, view === 'plan')}
           {button('view-top', <>Top view<small>From above, furnished</small></>, () => chooseView('top'), false, view === 'top')}
@@ -277,7 +366,7 @@ export function CompassStudio({ plan, scope, onClose, onSpeak, onLegacyReview }:
       <footer className="studio-footer">
         {page === 'view' ? <>
           {button('downloads', 'Download plan', () => go('downloads'))}
-          <p>{problems ? `${problems} note${problems === 1 ? '' : 's'} to review` : 'Geometry checked · preliminary concept'}</p>
+          {button('full', <><span className="studio-icon-label"><FullscreenIcon size={30} />Full screen</span><small>See this view larger</small></>, enterFull, !image)}
           {button('notes', `Plan notes${notes.length ? ` (${notes.length})` : ''}`, () => go('notes'))}
         </> : page === 'downloads' ? <>
           {button('return', '← Back to plan', () => go('view'), false, false, 'backSkipButton')}

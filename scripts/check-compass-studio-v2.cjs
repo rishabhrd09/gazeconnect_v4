@@ -5,7 +5,10 @@
  * the three views, the four outside angles, both floors, downloads (PNG, PDF sheets, DXF in feet-inches and in
  * millimetres with a README), notes paging, Ground floor only, a failed service and its Try again, a newer view
  * replacing an older one, closing while drawing, a map with saved Refine Map details, and that the studio never
- * changes the map. The original studio (GAZECONNECT_COMPASS_V2=0) is checked by check-compass-studio.cjs. */
+ * changes the map. Full screen (29 Oct 2026): the drawing larger and drawn again at that size, the plan filling the
+ * width with Up, Down and Whole plan, every view, both floors and the angles, its own audits, memory read for the
+ * larger Outside, and leaving keeps the image.
+ * The original studio (GAZECONNECT_COMPASS_V2=0) is checked by check-compass-studio.cjs. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -59,7 +62,7 @@ let browser;
     await page.locator('#strip-generate').waitFor(); await page.click('#strip-generate');
     await page.locator('#confirm-gen-yes').waitFor();
   }
-  const floors = () => page.evaluate(() => JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).floors);
+  const floors = () => page.evaluate(() => JSON.parse(localStorage.getItem('compass_persistent_backup_v3')).floors);
   const imageSrc = () => page.evaluate(() => document.querySelector('.studio-drawing img')?.src || '');
   async function drawing(previous = '') {
     await page.waitForFunction(p => { const i = document.querySelector('.studio-drawing img'); return !!i && i.src !== p && i.complete && i.naturalWidth > 0; }, previous);
@@ -67,6 +70,21 @@ let browser;
   /** Chooses a control that draws a new image, and waits for that image. */
   async function redraw(id) { const before = await imageSrc(); await page.click('#' + id); await drawing(before); }
   const heading = () => page.locator('.studio-heading').innerText();
+  // Full screen has no heading: the image's description names what is drawn.
+  const drawn = () => page.evaluate(() => document.querySelector('.studio-drawing img')?.alt || '');
+  const drawingSize = () => page.evaluate(() => { const d = document.querySelector('.studio-drawing'); return {w: d.clientWidth, h: d.clientHeight, image: d.querySelector('img')?.naturalWidth || 0}; });
+  /** Where the full screen's image sits in its drawing area (fill width: as wide as the area, moved under it). */
+  const placement = () => page.evaluate(() => {
+    const d = document.querySelector('.studio-drawing'), i = d.querySelector('img'), a = d.getBoundingClientRect(), b = i.getBoundingClientRect();
+    return {fill: d.classList.contains('studio-drawing-fill'), share: +(b.width / innerWidth).toFixed(3), asWide: Math.abs(b.width - a.width) <= 3,
+      top: Math.round(b.top - a.top), bottom: Math.round(b.bottom - a.bottom), deep: i.naturalHeight > i.naturalWidth,
+      inside: b.top >= a.top - 1 && b.bottom <= a.bottom + 1 && b.left >= a.left - 1 && b.right <= a.right + 1};
+  });
+  /** Chooses Up or Down in full screen until it is disabled (the plan's end), waiting out each move. */
+  async function moveToEnd(id) {
+    for (let n = 0; n < 10 && !(await page.locator('#' + id).isDisabled()); n++) { await page.click('#' + id); await page.waitForTimeout(350); }
+    assert.equal(await page.locator('#' + id).isDisabled(), true, `${id} reaches the end`);
+  }
 
   const results = [];
   async function audit(label) {
@@ -117,6 +135,37 @@ let browser;
         assert.match(await heading(), /YOUR HOUSE/); assert.match(await heading(), /Ground floor · Plan/);
         await audit(label + '-plan');
         if (size[0] === 1920 || process.env.COMPASS_QA_SMALL) await page.screenshot({path: path.join(out, `${mode}-${theme}-plan.png`)});
+        // Full screen: the drawing larger, drawn again at that size; every view and both floors there (the angle is
+        // left as it is, for the checks below; Next angle in full screen is checked with one floor).
+        const normal = await drawingSize();
+        await redraw('compass-studio-full');
+        const enlarged = await drawingSize();
+        assert.ok(enlarged.w > normal.w && enlarged.h > normal.h && enlarged.image > normal.image, `${label}: full screen ${JSON.stringify([normal, enlarged])}`);
+        assert.equal(await page.locator('.studio-header').count(), 0); assert.match(await drawn(), /^Ground floor · Plan\./);
+        await audit(label + '-full');
+        // Fill width (29 Oct 2026, maintainer request): the plan's image as wide as the drawing area, over 80 % of the
+        // screen; this plot being deeper than wide, it runs below the area. Down and Up move it to its bottom and back;
+        // Whole plan draws it fitted again, without Up and Down.
+        let place = await placement();
+        assert.ok(place.fill && place.asWide && place.share >= 0.8 && place.deep && place.bottom > 0 && Math.abs(place.top) <= 2,
+          `${label}: fill width ${JSON.stringify(place)}`);
+        assert.equal(await page.locator('#compass-studio-full-up').isDisabled(), true);
+        await moveToEnd('compass-studio-full-down'); place = await placement();
+        assert.ok(Math.abs(place.bottom) <= 2 && place.top < 0, `${label}: Down reaches the bottom ${JSON.stringify(place)}`);
+        await moveToEnd('compass-studio-full-up'); place = await placement();
+        assert.ok(Math.abs(place.top) <= 2, `${label}: Up returns to the top ${JSON.stringify(place)}`);
+        await redraw('compass-studio-full-fit'); place = await placement();
+        assert.ok(!place.fill && place.inside && !place.deep, `${label}: whole plan ${JSON.stringify(place)}`);
+        assert.equal(await page.locator('#compass-studio-full-up, #compass-studio-full-down').count(), 0);
+        await audit(label + '-full-whole');
+        await redraw('compass-studio-full-fit'); assert.ok((await placement()).fill);
+        await redraw('compass-studio-full-floor-first'); assert.match(await drawn(), /^First floor · Plan\./);
+        await redraw('compass-studio-full-top'); assert.match(await drawn(), /^First floor · Top view\./);
+        await redraw('compass-studio-full-outside'); assert.match(await drawn(), /^Outside · Front left\./); await audit(label + '-full-outside');
+        if (size[0] === 1920 || process.env.COMPASS_QA_SMALL) await page.screenshot({path: path.join(out, `${mode}-${theme}-full-outside.png`)});
+        await redraw('compass-studio-full-plan'); await redraw('compass-studio-full-floor-ground'); assert.match(await drawn(), /^Ground floor · Plan\./);
+        const enlargedImage = await imageSrc(); await page.click('#compass-studio-full-exit'); await page.locator('.studio-header').waitFor();
+        assert.equal(await imageSrc(), enlargedImage, 'leaving full screen keeps the image'); assert.match(await heading(), /Ground floor · Plan/);
         await redraw('compass-studio-view-top'); assert.match(await heading(), /Ground floor · Top view/); await audit(label + '-top');
         await redraw('compass-studio-view-outside'); assert.match(await heading(), /Outside · Front left/); await audit(label + '-outside');
         for (const angle of ['Front right', 'Back left', 'Back right']) { await redraw('compass-studio-angle'); assert.match(await heading(), new RegExp(`Outside · ${angle}`)); }
@@ -172,6 +221,37 @@ let browser;
   assert.doesNotMatch(await page.locator('#compass-studio-view-outside').innerText(), /Short of memory/);
   assert.deepEqual(await page.evaluate(() => window.qaResourceRequests.filter(r => r && r.outside).length), 2, 'read again each time Outside is chosen');
   await page.evaluate(() => sessionStorage.removeItem('qa-memory'));
+  // Full screen with one floor: Ground floor shown, selected and not a target; no First floor.
+  await redraw('compass-studio-view-plan'); await redraw('compass-studio-full');
+  assert.equal(await page.locator('#compass-studio-full-floor-ground').isDisabled(), true);
+  assert.equal(await page.locator('#compass-studio-full-floor-first').count(), 0);
+  await audit('ground-only-full');
+  // Outside in full screen reads memory for the larger size (C2): refused, the plan stays and the numbers show.
+  const outsideReads = () => page.evaluate(() => window.qaResourceRequests.filter(r => r && r.outside).map(r => r.width));
+  const planReads = await outsideReads();
+  await page.evaluate(m => sessionStorage.setItem('qa-memory', JSON.stringify(m)), memory(150, false));
+  await page.click('#compass-studio-full-outside');
+  await page.waitForFunction(() => /Low memory/.test(document.querySelector('#compass-studio-full-outside')?.innerText || ''));
+  assert.match(await page.locator('.studio-full-status').innerText(), /Outside needs about 199 MB of free memory; 150 MB is free now/);
+  assert.match(await drawn(), /^Ground floor · Plan\./, 'the plan stays on screen');
+  assert.ok((await outsideReads()).at(-1) > Math.max(...planReads), 'memory is read for the full-screen size');
+  await audit('full-outside-short');
+  await page.evaluate(m => sessionStorage.setItem('qa-memory', JSON.stringify(m)), memory(400, true));
+  await redraw('compass-studio-full-outside'); assert.match(await drawn(), /^Outside · Front left\./);
+  assert.equal(await page.locator('.studio-full-status').count(), 0);
+  // Entering full screen on Outside, refused: the image is kept (enlarged), and Next angle waits for memory too.
+  await page.click('#compass-studio-full-exit'); await page.locator('.studio-header').waitFor();
+  await page.evaluate(m => sessionStorage.setItem('qa-memory', JSON.stringify(m)), memory(150, false));
+  const keptOutside = await imageSrc(); await page.click('#compass-studio-full');
+  await page.locator('.studio-full-status').waitFor(); await page.waitForTimeout(1500);
+  assert.equal(await imageSrc(), keptOutside, 'refused, full screen keeps the image it has');
+  await page.click('#compass-studio-full-angle'); await page.waitForTimeout(1500);
+  assert.equal(await imageSrc(), keptOutside); assert.match(await drawn(), /^Outside · Front left\./, 'no new angle without memory');
+  await page.evaluate(m => sessionStorage.setItem('qa-memory', JSON.stringify(m)), memory(400, true));
+  // Every angle in full screen, back to Front left for the checks below.
+  for (const angle of ['Front right', 'Back left', 'Back right', 'Front left']) { await redraw('compass-studio-full-angle'); assert.match(await drawn(), new RegExp(`^Outside · ${angle}\\.`)); }
+  await page.click('#compass-studio-full-exit'); await page.locator('.studio-header').waitFor();
+  await page.evaluate(() => sessionStorage.removeItem('qa-memory'));
   // A newer view replaces an older one; only the newest image is kept, and closing releases it.
   let delayed = 0;
   await page.route('**/api/floorplan/compass/v2/render', async route => { if (++delayed === 1) await new Promise(r => setTimeout(r, 1200)); await route.continue().catch(() => {}); });
@@ -208,6 +288,6 @@ let browser;
 
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(out, 'checks.json'), JSON.stringify(results, null, 2));
-  console.log(`PASS: ${results.length} studio screens, ${results.reduce((n, r) => n + r.probes, 0)} gaze target probes; three views, four outside angles, both floors, PNG/PDF/DXF downloads, notes, newest view kept, service failure, closing while drawing, saved Refine Map details, map unchanged.`);
+  console.log(`PASS: ${results.length} studio screens, ${results.reduce((n, r) => n + r.probes, 0)} gaze target probes; three views, four outside angles, both floors, full screen (views, floors, angles, memory, image kept), PNG/PDF/DXF downloads, notes, newest view kept, service failure, closing while drawing, saved Refine Map details, map unchanged.`);
   await browser.close();
 })().catch(async e => { console.error(e); const pages = browser?.contexts()[0]?.pages(); if (pages?.[0]) await pages[0].screenshot({path: path.join(out, 'failure.png')}).catch(() => {}); await browser?.close(); process.exitCode = 1; });

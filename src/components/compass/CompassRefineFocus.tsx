@@ -1,5 +1,5 @@
 /**
- * Refine: one cell, large, as two equal targets, LEFT HALF and RIGHT HALF (IMPLEMENTATION_PLAN.md §5.1 step 3).
+ * Refine: one cell, large, as two equal targets, left/right or top/bottom (TOP_BOTTOM_SPLITS.md).
  *
  * Left and right are as on the map, with the road below them, so they cannot be misread. Each half shows
  * its room (or Empty) and its real size; upstairs it also shows what is below. The halves are separated by
@@ -10,6 +10,8 @@ import React from 'react';
 import GazeButton from '../core/GazeButton';
 import { GazeToggleCardFace } from '../core/GazeToggleCardFace';
 import type { PickerQuestion } from './CompassRoomPicker';
+import type { HalfSide, SplitDirection } from '../../types/compassPlan';
+import { HALF_NAMES, splitSides } from '../../utils/compassPlan';
 
 export interface HalfFace {
   label: string;          // owner name, or "Empty"
@@ -23,6 +25,7 @@ export interface HalfFace {
 export interface ThumbCell {
   key: string;
   split: boolean;
+  direction?: SplitDirection;
   colors: Array<string | null>;   // one (whole) or two (left, right)
 }
 
@@ -32,12 +35,15 @@ interface Props {
   left: HalfFace;
   right: HalfFace;
   divided: boolean;
+  direction: SplitDirection;
+  directionReasons: Record<SplitDirection, string>;
+  onDirection: (direction: SplitDirection) => void;
   thumbnail: ThumbCell[];         // the 16 cells, row 4 first (back at the top), as on the map
   focusKey: string;
   question?: PickerQuestion | null;
   message?: string;
   canUndo: boolean;
-  onHalf: (half: 'L' | 'R') => void;
+  onHalf: (half: HalfSide) => void;
   onUndo: () => void;
   onWhole: () => void;
   onBack: () => void;
@@ -67,9 +73,10 @@ function Half({ id, side, face, onSelect, enabled, lastEnabledTimestamp, isWarm 
   );
 }
 
-export function CompassRefineFocus({ title, subtitle, left, right, divided, thumbnail, focusKey, question, message, canUndo,
+export function CompassRefineFocus({ title, subtitle, left, right, divided, direction, directionReasons, onDirection, thumbnail, focusKey, question, message, canUndo,
   onHalf, onUndo, onWhole, onBack, isGazeEnabled, lastEnabledTimestamp, toggleGaze, isWarm }: Props) {
   const halvesEnabled = isGazeEnabled && !question;
+  const [a, b] = splitSides(direction);
   return (
     <div className="compass-refine-focus" role="dialog" aria-modal="true" aria-label="Divide a cell">
       <header className="refine-header">
@@ -80,7 +87,7 @@ export function CompassRefineFocus({ title, subtitle, left, right, divided, thum
         <div className="refine-thumb" aria-hidden="true">
           <div className="refine-thumb-grid">
             {thumbnail.map(cell => (
-              <span key={cell.key} data-focus={cell.key === focusKey} className="refine-thumb-cell">
+              <span key={cell.key} data-focus={cell.key === focusKey} data-direction={cell.direction} className="refine-thumb-cell">
                 {cell.colors.map((colour, i) => <b key={i} style={colour ? { background: colour } : undefined} />)}
               </span>
             ))}
@@ -88,6 +95,16 @@ export function CompassRefineFocus({ title, subtitle, left, right, divided, thum
           <span className="refine-thumb-road">ROAD</span>
         </div>
       </header>
+      {!question && <div className="refine-directions" aria-label="Split direction">
+        {(['left-right', 'top-bottom'] as const).map(value => <GazeButton key={value} id={`refine-direction-${value}`}
+          gazeEnabled={isGazeEnabled && !divided && !directionReasons[value]} gazeEnabledTimestamp={lastEnabledTimestamp}
+          disabled={divided || !!directionReasons[value]} selected={direction === value} isDarkMode={!isWarm}
+          dwellCategory="compassMapAction" onClick={() => onDirection(value)}
+          ariaLabel={`${value === 'left-right' ? 'Left and right halves' : 'Top and bottom halves'}${directionReasons[value] ? `: ${directionReasons[value]}` : ''}`}>
+          {value === 'left-right' ? 'LEFT / RIGHT' : 'TOP / BOTTOM'}
+          <small>{directionReasons[value] ? 'Halves too narrow' : divided ? direction === value ? 'Current split' : 'Use WHOLE CELL to change' : value === 'top-bottom' ? 'Top: back · Bottom: road' : 'Two equal halves'}</small>
+        </GazeButton>)}
+      </div>}
       {question ? <div className="refine-question" role="alert">
         <p>{question.text}</p>
         <div className="refine-question-answers">
@@ -96,11 +113,11 @@ export function CompassRefineFocus({ title, subtitle, left, right, divided, thum
             dwellCategory={answer.deliberate ? 'deliberateAction' : 'compassMapAction'} onClick={answer.action}>{answer.label}</GazeButton>)}
         </div>
       </div> : <div className="refine-body">
-        <div className="refine-halves" data-divided={divided}>
-          <Half id="refine-left" side="LEFT HALF" face={left} onSelect={() => onHalf('L')} enabled={halvesEnabled}
+        <div className="refine-halves" data-divided={divided} data-direction={direction}>
+          <Half id={`refine-${HALF_NAMES[a]}`} side={`${HALF_NAMES[a].toUpperCase()} HALF`} face={left} onSelect={() => onHalf(a)} enabled={halvesEnabled}
             lastEnabledTimestamp={lastEnabledTimestamp} isWarm={isWarm} />
           <div className="refine-gap" data-gaze="false" aria-hidden="true" />
-          <Half id="refine-right" side="RIGHT HALF" face={right} onSelect={() => onHalf('R')} enabled={halvesEnabled}
+          <Half id={`refine-${HALF_NAMES[b]}`} side={`${HALF_NAMES[b].toUpperCase()} HALF`} face={right} onSelect={() => onHalf(b)} enabled={halvesEnabled}
             lastEnabledTimestamp={lastEnabledTimestamp} isWarm={isWarm} />
         </div>
         <div className="refine-road" aria-hidden="true">FRONT / ROAD</div>

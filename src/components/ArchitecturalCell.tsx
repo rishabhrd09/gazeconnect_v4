@@ -372,8 +372,8 @@ export interface SplitHalf {
 }
 
 /** A divided cell on the map: two halves inside the cell's single gaze target (IMPLEMENTATION_PLAN.md §5.1 step 8). */
-export const SplitCellFace: React.FC<{ row: number; col: number; totalRows: number; totalCols: number; left: SplitHalf; right: SplitHalf }> = ({
-  row, col, totalRows, totalCols, left, right,
+export const SplitCellFace: React.FC<{ row: number; col: number; totalRows: number; totalCols: number; left: SplitHalf; right: SplitHalf; direction?: 'left-right' | 'top-bottom' }> = ({
+  row, col, totalRows, totalCols, left, right, direction = 'left-right',
 }) => {
   const ext = '3px solid var(--ui-border)';
   const int = '1.5px solid var(--ui-border)';
@@ -386,7 +386,7 @@ export const SplitCellFace: React.FC<{ row: number; col: number; totalRows: numb
     </div>
   );
   return (
-    <div className="split-cell" data-same={same} style={{
+    <div className="split-cell" data-same={same} data-direction={direction} style={{
       borderTop: row === totalRows ? ext : int, borderBottom: row === 1 ? ext : int,
       borderLeft: col === 1 ? ext : int, borderRight: col === totalCols ? ext : int,
     }}>

@@ -85,7 +85,7 @@ class SchemaTests(unittest.TestCase):
                        lambda p: p['floors']['ground']['rooms'][0]['regions'].append('r1_c1'),
                        lambda p: p['floors']['ground']['rooms'][0].update(regions=['r4_c2.L']),
                        lambda p: p['floors']['ground']['rooms'][0].update(id='g-backyard-x'),
-                       lambda p: p.update(version=3)):
+                       lambda p: p.update(version=4)):
             plan = copy.deepcopy(f1)
             mutate(plan)
             with self.assertRaises(schema.PlanError):

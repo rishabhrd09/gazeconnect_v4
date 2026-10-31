@@ -84,10 +84,21 @@
 .refine-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .refine-halves { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(40px, 4vw, 72px) minmax(0, 1fr); }
 .refine-gap { pointer-events: none; }
+.refine-directions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(16px, 2vw, 32px); flex-shrink: 0; }
+.refine-directions button { width: 100% !important; height: clamp(80px, 9vh, 100px) !important; min-height: 80px !important; padding: 8px 16px !important; background: var(--ui-surface) !important; color: var(--ui-ink) !important; border: 2px solid var(--ui-border) !important; border-radius: 14px !important; font-size: clamp(19px, 2.4vh, 27px) !important; box-shadow: none !important; }
+.refine-directions button small { display: block; font-size: clamp(14px, 1.7vh, 19px); margin-top: 4px; }
+.refine-directions button[aria-pressed='true'] { border-color: var(--ui-accent-ink) !important; background: var(--ui-selected) !important; }
+.refine-directions button:disabled { opacity: 1 !important; border-style: dashed !important; }
+.refine-thumb-cell[data-direction='top-bottom'] { flex-direction: column; }
+.refine-halves[data-direction='top-bottom'] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) clamp(40px, 4vw, 72px) minmax(0, 1fr); }
 .refine-halves .refine-half { width: 100% !important; height: 100% !important; min-width: 80px !important; min-height: 80px !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 1.6vh, 18px); border: 2px solid var(--ui-border) !important; border-radius: 18px !important; color: var(--ui-ink) !important; box-shadow: none !important; padding: 16px !important; }
 .refine-halves .refine-half:not([style]) { background: var(--ui-surface) !important; }
 /* GazeButton wraps its children in one block: lay that out as the centred column. */
 .refine-halves .refine-half > div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 1.6vh, 18px); text-align: center; }
+.refine-halves[data-direction='top-bottom'] .refine-half { padding: 8px 16px !important; }
+.refine-halves[data-direction='top-bottom'] .refine-half > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 4px 12px; width: 100%; }
+.refine-halves[data-direction='top-bottom'] :is(.refine-half-below, .refine-half-link, .refine-half-warning) { grid-column: 1 / -1; font-size: clamp(14px, 1.7vh, 19px); line-height: 1.2; }
+.refine-halves[data-direction='top-bottom'] .refine-half-owner { font-size: clamp(23px, 3vh, 36px); }
 .refine-halves .refine-half:hover { border-color: var(--ui-accent-ink) !important; }
 .refine-half-side { font-size: clamp(16px, 2vh, 22px); letter-spacing: .12em; color: var(--ui-muted); font-weight: 700; }
 .refine-half-owner { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: clamp(26px, 3.6vh, 42px); font-weight: 650; text-align: center; line-height: 1.2; }
@@ -119,5 +130,9 @@
 .split-cell > div > span + span { font-size: clamp(10px, 1.25vh, 14px); font-weight: 650; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
 .split-cell > i { position: absolute; top: 6%; bottom: 6%; left: 50%; width: 0; border-left: 2px solid var(--ui-ink); transform: translateX(-1px); pointer-events: none; }
 .split-cell[data-same='true'] > i { border-left: 1.5px dashed var(--ui-muted); }
+.split-cell[data-direction='top-bottom'] { grid-template-columns: 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.split-cell[data-direction='top-bottom'] > div { min-height: 0; gap: 1px; padding: 2px 4px; }
+.split-cell[data-direction='top-bottom'] > i { top: 50%; bottom: auto; left: 6%; right: 6%; width: auto; height: 0; border-left: 0; border-top: 2px solid var(--ui-ink); transform: translateY(-1px); }
+.split-cell[data-direction='top-bottom'][data-same='true'] > i { border-top: 1.5px dashed var(--ui-muted); }
 /* Refine: every cell is a target for dividing, shown by a dashed line inside it, drawn over the cell's face. */
 .compass-cell-grid > button.compass-cell-refine::after { content: ''; position: absolute; inset: 5px; border: 2px dashed var(--ui-accent-ink); border-radius: 8px; pointer-events: none; z-index: 20; }

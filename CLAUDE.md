@@ -23,6 +23,8 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - No scrolling on main screens (everything must fit within viewport)
 - overflow:hidden is intentional — content must fit, not scroll
 
+- **Compass top/bottom halves (30 Oct 2026).** REFINE supports Left/Right or Top/Bottom, exactly two equal halves and one direction per cell. Top is towards the back, bottom towards the road. Direction remains a preview until the first assignment; WHOLE CELL is required before changing an assigned split. Canonical v2 left/right data stays unchanged; top/bottom uses plan v3 with `.T`/`.B` and `splitDirections` exceptions. Draft v3 keys preserve older originals. Keep TypeScript/Python geometry, cross-floor overlap, save/reopen and every shared PlanModel export consistent. See `docs/compass-refine/TOP_BOTTOM_SPLITS.md` and the split rule/browser/Python tests. Preserve gaze timing; no crossing splits or quarter cells.
+
 ## Development Commands
 - `.\setup.bat` — Prepare the checkout (`--simulate` skips the helper build, `--force` reinstalls). Python comes from the `py` launcher (3.13 first, then 3.12), never PATH order; pinned versions live in `python/constraints.txt`. `start-dev.bat` stops with "Setup is needed" until setup has verified the current requirements (details in AGENTS.md)
 - `npm run dev` — Start Vite dev server (UI only, for rapid iteration)
@@ -49,7 +51,7 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 
 ## Word Prediction System (v4, deterministic)
 - **Default engine**: `python/services/deterministic_prediction/`, a port of the GazeCompass deterministic predictor (pinned `de33a95`, stage-level parity with 0 mismatches). No network, LLM, neural model, randomness or clock: the same draft, learned state and slot lineage always give the same slots. Details: `docs/deterministic-prediction/README.md`
-- **Ten word slots** on the traditional keyboard (5 top + phrase cell, 5 bottom). `word_slots` are fixed positions (`null` = deliberately empty); phrase suggestions travel separately in `sentences`
+- **Ten word slots** on the traditional keyboard: five equal slots on top (five words, or four and a confident phrase on the right, the fifth word stepping down), five below. `word_slots` are fixed positions (`null` = deliberately empty); phrase suggestions travel separately in `sentences`
 - **Execution**: runs in a separate worker process (latest-only per client, stale results dropped) — no measured impact on the 66Hz gaze loop; warm round trip ~1ms p50, <4ms max
 - **Safety**: reference content policy + `python/prediction_guardrails.py` (every lexicon inflection of a blocked word is blocked too) + English-only display (`english_only_policy.v1.json`)
 - **Learning**: committed actions only (accepted words, spoken messages); local `patient_data/deterministic_prediction_state.v1.json`; Delete Word undoes an acceptance

@@ -6,7 +6,7 @@
  * so a plan the map saves is read identically by the floor-plan service.
  */
 import type {
-  CellKey, CompassPlanV2, FloorId, FloorIntent, GateSide, PlanIssue, PlotType, RegionKey, RoomIntent,
+  CellKey, CompassPlanV2, FloorId, FloorIntent, GateSide, HalfSide, PlanIssue, PlotType, RegionKey, RoomIntent, SplitDirection,
 } from '../types/compassPlan';
 
 export const PLAN_SCHEMA = 'gazeconnect.compass-plan';
@@ -61,17 +61,28 @@ export const STAIR_HOSTS: Record<FloorId, Set<string>> = {
 };
 const VOID_BELOW = new Set(['living', 'dining', 'staircase', 'diningStaircase']);
 const ALIASES: Record<string, string> = { commonBath: 'bathroom', masterbed: 'masterBed' };
-const REGION = /^r([1-4])_c([1-4])(?:\.(L|R))?$/;
+const REGION = /^r([1-4])_c([1-4])(?:\.(L|R|T|B))?$/;
 const ROOM_ID = /^(g|f)-([A-Za-z_][A-Za-z0-9_]*)-([1-9][0-9]{0,2})$/;
 
 export class PlanError extends Error {}
 
 // ---- Regions ------------------------------------------------------------------------------
 
-export function parseRegion(key: string): { row: number; col: number; half: 'L' | 'R' | null } {
+export function parseRegion(key: string): { row: number; col: number; half: HalfSide | null } {
   const m = REGION.exec(String(key));
   if (!m) throw new PlanError(`Unknown map region ${key}.`);
-  return { row: Number(m[1]), col: Number(m[2]), half: (m[3] as 'L' | 'R' | undefined) ?? null };
+  return { row: Number(m[1]), col: Number(m[2]), half: (m[3] as HalfSide | undefined) ?? null };
+}
+
+export const HALF_NAMES: Record<HalfSide, string> = { L: 'left', R: 'right', T: 'top', B: 'bottom' };
+export const OPPOSITE_HALF: Record<HalfSide, HalfSide> = { L: 'R', R: 'L', T: 'B', B: 'T' };
+export const splitSides = (direction: SplitDirection): [HalfSide, HalfSide] => direction === 'top-bottom' ? ['T', 'B'] : ['L', 'R'];
+export const splitDirection = (floor: Pick<FloorIntent, 'splitDirections'>, cell: CellKey): SplitDirection =>
+  floor.splitDirections?.[cell] ?? 'left-right';
+export const halfName = (key: string): string => HALF_NAMES[parseRegion(key).half!];
+export const otherHalf = (key: string): RegionKey => `${cellOf(key)}.${OPPOSITE_HALF[parseRegion(key).half!]}`;
+export function cellRegions(floor: Pick<FloorIntent, 'splits' | 'splitDirections'>, cell: CellKey): RegionKey[] {
+  return floor.splits.includes(cell) ? splitSides(splitDirection(floor, cell)).map(h => `${cell}.${h}` as RegionKey) : [cell];
 }
 
 export function cellOf(key: string): CellKey {
@@ -83,27 +94,44 @@ export function regionRectIn(key: string, widthIn: number, depthIn: number): [nu
   const { row, col, half } = parseRegion(key);
   const cw = widthIn / 4, cd = depthIn / 4;
   let x1 = (col - 1) * cw, x2 = col * cw;
+  let y1 = (row - 1) * cd, y2 = row * cd;
   if (half === 'L') x2 = x1 + cw / 2;
   else if (half === 'R') x1 = x1 + cw / 2;
-  return [x1, (row - 1) * cd, x2, row * cd];
+  // The road is below the map: screen top is the larger model y.
+  if (half === 'T') y1 += cd / 2;
+  else if (half === 'B') y2 -= cd / 2;
+  return [x1, y1, x2, y2];
 }
 
 /** Every region of a floor in map order: whole cells, or the two halves of a divided cell. */
-export function floorRegions(floor: Pick<FloorIntent, 'splits'>): RegionKey[] {
-  const splits = new Set(floor.splits || []);
-  return CELLS.flatMap(c => (splits.has(c) ? [`${c}.L`, `${c}.R`] : [c])) as RegionKey[];
+export function floorRegions(floor: Pick<FloorIntent, 'splits' | 'splitDirections'>): RegionKey[] {
+  return CELLS.flatMap(c => cellRegions(floor, c));
 }
 
 /** True when two regions of one floor share an edge of positive length. */
 export function regionsTouch(a: string, b: string): boolean {
   const ra = parseRegion(a), rb = parseRegion(b);
-  if (ra.row === rb.row && ra.col === rb.col) return ra.half !== null && rb.half !== null && ra.half !== rb.half;
-  if (ra.row === rb.row && Math.abs(ra.col - rb.col) === 1) {
-    const [left, right] = ra.col < rb.col ? [ra.half, rb.half] : [rb.half, ra.half];
-    return (left === null || left === 'R') && (right === null || right === 'L');
+  // Keep the original inexpensive path for existing maps and legacy migration.
+  if (ra.half !== 'T' && ra.half !== 'B' && rb.half !== 'T' && rb.half !== 'B') {
+    if (ra.row === rb.row && ra.col === rb.col) return ra.half !== null && rb.half !== null && ra.half !== rb.half;
+    if (ra.row === rb.row && Math.abs(ra.col - rb.col) === 1) {
+      const [left, right] = ra.col < rb.col ? [ra.half, rb.half] : [rb.half, ra.half];
+      return (left === null || left === 'R') && (right === null || right === 'L');
+    }
+    return ra.col === rb.col && Math.abs(ra.row - rb.row) === 1 && (ra.half === null || rb.half === null || ra.half === rb.half);
   }
-  if (ra.col === rb.col && Math.abs(ra.row - rb.row) === 1) return ra.half === null || rb.half === null || ra.half === rb.half;
-  return false;
+  const [ax, ay, ax2, ay2] = regionRectIn(a, 8, 8), [bx, by, bx2, by2] = regionRectIn(b, 8, 8);
+  return ((ax2 === bx || bx2 === ax) && Math.min(ay2, by2) > Math.max(ay, by))
+    || ((ay2 === by || by2 === ay) && Math.min(ax2, bx2) > Math.max(ax, bx));
+}
+
+/** Positive area overlap, including differently divided floors. Corner/edge contact is not coverage. */
+export function regionsOverlap(a: string, b: string): boolean {
+  const [ax, ay, ax2, ay2] = regionRectIn(a, 8, 8), [bx, by, bx2, by2] = regionRectIn(b, 8, 8);
+  return Math.min(ax2, bx2) > Math.max(ax, bx) && Math.min(ay2, by2) > Math.max(ay, by);
+}
+export function regionsBelow(key: string, floor: FloorIntent): RegionKey[] {
+  return cellRegions(floor, cellOf(key)).filter(k => regionsOverlap(key, k));
 }
 
 /** Edge-connected groups of regions, each sorted, in order of their first region. */
@@ -175,7 +203,7 @@ export function normalisePlan(plan: unknown): CompassPlanV2 {
   const p = plan as any;
   if (!p || typeof p !== 'object') throw new PlanError('A Compass plan is required.');
   if (JSON.stringify(p).length > MAX_JSON_BYTES) throw new PlanError('This plan is too large.');
-  if (p.schema !== PLAN_SCHEMA || p.version !== PLAN_VERSION) throw new PlanError('This is not a version 2 Compass plan.');
+  if (p.schema !== PLAN_SCHEMA || ![2, 3].includes(p.version)) throw new PlanError('This is not a supported Compass plan (version 2 or 3).');
   const plot = p.plot;
   if (!plot || typeof plot !== 'object') throw new PlanError('Plot details are missing.');
   const outPlot: any = {};
@@ -212,7 +240,18 @@ export function normalisePlan(plan: unknown): CompassPlanV2 {
     if (!floor || !Array.isArray(floor.splits ?? []) || !Array.isArray(floor.rooms ?? [])) throw new PlanError('Each floor has splits and rooms.');
     const splits = [...new Set<string>(floor.splits ?? [])].sort();
     if (splits.some(s => !CELLS.includes(s as CellKey))) throw new PlanError('A divided cell is not a map cell.');
-    const valid = new Set<string>(floorRegions({ splits: splits as CellKey[] }));
+    const directions: FloorIntent['splitDirections'] = {};
+    if ('splitDirections' in floor) {
+      if (p.version !== 3 || !floor.splitDirections || typeof floor.splitDirections !== 'object' || Array.isArray(floor.splitDirections)) {
+        throw new PlanError('Split directions need a version 3 Compass plan.');
+      }
+      for (const cell of Object.keys(floor.splitDirections).sort()) {
+        const direction = floor.splitDirections[cell];
+        if (!splits.includes(cell) || !['left-right', 'top-bottom'].includes(direction)) throw new PlanError('A split direction must name a divided cell and one direction.');
+        if (direction === 'top-bottom') directions[cell as CellKey] = direction;
+      }
+    }
+    const valid = new Set<string>(floorRegions({ splits: splits as CellKey[], splitDirections: directions }));
     if ((floor.rooms ?? []).length > MAX_ROOMS) throw new PlanError(`A floor can have at most ${MAX_ROOMS} rooms.`);
     const owner = new Map<string, string>();
     const rooms: RoomIntent[] = [];
@@ -233,6 +272,7 @@ export function normalisePlan(plan: unknown): CompassPlanV2 {
       rooms.push({ id: room.id, use: room.use, regions: regions as RegionKey[] });
     }
     outFloors[name] = { splits, rooms: rooms.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
+    if (Object.keys(directions).length) outFloors[name].splitDirections = directions;
   }
   const choices = p.choices ?? {};
   if (typeof choices !== 'object') throw new PlanError('Invalid layout choices.');
@@ -245,20 +285,12 @@ export function normalisePlan(plan: unknown): CompassPlanV2 {
     if (!['open', 'closed'].includes(choices.kitchen)) throw new PlanError('kitchen is open or closed.');
     outChoices.kitchen = choices.kitchen;
   }
-  const out: CompassPlanV2 = { schema: PLAN_SCHEMA, version: PLAN_VERSION, plot: outPlot, storeys: p.storeys, floors: outFloors, choices: outChoices };
+  const out: CompassPlanV2 = { schema: PLAN_SCHEMA, version: p.version, plot: outPlot, storeys: p.storeys, floors: outFloors, choices: outChoices };
   if (p.legacy && typeof p.legacy === 'object') out.legacy = JSON.parse(JSON.stringify(p.legacy));
   return out;
 }
 
 /** Ground regions under a first-floor region: the same key, its whole cell, or both halves of it. */
-function covering(key: string, groundOwner: Map<string, RoomIntent>): string[] {
-  const cell = cellOf(key);
-  if (groundOwner.has(key)) return [key];
-  if (groundOwner.has(cell)) return [cell];
-  if (key.includes('.')) return [key];
-  return [`${cell}.L`, `${cell}.R`];
-}
-
 /** Semantic notes on a normalised plan, identical to compass_schema.check. Never throws. */
 export function checkPlan(plan: CompassPlanV2): PlanIssue[] {
   const notes: PlanIssue[] = [];
@@ -285,7 +317,7 @@ export function checkPlan(plan: CompassPlanV2): PlanIssue[] {
     for (const room of first.rooms) {
       if (room.use !== 'void') continue;
       for (const key of room.regions) {
-        const below = covering(key, groundOwner).map(k => groundOwner.get(k));
+        const below = regionsBelow(key, plan.floors.ground).map(k => groundOwner.get(k));
         const ok = below.length > 0 && below.every(b => b !== undefined && (VOID_BELOW.has(b.use) || (b.use === 'drawing' && drawingOpen)));
         if (!ok) notes.push(issue('void-below', 'conflict', 'A double-height space needs the living hall (or dining or stair hall) below it.', [room.id], [key]));
       }

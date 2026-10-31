@@ -671,6 +671,7 @@ It is unproven. Budget targets [E]: at most 8 s and 300 MB peak per still, on 8 
 - **Removes, as the brief requires**: Previous/Next plan (the alternatives), "Enlarge plan" corner zoom, the room chooser and per-room 3D views, room zoom, interior rotation, and the three exterior finishes (one restrained finish remains).
 - **Saved preferences**: the saved `gc-compass-exterior` value is ignored and kept, not deleted.
 - **Decided 14 Oct**: the maintainer confirmed the removal of these 4–6 Oct features.
+- **Added 29 Oct (maintainer request)**: Full screen, with Plan, Top view, Outside, the floors and Next angle in one row at the bottom. Plan and Top view fill about three quarters of the screen's width (the service's `fit: 'width'`, as tall as that needs), moved with Up and Down; Whole plan fits them to the screen. It is not the corner zoom: the drawing's whole width, moved only up and down.
 
 ---
 

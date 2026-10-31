@@ -7,11 +7,11 @@
  * committed as one undoable step (COMMIT_FLOOR); no change is ever applied silently or partly.
  * docs/compass-refine/IMPLEMENTATION_PLAN.md §4.3, §5.
  */
-import type { CellKey, CompassPlanV2, FloorId, FloorIntent, RegionKey, RoomIntent } from '../types/compassPlan';
+import type { CellKey, CompassPlanV2, FloorId, FloorIntent, RegionKey, RoomIntent, SplitDirection } from '../types/compassPlan';
 import type { RoomComponent } from '../types/compass';
 import {
   CATALOGUE, CELLS, PLAN_LIBRARY, REPEATABLE, STAIR_HOSTS, cellOf, components, floorRegions, nextRoomId,
-  parseRegion, planLabels, regionRectIn, regionsTouch,
+  parseRegion, planLabels, regionRectIn, regionsTouch, cellRegions, halfName, otherHalf, regionsBelow, splitDirection, splitSides,
 } from './compassPlan';
 
 export const UNDO_LIMIT = 120;
@@ -97,6 +97,7 @@ export function ownerOf(floor: FloorIntent, key: string): RoomIntent | undefined
 export interface CellView {
   key: CellKey;
   split: boolean;
+  direction: SplitDirection;
   whole: RoomIntent | null;
   left: RoomIntent | null;
   right: RoomIntent | null;
@@ -104,11 +105,13 @@ export interface CellView {
 
 export function cellView(floor: FloorIntent, key: CellKey): CellView {
   const split = floor.splits.includes(key);
+  const direction = splitDirection(floor, key);
+  const [a, b] = splitSides(direction);
   return {
-    key, split,
+    key, split, direction,
     whole: split ? null : ownerOf(floor, key) || null,
-    left: split ? ownerOf(floor, `${key}.L`) || null : null,
-    right: split ? ownerOf(floor, `${key}.R`) || null : null,
+    left: split ? ownerOf(floor, `${key}.${a}`) || null : null,
+    right: split ? ownerOf(floor, `${key}.${b}`) || null : null,
   };
 }
 
@@ -165,20 +168,25 @@ export function clearWidthIn(key: string, widthIn: number, depthIn: number): num
   const { width } = regionSizeIn(key, widthIn, depthIn);
   const atLeft = col === 1 && half !== 'R';
   const atRight = col === 4 && half !== 'L';
-  return width - (atLeft ? 9 : 3) - (atRight ? 9 : 3);
+  const clearWidth = width - (atLeft ? 9 : 3) - (atRight ? 9 : 3);
+  if (half !== 'T' && half !== 'B') return clearWidth;
+  const [x1, y1, x2, y2] = regionRectIn(key, widthIn, depthIn);
+  return Math.min(x2 - x1 - (x1 === 0 ? 9 : 3) - (x2 === widthIn ? 9 : 3),
+    y2 - y1 - (y1 === 0 ? 9 : 3) - (y2 === depthIn ? 9 : 3));
 }
 
 /** No room is given a half narrower than this (2'-6" clear): the one size limit that refuses (decided 16 Oct 2026). */
 export const HALF_MIN_CLEAR_IN = 30;
 
 /** The narrowest and widest clear widths a half cell has on this plot (at the side wall, and inside). */
-export function halfClearRangeIn(widthIn: number, depthIn: number): { narrowest: number; widest: number } {
+export function halfClearRangeIn(widthIn: number, depthIn: number, direction: SplitDirection = 'left-right'): { narrowest: number; widest: number } {
+  if (direction === 'top-bottom') return { narrowest: clearWidthIn('r1_c1.B', widthIn, depthIn), widest: clearWidthIn('r2_c2.T', widthIn, depthIn) };
   return { narrowest: clearWidthIn('r2_c1.L', widthIn, depthIn), widest: clearWidthIn('r2_c2.L', widthIn, depthIn) };
 }
 
 /** Whether cells may be divided on this plot: every half at least 2'-6" clear (30 ft plots and wider; 20 and 25 ft not). */
-export function halvesUsable(widthIn: number, depthIn: number): boolean {
-  return halfClearRangeIn(widthIn, depthIn).narrowest >= HALF_MIN_CLEAR_IN;
+export function halvesUsable(widthIn: number, depthIn: number, direction: SplitDirection = 'left-right'): boolean {
+  return halfClearRangeIn(widthIn, depthIn, direction).narrowest >= HALF_MIN_CLEAR_IN;
 }
 
 // ---- Placement mode (whole cells) ----------------------------------------------------------
@@ -251,10 +259,7 @@ export function voidProblem(below: FloorIntent | undefined, keys: string[], choi
   if (!below) return 'Place the ground floor first: a double-height space needs the living hall below it.';
   const drawingOpen = choices?.drawingRoom !== 'separate';
   for (const key of keys) {
-    const cell = cellOf(key);
-    const candidates = below.splits.includes(cell)
-      ? (key.includes('.') ? [key] : [`${cell}.L`, `${cell}.R`])
-      : [cell];
+    const candidates = regionsBelow(key, below);
     for (const k of candidates) {
       const room = ownerOf(below, k);
       const ok = room && (['living', 'dining', 'staircase', 'diningStaircase'].includes(room.use) || (room.use === 'drawing' && drawingOpen));
@@ -267,13 +272,14 @@ export function voidProblem(below: FloorIntent | undefined, keys: string[], choi
 // ---- Refine: dividing a cell and assigning its halves -------------------------------------
 
 /** Divides a whole cell 50 % | 50 %; both halves keep the cell's owner, so nothing moves yet. */
-export function splitCell(floor: FloorIntent, cell: CellKey): FloorIntent {
+export function splitCell(floor: FloorIntent, cell: CellKey, direction: SplitDirection = 'left-right'): FloorIntent {
   if (floor.splits.includes(cell)) return floor;
+  const halves = splitSides(direction).map(h => `${cell}.${h}` as RegionKey);
   const owner = ownerOf(floor, cell);
   const splits = [...floor.splits, cell].sort() as CellKey[];
   const rooms = floor.rooms.map(r => (r.id === owner?.id
-    ? { ...r, regions: [...r.regions.filter(k => k !== cell), `${cell}.L`, `${cell}.R`].sort() as RegionKey[] } : r));
-  return { splits, rooms };
+    ? { ...r, regions: [...r.regions.filter(k => k !== cell), ...halves].sort() as RegionKey[] } : r));
+  return { ...floor, splits, rooms, ...(direction === 'top-bottom' ? { splitDirections: { ...floor.splitDirections, [cell]: direction } } : {}) };
 }
 
 export type AssignChoice = { type: 'empty' } | { type: 'use'; use: string; separate?: boolean };
@@ -299,6 +305,31 @@ export function shortfallText(use: string, short: Shortfall): string {
  * service decides the drawn size and writes the size-short note.
  */
 export function roomClearWidthIn(room: RoomIntent, widthIn: number, depthIn: number): number {
+  if (room.regions.some(k => /\.[TB]$/.test(k))) {
+    // Sweep actual bands: a top and a bottom region do not share a horizontal run merely because
+    // they have the same row number. Measure both axes for the new orientation.
+    const rects = room.regions.map(k => regionRectIn(k, widthIn, depthIn));
+    const widestRun = (axis: 0 | 1, extent: number) => {
+      const cross = axis === 0 ? 1 : 0;
+      const cuts = [...new Set(rects.flatMap(r => [r[cross], r[cross + 2]]))].sort((a, b) => a - b);
+      let best = 0;
+      for (let i = 1; i < cuts.length; i++) {
+        const mid = (cuts[i - 1] + cuts[i]) / 2;
+        const spans = rects.filter(r => r[cross] < mid && r[cross + 2] > mid)
+          .map(r => [r[axis], r[axis + 2]]).sort((a, b) => a[0] - b[0]);
+        if (!spans.length) continue;
+        let [start, end] = spans[0];
+        const measure = () => { best = Math.max(best, end - start - (start === 0 ? 9 : 3) - (end === extent ? 9 : 3)); };
+        for (const [a, b] of spans.slice(1)) {
+          if (a <= end) end = Math.max(end, b);
+          else { measure(); [start, end] = [a, b]; }
+        }
+        measure();
+      }
+      return best;
+    };
+    return Math.min(widestRun(0, widthIn), widestRun(1, depthIn));
+  }
   const rows = new Map<number, Array<[number, number]>>();
   for (const key of room.regions) {
     const [x1, , x2] = regionRectIn(key, widthIn, depthIn);
@@ -333,7 +364,7 @@ export function halfShortfall(floor: FloorIntent, key: string, widthIn: number, 
  * undivided cell, as if it were divided (both halves keep the cell's room).
  */
 export function halfLinksRoom(floor: FloorIntent, key: RegionKey): RoomIntent | null {
-  const divided = splitCell(floor, cellOf(key) as CellKey);
+  const divided = splitCell(floor, cellOf(key), /\.[TB]$/.test(key) ? 'top-bottom' : 'left-right');
   const room = ownerOf(divided, key);
   if (!room || room.regions.length < 2) return null;
   return connected(room.regions.filter(k => k !== key)) ? null : room;
@@ -344,9 +375,11 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
   const floorId = state.currentFloor;
   const floor = state.floors[floorId];
   const { widthIn, depthIn } = plotInches(state);
+  if (!parseRegion(key).half || !floorRegions(floor).includes(key)) return { kind: 'refused', message: 'Choose a half in this cell’s saved split direction.' };
   const current = ownerOf(floor, key);
-  const side = key.endsWith('.L') ? 'left' : 'right';
-  const otherHalf = (key.endsWith('.L') ? key.replace('.L', '.R') : key.replace('.R', '.L')) as RegionKey;
+  const side = halfName(key);
+  const opposite = otherHalf(key);
+  const sideTitle = side[0].toUpperCase() + side.slice(1);
   if (choice.type === 'use' && current?.use === choice.use && !choice.separate) {
     return { kind: 'commit', floor, roomId: current.id, message: `The ${side} half is already ${label(floor, current)}.` };
   }
@@ -361,8 +394,8 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
   if (current) {
     const rest = current.regions.filter(k => k !== key);
     if (!connected(rest)) {
-      return { kind: 'disconnects', victim: current, victimLabel: label(floor, current), otherHalf,
-        message: `${label(floor, current)} would be cut in two. Give the ${side === 'left' ? 'right' : 'left'} half instead, or give both halves.` };
+      return { kind: 'disconnects', victim: current, victimLabel: label(floor, current), otherHalf: opposite,
+        message: `${label(floor, current)} would be cut in two. Give the ${halfName(opposite)} half instead, or give both halves.` };
     }
     base = withRegions(floor, current.id, rest);
   }
@@ -375,7 +408,7 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
   if (touching.length && !choice.separate) {
     const target = touching.find(r => r.id === state.activeRoomId) || touching[0];
     const next = withRegions(base, target.id, [...target.regions, key]);
-    return { kind: 'commit', floor: next, roomId: target.id, message: `${side === 'left' ? 'Left' : 'Right'} half: ${labelsOf(next)[target.id]}.` };
+    return { kind: 'commit', floor: next, roomId: target.id, message: `${sideTitle} half: ${labelsOf(next)[target.id]}.` };
   }
   if (same.length && !choice.separate && !REPEATABLE.has(use)) {
     return { kind: 'refused', message: `${library(use)} is already on this floor; a house has one. Choose another room.` };
@@ -400,20 +433,24 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
   }
   const created = withNewRoom(base, floorId, use, [key]);
   return { kind: 'commit', floor: created.floor, roomId: created.id, short,
-    message: `${side === 'left' ? 'Left' : 'Right'} half: ${labelsOf(created.floor)[created.id]}.${narrow}` };
+    message: `${sideTitle} half: ${labelsOf(created.floor)[created.id]}.${narrow}` };
 }
 
 /** "Give both halves to B" (the answer to a cut-in-two refusal): both halves, then the cell made whole. */
-export function giveBothHalves(state: CompassStateV2, cell: CellKey, use: string): AssignOutcome {
+export function giveBothHalves(state: CompassStateV2, cell: CellKey, use: string, below?: FloorIntent): AssignOutcome {
+  if (use === 'void') {
+    const problem = voidProblem(below, [cell], state.choices);
+    if (problem) return { kind: 'refused', message: problem };
+  }
   const floor = state.floors[state.currentFloor];
-  const owners = [ownerOf(floor, `${cell}.L`), ownerOf(floor, `${cell}.R`)].filter(Boolean) as RoomIntent[];
+  const owners = cellRegions(floor, cell).map(k => ownerOf(floor, k)).filter(Boolean) as RoomIntent[];
   let base = floor;
   for (const owner of owners) {
     const rest = owner.regions.filter(k => !k.startsWith(`${cell}.`));
     if (!connected(rest)) return { kind: 'refused', message: `${label(floor, owner)} would be cut in two.` };
     base = withRegions(base, owner.id, rest);
   }
-  const unsplit: FloorIntent = { ...base, splits: base.splits.filter(c => c !== cell) };
+  const unsplit = wholeCell(base, cell, null);
   const outcome = joinOrCreate(unsplit, state.currentFloor, use, cell, state.activeRoomId);
   if (outcome.kind !== 'commit') return { kind: 'refused', message: outcome.kind === 'refused' ? outcome.message : 'Not possible here.' };
   return { kind: 'commit', floor: outcome.floor, roomId: outcome.roomId, message: `Whole cell: ${labelsOf(outcome.floor)[outcome.roomId || ''] || library(use)}.` };
@@ -423,8 +460,9 @@ export interface WholeOption { owner: string | null; label: string; removes: str
 
 /** The answers WHOLE CELL offers for a divided cell (§5.3 "Restore whole cell"). */
 export function wholeOptions(floor: FloorIntent, cell: CellKey): WholeOption[] {
-  const left = ownerOf(floor, `${cell}.L`) || null;
-  const right = ownerOf(floor, `${cell}.R`) || null;
+  const [a, b] = cellRegions(floor, cell);
+  const left = ownerOf(floor, a) || null;
+  const right = b ? ownerOf(floor, b) || null : null;
   const names = labelsOf(floor);
   const option = (owner: RoomIntent | null): WholeOption => {
     const removes: string[] = [];
@@ -453,7 +491,10 @@ export function wholeCell(floor: FloorIntent, cell: CellKey, owner: string | nul
     const regions = r.regions.filter(k => !k.startsWith(`${cell}.`));
     return { ...r, regions: (r.id === owner ? [...regions, cell] : regions).sort() as RegionKey[] };
   }).filter(r => r.regions.length > 0);
-  return { splits: floor.splits.filter(c => c !== cell), rooms };
+  const splitDirections = { ...floor.splitDirections };
+  delete splitDirections[cell];
+  return { splits: floor.splits.filter(c => c !== cell), rooms,
+    ...(Object.keys(splitDirections).length ? { splitDirections } : {}) };
 }
 
 // ---- Plot, plan, and the reducer ---------------------------------------------------------------
@@ -482,7 +523,7 @@ export function planFromState(state: CompassStateV2): CompassPlanV2 {
   const plotType = PLOT_TYPES.includes(state.foundation.plotType || '') ? state.foundation.plotType! : 'Middle Plot';
   const storeys = state.numFloors === 'Multi-Floor' ? 2 : 1;
   const plan: CompassPlanV2 = {
-    schema: 'gazeconnect.compass-plan', version: 2,
+    schema: 'gazeconnect.compass-plan', version: Object.values(state.floors).some(f => Object.keys(f.splitDirections || {}).length) ? 3 : 2,
     plot: { widthIn: Math.min(2400, Math.max(180, widthIn)), depthIn: Math.min(2400, Math.max(180, depthIn)),
       facing: facing as CompassPlanV2['plot']['facing'], gate: gate as CompassPlanV2['plot']['gate'],
       plotType: plotType as CompassPlanV2['plot']['plotType'] },

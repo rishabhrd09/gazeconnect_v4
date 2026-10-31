@@ -23,6 +23,8 @@ print(json.dumps(result))
 `],{input:JSON.stringify(drafts),encoding:'utf8',env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}}));
 (async()=>{
  const browser=await chromium.launch({headless:true});const errors=[],rows=[];let comparisons=0;
+ // While `held` is set, prediction replies wait in it (the response to a keystroke still on its way).
+ let held=null;
  async function boot(url,opts){
   const p=await browser.newPage({viewport:{width:opts.width,height:opts.width===1366?768:1080}});p.setDefaultTimeout(8000);p.on('pageerror',e=>errors.push(e.message));
   await p.addInitScript(o=>{
@@ -33,17 +35,19 @@ print(json.dumps(result))
   },opts);
   await p.routeWebSocket('ws://127.0.0.1:8765',ws=>{
    ws.onMessage(raw=>{const m=JSON.parse(raw);p.evaluate(m=>qa.calls.push(m),m).catch(()=>{});
-    if(m.type==='get_predictions')ws.send(JSON.stringify({type:'predictions',request_id:m.request_id,prediction:{text:m.text,prefix:m.text.match(/[a-z]+$/i)?.[0]||''},...(fixtures[m.text]??{word_slots:Array(10).fill(null),words:[],sentences:[]})}));
+    if(m.type==='get_predictions'){const reply=()=>ws.send(JSON.stringify({type:'predictions',request_id:m.request_id,prediction:{text:m.text,prefix:m.text.match(/[a-z]+$/i)?.[0]||''},...(fixtures[m.text]??{word_slots:Array(10).fill(null),words:[],sentences:[]})}));if(held)held.push(reply);else reply();}
    });
    ws.send(JSON.stringify({type:'connected',tts_available:true,tts_voice:'af_heart',tts_state:'ready',gaze_enabled:false,current_screen:'home'}));
   });
-  await p.goto(url);await p.click('#kb');await p.waitForFunction(()=>document.querySelectorAll('.keyboard-word-slot').length===10);
+  await p.goto(url);await p.click('#kb');await p.waitForFunction(()=>document.querySelectorAll('.keyboard-word-slot').length+document.querySelectorAll('.keyboard-phrase-slot').length>=10);
   await p.evaluate(()=>document.fonts.ready);await p.mouse.move(0,0);
   await p.waitForFunction(()=>!document.querySelector('#phrase-suggestion-0')?.disabled);
   return p;
  }
  async function settle(p){await p.mouse.move(0,0);await p.locator('.keyboard-screen').evaluate(async e=>{await new Promise(requestAnimationFrame);await Promise.all(e.getAnimations({subtree:true}).filter(a=>a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})));});}
- async function geometry(p){return p.locator('button.keyboard-key,.keyboard-word-slot,.keyboard-phrase-slot,.keyboard-message,#nav-restore-btn').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return{id:e.id,classes:e.className,rect:[r.x,r.y,r.width,r.height].map(n=>+n.toFixed(3)),font:[s.fontFamily,s.fontSize,s.fontWeight,s.lineHeight],dwell:e.getAttribute('data-gaze-dwell-ms')};}));}
+ // Word rows by their row boxes: their slots were redesigned on 29 Oct 2026 (five equal top slots,
+ // four words and a phrase or five words); keys, message, rows and SHOW NAV must not move.
+ async function geometry(p){return p.locator('button.keyboard-key,.keyboard-word-row,.keyboard-message,#nav-restore-btn').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return{id:e.id,classes:e.className,rect:[r.x,r.y,r.width,r.height].map(n=>+n.toFixed(3)),font:[s.fontFamily,s.fontSize,s.fontWeight,s.lineHeight],dwell:e.getAttribute('data-gaze-dwell-ms')};}));}
  async function targets(p){return p.locator('.phrase-panel button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return{id:e.id,w:r.width,h:r.height,x:r.x,y:r.y};}));}
  for(const width of (process.env.PHRASE_QA_EDGE_ONLY==='1'?[]:[1366,1920]))for(const mode of ['focus','serene'])for(const theme of ['dark','warm','midnight-navy'])for(const feel of ['standard','familiar']){
   const opts={width,mode,theme,feel,draft:'i need wa'};const p=await boot(base,opts);const old=baseline?await boot(baseline,opts):null;
@@ -81,8 +85,21 @@ print(json.dumps(result))
   assert.equal(await q.evaluate(()=>qa.calls.filter(m=>m.type==='learn_sentence').length),0);
   await q.close();console.log(width,mode,theme,feel,'phrase insert / browse / review / speech passed');
  }
+ // The row keeps its shape while a keystroke's response is on its way (29 Oct 2026): the phrase stays,
+ // not selectable, instead of giving way to a fifth word until the response arrives.
+ const waiting=await boot(base,{width:1366,mode:'focus',theme:'dark',feel:'familiar',draft:'i need wa'});
+ const shownPhrase=await waiting.locator('#phrase-suggestion-0').getAttribute('aria-label');assert.equal(shownPhrase,'Add phrase: I need water now');
+ held=[];await waiting.locator('[data-action=letter]').filter({hasText:/^t$/i}).click();
+ await waiting.waitForFunction(()=>qa.calls.some(m=>m.type==='get_predictions'&&m.text==='i need wat'));
+ assert.equal(await waiting.evaluate(()=>document.querySelector('#phrase-suggestion-0')?.getAttribute('aria-label')??null),shownPhrase,'The phrase gave way before the response arrived');
+ assert(await waiting.locator('#phrase-suggestion-0').isDisabled());assert.equal(await waiting.locator('#phrase-suggestion-0.keyboard-phrase-slot-stale').count(),1);
+ assert.equal(await waiting.locator('.keyboard-word-row-top .keyboard-word-slot').count(),4);
+ const replies=held;held=null;replies.forEach(reply=>reply());
+ await waiting.waitForFunction(()=>!document.querySelector('#phrase-suggestion-0')&&document.querySelectorAll('.keyboard-word-row-top .keyboard-word-slot').length===5);
+ await waiting.close();
  const narrow=await boot(base,{width:1366,mode:'focus',theme:'dark',feel:'familiar',draft:'i need wa'});
- await narrow.addStyleTag({content:'.keyboard-screen #phrase-suggestion-0 { width:160px!important; height:80px!important; min-height:80px!important; }'});
+ // 120 px: since 29 Oct 2026 a phrase takes two lines at 22 px or more, so 160 px now holds this one.
+ await narrow.addStyleTag({content:'.keyboard-screen #phrase-suggestion-0 { width:120px!important; height:80px!important; min-height:80px!important; }'});
  await narrow.waitForFunction(()=>document.querySelector('#phrase-suggestion-0')?.getAttribute('aria-label')==='Browse suggested phrases');
  assert.equal((await narrow.locator('.keyboard-message-text').innerText()).trim(),'i need wa');
  await narrow.click('#phrase-suggestion-0');await narrow.locator('.phrase-panel').waitFor();

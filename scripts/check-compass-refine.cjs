@@ -61,7 +61,7 @@ eq(R.placeCell(s, 'r2_c3', 'dining').kind, 'refused', 'a divided cell is changed
 
 // An empty cell: halves assigned one at a time, partial assignment allowed; too narrow halves refused.
 s = R.compassReducer(s, { type: 'COMMIT_FLOOR', floor: R.splitCell(s.floors.ground, 'r1_c1') });
-eq(R.cellView(s.floors.ground, 'r1_c1'), { key: 'r1_c1', split: true, whole: null, left: null, right: null });
+eq(R.cellView(s.floors.ground, 'r1_c1'), { key: 'r1_c1', split: true, direction: 'left-right', whole: null, left: null, right: null });
 s = commit(s, R.assignHalf(s, 'r1_c1.L', { type: 'use', use: 'passage' }));
 eq(R.assignHalf(s, 'r1_c1.R', { type: 'use', use: 'living' }).kind, 'refused', 'one living hall per house');
 // A room narrower than its use needs is placed with a warning, not refused (B2, decided 16 Oct 2026).
@@ -180,7 +180,7 @@ const converted = R.compassReducer(both.state, { type: 'CONVERT_LEGACY' });
 eq(converted.legacy.converted, true);
 eq(converted.legacy.refinements, both.state.legacy.refinements, 'converting deletes nothing');
 eq(converted.floors, both.state.floors, 'converting changes no room');
-const newer = Draft.parseDraft(JSON.stringify({ ...JSON.parse(raw), version: 3 }), queue);
+const newer = Draft.parseDraft(JSON.stringify({ ...JSON.parse(raw), version: 4 }), queue);
 eq(newer.newer, true, 'a newer draft opens read-only');
 const copy = Draft.backendCopy(s);
 eq(copy.compass_map.requires_v2, true);

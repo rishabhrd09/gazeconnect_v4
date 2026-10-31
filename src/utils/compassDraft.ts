@@ -1,7 +1,7 @@
 /**
  * Saving and restoring the Compass map (docs/compass-refine/IMPLEMENTATION_PLAN.md §4.8).
  *
- * Version 2 drafts live under new keys, so a rollback build still finds its version 1 draft untouched.
+ * Version 3 drafts live under new keys, so a rollback build still finds its version 1/2 drafts untouched.
  * A version 1 draft is migrated once, on load, by the same rules as the floor-plan service
  * (compassPlan.migrateV1): each room becomes one room per connected part, vertical 50 % splits become
  * divided cells, and anything else is kept read-only in `legacy`. Nothing is deleted. A draft newer than
@@ -12,14 +12,16 @@ import type { RoomComponent } from '../types/compass';
 import { deriveV1, migrateV1, normalisePlan } from './compassPlan';
 import { CompassStateV2, Foundation, createInitialState, emptyFloor, nextUnplaced, planFromState, roomsOfUse } from './compassReducer';
 
-export const DRAFT_VERSION = 2;
-export const DRAFT_KEYS = { session: 'gazeconnect_compass_progress_v2', primary: 'compass_persistent_backup_v2', last: 'compass_last_session_backup_v2' };
+export const DRAFT_VERSION = 3;
+export const DRAFT_KEYS = { session: 'gazeconnect_compass_progress_v3', primary: 'compass_persistent_backup_v3', last: 'compass_last_session_backup_v3' };
+export const V2_KEYS = { session: 'gazeconnect_compass_progress_v2', primary: 'compass_persistent_backup_v2', last: 'compass_last_session_backup_v2' };
+export const V2_MIGRATED_KEY = 'gazeconnect_compass_v2_started';
 export const V1_KEYS = { session: 'gazeconnect_compass_progress_v1', primary: 'compass_persistent_backup', last: 'compass_last_session_backup' };
-/** Set once a version 2 draft exists: from then on the frozen version 1 draft is never migrated again. */
-export const MIGRATED_KEY = 'gazeconnect_compass_v2_started';
+/** Set once a version 3 draft exists: older drafts are never migrated again, including after Restart. */
+export const MIGRATED_KEY = 'gazeconnect_compass_v3_started';
 
 export interface DraftV2 {
-  version: 2;
+  version: 2 | 3;
   plan: CompassPlanV2 | null;
   floors: Record<FloorId, FloorIntent>;
   ui: {
@@ -46,6 +48,12 @@ export interface ParsedDraft {
 
 type QueueFor = (floor: FloorId) => RoomComponent[];
 
+function protectedDraft(value: any, queueFor: QueueFor): ParsedDraft {
+  const state = createInitialState(queueFor('ground'));
+  state.foundation = { ...state.foundation, ...value?.ui?.foundation };
+  return { state, notices: ['The saved map could not be validated. Its original data is kept; this view is read-only.'], fromV1: false, newer: true };
+}
+
 export function draftFromState(state: CompassStateV2): DraftV2 {
   let plan: CompassPlanV2 | null = null;
   if (state.phase !== 'foundation' && state.foundation.plotWidth && state.foundation.plotDepth) {
@@ -61,6 +69,7 @@ export function draftFromState(state: CompassStateV2): DraftV2 {
 function hydrateFloors(value: any): Record<FloorId, FloorIntent> {
   const floor = (f: any): FloorIntent => ({
     splits: Array.isArray(f?.splits) ? [...f.splits] : [],
+    ...(f?.splitDirections ? { splitDirections: { ...f.splitDirections } } : {}),
     rooms: Array.isArray(f?.rooms) ? f.rooms.map((r: any) => ({ id: r.id, use: r.use, regions: [...(r.regions || [])] })) : [],
   });
   return { ground: floor(value?.ground), first: floor(value?.first) };
@@ -70,14 +79,12 @@ function hydrateFloors(value: any): Record<FloorId, FloorIntent> {
 function fromV2(draft: DraftV2, queueFor: QueueFor): CompassStateV2 {
   const ui = draft.ui;
   const floors = hydrateFloors(draft.plan?.floors ?? draft.floors);
-  // A draft whose floors fail the schema (edited by hand, or damaged) keeps its plot but starts empty.
+  // Never turn an unreadable map into an editable empty draft: its original must survive.
   try {
-    normalisePlan({ schema: 'gazeconnect.compass-plan', version: 2,
+    normalisePlan({ schema: 'gazeconnect.compass-plan', version: draft.plan?.version ?? (Object.values(floors).some(f => Object.keys(f.splitDirections || {}).length) ? 3 : 2),
       plot: { widthIn: 480, depthIn: 720, facing: 'South', gate: 'Center', plotType: 'Middle Plot' },
       storeys: 2, floors, choices: draft.choices || {} });
-  } catch {
-    floors.ground = emptyFloor(); floors.first = emptyFloor();
-  }
+  } catch { throw new Error('The saved map could not be validated. Its original data is kept.'); }
   const queue = queueFor(ui.currentFloor);
   const state = createInitialState(queue);
   return {
@@ -140,13 +147,29 @@ export function parseDraft(raw: string | null, queueFor: QueueFor): ParsedDraft 
   const version = Number(value.version);
   if (version > DRAFT_VERSION) {
     // A newer build's draft: shown read-only, never overwritten (§4.8).
-    try { return { state: fromV2(value as DraftV2, queueFor), notices: [], fromV1: false, newer: true }; } catch { return null; }
+    try { return { state: fromV2(value as DraftV2, queueFor), notices: [], fromV1: false, newer: true }; } catch { return protectedDraft(value, queueFor); }
   }
-  if (version === DRAFT_VERSION) {
+  if (version === DRAFT_VERSION || version === 2) {
     if (!value.ui || !value.ui.foundation) return null;
-    return { state: fromV2(value as DraftV2, queueFor), notices: [], fromV1: false, newer: false };
+    try { return { state: fromV2(value as DraftV2, queueFor), notices: [], fromV1: false, newer: false }; }
+    catch { return protectedDraft(value, queueFor); }
   }
   try { return fromV1(value, queueFor); } catch { return null; }
+}
+
+/** Reopen the canonical backend copy when no local draft is present. */
+export function draftFromPlan(value: unknown, queueFor: QueueFor): ParsedDraft {
+  const plan = normalisePlan(value);
+  const queue = queueFor('ground');
+  const state = createInitialState(queue);
+  const numFloors = plan.storeys === 2 ? 'Multi-Floor' : 'Single Floor';
+  return { fromV1: false, newer: false, notices: [], state: {
+    ...state, phase: 'placement', foundationStep: 7, numFloors, choices: plan.choices, legacy: plan.legacy,
+    foundation: { ...state.foundation, facing: plan.plot.facing, plotWidth: plan.plot.widthIn / 12,
+      plotDepth: plan.plot.depthIn / 12, plotType: plan.plot.plotType, gatePosition: plan.plot.gate, numFloors },
+    floors: { ground: plan.floors.ground, first: plan.floors.first || emptyFloor() },
+    currentIndex: nextUnplaced(queue, plan.floors.ground),
+  } };
 }
 
 /** How much work a draft holds: rooms first, then a finished foundation. */
@@ -161,7 +184,8 @@ export function bestDraft(raws: Array<string | null>, queueFor: QueueFor): { raw
   let best: { raw: string; parsed: ParsedDraft } | null = null;
   for (const raw of raws) {
     const parsed = parseDraft(raw, queueFor);
-    if (parsed && (!best || draftScore(parsed) > draftScore(best.parsed))) best = { raw: raw!, parsed };
+    if (parsed && (!best || (parsed.newer && !best.parsed.newer)
+      || (parsed.newer === best.parsed.newer && draftScore(parsed) > draftScore(best.parsed)))) best = { raw: raw!, parsed };
   }
   return best;
 }

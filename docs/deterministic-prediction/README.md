@@ -114,7 +114,7 @@ On an engine error the backend still answers. It sends ten `null` slots, never t
 
 | Row | Contents |
 |---|---|
-| Top | Word slots 1–5, then the **phrase cell** (one short sentence suggestion or abbreviation expansion) |
+| Top | Five equal slots: word slots 1–5, or, when a phrase is a confident match, word slots 1–4 and the **phrase cell** on the right (29 Oct 2026; see below) |
 | Letters, actions | Unchanged, including Word delete, SPACE, 123, Quick Words and the gaze toggle when navigation is hidden |
 | Bottom | Word slots 6–10, then **SHOW NAV** while navigation is hidden. With navigation shown, the five slots use the full width and the global navigation bar sits below |
 
@@ -127,6 +127,22 @@ Alternatives were rejected:
 - Replacing slot 10 when a sentence exists would silently remove a word.
 - A third suggestion row would shrink letter keys below comfortable sizes at 768 px height.
 - Showing sentences only on demand would add a navigation step.
+
+**Five equal top slots (29 Oct 2026, maintainer request).** The maintainer asked for five slots on top, each word with a good amount of space: five words, or four words and a phrase on the right, the best words on top and the phrase offered only at the right time. This replaces the separate sixth cell described above:
+- **When a phrase appears** (`keyboardPhrase` in `src/utils/wordPredictionSlots.ts`). The engine's best-ranked phrase decides:
+  - It must do more than a word slot does (`phraseAddsWords`). A phrase that only adds the next word, when that word is on screen, is left out: the household's "I need Water" at `i need wa`, or "Call Rishabh" at `call r`.
+  - It must be a confident match (`phraseIsConfident`):
+    - a completion needs 40 % of the phrase, or three of its words, typed in the current sentence;
+    - a keyword's replacement, always reviewed before use, needs the whole word;
+    - a caregiver's shortcut expansion always qualifies;
+    - an opening on an empty draft never does.
+
+  Otherwise the slot stays a word, and a weaker phrase further down never stands in. Before this, `please ` showed "Please help me", fifth in line, because it was easier to match; `call r` would have fallen through to the template "Call Rahul". The slot shows the best confident phrase short enough to read there; a longer one becomes the Suggested cell.
+
+  Measured before this rule, the slot filled after one letter (`i` offered "I need help immediately"). Through the app's own connection, with the default household, it now appears at `please call` (Please call the doctor), `what time` (What time is it now), `thank` (Thank you), `can you t` (Can you turn me) and `suction` (Do TT suction, reviewed). It stays a fifth word after one letter, at `i need `, `please c` and `call `, and where the best phrase only repeats a word on screen (`i need wa`, `call r`, `i am in p`). Expand > Suggested phrases still lists every phrase offered.
+- **While a response is on its way** after a keystroke, the slots and the phrase keep the previous draft's layout, not selectable, and dim only after 300 ms; the row no longer swaps the phrase for a word and back on every key.
+- **Which word gives way** (`arrangeWordRows`): an empty top slot first. Otherwise the lowest-ranked of the top five steps down, into an empty bottom slot or in place of the lowest-ranked bottom word. The best four stay on top, the fifth is still on screen, and only the tenth word is hidden while the phrase shows.
+- **Type**: word and phrase suggestions use Atkinson Hyperlegible Next at weight 700. Words are up to 72 px (49 px at 1366×768, 69 px at 1920×1080; were 43 and 60 px). The phrase is measured to its slot: as large as fits on at most two lines under its label, from 22 px up to the one-line cap of about 50 px. "Please call the doctor" is 35 px at 1366×768 and 44 px at 1920×1080 with navigation hidden (25 and 34.5 px with it shown; 25 and 36 px before). A phrase that would need more becomes the Suggested cell, which opens the chooser.
 
 ### Slot behaviour
 
@@ -141,7 +157,7 @@ Alternatives were rejected:
   - It inserts exactly `acceptPredictedWord(draft, word)`: replace the unfinished word, then one space.
   - The renderer's insertion is checked against the engine's on the same reference-generated cases (`insertion_contract.v1.json`).
 - **Dwell timing.** Word slots and the phrase cell use `predictionButton`, the selected timing set’s suggestion duration (1.1× its key time). The ten timing sets, onset/cooldown rules and gaze safeguards are unchanged; `check:dwell-groups` passes.
-- **Word label size.** Labels auto-fit using the slot's own width (`100cqw`), capped at `clamp(34px, 3.6vw, 52px)`.
+- **Word label size.** Labels auto-fit using the slot's own width (`100cqw / (letters × 0.62)`), capped at `clamp(40px, min(6.4vh, 3.6vw), 72px)` (29 Oct 2026; Atkinson Hyperlegible Next 700).
 - **Zone Board.** It keeps six slots. Small integration fixes:
   - backend order is preserved (no re-sort by score);
   - fallback words appear only when they complete the prefix;
@@ -168,6 +184,7 @@ Measured in-browser on the live app with the real engine, with the draft "i need
 
 - **1920×1080, navigation visible:** top slots are 288×111, bottom slots 371×101 and letter keys 183×127. Previously they were 183×162; that height went to the second slot row.
 - **1366×768, navigation hidden:** top slots 202×112, bottom slots 225×96, phrase cell 294×112, letter keys 128×98.
+- **Five equal top slots (29 Oct 2026),** measured headless in 1920×1080 and 1366×768 viewports: top slots 373×135 (navigation hidden) and 373×113 (shown) at 1920×1080, 262×112 and 262×84 at 1366×768, the phrase cell included. Letter keys, the bottom row, the message and SHOW NAV did not move: 1,776 box comparisons against the previous commit across 24 layout, theme and feel combinations.
 - **Previews:** Warm and Dark, both navigation states, at 1366×768, 1920×1080, 1024×768 and 1536×864 at 1.25× DPR. They were captured with headless Chrome against the running app and the real engine, delivered with this change, and not committed.
 
 ## Port: mapping, assets and intentional differences

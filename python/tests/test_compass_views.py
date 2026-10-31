@@ -89,6 +89,49 @@ class ImageTests(unittest.TestCase):
         self.assertEqual(perspective.render(self.c2, 'back-right', 'warm', 900, 600),
                          perspective.render(self.c2, 'back-right', 'warm', 900, 600))
 
+    def test_fill_width_draws_as_tall_as_filling_the_width_needs(self):
+        # The full screen's fill-width view (29 Oct 2026): the width sets the scale, so a deep plot gets a canvas
+        # taller than wide and a wide plot one shorter; the requested height is ignored.
+        deep, wide = model_of(small_plan(width_ft=40, depth_ft=60)), model_of(small_plan(width_ft=60, depth_ft=40))
+        renders = {'plan': (plan2d, lambda m, w: plan2d.render_screen(m, 'ground', 'dark', w, 500, fit='width')),
+                   'top': (top, lambda m, w: top.render(m, 'ground', 'dark', w, 500, fit='width'))}
+        for name, (module, render) in renders.items():
+            for width in (1200, 1650):
+                with self.subTest(name, width=width):
+                    deep_w, deep_h = png_size(render(deep, width))
+                    wide_w, wide_h = png_size(render(wide, width))
+                    self.assertEqual((deep_w, wide_w), (width, width))
+                    self.assertGreater(deep_h, width)
+                    self.assertLess(wide_h, width)
+                    self.assertEqual(deep_h, module.fill_height(deep, width))
+
+    def test_fill_height_is_the_first_height_at_which_the_width_sets_the_scale(self):
+        model = model_of(small_plan(width_ft=40, depth_ft=60))
+        W, D = model['plot']['W'], model['plot']['D']
+
+        def plan_by_width(width, height):
+            _, _, top_margin, left, right, _, bottom = plan2d.screen_margins(width, height)
+            return (width - left - right) / W <= (height - top_margin - bottom) / D
+
+        def top_by_width(width, height):
+            _, _, across, down = top.scales(width, height, W / U, D / U)
+            return across <= down
+
+        for module, by_width in ((plan2d, plan_by_width), (top, top_by_width)):
+            for width in (900, 1600, 2400):
+                with self.subTest(module.__name__, width=width):
+                    height = module.fill_height(model, width)
+                    self.assertTrue(by_width(width, height))
+                    self.assertFalse(by_width(width, height - 1))
+        # A very deep plot stops at FILL_MAX_HEIGHT (then fitted by its height) instead of growing without limit.
+        needle = model_of(small_plan(width_ft=20, depth_ft=200))
+        self.assertEqual(png_size(plan2d.render_screen(needle, 'ground', 'warm', 2400, 500, fit='width')), (2400, 4000))
+        # Every other request keeps its size, the plan and top view as before.
+        self.assertEqual(png_size(plan2d.render_screen(model, 'ground', 'warm', 3000, 2000)), (2400, 1600))
+        self.assertEqual(png_size(top.render(model, 'ground', 'warm', 1000, 3000)), (1000, 1600))
+        with self.assertRaises(ValueError):
+            studio.render(small_plan(), 'plan', fit='stretch')
+
     def test_top_view_and_every_outside_angle(self):
         for floor in ('ground', 'first'):
             self.assertEqual(png_size(top.render(self.half, floor, 'midnight-navy', 1000, 650)), (1000, 650))
@@ -196,6 +239,12 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(image.status_code, 200)
         self.assertEqual(image.headers['X-Plan-Hash'], summary['modelHash'])
         self.assertEqual(png_size(image.data), (800, 600))
+        # Fill width (the full screen): the service draws as tall as the plan needs, whatever height is asked.
+        tall = self.post('render', {'plan': HALF, 'view': 'plan', 'floor': 'first', 'format': 'png', 'width': 800, 'height': 600,
+                                    'fit': 'width'})
+        self.assertEqual(tall.status_code, 200)
+        self.assertEqual(png_size(tall.data), (800, plan2d.fill_height(model_of(HALF), 800)))
+        self.assertEqual(self.post('render', {'plan': HALF, 'view': 'plan', 'fit': 'stretch'}).status_code, 422)
 
     def test_every_studio_download(self):
         for options, mime, magic in (

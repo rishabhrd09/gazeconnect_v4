@@ -29,6 +29,7 @@ def self_test():
         raise RuntimeError("The floor-plan service must not load OR-Tools or pandas")
     compass_self_test()
     compass_v2_self_test()
+    compass_top_bottom_self_test()
     print(json.dumps({"self_test": "passed", "renderer": "Cairo", "memory": health.get_json().get("memory")}))
 
 
@@ -62,7 +63,7 @@ def compass_self_test():
         raise RuntimeError('Bundled Compass room view failed')
 
 
-def compass_v2_self_test():
+def compass_v2_self_test(plan_override=None):
     """The version 2 studio (14 Oct 2026): a plan with a divided cell, drawn every way the studio offers.
     Also proves the bundled plan fonts are found (tools/assets/fonts, packed as compass_fonts)."""
     import compass_text
@@ -72,7 +73,7 @@ def compass_v2_self_test():
     for name in ("AtkinsonHyperlegibleNext-Regular.ttf", "AtkinsonHyperlegibleNext-Bold.ttf"):
         if not (fonts / name).is_file():
             raise RuntimeError(f"Bundled plan font missing: {fonts / name}")
-    plan = {
+    plan = plan_override or {
         "schema": "gazeconnect.compass-plan", "version": 2,
         "plot": {"widthIn": 480, "depthIn": 720, "facing": "South", "gate": "Center", "plotType": "Middle Plot"},
         "storeys": 1, "choices": {},
@@ -101,6 +102,19 @@ def compass_v2_self_test():
         })
         if output.status_code != 200 or not output.data.startswith(magic):
             raise RuntimeError(f"Bundled Compass v2 {options['view']} {options['format']} failed: {output.status_code}")
+
+
+def compass_top_bottom_self_test():
+    """The packaged service must carry version 3 through the model and every export too."""
+    compass_v2_self_test({
+        'schema': 'gazeconnect.compass-plan', 'version': 3,
+        'plot': {'widthIn': 720, 'depthIn': 480, 'facing': 'West', 'gate': 'Center', 'plotType': 'Independent'},
+        'storeys': 1, 'choices': {}, 'floors': {'ground': {
+            'splits': ['r2_c3'], 'splitDirections': {'r2_c3': 'top-bottom'}, 'rooms': [
+                {'id': 'g-bedroom-1', 'use': 'bedroom', 'regions': ['r2_c3.T']},
+                {'id': 'g-bathroom-1', 'use': 'bathroom', 'regions': ['r2_c3.B']},
+            ]}},
+    })
 
 
 if __name__ == "__main__":

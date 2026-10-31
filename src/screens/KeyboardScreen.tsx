@@ -40,7 +40,8 @@ import {
   WORD_SLOT_COUNT,
   acceptSentenceSuggestion,
   acceptWordPrediction,
-  inlineSentenceSuggestion,
+  arrangeWordRows,
+  keyboardPhrase,
   predictionsAreFresh,
   presentWordSlots,
   wordFitsText,
@@ -80,6 +81,10 @@ const HINDI_AAC_VOCABULARY: string[] = [
 // ────────────────────────────────────────────────────────────────────────────
 
 const UI_FONT = typography.fontFamily.primary;
+// Word and phrase suggestions (29 Oct 2026, maintainer request: larger and clearer to the eye):
+// Atkinson Hyperlegible Next, made for low vision, in every design (keyboard-layout.css keeps it
+// over a design's own font).
+const SUGGESTION_FONT = "'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif";
 // Hierarchy colors — paper-mode values use the research-grounded prediction palette:
 // best prediction gets a slightly deeper amber accent so it's instantly identifiable
 // in eye-tracking scans (Schlosser 2015: visual hierarchy reduces fixation errors 24%).
@@ -193,12 +198,12 @@ const WordSlotButton: React.FC<{
       disabled={!selectable}
       onClick={() => onSelect(index, word)}
       style={{
-        width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(6px, 0.6vw, 12px)',
+        width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(8px, 0.8vw, 14px)',
         border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
         backgroundColor: best ? predictionBestBg : keyboardTheme.predictionBg,
         color: best ? predictionBestText : predictionText,
-        fontWeight: 800,
-        fontFamily: UI_FONT,
+        fontWeight: 700,
+        fontFamily: SUGGESTION_FONT,
         lineHeight: 1.1,
         whiteSpace: 'nowrap',
         opacity: 1,
@@ -208,16 +213,25 @@ const WordSlotButton: React.FC<{
       } as React.CSSProperties}
     >
       {/* Long words shrink to fit the slot instead of being clipped; short words
-          keep the large keyboard size. 100cqw is the slot's content width; 0.64 em
-          is a generous average letter width at weight 800. */}
+          keep the large keyboard size (29 Oct 2026: up to 72 px, from 62). 100cqw is
+          the slot's content width; 0.62 em is a generous average letter width for
+          Atkinson Hyperlegible Next at weight 700. */}
       <span className="keyboard-word-slot-label" style={{
-        fontSize: `min(clamp(36px, min(5.6vh, 3.2vw), 62px), calc(100cqw / ${(letters * 0.64).toFixed(2)}))`,
+        fontSize: `min(clamp(40px, min(6.4vh, 3.6vw), 72px), calc(100cqw / ${(letters * 0.62).toFixed(2)}))`,
       }}>
         {word}
       </span>
     </GazeButton>
   );
 });
+
+/* The phrase's type in its slot (29 Oct 2026, maintainer request: clear and visible): measured, as
+   large as fits on at most two lines under the action label, between the 22 px the phrase cell had
+   before and the one-line cap of the Suggested label (about 50 px at 1920x1080). */
+const PHRASE_MIN_PX = 22;
+const PHRASE_LINE_HEIGHT = 1.25;
+const PHRASE_BROWSE_SIZE = 'clamp(22px, min(4.6vh, 2.6vw), 50px)';
+const phraseMaxPx = () => Math.max(PHRASE_MIN_PX, Math.min(50, 0.046 * window.innerHeight, 0.026 * window.innerWidth));
 
 /** Phrase suggestions (sentences, starters, abbreviation expansions): one cell, never a word slot. */
 const PhraseSuggestionButton: React.FC<{
@@ -232,25 +246,45 @@ const PhraseSuggestionButton: React.FC<{
   onBrowse: () => void;
 }> = React.memo(({ suggestion, selectable, isDarkMode, gazeEnabled, gazeEnabledTimestamp, familiarFeel, onSelect, hasSuggestions, onBrowse }) => {
   const { sentenceSuggestionBg, sentenceSuggestionText } = getKeyboardHierarchyColors(isDarkMode);
-  const [fits, setFits] = useState(false);
+  // The phrase's size in px once measured to fit; null shows the Suggested cell instead.
+  const [size, setSize] = useState<number | null>(null);
   const contentRef = useRef<HTMLSpanElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
   const copyRef = useRef<HTMLSpanElement>(null);
   const phraseText = suggestion?.text;
+  const phraseLabel = suggestion?.requires_confirmation ? 'Review phrase' : 'Add phrase';
   React.useLayoutEffect(() => {
     if (!phraseText) return;
     let live = true;
     const measure = () => {
-      const copy = copyRef.current, content = contentRef.current, button = content?.closest('button');
-      if (!live || !copy || !content || !button) return;
-      const previous = copy.textContent, clamp = copy.style.webkitLineClamp;
+      const copy = copyRef.current, label = labelRef.current, content = contentRef.current, button = content?.closest('button');
+      if (!live || !copy || !label || !content || !button) return;
+      // Measured as it would be shown, whatever the cell shows now (the Suggested cell has other text).
+      const previous = copy.textContent, previousLabel = label.textContent, clamp = copy.style.webkitLineClamp, shown = copy.style.fontSize;
       copy.textContent = phraseText;
+      label.textContent = phraseLabel;
       copy.style.webkitLineClamp = 'unset';
       const style = getComputedStyle(button);
       const available = button.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-      const usable = content.scrollHeight <= available + 1 && copy.scrollWidth <= content.clientWidth + 1;
+      const fitsAt = (px: number) => {
+        copy.style.fontSize = `${px}px`;
+        return content.scrollHeight <= available + 1 && copy.scrollWidth <= content.clientWidth + 1
+          && copy.scrollHeight <= 2 * PHRASE_LINE_HEIGHT * px + 1;
+      };
+      let low = PHRASE_MIN_PX, high = phraseMaxPx(), best: number | null = null;
+      if (fitsAt(high)) best = high;
+      else if (fitsAt(low)) {
+        best = low;
+        for (let step = 0; step < 6; step += 1) {
+          const middle = (low + high) / 2;
+          if (fitsAt(middle)) { best = middle; low = middle; } else high = middle;
+        }
+      }
       copy.textContent = previous;
+      label.textContent = previousLabel;
       copy.style.webkitLineClamp = clamp;
-      setFits(usable);
+      copy.style.fontSize = shown;
+      setSize(best === null ? null : Math.floor(best * 2) / 2);
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -258,8 +292,8 @@ const PhraseSuggestionButton: React.FC<{
     if (button) observer.observe(button);
     void document.fonts.ready.then(measure);
     return () => { live = false; observer.disconnect(); };
-  }, [phraseText, fits]);
-  const inline = !!suggestion && fits;
+  }, [phraseText, phraseLabel, size]);
+  const inline = !!suggestion && size !== null;
   if (!suggestion && !hasSuggestions) {
     return <div className="keyboard-phrase-slot keyboard-phrase-slot-empty" aria-hidden="true" style={{ backgroundColor: sentenceSuggestionBg }} />;
   }
@@ -267,7 +301,7 @@ const PhraseSuggestionButton: React.FC<{
     <GazeButton
       key={inline ? 'insert' : 'browse'}
       id="phrase-suggestion-0"
-      className="keyboard-phrase-slot"
+      className={`keyboard-phrase-slot${selectable ? '' : ' keyboard-phrase-slot-stale'}`}
       ariaLabel={inline ? (suggestion.requires_confirmation ? 'Review phrase: ' : 'Add phrase: ') + suggestion.text : 'Browse suggested phrases'}
       dwellCategory="predictionButton"
       mouseDwellOnsetMs={familiarFeel ? FAMILIAR_KEYBOARD_TIMING.onset : undefined}
@@ -280,15 +314,20 @@ const PhraseSuggestionButton: React.FC<{
         width: '100%', height: '100%', minWidth: 0, padding: '0 clamp(10px, 1vw, 18px)',
         border: 'none', borderRadius: '10px', boxShadow: 'none', boxSizing: 'border-box',
         backgroundColor: sentenceSuggestionBg, color: sentenceSuggestionText,
-        fontSize: 'clamp(22px, min(3.3vh, 1.9vw), 36px)', fontWeight: 800, fontFamily: UI_FONT, lineHeight: 1.3,
+        fontWeight: 700, fontFamily: SUGGESTION_FONT, lineHeight: 1.25, opacity: 1,
         textAlign: 'center', overflow: 'hidden', cursor: selectable ? 'pointer' : 'default',
-      }}
+        // The slot is the size container for its phrase (see below).
+        containerType: 'inline-size',
+      } as React.CSSProperties}
     >
       <span ref={contentRef} style={{ display: 'block', width: '100%', alignSelf: 'center' }}>
-      <span className="keyboard-phrase-action-label">{inline ? (suggestion.requires_confirmation ? 'Review phrase' : 'Add phrase') : 'Suggested'}</span>
+      <span ref={labelRef} className="keyboard-phrase-action-label">{inline ? phraseLabel : 'Suggested'}</span>
+      {/* One slot of five (29 Oct 2026): the phrase at its measured size (see PHRASE_MIN_PX); one
+          that needs more than two lines at 22 px is offered as Suggested instead. */}
       <span ref={copyRef} style={{
         display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
         overflow: 'hidden', whiteSpace: 'normal', maxWidth: '100%',
+        fontSize: inline ? `${size}px` : PHRASE_BROWSE_SIZE,
       }}>
         {inline ? suggestion.text : 'Phrases'}
       </span></span>
@@ -687,16 +726,19 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
     return result;
   }, [keyboardMode, text]);
 
-  // Ten word slots: five in the top strip, five in the lower row, in fixed
-  // positions from the backend. Hindi mode (not reachable in this English
-  // release) keeps its local list in the same slots.
+  // Ten word slots in fixed positions from the backend: five on top, five in the lower row. Hindi
+  // mode (not reachable in this English release) keeps its local list in the same slots. The top
+  // row is five equal slots (29 Oct 2026): five words, or four and a confident phrase on the right,
+  // the word that gives way stepping down (keyboardPhrase, arrangeWordRows).
+  // Slots and the phrase follow the draft they were computed for, so the row keeps its shape while
+  // the next keystroke's response is on its way (they are not selectable until it arrives).
   const slotWords = keyboardMode === 'hindi' && predictions.length === 0 ? hindiPredictions : predictions;
-  const slots = presentWordSlots(keyboardMode === 'hindi' ? null : wordSlots, slotWords, predictionMeta?.text ?? text);
+  const slotsDraft = predictionMeta?.text ?? text;
+  const slots = useMemo(() => presentWordSlots(keyboardMode === 'hindi' ? null : wordSlots, slotWords, slotsDraft),
+    [keyboardMode, wordSlots, slotWords, slotsDraft]);
   const slotsSelectable = connected && predictionsAreFresh(predictionMeta, text);
-  const phraseSuggestion = useMemo(
-    () => inlineSentenceSuggestion(sentencePredictions, text),
-    [sentencePredictions, text]
-  );
+  const phrase = useMemo(() => keyboardPhrase(sentencePredictions, slotsDraft, slots), [sentencePredictions, slotsDraft, slots]);
+  const rows = arrangeWordRows(slots, slotWords.map(item => item.word), phrase !== null);
 
   return (
     <div data-keyboard-feel={familiarFeel ? 'familiar' : 'standard'} className={`keyboard-screen${navHidden ? ' keyboard-nav-hidden' : ' keyboard-nav-visible'}${isLight ? ' theme-light' : isWarm ? ' theme-warm' : ''}`} style={{
@@ -766,19 +808,22 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           Suggested phrases
         </GazeButton></div>
       ) : (
-        <div className="keyboard-prediction-bar keyboard-word-row keyboard-word-row-top" aria-label="Word suggestions 1 to 5 and a phrase">
-          {slots.slice(0, TOP_WORD_SLOTS).map((word, index) => (
+        <div className="keyboard-prediction-bar keyboard-word-row keyboard-word-row-top"
+          aria-label={phrase ? 'Word suggestions 1 to 4 and a phrase' : 'Word suggestions 1 to 5'}>
+          {rows.top.map((word, index) => (
             <WordSlotButton key={`${index}:${word ?? ''}`} index={index} word={word}
               selectable={slotsSelectable} best={index === 0} isDarkMode={isDarkMode}
               gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
               familiarFeel={familiarFeel}
               onSelect={handleWordSlot} />
           ))}
-          <PhraseSuggestionButton key={JSON.stringify(['phrase', text, phraseSuggestion?.mode, phraseSuggestion?.text])}
-            suggestion={phraseSuggestion} selectable={slotsSelectable} isDarkMode={isDarkMode}
-            gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
-            familiarFeel={familiarFeel}
-            onSelect={handleSentenceSelect} hasSuggestions={sentencePredictions.length > 0} onBrowse={() => openPhrasePanel()} />
+          {phrase && (
+            <PhraseSuggestionButton key={JSON.stringify(['phrase', text, phrase.suggestion.mode, phrase.suggestion.text, phrase.inline])}
+              suggestion={phrase.inline ? phrase.suggestion : null} selectable={slotsSelectable} isDarkMode={isDarkMode}
+              gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp}
+              familiarFeel={familiarFeel}
+              onSelect={handleSentenceSelect} hasSuggestions onBrowse={() => openPhrasePanel()} />
+          )}
         </div>
       )}
 
@@ -1054,7 +1099,7 @@ const KeyboardScreen: React.FC<KeyboardScreenProps> = ({
           {/* ===== Word slots 6-10 (always visible) + SHOW NAV when navigation is hidden ===== */}
           <div className={`keyboard-prediction-bar keyboard-word-row keyboard-word-row-bottom${navHidden ? ' with-show-nav' : ''}`}
             aria-label="Word suggestions 6 to 10">
-            {slots.slice(TOP_WORD_SLOTS, WORD_SLOT_COUNT).map((word, offset) => {
+            {rows.bottom.map((word, offset) => {
               const index = TOP_WORD_SLOTS + offset;
               return (
                 <WordSlotButton key={`${index}:${word ?? ''}`} index={index} word={word}

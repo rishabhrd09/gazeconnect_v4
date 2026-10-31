@@ -37,7 +37,10 @@ if (OUT) fs.mkdirSync(OUT, { recursive: true });
                 type: 'predictions', request_id: m.request_id,
                 prediction: { text: m.text, prefix: m.text.match(/[a-z]+$/i)?.[0] || '' },
                 word_slots: populated ? ['please', 'water', 'help', 'thank', 'you', 'good', 'morning', 'comfortable', 'today', 'yes'] : [],
-                sentences: populated ? [{ text: 'Thank you', score: 1, source: 'qa', mode: 'append' }] : [],
+                // A phrase the top row offers at "hi " (since 29 Oct 2026 an appended opening never takes
+                // the slot), so the phrase cell's paint and contrast stay covered.
+                sentences: populated ? [{ text: 'Hi, how are you today', score: 1, source: 'qa', mode: 'replace_sentence', matched_text: m.text,
+                    replacement_start: 0, result_text: 'Hi, how are you today ', requires_confirmation: true }] : [],
             }));
         });
     });

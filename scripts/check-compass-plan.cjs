@@ -60,7 +60,7 @@ eq(plan.regionsTouch('r2_c3.L', 'r3_c3.R'), false);
 eq(plan.components(['r1_c1', 'r1_c2.R', 'r1_c2.L']), [['r1_c1', 'r1_c2.L', 'r1_c2.R']]);
 eq(plan.nextRoomId('ground', { rooms: [{ id: 'g-bedroom-1', use: 'bedroom', regions: [] }, { id: 'g-bedroom-3', use: 'bedroom', regions: [] }] }, 'bedroom'), 'g-bedroom-4');
 for (const mutate of [p => { p.plot.widthIn = 359.5; }, p => { p.floors.ground.rooms[0].regions.push('r1_c1'); },
-  p => { p.floors.ground.rooms[0].regions = ['r4_c2.L']; }, p => { p.version = 3; }]) {
+  p => { p.floors.ground.rooms[0].regions = ['r4_c2.L']; }, p => { p.version = 4; }]) {
   const copy = JSON.parse(JSON.stringify(f1.plan));
   mutate(copy);
   assert.throws(() => plan.normalisePlan(copy), plan.PlanError); checks++;

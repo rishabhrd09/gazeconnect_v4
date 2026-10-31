@@ -1,8 +1,8 @@
 /**
  * CompassPlanV2: the one persisted description of a Compass house (docs/compass-refine/IMPLEMENTATION_PLAN.md §4.3).
  *
- * It stores only what the person chose: plot facts, which cells are divided into a left and a right
- * half (exactly 50 %, screen-relative: left is the smaller x, with the road at the bottom), which rooms
+ * It stores only what the person chose: plot facts, cells divided left/right (v2) or top/bottom (v3),
+ * exactly 50 %, screen-relative with the road at the bottom; top is the larger model y. Which rooms
  * own which regions, and two layout preferences. Walls, doors, windows, the stair and every view are
  * derived from it by tools/compass_geometry.py. Mirrored by tools/compass_schema.py.
  */
@@ -10,16 +10,19 @@
 export type Row = 1 | 2 | 3 | 4;
 export type Col = 1 | 2 | 3 | 4;
 export type CellKey = `r${Row}_c${Col}`;
-export type HalfKey = `${CellKey}.L` | `${CellKey}.R`;
+export type HalfSide = 'L' | 'R' | 'T' | 'B';
+export type SplitDirection = 'left-right' | 'top-bottom';
+export type HalfKey = `${CellKey}.${HalfSide}`;
 export type RegionKey = CellKey | HalfKey;
 export type FloorId = 'ground' | 'first';
 export type Facing = 'North' | 'East' | 'South' | 'West';
 export type GateSide = 'Left' | 'Center' | 'Right';
 export type PlotType = 'Middle Plot' | 'Corner Plot' | 'Independent';
 
+/** Historical public type name retained for the studio; supports canonical formats 2 and 3. */
 export interface CompassPlanV2 {
   schema: 'gazeconnect.compass-plan';
-  version: 2;
+  version: 2 | 3;
   plot: {
     widthIn: number;                 // whole inches, 180..2400 (15 to 200 ft)
     depthIn: number;
@@ -37,7 +40,9 @@ export interface CompassPlanV2 {
 }
 
 export interface FloorIntent {
-  splits: CellKey[];                 // sorted, unique; each is exactly 50 % left | 50 % right
+  splits: CellKey[];                 // sorted, unique; exactly two equal halves per cell
+  /** Version 3: top/bottom exceptions. Missing entries retain the v2 left/right meaning. */
+  splitDirections?: Partial<Record<CellKey, SplitDirection>>;
   rooms: RoomIntent[];               // sorted by id
 }
 

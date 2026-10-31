@@ -19,26 +19,43 @@ const OUT=process.env.PREDICTION_QA_OUTPUT || fs.mkdtempSync(path.join(os.tmpdir
   await p.waitForFunction(()=>document.querySelectorAll('button.keyboard-word-slot:not(:disabled)').length===10).catch(async e=>{console.error(await p.evaluate(()=>({qa,body:document.body.innerText})));throw e;});
   assert.equal(await p.locator('html').getAttribute('data-theme'),theme);assert.equal(await p.locator('html').getAttribute('data-design'),mode);
   const empty=await p.locator('button.keyboard-word-slot').allTextContents();assert.equal(empty.length,10);
+  assert.equal(await p.locator('.keyboard-phrase-slot').count(),0,'An opening phrase took a word slot on the empty draft');
+  // The rows as drawn, and as the shared helpers lay out the latest reply (29 Oct 2026: five equal
+  // top slots holding five words, or four and a confident phrase on the right).
+  const layout=()=>p.evaluate(async()=>{
+   const m=await import('/src/utils/wordPredictionSlots.ts');const reply=qa.received.at(-1).data,text=reply.prediction.text;
+   const slots=m.presentWordSlots(reply.word_slots,reply.words,text),phrase=m.keyboardPhrase(reply.sentences||[],text,slots);
+   const expected=m.arrangeWordRows(slots,reply.words.map(w=>w.word),phrase!==null);
+   const read=row=>[...document.querySelectorAll(`.keyboard-word-row-${row} .keyboard-word-slot`)].map(e=>e.tagName==='BUTTON'?e.textContent.trim():null);
+   const cell=document.querySelector('.keyboard-word-row-top .keyboard-phrase-slot');
+   return {reply,phrase,expected,top:read('top'),bottom:read('bottom'),cell:cell&&{text:cell.textContent.trim(),button:cell.tagName==='BUTTON',disabled:cell.disabled===true}};
+  });
+  const checkRows=(view,draft)=>{
+   assert.deepEqual({top:view.top,bottom:view.bottom},view.expected,draft+': renderer changed the backend slots');
+   assert.equal(!!view.cell,!!view.phrase,draft+': phrase slot out of turn');
+   assert.equal(view.top.length+(view.cell?1:0),5,draft+': the top row is not five slots');
+   const ranked=view.reply.words.map(w=>w.word),shown=[...view.top,...view.bottom].filter(Boolean);
+   assert(view.top.filter(Boolean).every(w=>ranked.slice(0,5).includes(w)),draft+': a lower-priority word on the top row');
+   const dropped=ranked.filter(w=>!shown.includes(w));
+   assert(dropped.length<=(view.cell?1:0)&&dropped.every(w=>shown.every(s=>ranked.indexOf(s)<ranked.indexOf(w))),draft+': a better word gave way');
+  };
   for(const c of 'i need '){if(c===' ')await p.click('[data-action=space]');else await p.locator('[data-action=letter]').filter({hasText:new RegExp('^'+c+'$','i')}).click();}
   await p.waitForFunction(()=>qa.received.at(-1)?.data.prediction.text.toLowerCase()==='i need ').catch(async e=>{console.error(JSON.stringify(await p.evaluate(()=>({qa,body:document.body.innerText})),null,2));throw e;});
   await p.waitForFunction(()=>[...document.querySelectorAll('button.keyboard-word-slot')].some(e=>e.innerText.trim().toLowerCase()==='water'&&!e.disabled));
-  const phrase=await p.locator('button.keyboard-phrase-slot').innerText();assert(phrase.toLowerCase().includes('i need'));
-  const slots=await p.locator('button.keyboard-word-slot').evaluateAll(es=>es.map(e=>({id:e.id,text:e.innerText.trim(),visible:e.getBoundingClientRect().width>0,disabled:e.disabled,y:e.getBoundingClientRect().y})));
+  const start=await layout();checkRows(start,'i need ');const phrase=start.cell?.text??null;
+  const slots=await p.locator('button.keyboard-word-slot,button.keyboard-phrase-slot').evaluateAll(es=>es.map(e=>({id:e.id,text:e.innerText.trim(),visible:e.getBoundingClientRect().width>0,disabled:e.disabled,y:e.getBoundingClientRect().y})));
   assert.equal(slots.length,10);assert(slots.every(e=>e.visible&&!e.disabled));assert(new Set(slots.map(e=>Math.round(e.y))).size>=2);
-  const rowPromotions=[];let previous=await p.evaluate(()=>qa.received.at(-1).data.word_slots);
+  const rowPromotions=[];let previous=start.reply.word_slots;
   for(const [index,c] of [...'wate'].entries()){
    await p.evaluate(()=>{qa.oldButtons=[...document.querySelectorAll('button.keyboard-word-slot')].map(e=>({id:e.id,word:e.textContent.trim(),element:e}));});
    await p.locator('[data-action=letter]').filter({hasText:new RegExp('^'+c+'$','i')}).click();
    const draft='i need '+'wate'.slice(0,index+1);
    await p.waitForFunction(text=>qa.received.at(-1)?.data.prediction.text.toLowerCase()===text,draft);
    await p.waitForFunction(()=>[...document.querySelectorAll('button.keyboard-word-slot')].every(e=>!e.disabled));
-   const reply=await p.evaluate(()=>qa.received.at(-1).data);
-   const shown=await p.locator('.keyboard-word-slot').evaluateAll(es=>es.map(e=>e.tagName==='BUTTON'?e.textContent.trim():null));
-   assert.deepEqual(shown,reply.word_slots,'Renderer changed backend slots');
-   assert.deepEqual(new Set(shown.slice(0,5).filter(Boolean)),new Set(reply.words.slice(0,5).map(w=>w.word)),draft+' priority word below the keyboard');
-   assert.deepEqual(new Set(shown.slice(5).filter(Boolean)),new Set(reply.words.slice(5).map(w=>w.word)));
-   const promoted=shown.slice(0,5).filter(w=>w&&previous.slice(5).includes(w));promotions+=promoted.length;
-   rowPromotions.push({draft,promoted,slots:shown});previous=shown;
+   const view=await layout();checkRows(view,draft);
+   // Promotions are the backend's lineage, counted on its slots before a phrase's step down.
+   const promoted=view.reply.word_slots.slice(0,5).filter(w=>w&&previous.slice(5).includes(w));promotions+=promoted.length;
+   rowPromotions.push({draft,promoted,top:view.top,phrase:view.cell?.text??null,bottom:view.bottom});previous=view.reply.word_slots;
    assert(await p.evaluate(()=>qa.oldButtons.every(old=>{const next=document.getElementById(old.id);return next?.textContent.trim()===old.word||!old.element.isConnected;})),'Changed suggestion retained its old dwell target');
   }
   await p.locator('button.keyboard-word-slot').filter({hasText:/^water$/i}).click();
@@ -50,9 +67,12 @@ const OUT=process.env.PREDICTION_QA_OUTPUT || fs.mkdtempSync(path.join(os.tmpdir
   // sentence to test completion without overwriting the one already authored.
   assert(await p.evaluate(()=>qa.received.at(-1).data.sentences.every(s=>s.text.trim().toLowerCase()!=='i need water')));
   await p.locator('[data-action=letter]').filter({hasText:/^\?$/}).click();
-  for(const c of 'i need wa'){if(c===' ')await p.click('[data-action=space]');else await p.locator('[data-action=letter]').filter({hasText:new RegExp('^'+c+'$','i')}).click();}
-  await p.waitForFunction(()=>qa.received.at(-1)?.data.prediction.text.toLowerCase()==='i need water? i need wa');
-  await p.waitForFunction(()=>document.querySelector('button.keyboard-phrase-slot')?.textContent.toLowerCase().includes('i need wa')&&!document.querySelector('button.keyboard-phrase-slot').disabled);
+  // "please call": since 29 Oct 2026 the slot offers a phrase only when it adds more than a word slot
+  // (the household's "I need Water" at "i need wa" only repeats the word water) and is a confident match.
+  for(const c of 'please call'){if(c===' ')await p.click('[data-action=space]');else await p.locator('[data-action=letter]').filter({hasText:new RegExp('^'+c+'$','i')}).click();}
+  await p.waitForFunction(()=>qa.received.at(-1)?.data.prediction.text.toLowerCase()==='i need water? please call');
+  await p.waitForFunction(()=>document.querySelector('button.keyboard-phrase-slot')?.textContent.toLowerCase().includes('please call')&&!document.querySelector('button.keyboard-phrase-slot').disabled);
+  checkRows(await layout(),'i need water? please call');
   const expected=await p.evaluate(async()=>{const {acceptSentenceSuggestion}=await import('/src/utils/wordPredictionSlots.ts');const reply=qa.received.at(-1).data;const label=document.querySelector('button.keyboard-phrase-slot').textContent;const suggestion=reply.sentences.find(s=>label.includes(s.text));return acceptSentenceSuggestion(reply.prediction.text,suggestion);});
   assert(expected.startsWith('i need water? '));
   await p.locator('button.keyboard-phrase-slot').click();

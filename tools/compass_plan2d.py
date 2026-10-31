@@ -715,19 +715,48 @@ def title_of(model, floor):
 
 # ---- Screen image ----------------------------------------------------------------------------
 
+def screen_margins(width, height):
+    """The studio plan's margins on a width x height canvas: px, the title band, top, left, right, the road band and
+    bottom, all in pixels."""
+    px = min(width, height) / 1000
+    title_h = 46 * px
+    road_h = 64 * px
+    return (px, title_h, title_h + (SCREEN['tier2'] + 16) * px, (SCREEN['tier2'] + 22) * px, 96 * px, road_h,
+            road_h + 54 * px)
+
+
+# Fill width (the studio's full screen, 29 Oct 2026, maintainer request): the plan spans the width and the canvas is
+# as tall as that needs, up to this height.
+FILL_MAX_HEIGHT = 4000
+
+
+def fill_height(model, width):
+    """The smallest canvas height at which the plan's scale is set by `width`, at most FILL_MAX_HEIGHT."""
+    W, D = model['plot']['W'], model['plot']['D']
+
+    def by_width(height):
+        _, _, top, left, right, _, bottom = screen_margins(width, height)
+        return (width - left - right) / W <= (height - top - bottom) / D
+
+    low, high = 320, FILL_MAX_HEIGHT
+    if not by_width(high):
+        return high
+    while low < high:
+        middle = (low + high) // 2
+        if by_width(middle):
+            high = middle
+        else:
+            low = middle + 1
+    return low
+
+
 def draw_screen(c, model, floor, theme, width, height):
     """The floor plan for the studio, fitted to width x height pixels (road at the bottom)."""
     ink = Ink(theme)
-    px = min(width, height) / 1000
+    px, title_h, top_margin, left_margin, right_margin, road_h, bottom_margin = screen_margins(width, height)
     pen = SCREEN
     paint(c, ink.page); c.paint()
     W, D = model['plot']['W'], model['plot']['D']
-    title_h = 46 * px
-    top_margin = title_h + (pen['tier2'] + 16) * px
-    left_margin = (pen['tier2'] + 22) * px
-    right_margin = 96 * px
-    road_h = 64 * px
-    bottom_margin = road_h + 54 * px
     k = min((width - left_margin - right_margin) / W, (height - top_margin - bottom_margin) / D)
     plan_w, plan_h = W * k, D * k
     left = left_margin + (width - left_margin - right_margin - plan_w) / 2
@@ -761,8 +790,10 @@ def draw_screen(c, model, floor, theme, width, height):
     label(c, width - 24 * px, height - 14 * px, note, 11 * px, ink.muted, None, 0, anchor='right')
 
 
-def render_screen(model, floor, theme='warm', width=1600, height=1000, fmt='png'):
-    width, height = int(min(max(width, 480), 2400)), int(min(max(height, 320), 1600))
+def render_screen(model, floor, theme='warm', width=1600, height=1000, fmt='png', fit='contain'):
+    """`fit='width'` ignores `height` and makes the canvas as tall as the plan needs to fill the width."""
+    width = int(min(max(width, 480), 2400))
+    height = fill_height(model, width) if fit == 'width' else int(min(max(height, 320), 1600))
     stream = io.BytesIO()
     if fmt == 'svg':
         surface = cairo.SVGSurface(stream, width, height)

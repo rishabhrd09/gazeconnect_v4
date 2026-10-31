@@ -1,0 +1,55 @@
+{
+  "id": "F16",
+  "cases": [
+    {
+      "name": "top-bottom-occupied",
+      "plan": {
+        "schema": "gazeconnect.compass-plan", "version": 3,
+        "plot": {"widthIn": 720, "depthIn": 480, "facing": "West", "gate": "Center", "plotType": "Independent"},
+        "storeys": 1, "choices": {},
+        "floors": {"ground": {
+          "splits": ["r2_c3"], "splitDirections": {"r2_c3": "top-bottom"},
+          "rooms": [
+            {"id": "g-bathroom-1", "use": "bathroom", "regions": ["r2_c3.B"]},
+            {"id": "g-bedroom-1", "use": "bedroom", "regions": ["r2_c3.T"]}
+          ]
+        }}
+      },
+      "expect": {"issues": [], "regionsIn": {"r2_c3.T": [360, 180, 540, 240], "r2_c3.B": [360, 120, 540, 180]}}
+    },
+    {
+      "name": "mixed-neighbour-directions",
+      "plan": {
+        "schema": "gazeconnect.compass-plan", "version": 3,
+        "plot": {"widthIn": 480, "depthIn": 720, "facing": "South", "gate": "Left", "plotType": "Middle Plot"},
+        "storeys": 1, "choices": {},
+        "floors": {"ground": {
+          "splits": ["r2_c2", "r2_c3"], "splitDirections": {"r2_c3": "top-bottom"},
+          "rooms": [
+            {"id": "g-bathroom-1", "use": "bathroom", "regions": ["r2_c3.B"]},
+            {"id": "g-living-1", "use": "living", "regions": ["r2_c2.L", "r2_c2.R", "r2_c3.T"]}
+          ]
+        }}
+      },
+      "expect": {"issues": [], "regionsIn": {"r2_c3.T": [240, 270, 360, 360], "r2_c2.R": [180, 180, 240, 360]}}
+    },
+    {
+      "name": "mixed-floors-void-over-bedroom-refused",
+      "plan": {
+        "schema": "gazeconnect.compass-plan", "version": 3,
+        "plot": {"widthIn": 480, "depthIn": 720, "facing": "North", "gate": "Center", "plotType": "Independent"},
+        "storeys": 2, "choices": {},
+        "floors": {
+          "ground": {"splits": ["r2_c2"], "rooms": [
+            {"id": "g-bedroom-1", "use": "bedroom", "regions": ["r2_c2.R"]},
+            {"id": "g-living-1", "use": "living", "regions": ["r2_c2.L"]}
+          ]},
+          "first": {"splits": ["r2_c2"], "splitDirections": {"r2_c2": "top-bottom"}, "rooms": [
+            {"id": "f-void-1", "use": "void", "regions": ["r2_c2.T"]}
+          ]}
+        }
+      },
+      "expect": {"issues": ["void-below:f-void-1"]}
+    }
+  ]
+}

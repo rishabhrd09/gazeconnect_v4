@@ -2,7 +2,7 @@
  * CompassMapScreen: the Compass map (4 x 4 cells, road at the bottom), placed with gaze.
  *
  * Version 2 (docs/compass-refine/IMPLEMENTATION_PLAN.md): rooms are identities ("Bedroom 1", "Bedroom 2"),
- * any cell can be divided exactly 50 % left | 50 % right with REFINE, and one canonical plan
+ * any cell can be divided exactly 50 % left/right or top/bottom with REFINE, and one canonical plan
  * (CompassPlanV2) is what is saved, sent to the studio and drawn. Every change is one undoable step.
  * The grid, its gaze targets and their dwell timings are unchanged: a divided cell stays one target.
  * - Grid: 4x4 Connected Architectural Layout (Zero gaps)
@@ -43,7 +43,7 @@ import {
   GRID_ROWS,
   GRID_COLS
 } from '../types/compass';
-import type { CellKey, CompassPlanV2, FloorId, FloorIntent, RegionKey, RoomIntent } from '../types/compassPlan';
+import type { CellKey, CompassPlanV2, FloorId, FloorIntent, HalfSide, RegionKey, RoomIntent, SplitDirection } from '../types/compassPlan';
 import {
   parseCellKey,
   buildCellKey,
@@ -53,7 +53,7 @@ import {
 } from '../utils/compassMath';
 import { getDirectionLabels, NORTH_ROSE_DEGREES } from '../utils/compassDirections';
 import { formatFeetShort, formatSize } from '../utils/feetInches';
-import { REPEATABLE, STAIR_HOSTS, cellOf, deriveV1, normalisePlan, regionsTouch } from '../utils/compassPlan';
+import { REPEATABLE, STAIR_HOSTS, cellOf, cellRegions, deriveV1, halfName, normalisePlan, otherHalf, regionsBelow, regionRectIn, regionsTouch, splitDirection, splitSides } from '../utils/compassPlan';
 import {
   AssignChoice, CompassActionV2, CompassStateV2, HALF_MIN_CLEAR_IN, MIN_CLEAR_IN, PlaceOutcome, Shortfall, assignHalf, catalogueUses,
   cellView, clearWidthIn, compassReducer, createInitialState, giveBothHalves, halfClearRangeIn, halfLinksRoom, halfShortfall,
@@ -61,7 +61,7 @@ import {
   skippedAnswer, splitCell, voidProblem, wholeCell, wholeOptions,
 } from '../utils/compassReducer';
 import {
-  DRAFT_KEYS, MIGRATED_KEY, ParsedDraft, V1_KEYS, backendCopy, bestDraft, draftFromState, draftScore, parseDraft,
+  DRAFT_KEYS, MIGRATED_KEY, ParsedDraft, V1_KEYS, V2_KEYS, V2_MIGRATED_KEY, backendCopy, bestDraft, draftFromPlan, draftFromState, draftScore, parseDraft,
 } from '../utils/compassDraft';
 import { compassV2Enabled } from '../utils/compassFeatures';
 import { useTheme } from '../contexts/ThemeContext';
@@ -620,6 +620,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // it is never saved, and leaving it never changes the map.
   const [refineMode, setRefineMode] = useState(false);
   const [focusCell, setFocusCell] = useState<CellKey | null>(null);
+  const [refineDirection, setRefineDirection] = useState<SplitDirection>('left-right');
   const [focusQuestion, setFocusQuestion] = useState<PickerQuestion | null>(null);
   const [focusMessage, setFocusMessage] = useState('');
   const [assignKey, setAssignKey] = useState<RegionKey | null>(null);
@@ -778,13 +779,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // ── Session resume (same app run only) ─────────────────────
   // Auto-hydration reads only the session and primary drafts (current work). The last-session backup is
   // reached only through LOAD PREVIOUS SESSION, so a Restart is never undone by reopening the screen.
-  // Version 2 keys first; a version 1 draft is migrated once (its keys stay untouched for a rollback build).
+  // Current keys first; older drafts migrate once (their keys stay untouched for a rollback build).
   const hydrate = useCallback((parsed: ParsedDraft, raw: string | null, spoken: string) => {
     dispatch({ type: 'HYDRATE', state: parsed.state });
     surveyProcessed.current = true;
     setReadOnlyDraft(parsed.newer);
     const notices = parsed.notices.length ? ` ${parsed.notices.join(' ')}` : '';
-    onSpeak(parsed.newer ? 'This map was saved by a newer version of GazeConnect. It is shown read-only.' : `${spoken}${notices}`);
+    onSpeak(parsed.newer ? `This saved map is shown read-only and will not be overwritten.${notices}` : `${spoken}${notices}`);
     if (raw && !parsed.newer && !parsed.fromV1) {
       try { localStorage.setItem(DRAFT_KEYS.primary, raw); } catch { /* Ignore storage write errors. */ }
     }
@@ -798,13 +799,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         hydrate(v2.parsed, v2.raw, 'Compass progress restored. Continue from where you left off.');
         restoredFromDraft = true;
       } else if (!localStorage.getItem(MIGRATED_KEY)) {
-        const v1 = bestDraft([sessionStorage.getItem(V1_KEYS.session), localStorage.getItem(V1_KEYS.primary)], queueFor);
-        if (v1 && draftScore(v1.parsed) > 0) {
-          hydrate(v1.parsed, null, 'Your Compass map was updated to the new map. Continue from where you left off.');
+        const older = bestDraft([sessionStorage.getItem(V2_KEYS.session), localStorage.getItem(V2_KEYS.primary)], queueFor)
+          || (!localStorage.getItem(V2_MIGRATED_KEY) ? bestDraft([sessionStorage.getItem(V1_KEYS.session), localStorage.getItem(V1_KEYS.primary)], queueFor) : null);
+        if (older && draftScore(older.parsed) > 0) {
+          hydrate(older.parsed, null, 'Your Compass map was updated to the new map. Continue from where you left off.');
           restoredFromDraft = true;
         }
       }
       if (restoredFromDraft) setSurveyLoading(false);
+      else if (!localStorage.getItem(MIGRATED_KEY)) ws.loadSurvey();
     } catch {
       // Ignore malformed local draft payloads.
     }
@@ -820,6 +823,18 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const a = ws.surveyData;
     if (!a) {
       startWithDefaultFoundation('No in-session survey data found. Opening compass grid with default plot settings.');
+      return;
+    }
+
+    const answersForMap = (a.answers && typeof a.answers === 'object' ? a.answers : a) as Record<string, any>;
+    const savedPlan = (a.compass_map as any)?.compass_plan ?? answersForMap.compass_map?.compass_plan;
+    if (savedPlan && !localStorage.getItem(MIGRATED_KEY)) {
+      try { hydrate(draftFromPlan(savedPlan, queueFor), null, 'Saved Compass map restored.'); }
+      catch {
+        surveyProcessed.current = true; setReadOnlyDraft(true);
+        onSpeak('This saved Compass map cannot be read by this version. Its original data is kept and will not be overwritten.');
+      }
+      setSurveyLoading(false);
       return;
     }
 
@@ -850,9 +865,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       numFloors: nfNorm,
     });
     onSpeak('Survey defaults loaded. Please confirm house facing and number of floors.');
-  }, [ws.surveyData, surveyLoading, onSpeak, startWithDefaultFoundation]);
+  }, [ws.surveyData, surveyLoading, onSpeak, startWithDefaultFoundation, hydrate]);
 
-  // ── Local draft: every change, version 2 keys only ──
+  // ── Local draft: every change, version 3 keys only ──
   useEffect(() => {
     if (surveyLoading || readOnlyDraft) return;
     try {
@@ -1022,18 +1037,20 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // ── Autosave: silently save after each change ───
   const roomTotal = groundRoomCount + firstRoomCount;
   useEffect(() => {
-    if (roomTotal === 0 || readOnlyDraft) return;
+    if (readOnlyDraft) return;
+    // Empty halves are still saved intent; clearing the final room must also replace an older backend copy.
+    if (roomTotal === 0 && !state.floors.ground.splits.length && !state.floors.first.splits.length
+      && !lastAutosaveFingerprintRef.current) return;
     if (state.phase !== 'placement' && state.phase !== 'review') return;
     // Debounce and save only when there is meaningful new layout data.
+    const saveDelay = Math.max(COMPASS_AUTOSAVE_DEBOUNCE_MS,
+      COMPASS_AUTOSAVE_MIN_INTERVAL_MS - (Date.now() - lastAutosaveAtRef.current) + 1);
     const t = setTimeout(() => {
       const fingerprint = JSON.stringify(backendCopy(state).compass_plan);
       if (fingerprint === lastAutosaveFingerprintRef.current) {
         return;
       }
       const now = Date.now();
-      if (now - lastAutosaveAtRef.current < COMPASS_AUTOSAVE_MIN_INTERVAL_MS) {
-        return;
-      }
       const payload = surveyPayload('compass-map-autosave');
       saveSurveyRef.current?.(payload);
       lastAutosaveAtRef.current = now;
@@ -1045,7 +1062,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         snapshotSurveyRef.current(payload);
         lastSnapshotAtRef.current = now;
       }
-    }, COMPASS_AUTOSAVE_DEBOUNCE_MS);
+    }, saveDelay);
     return () => clearTimeout(t);
   }, [roomTotal, state, surveyPayload, readOnlyDraft]);
 
@@ -1080,7 +1097,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const hasSavedDraft = () => {
     try {
       return !!(localStorage.getItem(DRAFT_KEYS.primary) || localStorage.getItem(DRAFT_KEYS.last)
-        || (!localStorage.getItem(MIGRATED_KEY) && (localStorage.getItem(V1_KEYS.primary) || localStorage.getItem(V1_KEYS.last))));
+        || (!localStorage.getItem(MIGRATED_KEY) && (localStorage.getItem(V2_KEYS.primary) || localStorage.getItem(V2_KEYS.last)
+          || (!localStorage.getItem(V2_MIGRATED_KEY) && (localStorage.getItem(V1_KEYS.primary) || localStorage.getItem(V1_KEYS.last))))));
     } catch { return false; }
   };
 
@@ -1088,7 +1106,8 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     try {
       let best = bestDraft([localStorage.getItem(DRAFT_KEYS.primary), localStorage.getItem(DRAFT_KEYS.last)], queueFor);
       if (!best && !localStorage.getItem(MIGRATED_KEY)) {
-        best = bestDraft([localStorage.getItem(V1_KEYS.primary), localStorage.getItem(V1_KEYS.last)], queueFor);
+        best = bestDraft([localStorage.getItem(V2_KEYS.primary), localStorage.getItem(V2_KEYS.last)], queueFor)
+          || (!localStorage.getItem(V2_MIGRATED_KEY) ? bestDraft([localStorage.getItem(V1_KEYS.primary), localStorage.getItem(V1_KEYS.last)], queueFor) : null);
       }
       if (best) hydrate(best.parsed, best.parsed.fromV1 ? null : best.raw, 'Previous session restored.');
     } catch { /* Ignore malformed drafts. */ }
@@ -1210,16 +1229,20 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     signalNavigation();
     setMapNotice(null);
     setPlaceUse(room.roomId); setFocusCell(cell); setFocusQuestion(null); setFocusMessage('');
-    onSpeak(`Place ${room.roomLabel}: choose the left half or the right half.`);
+    setRefineDirection(splitDirection(floor, cell));
+    const [a, b] = splitSides(splitDirection(floor, cell)).map(h => halfName(`${cell}.${h}`));
+    onSpeak(`Place ${room.roomLabel}: choose the ${a} half or the ${b} half.`);
   };
 
   // ── Refine (§5): a cell in focus, then the room for one of its halves ──
   /** Why cells cannot be divided on this plot (20 and 25 ft: a half would be under 2'-6" clear), or ''. */
-  const narrowPlotReason = (() => {
-    if (halvesUsable(widthIn, depthIn)) return '';
-    const { narrowest, widest } = halfClearRangeIn(widthIn, depthIn);
-    return `On a ${pw} ft plot a half cell would be only ${inches(narrowest)} to ${inches(widest)} clear, under the 2'-6" a half needs. Cells stay whole on this plot.`;
-  })();
+  const directionReason = (direction: SplitDirection) => {
+    if (halvesUsable(widthIn, depthIn, direction)) return '';
+    const { narrowest, widest } = halfClearRangeIn(widthIn, depthIn, direction);
+    return `${direction === 'top-bottom' ? 'Top/bottom' : 'Left/right'} halves would be only ${inches(narrowest)} to ${inches(widest)} clear, under the 2'-6" a half needs.`;
+  };
+  const narrowPlotReason = directionReason('left-right') && directionReason('top-bottom')
+    ? `On this ${pw} by ${pd} ft plot neither split direction gives halves at least 2'-6" clear. Cells stay whole on this plot.` : '';
 
   const toggleRefine = () => {
     if (overlayOpen) return;
@@ -1243,9 +1266,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const openFocus = (cell: CellKey) => {
     signalNavigation();
     setFocusCell(cell); setFocusQuestion(null); setFocusMessage('');
+    const direction = floor.splits.includes(cell) ? splitDirection(floor, cell)
+      : halvesUsable(widthIn, depthIn) ? 'left-right' : 'top-bottom';
+    setRefineDirection(direction);
     touchRefine();
     const { row, col } = parseCellKey(cell);
-    onSpeak(`Row ${row}, column ${col}. Choose the left half or the right half.`);
+    const [a, b] = splitSides(direction).map(h => halfName(`${cell}.${h}`));
+    onSpeak(`Row ${row}, column ${col}. Choose the ${a} half or the ${b} half${floor.splits.includes(cell) ? '.' : ', or change the split direction.'}`);
   };
 
   const closeFocus = () => {
@@ -1259,16 +1286,17 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   /** The state with the focus cell divided but not committed: dividing and choosing a half's room are one step. */
   const workingState = (): CompassStateV2 => {
     if (!focusCell || floor.splits.includes(focusCell)) return state;
-    return { ...state, floors: { ...state.floors, [floorId]: splitCell(floor, focusCell) } };
+    return { ...state, floors: { ...state.floors, [floorId]: splitCell(floor, focusCell, refineDirection) } };
   };
 
-  const onHalf = (half: 'L' | 'R') => {
+  const onHalf = (half: HalfSide) => {
     if (!focusCell) return;
     const key = `${focusCell}.${half}` as RegionKey;
     touchRefine();
-    if (!floor.splits.includes(focusCell) && narrowPlotReason) {
-      setFocusMessage(narrowPlotReason);
-      onSpeak(`${narrowPlotReason} Choose Back to map.`);
+    const reason = directionReason(refineDirection);
+    if (!floor.splits.includes(focusCell) && reason) {
+      setFocusMessage(reason);
+      onSpeak(`${reason} Choose another direction, or Back to map.`);
       return;
     }
     // Placing (B1): the armed room goes to this half at once; any question is asked here in the focus view. A half
@@ -1278,7 +1306,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       if (owner && owner.use !== placeUse) {
         const name = libraryOf(placeUse)?.roomLabel || placeUse;
         const gone = owner.regions.length === 1 ? ` ${labels[owner.id]} has no other part, so it is removed.` : '';
-        const text = `Replace ${labels[owner.id]} with ${name} in the ${half === 'L' ? 'left' : 'right'} half?${gone}`;
+        const text = `Replace ${labels[owner.id]} with ${name} in the ${halfName(key)} half?${gone}`;
         setFocusQuestion({ text, answers: [
           { id: 'place-replace', label: `Yes, replace ${labels[owner.id]}`, deliberate: true, action: () => applyAssign({ type: 'use', use: placeUse }, key) },
           { id: 'place-cancel', label: 'Cancel', action: () => setFocusQuestion(null) },
@@ -1291,7 +1319,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     }
     signalNavigation();
     setAssignKey(key); setAssignReady(false); setAssignPage(0); setPickerQuestion(null); setPickerNotice('');
-    onSpeak(`Room for the ${half === 'L' ? 'left' : 'right'} half. Press READY, then choose a room.`);
+    onSpeak(`Room for the ${halfName(key)} half. Press READY, then choose a room.`);
   };
 
   /** When a change takes area from the room that holds the stair: whether the stair still fits is decided by the
@@ -1307,7 +1335,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const finishAssign = (outcome: { floor: FloorIntent; roomId: string | null; message: string; short?: Shortfall }, key: RegionKey,
     removed = '') => {
     dispatch({ type: 'COMMIT_FLOOR', floor: outcome.floor, activeRoomId: outcome.roomId ?? state.activeRoomId });
-    const otherSide = key.endsWith('.L') ? 'right' : 'left';
+    const otherSide = halfName(otherHalf(key));
     const stair = stairNote(floor, outcome.floor);
     let spoken = outcome.message;
     if (outcome.roomId) {
@@ -1343,15 +1371,15 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     touchRefine();
     const st = workingState();
     const outcome = assignHalf(st, key, choice, below);
-    const otherKey = (key.endsWith('.L') ? key.replace('.L', '.R') : key.replace('.R', '.L')) as RegionKey;
+    const otherKey = otherHalf(key);
     const wfloor = st.floors[floorId];
-    const owners = [...new Set([ownerOf(wfloor, `${focusCell}.L`), ownerOf(wfloor, `${focusCell}.R`)].filter(Boolean))] as RoomIntent[];
+    const owners = [...new Set(cellRegions(wfloor, focusCell).map(k => ownerOf(wfloor, k)).filter(Boolean))] as RoomIntent[];
     const replaces = (use: string) => {
       const others = owners.filter(r => r.use !== use).map(r => labelsOf(wfloor)[r.id]);
       return others.length ? ` (replaces ${others.join(' and ')} here)` : '';
     };
     const wholeFor = (use: string) => {
-      const whole = giveBothHalves(st, focusCell, use);
+      const whole = giveBothHalves(st, focusCell, use, below);
       if (whole.kind === 'commit') finishAssign(whole, key);
       else refuse('message' in whole ? whole.message : 'Not possible here.');
     };
@@ -1374,7 +1402,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         return;
       case 'too-narrow': {
         // Only a half under 2'-6" clear (B2). One question: it names the room the whole cell would become ("Bedroom 2").
-        const whole = giveBothHalves(st, focusCell, outcome.use);
+        const whole = giveBothHalves(st, focusCell, outcome.use, below);
         const name = whole.kind === 'commit' && whole.roomId ? labelsOf(whole.floor)[whole.roomId] : libraryOf(outcome.use)?.roomLabel || outcome.use;
         ask({ text: outcome.message, answers: [
           { id: 'assign-whole', label: `Use the whole cell for ${name}${replaces(outcome.use)}`, deliberate: true, action: () => wholeFor(outcome.use) },
@@ -1386,13 +1414,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       case 'disconnects': {
         // B4: the half that joins the rest of the room cannot be given away. The other half comes first, and only
         // answers that would work are offered (both halves can cut the room in two as well, e.g. a middle cell).
-        const otherSide = key.endsWith('.L') ? 'right' : 'left';
+        const otherSide = halfName(otherKey);
         const answers: PickerQuestion['answers'] = [];
         if (assignHalf(st, otherKey, choice, below).kind !== 'disconnects') {
           // The other half is assigned by the same rules, so any question it raises is asked in turn.
           answers.push({ id: 'assign-other-half', label: `Give the ${otherSide} half instead`, deliberate: true, action: () => applyAssign(choice, otherKey) });
         }
-        if (choice.type === 'use' && giveBothHalves(st, focusCell, choice.use).kind === 'commit') {
+        if (choice.type === 'use' && giveBothHalves(st, focusCell, choice.use, below).kind === 'commit') {
           answers.push({ id: 'assign-both-halves', label: `Give both halves to ${libraryOf(choice.use)?.roomLabel || choice.use}`,
             deliberate: true, action: () => wholeFor(choice.use) });
         }
@@ -1649,10 +1677,13 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     if (r < 1 || r > GRID_ROWS || c < 1 || c > GRID_COLS) return null;
     const v = cellView(floor, buildCellKey(r, c));
     if (!v.split) return v.whole?.id || null;
-    // The half that faces this cell: an east neighbour's left half, a west neighbour's right half.
-    if (side === 'E') return v.left?.id || null;
-    if (side === 'W') return v.right?.id || null;
-    return v.left && v.left.id === v.right?.id ? v.left.id : null;
+    const cell = buildCellKey(r, c);
+    const [x, y, x2, y2] = regionRectIn(cell, widthIn, depthIn);
+    const touching = cellRegions(floor, cell).filter(k => {
+      const rect = regionRectIn(k, widthIn, depthIn);
+      return side === 'E' ? rect[0] === x : side === 'W' ? rect[2] === x2 : side === 'N' ? rect[1] === y : rect[3] === y2;
+    }).map(k => ownerOf(floor, k)?.id || null);
+    return touching.length && touching.every(id => id === touching[0]) ? touching[0] : null;
   };
   const shortNameOf = (room: RoomIntent): string => {
     const number = labels[room.id]?.match(/ (\d+)$/)?.[1];
@@ -1684,7 +1715,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
         onDwellComplete={() => setHoveredCell(null)}
         onClick={() => onCellClick(cellKey)}
         ariaLabel={view.split
-          ? `Row ${row}, column ${col}, divided: left ${halfWords(view.left, `${cellKey}.L`)}, right ${halfWords(view.right, `${cellKey}.R`)}`
+          ? `Row ${row}, column ${col}, divided: ${splitSides(view.direction).map((h, i) => `${halfName(`${cellKey}.${h}`)} ${halfWords(i === 0 ? view.left : view.right, `${cellKey}.${h}`)}`).join(', ')}`
           : `Row ${row}, column ${col}: ${owner ? labels[owner.id] : 'empty'}`}
         contentFill
         style={{
@@ -1696,7 +1727,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       >
         {view.split ? (
           <SplitCellFace row={row} col={col} totalRows={GRID_ROWS} totalCols={GRID_COLS}
-            left={half(view.left, `${cellKey}.L`)} right={half(view.right, `${cellKey}.R`)} />
+            direction={view.direction} left={half(view.left, `${cellKey}.${splitSides(view.direction)[0]}`)} right={half(view.right, `${cellKey}.${splitSides(view.direction)[1]}`)} />
         ) : (
           <ArchitecturalCell
             cellKey={cellKey} row={row} col={col} totalRows={GRID_ROWS} totalCols={GRID_COLS}
@@ -1958,7 +1989,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
             }}>
               {mapNotice ? mapNotice.text
                 : readOnlyDraft ? 'Saved by a newer version of GazeConnect'
-                  : refineMode ? 'Look at a cell to divide it into left and right halves'
+                  : refineMode ? 'Look at a cell to divide it left/right or top/bottom'
                     : state.phase === 'placement' ? <>{formatFeetShort(owned)} / {16} cells placed &middot; {coveragePercent}%</> : null}
             </span>
           </div>
@@ -2255,9 +2286,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   // ─── RENDER: Refine focus view (§5.1 step 3) ───
   const belowText = (key: string): string | undefined => {
     if (!below) return undefined;
-    const cell = cellOf(key);
-    const room = ownerOf(below, below.splits.includes(cell) ? key : cell);
-    return `Below: ${room ? labelsOf(below)[room.id] : 'empty'}`;
+    const names = labelsOf(below);
+    const owners = regionsBelow(key, below).map(k => { const room = ownerOf(below, k); return room ? names[room.id] : 'empty'; });
+    return `Below: ${[...new Set(owners)].join(' / ')}`;
   };
 
   const renderFocus = () => {
@@ -2266,7 +2297,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const { row, col } = parseCellKey(focusCell);
     // An undivided cell is shown as it would divide: both halves keep the cell's room. A narrow half carries its
     // warning (B2); a half that joins the rest of its room says so, as giving it away would cut that room (B4).
-    const divided = v.split ? floor : splitCell(floor, focusCell);
+    const direction = v.split ? v.direction : refineDirection;
+    const [a, b] = splitSides(direction);
+    const divided = v.split ? floor : splitCell(floor, focusCell, direction);
     const face = (room: RoomIntent | null, key: string): HalfFace => {
       const size = regionSizeIn(key, widthIn, depthIn);
       const short = room ? halfShortfall(divided, key, widthIn, depthIn) : null;
@@ -2279,16 +2312,21 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const thumbnail: ThumbCell[] = RENDER_ORDER.map(key => {
       const c = cellView(floor, key);
       const colour = (room: RoomIntent | null) => (room ? colourOf(room.use) : null);
-      return { key, split: c.split, colors: c.split ? [colour(c.left), colour(c.right)] : [colour(c.whole)] };
+      return { key, split: c.split, direction: c.direction, colors: c.split ? [colour(c.left), colour(c.right)] : [colour(c.whole)] };
     });
     const placing = placeUse ? libraryOf(placeUse)?.roomLabel || placeUse : null;
     return (
       <CompassRefineFocus
         title={placing ? `Place ${placing} in:` : 'Divide a cell'}
-        subtitle={placing ? `The left half or the right half · ${floorName} · Row ${row}, Column ${col}`
+        subtitle={placing ? `The ${halfName(`${focusCell}.${a}`)} half or the ${halfName(`${focusCell}.${b}`)} half · ${floorName} · Row ${row}, Column ${col}`
           : `${floorName} · Row ${row} (${ROW_NAMES[row]}), Column ${col}`}
-        left={face(v.split ? v.left : v.whole, `${focusCell}.L`)}
-        right={face(v.split ? v.right : v.whole, `${focusCell}.R`)}
+        direction={direction} onDirection={next => {
+          if (v.split || focusQuestion) return;
+          signalNavigation(); touchRefine(); setRefineDirection(next); setFocusMessage(directionReason(next));
+          onSpeak(`${next === 'top-bottom' ? 'Top and bottom halves. Top is towards the back; bottom towards the road.' : 'Left and right halves.'} ${directionReason(next)}`);
+        }} directionReasons={{ 'left-right': directionReason('left-right'), 'top-bottom': directionReason('top-bottom') }}
+        left={face(v.split ? v.left : v.whole, `${focusCell}.${a}`)}
+        right={face(v.split ? v.right : v.whole, `${focusCell}.${b}`)}
         divided={v.split} thumbnail={thumbnail} focusKey={focusCell}
         question={focusQuestion} message={focusMessage} canUndo={state.history.length > 0}
         onHalf={onHalf}
@@ -2308,7 +2346,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const have = clearWidthIn(assignKey, widthIn, depthIn);
     const size = regionSizeIn(assignKey, widthIn, depthIn);
     const { row, col } = parseCellKey(focusCell);
-    const side = assignKey.endsWith('.L') ? 'LEFT' : 'RIGHT';
+    const side = halfName(assignKey).toUpperCase();
     // Giving this half away cuts the room it joins to the rest of itself (B4): every card but that room says so.
     const cuts = halfLinksRoom(wfloor, assignKey);
     const cutText = cuts ? { ok: false, warn: true, text: `Cuts ${names[cuts.id]} in two` } : undefined;

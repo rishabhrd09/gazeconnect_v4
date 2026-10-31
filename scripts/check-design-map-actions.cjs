@@ -144,7 +144,7 @@ let browser;
   assert.match(await page.locator('#compass-road-status').innerText(),/Right half: Kitchen \+ Store\. Narrow: 4'-6" clear; Kitchen \+ Store needs 4'-11"\. Bathroom removed\./);
   assert.match(await page.locator('#cell-r2_c3').getAttribute('aria-label'),/right Kitchen \+ Store, narrow/);
   // A fresh map: skipping every question keeps the prefilled 40 x 60 ft West plot (A1). A 20 ft plot says at the
-  // rail that its cells cannot be divided, and REFINE does not open (A4).
+  // rail no longer blocks Refine globally: a deep 20 ft plot supports top/bottom but not left/right.
   async function freshMap() {
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.reload(); await page.locator('#kb').waitFor();
@@ -160,15 +160,17 @@ let browser;
   assert.match(await page.locator('#foundation-readiness').innerText(),/SKIP keeps West/);
   await skipAll();
   assert.match(await page.locator('.compass-road-info').innerText(),/\(West\) – 40 ft/);
-  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('compass_persistent_backup_v2')).ui.foundation);
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('compass_persistent_backup_v3')).ui.foundation);
   assert.deepEqual([kept.facing, kept.plotWidth, kept.plotDepth], ['West', 40, 60], 'skipping every question keeps 40 x 60 West');
   await freshMap();
   await page.click('#f-skip'); await page.click('[id="fq-1-20 ft"]'); await skipAll();
-  assert.match(await page.locator('#strip-refine').innerText(),/HALVES TOO NARROW ON A 20 FT PLOT/);
   await page.click('#strip-refine');
-  assert.match(await page.locator('#strip-refine').innerText(),/^REFINE/, 'Refine does not open on a 20 ft plot');
-  assert.match(await page.locator('#compass-road-status').innerText(),/under the 2'-6" a half needs/);
+  assert.match(await page.locator('#strip-refine').innerText(),/DONE REFINING/, 'top/bottom halves remain available on a deep 20 ft plot');
+  await page.click('#cell-r2_c2');
+  assert.equal(await page.locator('#refine-direction-left-right').isDisabled(), true);
+  assert.equal(await page.locator('#refine-direction-top-bottom').isEnabled(), true);
+  assert.equal(await page.locator('#refine-top').count(), 1);
   assert.deepEqual(errors,[]);
   await browser.close();
-  console.log('PASS: five-action rail, room paging/READY/selection, two room placements, NEXT, Generate confirmation/cancel, floor switching, Back to Map, SKIP keeps answers, refusals on the road, no Refine on a 20 ft plot; Refine: focus view, READY-gated picker built for halves (page 1, READY across pages, disabled last), Back, a half room, Undo as one step, whole cell, divided cell on the map; placing on a divided cell: half chooser, replace asked, narrow warning.');
+  console.log('PASS: five-action rail, room paging/READY/selection, two room placements, NEXT, Generate confirmation/cancel, floor switching, Back to Map, SKIP keeps answers, refusals on the road, usable top/bottom direction on a deep 20 ft plot; Refine: focus view, READY-gated picker built for halves (page 1, READY across pages, disabled last), Back, a half room, Undo as one step, whole cell, divided cell on the map; placing on a divided cell: half chooser, replace asked, narrow warning.');
 })().catch(async e=>{console.error(e);await browser?.close();process.exitCode=1;});

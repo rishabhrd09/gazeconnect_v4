@@ -146,8 +146,43 @@ def _floor_tone(room):
     return FLOOR.get(room.zone, FLOOR['public'])
 
 
-def render(model, floor, theme='warm', width=2000, height=1300):
-    width, height = int(min(max(width, 480), 2400)), int(min(max(height, 320), 1600))
+def scales(width, height, W, D):
+    """The top view on a width x height canvas: px, the title band, and the drawing scale the width and the height
+    each allow (the smaller is used)."""
+    px = min(width, height) / 1000
+    title_h = 64 * px
+    return px, title_h, (width - 120 * px) / (W + A * CUT), (height - title_h - 90 * px) / (D + B * CUT)
+
+
+# Fill width (the studio's full screen, 29 Oct 2026, maintainer request): the drawing spans the width and the canvas
+# is as tall as that needs, up to this height.
+FILL_MAX_HEIGHT = 4000
+
+
+def fill_height(model, width):
+    """The smallest canvas height at which the drawing's scale is set by `width`, at most FILL_MAX_HEIGHT."""
+    W, D = model['plot']['W'] / U, model['plot']['D'] / U
+
+    def by_width(height):
+        _, _, across, down = scales(width, height, W, D)
+        return across <= down
+
+    low, high = 320, FILL_MAX_HEIGHT
+    if not by_width(high):
+        return high
+    while low < high:
+        middle = (low + high) // 2
+        if by_width(middle):
+            high = middle
+        else:
+            low = middle + 1
+    return low
+
+
+def render(model, floor, theme='warm', width=2000, height=1300, fit='contain'):
+    """`fit='width'` ignores `height` and makes the canvas as tall as the drawing needs to fill the width."""
+    width = int(min(max(width, 480), 2400))
+    height = fill_height(model, width) if fit == 'width' else int(min(max(height, 320), 1600))
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
     draw(cairo.Context(surface), surface, model, floor, theme, width, height)
     stream = io.BytesIO()
@@ -159,12 +194,11 @@ def render(model, floor, theme='warm', width=2000, height=1300):
 def draw(c, surface, model, floor, theme, width, height):
     page, paper, ink, muted, edge = THEMES[theme]
     dark = luminance(page) < .45
-    px = min(width, height) / 1000
     W, D = model['plot']['W'] / U, model['plot']['D'] / U
+    px, title_h, across, down = scales(width, height, W, D)
     f = model['floors'][floor]
     c.set_source_rgb(*rgb(page)); c.paint()
-    title_h = 64 * px
-    s = min((width - 120 * px) / (W + A * CUT), (height - title_h - 90 * px) / (D + B * CUT))
+    s = min(across, down)
     ox = (width - (W + A * CUT) * s) / 2
     oy = title_h + (height - title_h - 90 * px - (D + B * CUT) * s) / 2 + (D + B * CUT) * s
 
