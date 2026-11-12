@@ -4,8 +4,9 @@
  * From the keyboard or Zone Board, Quick Words opens a screen of four cards: Quick Phrases,
  * Phrases, People and Daily Assistance. What is chosen behind them is added to the message
  * being typed instead of being spoken, and the person is taken back to the typing screen
- * to go on or press Speak. Urgent care requests are the exception: they are still spoken
- * at once, never left waiting in a message. Reached from Home, the same screens speak as before.
+ * to go on or press Speak. Urgent care requests are also spoken at once, never left waiting
+ * in a message, and then join it and return to the typing screen like every other choice
+ * (12 Nov 2026, maintainer decision). Reached from Home, the same screens speak as before.
  */
 
 export type TypingScreen = 'keyboard' | 'spatial';

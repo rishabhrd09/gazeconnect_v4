@@ -72,8 +72,9 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
     if (dismissRef.current) clearTimeout(dismissRef.current);
   }, []);
 
-  // The Medical / Urgent words (and their phrases) are spoken at once even from Add to Message:
-  // an urgent request is never left waiting in a message (utils/addToMessage.ts).
+  // From Add to Message every choice joins the message and the typing screen comes back. The Medical / Urgent
+  // words (and their phrases) are also spoken at once on the way: an urgent request is never left waiting in a
+  // message (utils/addToMessage.ts; 12 Nov 2026, maintainer decision).
   const urgentWordKeys = useMemo(() => new Set(
     (categories.find(category => category.id === 'emergency')?.words ?? []).map(word => word.id || word.en),
   ), [categories]);
@@ -88,10 +89,14 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
     }
 
     onSpeak(word.en);
+    if (addToMessage) {               // an urgent word: spoken, and in the message too
+      addToMessage.add(word.en);
+      return;
+    }
     setLastSpoken({ en: word.en, hi: word.hi });
     if (dismissRef.current) clearTimeout(dismissRef.current);
     dismissRef.current = setTimeout(() => setLastSpoken(null), 2200);
-  }, [addsToMessage, onSpeak]);
+  }, [addToMessage, addsToMessage, onSpeak]);
 
   const handlePhraseSelect = useCallback((phrase: Phrase) => {
     if (addToMessage && addsToMessage(activeWord)) {
@@ -101,8 +106,12 @@ const QuickWordsScreen: React.FC<QuickWordsScreenProps> = ({
     }
 
     onSpeak(phrase.en);
-    setLastSpoken({ en: phrase.en, hi: phrase.hi });
     setActiveWord(null);
+    if (addToMessage) {               // an urgent word's phrase: spoken, and in the message too
+      addToMessage.add(phrase.en);
+      return;
+    }
+    setLastSpoken({ en: phrase.en, hi: phrase.hi });
     if (dismissRef.current) clearTimeout(dismissRef.current);
     dismissRef.current = setTimeout(() => setLastSpoken(null), 2600);
   }, [activeWord, addToMessage, addsToMessage, onSpeak]);

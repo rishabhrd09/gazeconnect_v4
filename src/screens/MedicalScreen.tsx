@@ -27,8 +27,8 @@ interface MedicalScreenProps {
   isDarkMode?: boolean;
   showHindi?: boolean;
   /**
-   * Opened from Add to Message: a chosen request joins the message instead of being spoken,
-   * except an urgent one (suction, breathing, severe pain...), which is still spoken at once.
+   * Opened from Add to Message: a chosen request joins the message instead of being spoken, and the
+   * typing screen comes back; an urgent one (suction, breathing, severe pain...) is also spoken at once.
    */
   addToMessage?: AddToMessage;
 }
@@ -339,8 +339,10 @@ const MedicalScreen: React.FC<MedicalScreenProps> = ({
   }, []);
 
   const handleActivate = useCallback((item: MedItem) => {
-    // From Add to Message a request joins the message; an urgent one is never left waiting there.
-    if (addToMessage && !item.urgent) {
+    // From Add to Message a request joins the message and the typing screen comes back. An urgent one is spoken
+    // at once first, never left waiting in the message (12 Nov 2026, maintainer decision).
+    if (addToMessage) {
+      if (item.urgent) onSpeak(item.en);
       addToMessage.add(item.en);
       return;
     }

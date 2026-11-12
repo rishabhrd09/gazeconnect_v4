@@ -73,14 +73,19 @@ expect(screen.includes('onBack={() => onNavigate(returnScreen)}'), 'Back returns
 const css = read('src/styles/design-modes.css');
 expect(/\.add-message-grid \{[^}]*grid-template-columns: repeat\(2,minmax\(0,1fr\)\); grid-template-rows: repeat\(2,minmax\(0,1fr\)\)/.test(css), 'the cards are two by two');
 
-// Urgent care requests are spoken at once, never parked in the message.
+// Urgent care requests are spoken at once, never parked unspoken in the message; then, like every other choice,
+// they join the message and the typing screen comes back (12 Nov 2026, maintainer decision).
 const medical = read('src/screens/MedicalScreen.tsx');
-expect(/if \(addToMessage && !item\.urgent\) \{\s*addToMessage\.add\(item\.en\);\s*return;\s*\}\s*onSpeak\(item\.en\);/.test(medical),
-  'an urgent request is spoken even while adding to the message');
+expect(/if \(addToMessage\) \{\s*if \(item\.urgent\) onSpeak\(item\.en\);\s*addToMessage\.add\(item\.en\);\s*return;\s*\}/.test(medical),
+  'an urgent request is spoken, then joins the message and the typing screen comes back');
 const quick = read('src/screens/QuickWordsScreen.tsx');
 expect(/categories\.find\(category => category\.id === 'emergency'\)/.test(quick) &&
   /if \(addToMessage && addsToMessage\(activeWord\)\) \{\s*setActiveWord\(null\);\s*addToMessage\.add\(phrase\.en\);/.test(quick),
-  "Quick Phrases' Medical / Urgent words and phrases are spoken even while adding to the message");
+  'other Quick Phrases words and phrases join the message without being spoken');
+expect(/onSpeak\(word\.en\);\s*if \(addToMessage\) \{[^}]*addToMessage\.add\(word\.en\);\s*return;/.test(quick),
+  'a Medical / Urgent word is spoken, then joins the message and the typing screen comes back');
+expect(/onSpeak\(phrase\.en\);\s*setActiveWord\(null\);\s*if \(addToMessage\) \{[^}]*addToMessage\.add\(phrase\.en\);\s*return;/.test(quick),
+  "a Medical / Urgent word's phrase is spoken, then joins the message and the typing screen comes back");
 for (const [file, call] of [['src/screens/PhrasesScreen.tsx', 'addToMessage.add(phrase.en)'], ['src/screens/PeopleScreen.tsx', 'addToMessage.add(p.name)'],
   ['src/screens/QuickWordsScreen.tsx', 'addToMessage.add(phrase.en)']]) {
   const source = read(file);
