@@ -53,9 +53,13 @@ import {
 } from '../utils/compassMath';
 import { getDirectionLabels, NORTH_ROSE_DEGREES } from '../utils/compassDirections';
 import { formatFeetShort, formatSize } from '../utils/feetInches';
-import { REPEATABLE, STAIR_HOSTS, cellOf, cellRegions, deriveV1, halfName, normalisePlan, otherHalf, regionsBelow, regionRectIn, regionsTouch, splitDirection, splitSides } from '../utils/compassPlan';
+import {
+  REPEATABLE, STAIR_HOSTS, cellOf, cellRegions, deriveV1, firstFloorBlockers, firstFloorFindings, halfName, normalisePlan, otherHalf,
+  regionsBelow, regionRectIn, regionsTouch, splitDirection, splitSides,
+} from '../utils/compassPlan';
 import {
   AssignChoice, CompassActionV2, CompassStateV2, HALF_MIN_CLEAR_IN, MIN_CLEAR_IN, PlaceOutcome, Shortfall, assignHalf, catalogueUses,
+  firstFloorCheck,
   cellView, clearWidthIn, compassReducer, createInitialState, giveBothHalves, halfClearRangeIn, halfLinksRoom, halfShortfall,
   halvesUsable, inches, labelsOf, ownerOf, placeCell, planFromState, plotInches, regionSizeIn, roomsOfUse, shortfallText,
   skippedAnswer, splitCell, voidProblem, wholeCell, wholeOptions,
@@ -905,6 +909,16 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
 
   /** Speaks a map message and shows it on the road for MAP_NOTICE_MS (A3): never speech alone. */
   const tell = useCallback((message: string) => { onSpeak(message); setMapNotice({ text: message, at: Date.now() }); }, [onSpeak]);
+  // Generate's "Both floors" opens only when the first floor is ready (12 Nov 2026): a staircase below, the 1F Stair
+  // Landing over it, every room joined to the landing, and no first-floor rule broken (docs/compass-refine/FIRST_FLOOR_RULES.md).
+  // The 4-6 Oct fallback studio (GAZECONNECT_COMPASS_V2=0) keeps showing a partly filled first floor as a concept.
+  const bothFloorBlockers = () => {
+    if (!isMultiFloor) return [];
+    if (!v2Enabled) return firstRoomCount ? [] : [{ code: 'ff-empty', text: 'No first-floor rooms yet', message: 'Place rooms on the first floor first.' }];
+    try { return firstFloorBlockers(normalisePlan(planFromState(state))); } catch {
+      return [{ code: 'unreadable', text: 'The first floor needs checking', message: 'The first floor could not be checked.' }];
+    }
+  };
   useEffect(() => {
     if (!mapNotice) return undefined;
     const t = setTimeout(() => setMapNotice(null), MAP_NOTICE_MS);
@@ -1205,7 +1219,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     const { row, col } = parseCellKey(cellKey);
     const zoneRow = row === 4 ? 'Back' : row === 3 ? 'Inner back' : row === 2 ? 'Inner front' : 'Front';
     const zoneCol = col === 1 ? 'Left' : col === 2 ? 'Left centre' : col === 3 ? 'Right centre' : 'Right';
-    onSpeak(`${outcome.message} ${zoneRow}, ${zoneCol} zone.`);
+    // A first-floor note (a room on columns, a bathroom needing waterproofing...) is said after the zone and shown
+    // on the road, like a refusal, so it is never missed.
+    const placed = outcome.note ? outcome.message.replace(` Note: ${outcome.note}`, '') : outcome.message;
+    onSpeak(`${placed} ${zoneRow}, ${zoneCol} zone.${outcome.note ? ` Note: ${outcome.note}` : ''}`);
+    if (outcome.note) setMapNotice({ text: `⚠ ${outcome.note}`, at: Date.now() });
   };
 
   const onCellClick = (cellKey: GridCellKey) => {
@@ -1226,12 +1244,20 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   };
 
   const openPlaceHalf = (cell: CellKey, room: RoomComponent) => {
+    // The first-floor rules for each half first (12 Nov 2026): neither half allowed, it is refused here and now; one
+    // allowed, the chooser says which, so a chooser never looks like a yes that its half then refuses.
+    const halves = cellRegions(floor, cell);
+    const refusals = halves.map(k => firstFloorCheck(room.roomId, [k], below, floor).refused);
+    if (refusals.every(Boolean)) { tell(refusals[0]!); return; }
     signalNavigation();
     setMapNotice(null);
-    setPlaceUse(room.roomId); setFocusCell(cell); setFocusQuestion(null); setFocusMessage('');
+    setPlaceUse(room.roomId); setFocusCell(cell); setFocusQuestion(null);
     setRefineDirection(splitDirection(floor, cell));
-    const [a, b] = splitSides(splitDirection(floor, cell)).map(h => halfName(`${cell}.${h}`));
-    onSpeak(`Place ${room.roomLabel}: choose the ${a} half or the ${b} half.`);
+    const [a, b] = halves.map(k => halfName(k));
+    const bad = refusals.findIndex(Boolean);
+    const only = bad < 0 ? '' : `Only the ${halfName(halves[1 - bad])} half. Not the ${halfName(halves[bad])} half: ${refusals[bad]}`;
+    setFocusMessage(only);
+    onSpeak(only ? `Place ${room.roomLabel}. ${only}` : `Place ${room.roomLabel}: choose the ${a} half or the ${b} half.`);
   };
 
   // ── Refine (§5): a cell in focus, then the room for one of its halves ──
@@ -1442,7 +1468,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
   const onWhole = () => {
     if (!focusCell) return;
     touchRefine();
-    const options = wholeOptions(floor, focusCell);
+    const options = wholeOptions(floor, focusCell, below);
     const apply = (owner: string | null) => {
       const next = wholeCell(floor, focusCell, owner);
       dispatch({ type: 'COMMIT_FLOOR', floor: next, activeRoomId: owner ?? state.activeRoomId });
@@ -1655,7 +1681,9 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
                 if (overlayOpen || refineMode) return;
                 if (!canPreviewPlan) { tell('Place a ground floor room first.'); return; }
                 setConfirmGenerate(true);
-                onSpeak('Choose ground floor only, or both floors.');
+                const blockers = bothFloorBlockers();
+                onSpeak(!isMultiFloor || !blockers.length ? 'Choose ground floor only, or both floors.'
+                  : `Ground floor only is ready. Both floors needs the first floor ready first: ${blockers[0].message}`);
               }}
               style={{
                 ...stripBtnStyle(canPreviewPlan && !refineMode, T_generatePlanBg),
@@ -2141,19 +2169,23 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
     }
 
     if (confirmGenerate) {
+      const blockers = bothFloorBlockers();
+      const bothBlocked = blockers[0];
       return (
         <div className="compass-plan-choice" role="dialog" aria-modal="true">
           <div className="compass-plan-choice-panel">
             <h2>Which floors would you like to see?</h2>
-            <p>You can view the ground floor now. Your first-floor draft stays saved, even if it is unfinished.</p>
+            <p>{!isMultiFloor || !bothBlocked ? 'You can view the ground floor now. Your first-floor draft stays saved, even if it is unfinished.'
+              : `You can view the ground floor now. Both floors opens when the first floor is ready: ${bothBlocked.message}`}</p>
             <div className="compass-plan-choice-actions">
               <GazeButton id="confirm-gen-yes" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction"
                 onClick={() => { setConfirmGenerate(false); handleGenerateFloorPlan('ground'); }}>
                 Ground floor only<br /><small>{groundRoomCount} rooms · view 2D plan</small>
               </GazeButton>
-              {isMultiFloor && <GazeButton id="confirm-gen-both" gazeEnabled={isGazeEnabled && firstRoomCount > 0} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction" disabled={!firstRoomCount}
-                onClick={() => { setConfirmGenerate(false); handleGenerateFloorPlan('all'); }}>
-                Both floors<br /><small>{firstRoomCount ? `${firstRoomCount} first-floor rooms · gaps stay open` : 'No first-floor rooms yet'}</small>
+              {isMultiFloor && <GazeButton id="confirm-gen-both" gazeEnabled={isGazeEnabled && !bothBlocked} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="compassMapAction" disabled={!!bothBlocked}
+                onClick={() => { if (bothBlocked) return; setConfirmGenerate(false); handleGenerateFloorPlan('all'); }}>
+                Both floors<br /><small>{bothBlocked ? `${bothBlocked.text}${blockers.length > 1 ? ` · ${blockers.length - 1} more` : ''}`
+                  : `${firstRoomCount} first-floor rooms · gaps stay open`}</small>
               </GazeButton>}
               <GazeButton id="confirm-gen-no" gazeEnabled={isGazeEnabled} gazeEnabledTimestamp={lastEnabledTimestamp} isDarkMode dwellCategory="backSkipButton"
                 onClick={() => setConfirmGenerate(false)}>← Back to map</GazeButton>
@@ -2367,7 +2399,11 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       let fit: PickerCard['fit'];
       let rank = need ? 1 : 2;                 // 0 joins or is this room, 1 fits (indoor), 2 fits (outdoor), 3 narrow, 4 not here
       let by = 0;
+      const findings = below && use !== 'void' && current?.use !== use ? firstFloorFindings(use, assignKey, below, wfloor) : [];
+      const refusedHere = findings.find(f => f.severity === 'conflict');
+      const notedHere = findings.find(f => f.severity === 'warning');
       if (current?.use === use) { fit = { ok: true, text: 'Already this room' }; rank = 0; }
+      else if (refusedHere) { fit = { ok: false, text: refusedHere.short }; rank = 4; }
       else if (use === 'void') {
         const problem = voidProblem(below, [assignKey], state.choices);
         fit = problem ? { ok: false, text: 'Needs the living hall below' } : { ok: true, text: 'Makes the living hall below double height' };
@@ -2378,6 +2414,7 @@ function CompassMapScreen({ onNavigate, onSpeak, isDarkMode = true }: CompassMap
       else if (have < HALF_MIN_CLEAR_IN) { fit = { ok: false, text: `Under 2'-6" clear` }; rank = 4; }
       else if (need && have < need) { fit = { ok: false, warn: true, text: `Narrow: ${inches(have)} clear, needs ${inches(need)}` }; rank = 3; by = need - have; }
       else fit = { ok: true, text: `Fits: ${inches(have)} clear` };
+      if (notedHere && rank < 3) { fit = { ok: false, warn: true, text: notedHere.short }; rank = 3; }
       if (cutText && current?.use !== use && rank < 4) fit = cutText;
       ranked.push({ rank, by, order, card: {
         id: use, label: lib?.roomLabel || use, color: colourOf(use), selected: current?.use === use, fit, disabled: rank === 4,

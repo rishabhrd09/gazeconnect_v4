@@ -14,7 +14,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const gazeProbe = require('./design-gaze-probe.cjs')(path.resolve(__dirname, '..'));
-const {draftV2} = require('./compass-qa-plan.cjs');
+const {draftV2, state: qaState} = require('./compass-qa-plan.cjs');
+const Draft = require('../src/utils/compassDraft.ts');
 const legacyDraft = require('./compass-qa-draft.cjs');
 const out = process.env.COMPASS_QA_OUTPUT || path.join(os.tmpdir(), 'gaze-compass-studio-v2-qa');
 fs.mkdirSync(out, {recursive: true});
@@ -220,6 +221,38 @@ let browser;
       }
 
   await page.setViewportSize({width: 1366, height: 768});
+  // The first floor over the ground floor (12 Nov 2026, docs/compass-refine/FIRST_FLOOR_RULES.md): a 1F bedroom over
+  // the lawn keeps Both floors closed and says why, Ground floor only still opens; on the map, placing a room over the
+  // lawn upstairs is refused on the road and the map is unchanged.
+  const overLawn = qaState('ground');
+  overLawn.floors = {...overLawn.floors, first: {...overLawn.floors.first, splits: [...overLawn.floors.first.splits, 'r1_c2'].sort(),
+    rooms: [...overLawn.floors.first.rooms, {id: 'f-ff_bed2-1', use: 'ff_bed2', regions: ['r1_c3']}]}};
+  await open('focus', 'warm', JSON.stringify(Draft.draftFromState(overLawn)));
+  assert.equal(await page.locator('#confirm-gen-both').isDisabled(), true, 'Both floors stays closed');
+  assert.match(await page.locator('#confirm-gen-both').innerText(), /1F Bed 2: over the garden/);
+  assert.match(await page.locator('.compass-plan-choice-panel p').innerText(), /Both floors opens when the first floor is ready: .*open to the sky/);
+  assert.equal(await page.locator('#confirm-gen-yes').isEnabled(), true, 'Ground floor only stays open');
+  await audit('both-floors-closed'); await page.screenshot({path: path.join(out, 'both-floors-closed-1366.png')});
+  await page.setViewportSize({width: 1920, height: 1080}); await audit('both-floors-closed-1920');
+  await page.screenshot({path: path.join(out, 'both-floors-closed-1920.png')});
+  await page.setViewportSize({width: 1366, height: 768});
+  await page.click('#confirm-gen-no');
+  const mapBefore = await floors();
+  await page.click('#strip-floor'); await page.click('#strip-rooms'); await page.click('#menu-ready');
+  for (let n = 0; n < 4 && !(await page.locator('[id^="m-ff_bed3-"]').count()); n++) await page.click('#menu-next');
+  await page.locator('[id^="m-ff_bed3-"]').click();
+  if (await page.locator('#ready-road-left').getAttribute('aria-pressed') === 'false') await page.click('#ready-road-left');
+  // A divided cell over the lawn: neither half may take the room, so it is refused at once, without the half chooser.
+  await page.click('#cell-r1_c2');
+  await page.waitForFunction(() => /open to the sky/.test(document.querySelector('#compass-road-status')?.innerText || ''));
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('.compass-refine-focus').count(), 0, 'no half chooser when neither half may take the room');
+  await page.click('#cell-r1_c4');
+  await page.waitForFunction(() => /open to the sky/.test(document.querySelector('#compass-road-status')?.innerText || ''));
+  await page.screenshot({path: path.join(out, 'first-floor-refused-1366.png')});
+  assert.deepEqual(await floors(), mapBefore, 'a refused first-floor room changes nothing');
+  await page.click('#strip-generate'); await page.locator('#confirm-gen-yes').waitFor();
+
   // Ground floor only: the first floor is left out of the drawing and stays in the map.
   await open(); await page.click('#confirm-gen-yes'); await drawing();
   assert.match(await heading(), /GROUND FLOOR ONLY/); assert.equal(await page.locator('#compass-studio-floor').isEnabled(), false);
@@ -267,6 +300,6 @@ let browser;
 
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(out, 'checks.json'), JSON.stringify(results, null, 2));
-  console.log(`PASS: ${results.length} studio screens, ${results.reduce((n, r) => n + r.probes, 0)} gaze target probes; two views (Plan, Model look) in three equal targets, both floors, full screen (views, floors, fill width, image kept), PNG/PDF/DXF downloads, notes, newest view kept, service failure, closing while drawing, saved Refine Map details, map unchanged.`);
+  console.log(`PASS: ${results.length} studio screens, ${results.reduce((n, r) => n + r.probes, 0)} gaze target probes; two views (Plan, Model look) in three equal targets, both floors, Both floors closed by the first-floor rules (and a refused room upstairs), full screen (views, floors, fill width, image kept), PNG/PDF/DXF downloads, notes, newest view kept, service failure, closing while drawing, saved Refine Map details, map unchanged.`);
   await browser.close();
 })().catch(async e => { console.error(e); const pages = browser?.contexts()[0]?.pages(); if (pages?.[0]) await pages[0].screenshot({path: path.join(out, 'failure.png')}).catch(() => {}); await browser?.close(); process.exitCode = 1; });

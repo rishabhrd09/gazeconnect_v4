@@ -23,6 +23,8 @@ Medical-grade AAC (Augmentative & Alternative Communication) app for ALS/MND pat
 - No scrolling on main screens (everything must fit within viewport)
 - overflow:hidden is intentional — content must fit, not scroll
 
+- **Compass first floor (12 Nov 2026).** A first-floor room is checked against the ground floor below it (the stair landing over at least part of the staircase, nothing else over the stair, nothing over the garden, no bathroom over the Home ICU; notes for columns, waterproofing and a closed-in balcony; keep the rules few and simple), and Generate's "Both floors" opens only when the first floor is ready. Rules in `src/utils/compassPlan.ts` and identical `tools/compass_schema.py`; see `docs/compass-refine/FIRST_FLOOR_RULES.md`. Keep both copies and fixture f17 in step.
+
 - **Compass top/bottom halves (30 Oct 2026).** REFINE supports Left/Right or Top/Bottom, exactly two equal halves and one direction per cell. Top is towards the back, bottom towards the road. Direction remains a preview until the first assignment; WHOLE CELL is required before changing an assigned split. Canonical v2 left/right data stays unchanged; top/bottom uses plan v3 with `.T`/`.B` and `splitDirections` exceptions. Draft v3 keys preserve older originals. Keep TypeScript/Python geometry, cross-floor overlap, save/reopen and every shared PlanModel export consistent. See `docs/compass-refine/TOP_BOTTOM_SPLITS.md` and the split rule/browser/Python tests. Preserve gaze timing; no crossing splits or quarter cells.
 
 ## Development Commands

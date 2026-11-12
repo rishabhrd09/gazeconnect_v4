@@ -226,7 +226,9 @@
     "choices": {}
    },
    "expect": {
-    "issues": [],
+    "issues": [
+     "ff-landing-off-stair:f-ff_stairLanding-1"
+    ],
     "kernel": {
      "stair": "misaligned",
      "notes": [

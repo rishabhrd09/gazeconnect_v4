@@ -28,7 +28,7 @@ let browser;
     const theme=sessionStorage.getItem('qa-theme');if(theme)localStorage.setItem('gc-theme',theme);
     window.electronAPI={on:()=>()=>{},off:()=>{},settings:{load:async()=>JSON.parse(sessionStorage.getItem('qa-profile')||'null'),save:async d=>{sessionStorage.setItem('qa-profile',JSON.stringify(d));return {success:true};}}};
   });
-  await page.goto('http://127.0.0.1:5173');await page.locator('#kb').waitFor();
+  await page.goto(process.env.DESIGN_QA_URL || 'http://127.0.0.1:5173');await page.locator('#kb').waitFor();
   async function open(mode='focus',theme='warm',firstRooms=false,architecture=false){
     await page.evaluate(({mode,theme,state})=>{
       sessionStorage.clear();localStorage.clear();localStorage.setItem('gc-compass-v2','0');sessionStorage.setItem('qa-theme',theme);

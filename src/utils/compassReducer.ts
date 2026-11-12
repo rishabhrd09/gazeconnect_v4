@@ -10,7 +10,7 @@
 import type { CellKey, CompassPlanV2, FloorId, FloorIntent, RegionKey, RoomIntent, SplitDirection } from '../types/compassPlan';
 import type { RoomComponent } from '../types/compass';
 import {
-  CATALOGUE, CELLS, PLAN_LIBRARY, REPEATABLE, STAIR_HOSTS, cellOf, components, floorRegions, nextRoomId,
+  CATALOGUE, CELLS, PLAN_LIBRARY, REPEATABLE, STAIR_HOSTS, cellOf, components, firstFloorFindings, floorRegions, nextRoomId,
   parseRegion, planLabels, regionRectIn, regionsTouch, cellRegions, halfName, otherHalf, regionsBelow, splitDirection, splitSides,
 } from './compassPlan';
 
@@ -189,12 +189,33 @@ export function halvesUsable(widthIn: number, depthIn: number, direction: SplitD
   return halfClearRangeIn(widthIn, depthIn, direction).narrowest >= HALF_MIN_CLEAR_IN;
 }
 
+// ---- The first floor over the ground floor (12 Nov 2026, docs/compass-refine/FIRST_FLOOR_RULES.md) ----------
+
+/**
+ * The first floor's rules for `use` over `keys` (the cell or half being placed), judged against the ground floor
+ * `below` (given only on the first floor) and the first floor as it is (`first`): the first conflict refuses, the first
+ * warning is said with the placement.
+ */
+export function firstFloorCheck(use: string, keys: string[], below?: FloorIntent, first?: FloorIntent): { refused?: string; note?: string } {
+  if (!below) return {};
+  const findings = keys.flatMap(key => firstFloorFindings(use, key, below, first));
+  const conflict = findings.find(f => f.severity === 'conflict');
+  if (conflict) return { refused: conflict.message };
+  const warning = findings.find(f => f.severity === 'warning');
+  return warning ? { note: warning.message } : {};
+}
+
+/** A committed placement with the first floor's note said after it. */
+function noted<T extends { kind: string; message?: string }>(outcome: T, note?: string): T {
+  return note && outcome.kind === 'commit' ? { ...outcome, message: `${outcome.message} Note: ${note}`, note } : outcome;
+}
+
 // ---- Placement mode (whole cells) ----------------------------------------------------------
 
 export type PlaceOutcome =
   | { kind: 'refused'; message: string }
   | { kind: 'confirm-replace'; victim: RoomIntent; victimLabel: string }
-  | { kind: 'commit'; floor: FloorIntent; activeRoomId: string | null; message: string; roomId: string | null };
+  | { kind: 'commit'; floor: FloorIntent; activeRoomId: string | null; message: string; roomId: string | null; note?: string };
 
 /**
  * A dwell on a whole cell while placing `use`: add it to that use's room, remove it again, or (after
@@ -221,6 +242,8 @@ export function placeCell(state: CompassStateV2, cell: CellKey, use: string, con
     const problem = voidProblem(below, [cell], state.choices);
     if (problem) return { kind: 'refused', message: problem };
   }
+  const rules = firstFloorCheck(use, [cell], below, floor);
+  if (rules.refused) return { kind: 'refused', message: rules.refused };
   let base = floor;
   if (owner) {
     if (!confirmedReplace) return { kind: 'confirm-replace', victim: owner, victimLabel: label(floor, owner) };
@@ -230,7 +253,7 @@ export function placeCell(state: CompassStateV2, cell: CellKey, use: string, con
     }
     base = withRegions(floor, owner.id, rest);
   }
-  return joinOrCreate(base, floorId, use, cell, state.activeRoomId);
+  return noted(joinOrCreate(base, floorId, use, cell, state.activeRoomId), rules.note);
 }
 
 function joinOrCreate(floor: FloorIntent, floorId: FloorId, use: string, key: string, activeRoomId: string | null): PlaceOutcome {
@@ -288,7 +311,7 @@ export type AssignChoice = { type: 'empty' } | { type: 'use'; use: string; separ
 export interface Shortfall { needIn: number; haveIn: number }
 
 export type AssignOutcome =
-  | { kind: 'commit'; floor: FloorIntent; roomId: string | null; message: string; short?: Shortfall }
+  | { kind: 'commit'; floor: FloorIntent; roomId: string | null; message: string; short?: Shortfall; note?: string }
   | { kind: 'ask-separate'; use: string; label: string; message: string; short?: Shortfall }
   | { kind: 'refused'; message: string }
   | { kind: 'too-narrow'; use: string; needIn: number; haveIn: number; message: string }
@@ -383,11 +406,15 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
   if (choice.type === 'use' && current?.use === choice.use && !choice.separate) {
     return { kind: 'commit', floor, roomId: current.id, message: `The ${side} half is already ${label(floor, current)}.` };
   }
+  let note: string | undefined;
   if (choice.type === 'use') {
     if (choice.use === 'void') {
       const problem = voidProblem(below, [key], state.choices);
       if (problem) return { kind: 'refused', message: problem };
     }
+    const rules = firstFloorCheck(choice.use, [key], below, floor);
+    if (rules.refused) return { kind: 'refused', message: rules.refused };
+    note = rules.note;
   }
   // Taking the half away from its owner must leave that room in one piece.
   let base = floor;
@@ -408,7 +435,7 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
   if (touching.length && !choice.separate) {
     const target = touching.find(r => r.id === state.activeRoomId) || touching[0];
     const next = withRegions(base, target.id, [...target.regions, key]);
-    return { kind: 'commit', floor: next, roomId: target.id, message: `${sideTitle} half: ${labelsOf(next)[target.id]}.` };
+    return noted({ kind: 'commit', floor: next, roomId: target.id, message: `${sideTitle} half: ${labelsOf(next)[target.id]}.` }, note);
   }
   if (same.length && !choice.separate && !REPEATABLE.has(use)) {
     return { kind: 'refused', message: `${library(use)} is already on this floor; a house has one. Choose another room.` };
@@ -432,8 +459,8 @@ export function assignHalf(state: CompassStateV2, key: RegionKey, choice: Assign
       message: `${library(use)} is elsewhere on this floor. Make a separate ${library(use)} ${same.length + 1}, or choose another room.${narrow}` };
   }
   const created = withNewRoom(base, floorId, use, [key]);
-  return { kind: 'commit', floor: created.floor, roomId: created.id, short,
-    message: `${sideTitle} half: ${labelsOf(created.floor)[created.id]}.${narrow}` };
+  return noted({ kind: 'commit', floor: created.floor, roomId: created.id, short,
+    message: `${sideTitle} half: ${labelsOf(created.floor)[created.id]}.${narrow}` }, note);
 }
 
 /** "Give both halves to B" (the answer to a cut-in-two refusal): both halves, then the cell made whole. */
@@ -442,6 +469,8 @@ export function giveBothHalves(state: CompassStateV2, cell: CellKey, use: string
     const problem = voidProblem(below, [cell], state.choices);
     if (problem) return { kind: 'refused', message: problem };
   }
+  const rules = firstFloorCheck(use, [cell], below, state.floors[state.currentFloor]);
+  if (rules.refused) return { kind: 'refused', message: rules.refused };
   const floor = state.floors[state.currentFloor];
   const owners = cellRegions(floor, cell).map(k => ownerOf(floor, k)).filter(Boolean) as RoomIntent[];
   let base = floor;
@@ -453,13 +482,15 @@ export function giveBothHalves(state: CompassStateV2, cell: CellKey, use: string
   const unsplit = wholeCell(base, cell, null);
   const outcome = joinOrCreate(unsplit, state.currentFloor, use, cell, state.activeRoomId);
   if (outcome.kind !== 'commit') return { kind: 'refused', message: outcome.kind === 'refused' ? outcome.message : 'Not possible here.' };
-  return { kind: 'commit', floor: outcome.floor, roomId: outcome.roomId, message: `Whole cell: ${labelsOf(outcome.floor)[outcome.roomId || ''] || library(use)}.` };
+  return noted({ kind: 'commit', floor: outcome.floor, roomId: outcome.roomId,
+    message: `Whole cell: ${labelsOf(outcome.floor)[outcome.roomId || ''] || library(use)}.` }, rules.note);
 }
 
 export interface WholeOption { owner: string | null; label: string; removes: string[]; allowed: boolean; reason?: string }
 
-/** The answers WHOLE CELL offers for a divided cell (§5.3 "Restore whole cell"). */
-export function wholeOptions(floor: FloorIntent, cell: CellKey): WholeOption[] {
+/** The answers WHOLE CELL offers for a divided cell (§5.3 "Restore whole cell"); on the first floor, `below` is the
+ *  ground floor, and a room the first-floor rules refuse over the whole cell cannot keep it. */
+export function wholeOptions(floor: FloorIntent, cell: CellKey, below?: FloorIntent): WholeOption[] {
   const [a, b] = cellRegions(floor, cell);
   const left = ownerOf(floor, a) || null;
   const right = b ? ownerOf(floor, b) || null : null;
@@ -474,6 +505,8 @@ export function wholeOptions(floor: FloorIntent, cell: CellKey): WholeOption[] {
       if (!rest.length) removes.push(names[other.id]);
       else if (!connected(rest)) { allowed = false; reason = `${names[other.id]} would be cut in two`; }
     }
+    const refused = owner ? firstFloorCheck(owner.use, [cell], below, floor).refused : undefined;
+    if (refused && allowed) { allowed = false; reason = refused.replace(/\.$/, ''); }
     const text = owner ? `Whole cell: ${names[owner.id]}` : 'Whole cell: empty';
     return { owner: owner?.id || null, label: removes.length ? `${text} (removes ${removes.join(', ')})` : text, removes, allowed, reason };
   };

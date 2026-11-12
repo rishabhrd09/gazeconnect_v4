@@ -322,8 +322,184 @@ export function checkPlan(plan: CompassPlanV2): PlanIssue[] {
         if (!ok) notes.push(issue('void-below', 'conflict', 'A double-height space needs the living hall (or dining or stair hall) below it.', [room.id], [key]));
       }
     }
+    // What stands below each first-floor room (12 Nov 2026): one note per room and rule, naming every region it
+    // concerns. Only for a two-storey plan: a one-storey plan keeps its first floor without drawing it.
+    if (plan.storeys === 2) {
+      for (const room of first.rooms) {
+        const byCode = new Map<string, { finding: FirstFloorFinding; regions: string[] }>();
+        for (const key of room.regions) {
+          for (const finding of firstFloorFindings(room.use, key, plan.floors.ground, first)) {
+            if (PLACEMENT_ONLY.has(finding.code)) continue;
+            const entry = byCode.get(finding.code);
+            if (entry) entry.regions.push(key);
+            else byCode.set(finding.code, { finding, regions: [key] });
+          }
+        }
+        for (const { finding, regions } of byCode.values()) {
+          notes.push(issue(finding.code, finding.severity, finding.message, [room.id], regions));
+        }
+      }
+    }
   }
   return notes;
+}
+
+// ---- The first floor over the ground floor (12 Nov 2026, maintainer request) ----------------------------
+// docs/compass-refine/FIRST_FLOOR_RULES.md. A first-floor room is judged by what stands directly below each of its
+// regions, as a G+1 house is built: loads go straight down, wet rooms stack, the stair rises in one place. A conflict
+// refuses the placement on the map and keeps Generate's "Both floors" closed; a warning places the room with a note.
+// Open to below keeps its own rule (void-below above). Identical to compass_schema.first_floor_findings.
+
+/** Open to the sky: no room or terrace above it; a balcony over it stands on columns in the garden. */
+const GARDEN_BELOW = new Set(['lawn', 'backyard']);
+/** Covered or paved open areas: a room above stands on columns; a balcony or terrace above is their roof. */
+const COLUMNS_BELOW = new Set(['porch', 'verandah', 'terrace', 'balcony']);
+/** Dry rooms a 1F bathroom may stand over with a sunken, waterproofed floor (over the Home ICU it is refused). */
+const DRY_BELOW = new Set(['kitchen', 'masterBed', 'bedroom', 'living', 'drawing', 'dining']);
+/** Notes said when placing but not repeated in the plan's notes: the service's support note says the same. */
+const PLACEMENT_ONLY = new Set(['ff-on-columns']);
+
+export interface FirstFloorFinding {
+  code: string;
+  severity: 'conflict' | 'warning';
+  /** Said and shown when placing, and in the plan's notes. */
+  message: string;
+  /** A few words for a picker card or Generate's "Both floors". */
+  short: string;
+}
+
+const useLabel = (use: string): string => PLAN_LIBRARY[use]?.label || use;
+
+/** A first-floor region open to the sky: no room on it (the roof below, or the garden), a terrace or a balcony. */
+function openUpstairs(first: FloorIntent, key: string): boolean {
+  const owner = first.rooms.find(r => r.regions.includes(key as RegionKey));
+  return !owner || owner.use === 'ff_terrace' || owner.use === 'ff_balcony';
+}
+
+const ROW_WORDS: Record<number, string> = { 4: 'Back', 3: 'Mid', 2: 'Inner', 1: 'Front' };
+const COL_WORDS: Record<number, string> = { 1: ' Left', 2: '', 3: '', 4: ' Right' };
+
+/** A cell as the map labels it, with its row and column: "the Mid Right cell (row 3, column 4)". */
+export function cellWords(cell: string): string {
+  const { row, col } = parseRegion(cell);
+  return `the ${ROW_WORDS[row]}${COL_WORDS[col]} cell (row ${row}, column ${col})`;
+}
+
+/** True when a region lies on the plot's boundary (the map's outer edge). */
+export function atPlotEdge(key: string): boolean {
+  const [x1, y1, x2, y2] = regionRectIn(key, 8, 8);
+  return x1 === 0 || y1 === 0 || x2 === 8 || y2 === 8;
+}
+
+/**
+ * What the ground floor below `key` says about a first-floor room of `use` there: conflicts first, then warnings.
+ * `first` (the first floor as it is) lets a balcony count an open roof or terrace beside it as its open side.
+ */
+export function firstFloorFindings(use: string, key: string, ground: FloorIntent, first?: FloorIntent): FirstFloorFinding[] {
+  if (use === 'void') return [];
+  const out: FirstFloorFinding[] = [];
+  const add = (code: string, severity: FirstFloorFinding['severity'], message: string, short: string) =>
+    out.push({ code, severity, message, short });
+  const owners = regionsBelow(key, ground).map(k => ground.rooms.find(r => r.regions.includes(k as RegionKey)));
+  if (!owners.length || owners.some(o => !o)) {
+    add('ff-nothing-below', 'conflict', 'Plan the ground floor under this cell first: the first floor stands on it.', 'Nothing planned below');
+    return out;
+  }
+  const below = owners as RoomIntent[];
+  const stair = below.find(o => STAIR_HOSTS.ground.has(o.use));
+  if (use === 'ff_stairLanding') {
+    // Where the stair arrives: part of the cell (or half) over the staircase is enough (a cell may be half stair).
+    if (!stair) {
+      const host = ground.rooms.find(r => STAIR_HOSTS.ground.has(r.use));
+      const where = host ? [...new Set(host.regions.map(cellOf))].sort().map(cellWords).join(' or ') : '';
+      if (host) add('ff-landing-off-stair', 'conflict', `The 1F Stair Landing goes where the stair arrives: on ${where}, above the ${useLabel(host.use)}.`, 'Not over the staircase');
+      else add('ff-landing-off-stair', 'conflict', 'Place the staircase on the ground floor first: the 1F Stair Landing goes over it.', 'No staircase below');
+    }
+  } else {
+    if (stair) add('ff-over-stair', 'conflict', `The stair rises here: only the 1F Stair Landing or Open to below can go over the ${useLabel(stair.use)}.`, 'The stair rises here');
+    const garden = below.find(o => GARDEN_BELOW.has(o.use));
+    if (garden && use === 'ff_balcony') {
+      add('ff-balcony-garden', 'warning', `A balcony over the ${useLabel(garden.use)} needs columns in the garden; an engineer must design them.`, 'Needs columns in the garden');
+    } else if (garden) {
+      add('ff-over-garden', 'conflict', `The ${useLabel(garden.use)} below is open to the sky: a first-floor room there would need columns in the garden. Choose a cell over the house, porch or verandah.`, `Over the ${PLAN_LIBRARY[garden.use].short}`);
+    }
+    if (use === 'ff_bathroom') {
+      if (below.some(o => o.use === 'icu')) add('ff-bath-over-icu', 'conflict', 'A bathroom never goes over the Home ICU: a leak must not reach the patient\'s room. Choose another cell.', 'Over the Home ICU');
+      const dry = below.find(o => DRY_BELOW.has(o.use));
+      if (dry) add('ff-bath-over-dry', 'warning', `A bathroom over the ${useLabel(dry.use)} needs a sunken, waterproofed floor; over a ground bathroom is best.`, 'Needs a waterproofed floor');
+    }
+    if (use === 'ff_balcony' && !atPlotEdge(key) && !below.some(o => GARDEN_BELOW.has(o.use) || COLUMNS_BELOW.has(o.use))
+      && !(first && floorRegions(first).some(k => k !== key && regionsTouch(key, k) && openUpstairs(first, k)))) {
+      add('ff-balcony-enclosed', 'warning', 'This balcony has no open side: rooms close it in. A cell at the edge of the house, or beside an open roof or terrace, gives it light and air.', 'No open side');
+    }
+    const columns = below.find(o => COLUMNS_BELOW.has(o.use));
+    if (columns && use !== 'ff_balcony' && use !== 'ff_terrace') {
+      add('ff-on-columns', 'warning', `${useLabel(use)} over the ${useLabel(columns.use)} stands on columns; an engineer must confirm them.`, 'Stands on columns');
+    }
+  }
+  return [...out.filter(f => f.severity === 'conflict'), ...out.filter(f => f.severity === 'warning')];
+}
+
+/** The few words a plan note gives Generate's "Both floors" (its room comes first: "1F Bath: over the Home ICU"). */
+const BLOCKER_WORDS: Record<string, string> = {
+  'ff-nothing-below': 'nothing planned below', 'ff-landing-off-stair': 'not over the staircase',
+  'ff-over-stair': 'over the stair', 'ff-over-garden': 'over the garden', 'ff-bath-over-icu': 'over the Home ICU',
+  'void-below': 'not over the living hall', 'room-disconnected': 'in two parts',
+  'stair-hosts': 'one stair landing only',
+};
+
+export interface FloorBlocker { code: string; text: string; message: string }
+
+/**
+ * Why Generate cannot offer "Both floors" yet (12 Nov 2026), the most basic first; empty when the first floor is
+ * ready: rooms upstairs, a staircase below and the 1F Stair Landing over it, every first-floor room joined to the
+ * landing through touching rooms (Open to below joins nothing), and no conflict upstairs.
+ */
+export function firstFloorBlockers(plan: CompassPlanV2): FloorBlocker[] {
+  const first = plan.floors.first, ground = plan.floors.ground;
+  if (!first || !first.rooms.length) return [{ code: 'ff-empty', text: 'No first-floor rooms yet', message: 'Place rooms on the first floor first.' }];
+  const out: FloorBlocker[] = [];
+  if (!ground.rooms.some(r => STAIR_HOSTS.ground.has(r.use))) {
+    out.push({ code: 'ff-no-stair', text: 'Needs a staircase on the ground floor',
+      message: 'A two-storey house needs the Living Lobby + Staircase (or Dining Hall + Staircase) on the ground floor.' });
+  }
+  const landing = first.rooms.find(r => r.use === 'ff_stairLanding');
+  if (!landing) out.push({ code: 'ff-no-landing', text: 'Needs the 1F Stair Landing', message: 'Place the 1F Stair Landing over the staircase.' });
+  const names = planLabels(first);
+  // "1F Bath", or "1F Bath 2" when the floor has two (the number planLabels gives a repeated room).
+  const short = (id: string): string => {
+    const room = first.rooms.find(r => r.id === id);
+    if (!room) return id;
+    const lib = PLAN_LIBRARY[room.use];
+    const number = /\s(\d+)$/.exec(names[id] || '')?.[1];
+    return number && lib && !/\s\d+$/.test(lib.label) ? `${lib.short} ${number}` : lib?.short || room.use;
+  };
+  for (const note of checkPlan({ ...plan, storeys: 2 })) {
+    if (note.severity !== 'conflict' && note.severity !== 'infeasible') continue;
+    const id = note.rooms.find(r => r.startsWith('f-'));
+    if (!id) continue;
+    out.push({ code: note.code, text: `${short(id)}: ${BLOCKER_WORDS[note.code] || 'needs a change'}`, message: note.message });
+  }
+  if (landing) {
+    const rooms = first.rooms.filter(r => r.use !== 'void');
+    const reached = new Set([landing.id]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const room of rooms) {
+        if (reached.has(room.id)) continue;
+        if (rooms.some(o => reached.has(o.id) && o.regions.some(a => room.regions.some(b => regionsTouch(a, b))))) {
+          reached.add(room.id); grew = true;
+        }
+      }
+    }
+    for (const room of rooms) {
+      if (!reached.has(room.id)) {
+        out.push({ code: 'ff-cut-off', text: `${short(room.id)}: not joined to the landing`,
+          message: `${names[room.id]} cannot be reached from the 1F Stair Landing: no room joins it to the others. Join it with a Passage or another room.` });
+      }
+    }
+  }
+  return out;
 }
 
 // ---- Migration from version 1 -------------------------------------------------------------

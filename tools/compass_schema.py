@@ -359,7 +359,130 @@ def check(plan: dict) -> List[dict]:
                     notes.append(_issue('void-below', 'conflict',
                                         'A double-height space needs the living hall (or dining or stair hall) below it.',
                                         [room['id']], [key]))
+        # What stands below each first-floor room (12 Nov 2026): one note per room and rule, naming every region it
+        # concerns. Only for a two-storey plan: a one-storey plan keeps its first floor without drawing it.
+        if plan['storeys'] == 2:
+            for room in floors['first']['rooms']:
+                by_code = {}
+                for key in room['regions']:
+                    for finding in first_floor_findings(room['use'], key, floors['ground'], floors['first']):
+                        if finding['code'] in PLACEMENT_ONLY:
+                            continue
+                        if finding['code'] in by_code:
+                            by_code[finding['code']][1].append(key)
+                        else:
+                            by_code[finding['code']] = (finding, [key])
+                for finding, regions in by_code.values():
+                    notes.append(_issue(finding['code'], finding['severity'], finding['message'], [room['id']], regions))
     return notes
+
+
+# ---- The first floor over the ground floor (12 Nov 2026, maintainer request) -------------------------------
+# docs/compass-refine/FIRST_FLOOR_RULES.md. A first-floor room is judged by what stands directly below each of its
+# regions, as a G+1 house is built: loads go straight down, wet rooms stack, the stair rises in one place. A conflict
+# refuses the placement on the map and keeps Generate's "Both floors" closed; a warning places the room with a note.
+# Open to below keeps its own rule (void-below above). Identical to firstFloorFindings in src/utils/compassPlan.ts.
+
+# Open to the sky: no room or terrace above it; a balcony over it stands on columns in the garden.
+GARDEN_BELOW = frozenset({'lawn', 'backyard'})
+# Covered or paved open areas: a room above stands on columns; a balcony or terrace above is their roof.
+COLUMNS_BELOW = frozenset({'porch', 'verandah', 'terrace', 'balcony'})
+# Dry rooms a 1F bathroom may stand over with a sunken, waterproofed floor (over the Home ICU it is refused).
+DRY_BELOW = frozenset({'kitchen', 'masterBed', 'bedroom', 'living', 'drawing', 'dining'})
+# Notes said when placing but not repeated in the plan's notes: the geometry's support note says the same.
+PLACEMENT_ONLY = frozenset({'ff-on-columns'})
+
+
+ROW_WORDS = {4: 'Back', 3: 'Mid', 2: 'Inner', 1: 'Front'}
+COL_WORDS = {1: ' Left', 2: '', 3: '', 4: ' Right'}
+
+
+def cell_words(cell: str) -> str:
+    """A cell as the map labels it, with its row and column: "the Mid Right cell (row 3, column 4)"."""
+    row, col, _ = parse_region(cell)
+    return f'the {ROW_WORDS[row]}{COL_WORDS[col]} cell (row {row}, column {col})'
+
+
+def _open_upstairs(first: dict, key: str) -> bool:
+    """A first-floor region open to the sky: no room on it (the roof below, or the garden), a terrace or a balcony."""
+    owner = next((r for r in first['rooms'] if key in r['regions']), None)
+    return owner is None or owner['use'] in ('ff_terrace', 'ff_balcony')
+
+
+def at_plot_edge(key: str) -> bool:
+    """True when a region lies on the plot's boundary (the map's outer edge)."""
+    x1, y1, x2, y2 = region_rect_in(key, 8, 8)
+    return x1 == 0 or y1 == 0 or x2 == 8 or y2 == 8
+
+
+def first_floor_findings(use: str, key: str, ground: dict, first: Optional[dict] = None) -> List[dict]:
+    """What the ground floor below `key` says about a first-floor room of `use` there: conflicts first, then warnings.
+    `first` (the first floor as it is) lets a balcony count an open roof or terrace beside it as its open side."""
+    if use == 'void':
+        return []
+    out = []
+
+    def add(code, severity, message, short):
+        out.append({'code': code, 'severity': severity, 'message': message, 'short': short})
+
+    def label(u):
+        return LIBRARY[u][0] if u in LIBRARY else u
+
+    owners = [next((r for r in ground['rooms'] if k in r['regions']), None) for k in regions_below(key, ground)]
+    if not owners or any(o is None for o in owners):
+        add('ff-nothing-below', 'conflict', 'Plan the ground floor under this cell first: the first floor stands on it.',
+            'Nothing planned below')
+        return out
+    stair = next((o for o in owners if o['use'] in STAIR_HOSTS['ground']), None)
+    if use == 'ff_stairLanding':
+        # Where the stair arrives: part of the cell (or half) over the staircase is enough (a cell may be half stair).
+        if not stair:
+            host = next((r for r in ground['rooms'] if r['use'] in STAIR_HOSTS['ground']), None)
+            if host:
+                where = ' or '.join(cell_words(c) for c in sorted({cell_of(k) for k in host['regions']}))
+                add('ff-landing-off-stair', 'conflict',
+                    f'The 1F Stair Landing goes where the stair arrives: on {where}, above the {label(host["use"])}.',
+                    'Not over the staircase')
+            else:
+                add('ff-landing-off-stair', 'conflict',
+                    'Place the staircase on the ground floor first: the 1F Stair Landing goes over it.', 'No staircase below')
+    else:
+        if stair:
+            add('ff-over-stair', 'conflict',
+                f'The stair rises here: only the 1F Stair Landing or Open to below can go over the {label(stair["use"])}.',
+                'The stair rises here')
+        garden = next((o for o in owners if o['use'] in GARDEN_BELOW), None)
+        if garden and use == 'ff_balcony':
+            add('ff-balcony-garden', 'warning',
+                f'A balcony over the {label(garden["use"])} needs columns in the garden; an engineer must design them.',
+                'Needs columns in the garden')
+        elif garden:
+            add('ff-over-garden', 'conflict',
+                f'The {label(garden["use"])} below is open to the sky: a first-floor room there would need columns in the '
+                'garden. Choose a cell over the house, porch or verandah.', f'Over the {LIBRARY[garden["use"]][1]}')
+        if use == 'ff_bathroom':
+            if any(o['use'] == 'icu' for o in owners):
+                add('ff-bath-over-icu', 'conflict',
+                    "A bathroom never goes over the Home ICU: a leak must not reach the patient's room. Choose another cell.",
+                    'Over the Home ICU')
+            dry = next((o for o in owners if o['use'] in DRY_BELOW), None)
+            if dry:
+                add('ff-bath-over-dry', 'warning',
+                    f'A bathroom over the {label(dry["use"])} needs a sunken, waterproofed floor; over a ground bathroom is best.',
+                    'Needs a waterproofed floor')
+        if use == 'ff_balcony' and not at_plot_edge(key) and not any(
+                o['use'] in GARDEN_BELOW or o['use'] in COLUMNS_BELOW for o in owners) and not (
+                first is not None and any(k != key and regions_touch(key, k) and _open_upstairs(first, k)
+                                          for k in floor_regions(first))):
+            add('ff-balcony-enclosed', 'warning',
+                'This balcony has no open side: rooms close it in. A cell at the edge of the house, or beside an open '
+                'roof or terrace, gives it light and air.', 'No open side')
+        columns = next((o for o in owners if o['use'] in COLUMNS_BELOW), None)
+        if columns and use not in ('ff_balcony', 'ff_terrace'):
+            add('ff-on-columns', 'warning',
+                f'{label(use)} over the {label(columns["use"])} stands on columns; an engineer must confirm them.',
+                'Stands on columns')
+    return [f for f in out if f['severity'] == 'conflict'] + [f for f in out if f['severity'] == 'warning']
 
 
 def intent_hash(plan: dict) -> str:

@@ -147,16 +147,24 @@ let browser;
   await page.locator('.compass-cell-grid').waitFor();
   assert.equal((await floor()).rooms.find(r => r.use === 'kitchen').regions[0], 'r2_c3.B');
   assert.equal((await floor()).rooms.find(r => r.use === 'bedroom').regions[0], 'r2_c3.T');
-  // Upstairs top/bottom halves over a downstairs left/right split must name both overlapping areas.
+  // Upstairs top/bottom halves over a downstairs left/right split must name both overlapping areas. A house the
+  // first-floor rules accept (12 Nov 2026, FIRST_FLOOR_RULES.md): both ground halves planned (a Bathroom beside the
+  // Passage), and a staircase beside them with the 1F Stair Landing over it, so Both floors opens.
   const two = structuredClone(kept);
   two.ui.numFloors = 'Multi-Floor'; two.ui.foundation.numFloors = 'Multi-Floor'; two.plan.storeys = 2;
-  two.floors.first = {splits: [], rooms: [{id: 'f-ff_living-1', use: 'ff_living', regions: ['r4_c4']}]};
+  two.floors.ground = {...two.floors.ground, rooms: [...two.floors.ground.rooms,
+    {id: 'g-bathroom-2', use: 'bathroom', regions: ['r4_c4.R']}, {id: 'g-staircase-1', use: 'staircase', regions: ['r4_c3']}]
+    .sort((a, b) => (a.id < b.id ? -1 : 1))};
+  two.plan.floors.ground = two.floors.ground;
+  two.floors.first = {splits: [], rooms: [{id: 'f-ff_living-1', use: 'ff_living', regions: ['r4_c4']},
+    {id: 'f-ff_stairLanding-1', use: 'ff_stairLanding', regions: ['r4_c3']}]};
   two.plan.floors.first = two.floors.first;
+  assert.deepEqual(P.firstFloorBlockers(P.normalisePlan(two.plan)), [], 'the two-floor house is one the first-floor rules accept');
   await open(JSON.stringify(two));
   await page.click('#strip-floor'); await page.click('#strip-refine'); await page.click('#cell-r4_c4');
   await page.click('#refine-direction-top-bottom');
-  assert.match(await page.locator('#refine-top').innerText(), /Below: Passage \/ empty/);
-  assert.match(await page.locator('#refine-bottom').innerText(), /Below: Passage \/ empty/);
+  assert.match(await page.locator('#refine-top').innerText(), /Below: Passage \/ Bathroom/);
+  assert.match(await page.locator('#refine-bottom').innerText(), /Below: Passage \/ Bathroom/);
   await page.click('#refine-bottom'); await chooseRoom('ff_bathroom');
   await page.locator('#refine-top').waitFor();
   assert.match(await page.locator('#refine-top').innerText(), /1F Living/);

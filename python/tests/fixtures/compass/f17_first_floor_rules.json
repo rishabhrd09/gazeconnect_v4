@@ -1,0 +1,1916 @@
+{
+ "id": "F17",
+ "title": "First floor over the ground floor (12 Nov 2026, docs/compass-refine/FIRST_FLOOR_RULES.md)",
+ "cases": [
+  {
+   "name": "ready",
+   "note": "A first floor that passes: the landing over the stair, a bathroom over the bathroom, a room over the porch (on columns: said when placing only), a terrace over the kitchen, Open to below over the living hall.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "f-ff_terrace-1",
+        "use": "ff_terrace",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "f-void-1",
+        "use": "void",
+        "regions": [
+         "r2_c3"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": []
+   }
+  },
+  {
+   "name": "over-garden",
+   "note": "A bedroom over the backyard: open to the sky below.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bed2-1",
+        "use": "ff_bed2",
+        "regions": [
+         "r4_c1"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-over-garden:f-ff_bed2-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "over-stair",
+   "note": "A bedroom where the stair rises.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bed2-1",
+        "use": "ff_bed2",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-over-stair:f-ff_bed2-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "landing-off-stair",
+   "note": "The landing over the living hall, not over the stair.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c2"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-landing-off-stair:f-ff_stairLanding-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "landing-without-staircase",
+   "note": "A landing with no staircase on the ground floor.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-masterBed-1",
+        "use": "masterBed",
+        "regions": [
+         "r2_c1"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-landing-off-stair:f-ff_stairLanding-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "bath-over-icu",
+   "note": "A bathroom over the Home ICU.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-bath-over-icu:f-ff_bathroom-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "bath-over-kitchen",
+   "note": "A bathroom over the kitchen: a warning (waterproofing), not a conflict.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": [
+     "ff-bath-over-dry:f-ff_bathroom-1"
+    ]
+   }
+  },
+  {
+   "name": "landing-partly-over-stair",
+   "note": "The landing over a cell that is half stair, half porch: part over the stair is enough.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [
+       "r2_c1"
+      ],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1",
+         "r2_c1.L"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1.R"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": []
+   }
+  },
+  {
+   "name": "balcony-beside-open-roof",
+   "note": "A balcony inside the plot beside an empty first-floor cell (an open roof): open, no note.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_balcony-1",
+        "use": "ff_balcony",
+        "regions": [
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": []
+   }
+  },
+  {
+   "name": "balcony-closed-in",
+   "note": "A balcony with rooms on all four sides: a note (no open side), never a refusal.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-masterBed-1",
+        "use": "masterBed",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_balcony-1",
+        "use": "ff_balcony",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "f-ff_bed2-1",
+        "use": "ff_bed2",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "f-ff_bed3-1",
+        "use": "ff_bed3",
+        "regions": [
+         "r4_c2"
+        ]
+       },
+       {
+        "id": "f-ff_living-1",
+        "use": "ff_living",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "f-ff_master-1",
+        "use": "ff_master",
+        "regions": [
+         "r2_c2"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": [
+     "ff-balcony-enclosed:f-ff_balcony-1"
+    ]
+   }
+  },
+  {
+   "name": "balcony-over-lawn",
+   "note": "A balcony at the road edge over the lawn: a warning (columns in the garden).",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_balcony-1",
+        "use": "ff_balcony",
+        "regions": [
+         "r1_c3"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": [
+     "ff-balcony-garden:f-ff_balcony-1"
+    ]
+   }
+  },
+  {
+   "name": "nothing-below",
+   "note": "A bedroom over a ground cell nothing is planned in.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bed3-1",
+        "use": "ff_bed3",
+        "regions": [
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-nothing-below:f-ff_bed3-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "bath-over-icu-half",
+   "note": "A whole-cell bathroom over a ground cell divided into the ICU and a bathroom.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [
+       "r3_c4"
+      ],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bathroom-2",
+        "use": "bathroom",
+        "regions": [
+         "r3_c4.R"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4.L"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bathroom-1",
+        "use": "ff_bathroom",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-bath-over-icu:f-ff_bathroom-1"
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "name": "first-floor-halves",
+   "note": "A divided first-floor cell over the backyard: the balcony half is a warning, the bedroom half a conflict.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 2,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [
+       "r4_c2"
+      ],
+      "rooms": [
+       {
+        "id": "f-ff_balcony-1",
+        "use": "ff_balcony",
+        "regions": [
+         "r4_c2.L"
+        ]
+       },
+       {
+        "id": "f-ff_bed2-1",
+        "use": "ff_bed2",
+        "regions": [
+         "r4_c2.R"
+        ]
+       },
+       {
+        "id": "f-ff_stairLanding-1",
+        "use": "ff_stairLanding",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [
+     "ff-over-garden:f-ff_bed2-1"
+    ],
+    "warnings": [
+     "ff-balcony-garden:f-ff_balcony-1"
+    ]
+   }
+  },
+  {
+   "name": "one-storey",
+   "note": "A one-storey plan keeps its first floor undrawn: no first-floor rules.",
+   "plan": {
+    "schema": "gazeconnect.compass-plan",
+    "version": 2,
+    "plot": {
+     "widthIn": 480,
+     "depthIn": 720,
+     "facing": "North",
+     "gate": "Left",
+     "plotType": "Middle Plot"
+    },
+    "storeys": 1,
+    "choices": {},
+    "floors": {
+     "ground": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "g-backyard-1",
+        "use": "backyard",
+        "regions": [
+         "r4_c1",
+         "r4_c2",
+         "r4_c3",
+         "r4_c4"
+        ]
+       },
+       {
+        "id": "g-bathroom-1",
+        "use": "bathroom",
+        "regions": [
+         "r3_c2"
+        ]
+       },
+       {
+        "id": "g-bedroom-1",
+        "use": "bedroom",
+        "regions": [
+         "r3_c1"
+        ]
+       },
+       {
+        "id": "g-drawing-1",
+        "use": "drawing",
+        "regions": [
+         "r2_c4"
+        ]
+       },
+       {
+        "id": "g-icu-1",
+        "use": "icu",
+        "regions": [
+         "r3_c4"
+        ]
+       },
+       {
+        "id": "g-kitchen-1",
+        "use": "kitchen",
+        "regions": [
+         "r3_c3"
+        ]
+       },
+       {
+        "id": "g-lawn-1",
+        "use": "lawn",
+        "regions": [
+         "r1_c2",
+         "r1_c3",
+         "r1_c4"
+        ]
+       },
+       {
+        "id": "g-living-1",
+        "use": "living",
+        "regions": [
+         "r2_c2",
+         "r2_c3"
+        ]
+       },
+       {
+        "id": "g-porch-1",
+        "use": "porch",
+        "regions": [
+         "r1_c1"
+        ]
+       },
+       {
+        "id": "g-staircase-1",
+        "use": "staircase",
+        "regions": [
+         "r2_c1"
+        ]
+       }
+      ]
+     },
+     "first": {
+      "splits": [],
+      "rooms": [
+       {
+        "id": "f-ff_bed2-1",
+        "use": "ff_bed2",
+        "regions": [
+         "r4_c1"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "issues": [],
+    "warnings": []
+   }
+  }
+ ]
+}
