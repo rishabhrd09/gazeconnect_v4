@@ -91,7 +91,6 @@ def compass_v2_self_test(plan_override=None):
     checks = [
         ({"view": "plan", "format": "png"}, b"\x89PNG"),
         ({"view": "top", "format": "png"}, b"\x89PNG"),
-        ({"view": "outside", "format": "png", "preset": "front-left"}, b"\x89PNG"),
         ({"view": "sheet", "format": "pdf"}, b"%PDF-"),
         ({"view": "cad", "format": "dxf-in"}, b"  0\nSECTION"),
         ({"view": "cad", "format": "dxf-mm"}, b"  0\nSECTION"),

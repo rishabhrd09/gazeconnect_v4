@@ -559,12 +559,12 @@ export async function renderCompassPlan(compassData: CompassMapPayload, options:
 }
 
 // ─── Compass studio, version 2 (docs/compass-refine/IMPLEMENTATION_PLAN.md §6, §8.2) ──────────
-// One PlanModel per plan; three views (Plan, Top view, Outside) and honest exports drawn from it.
+// One PlanModel per plan; two views (Plan, and the top view shown as Model look: the furnished model of
+// tools/plan25d.py) and honest exports drawn from it. Outside and the earlier top view were removed on 12 Nov 2026.
 // Every request carries a job id: the service runs the newest request of each channel and answers
 // a replaced one with 409, which these helpers return as null (the studio simply ignores it).
 
-export type StudioView = 'plan' | 'top' | 'outside';
-export type OutsidePreset = 'front-left' | 'front-right' | 'back-left' | 'back-right';
+export type StudioView = 'plan' | 'top';
 export interface StudioRoom {
   id: string; use: string; label: string; zone: string; regions: string[];
   areaSqft: number; clearSqft: number | null; clear: [number, number] | null; doubleHeight: boolean;
@@ -589,12 +589,9 @@ export interface StudioRenderOptions {
   floor: 'ground' | 'first';
   format: 'png' | 'pdf' | 'dxf-in' | 'dxf-mm' | 'readme';
   theme: string;
-  preset?: OutsidePreset;
   width?: number;
   height?: number;
   export?: boolean;
-  /** A light machine (electron/floorplanService.ts resources): downloads are drawn without supersampling. */
-  light?: boolean;
   /** 'width' (the full screen's fill-width plan and top view): as tall as filling `width` needs; `height` is ignored. */
   fit?: 'contain' | 'width';
 }
@@ -675,19 +672,4 @@ export async function saveCompassFile(plan: unknown, options: StudioRenderOption
   document.body.appendChild(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
   return { ok: true };
-}
-
-/** Memory for the heavier views, as electron/floorplanService.ts decides it (decideResources). */
-export interface FloorplanResources {
-  totalMb: number; availableMb: number; commitFreeMb: number | null;
-  /** The Outside view at width x height: what it may take, and the free memory it needs (cost and reserve). */
-  costMb: number; needMb: number; width: number; height: number;
-  light: boolean; exterior: boolean;
-}
-
-/** Memory for the heavier views, read now; null outside Electron. `outside: true` is the check made when Outside is chosen. */
-export async function getFloorplanResources(request?: { width: number; height: number; outside?: boolean }): Promise<FloorplanResources | null> {
-  const query = (window as any).electronAPI?.floorplan?.resources;
-  if (!query) return null;
-  try { return await query(request); } catch { return null; }
 }

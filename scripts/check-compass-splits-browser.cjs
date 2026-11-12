@@ -1,4 +1,4 @@
-/** Isolated map -> saved draft/backend payload -> real 2D/Top/Outside -> real downloads. */
+/** Isolated map -> saved draft/backend payload -> real 2D plan and Model look -> real downloads. */
 const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const ts = require('typescript');
@@ -185,7 +185,7 @@ let browser;
   const drawing = async previous => page.waitForFunction(old => { const i = document.querySelector('.studio-drawing img'); return i?.complete && i.naturalWidth > 0 && i.src !== old; }, previous || '');
   await drawing();
   await page.screenshot({path: path.join(OUT, 'generated-2d.png')});
-  for (const id of ['compass-studio-view-top', 'compass-studio-view-outside', 'compass-studio-view-plan']) {
+  for (const id of ['compass-studio-view-model', 'compass-studio-view-plan']) {
     const old = await page.locator('.studio-drawing img').getAttribute('src'); await page.click('#' + id); await drawing(old);
   }
   await page.click('#compass-studio-downloads');
@@ -206,5 +206,5 @@ let browser;
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(OUT, 'result.json'), JSON.stringify({passed: true, layouts: 12, saves: saves.length, outputs}, null, 2));
   await browser.close();
-  console.log('PASS: both-floor top/bottom editing and generation, mixed split directions, armed replacement/cancel, preview/cancel, Undo, preserved left/right, local/backend restore, 12 gaze/layout combinations, Whole Cell direction change, real 2D/Top/Outside and five exports. ' + OUT);
+  console.log('PASS: both-floor top/bottom editing and generation, mixed split directions, armed replacement/cancel, preview/cancel, Undo, preserved left/right, local/backend restore, 12 gaze/layout combinations, Whole Cell direction change, real 2D plan and Model look and five exports. ' + OUT);
 })().catch(async error => { console.error(error); if (browser) await browser.close(); process.exitCode = 1; });

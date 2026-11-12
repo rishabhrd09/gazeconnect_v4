@@ -356,3 +356,13 @@ Not checked here:
   imported shapely (numpy) before `floorplan_server` and so committed the 225 MB anyway (274.8 MB private in
   `check-windows.bat`), until `scripts/windows/floorplan_entry.py` set the limit first as well (then 50.1 MB).
 - **A cold start after a reboot** (antivirus scanning the bundle): measured warm here only.
+
+## 12 Nov 2026: Model look replaces Top view and Outside (maintainer request)
+
+- The studio keeps two views: Plan, and Model look, the furnished top view (`tools/plan25d.py`, the service's
+  `view: 'top'`). The earlier top view (`tools/compass_top.py`) and Outside (`tools/compass_perspective.py`, its
+  four angles) are removed, with Outside's memory check (C1-C3 above: `floorplan:resources`, `decideResources`,
+  the light sizes, `scripts/check-floorplan-resources.cjs`). The notes above on Outside, its angles and its memory
+  describe what was removed.
+- Plan, Model look and the floor switch share the views column equally; the full-screen row is Exit, Plan, Model
+  look, the floors and the gaze card. Fill width for the model look stops at 4000 px, as the plan's does.

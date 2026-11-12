@@ -26,7 +26,7 @@
 .compass-plan-studio .studio-drawing { position: relative; min-height: 0; overflow: hidden; border-radius: 22px; border: 1px solid var(--design-border); background: var(--design-panel); display: flex; align-items: center; justify-content: center; }
 .compass-plan-studio .studio-drawing img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .compass-plan-studio .studio-zoom-name { position: absolute; left: 20px; top: 16px; background: var(--design-panel); padding: 10px 18px; border-radius: 12px; font-size: 21px; }
-.compass-plan-studio .studio-tools { display: grid; grid-template-rows: repeat(4, minmax(104px, 1fr)); gap: clamp(12px, 1.6vh, 20px); min-height: 0; }
+.compass-plan-studio .studio-tools { display: grid; grid-template-rows: repeat(3, minmax(104px, 1fr)); gap: clamp(12px, 1.6vh, 20px); min-height: 0; }
 .compass-plan-studio .studio-footer { flex-shrink: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(18px, 2vw, 32px); height: clamp(104px, 12vh, 136px); }
 .compass-plan-studio .studio-footer p { align-self: center; text-align: center; font-size: clamp(18px, 1.65vw, 24px); color: var(--design-muted); margin: 0; }
 .compass-plan-studio .studio-footnote { flex-shrink: 0; text-align: center; font-size: clamp(15px, 1.3vw, 20px); color: var(--design-muted); line-height: 1.25; }
@@ -47,12 +47,12 @@
 .compass-plan-studio .studio-error-actions { display: flex; gap: 24px; width: 70%; }
 .compass-plan-studio .studio-image-status { padding: 28px; text-align: center; font-size: 26px; }
 /* Full screen (29 Oct 2026, maintainer request): the whole drawing as large as the screen allows, with Exit full
-   screen, the three views, the floors drawn (Next angle for Outside) and the gaze card in one row of 104 px targets
-   at the bottom. Not the corner zoom retired on 14 Oct: always the whole drawing. */
+   screen, the two views, the floors drawn and the gaze card in one row of 104 px targets at the bottom. Not the
+   corner zoom retired on 14 Oct: always the whole drawing. */
 .compass-plan-studio.studio-full { padding: clamp(12px, 1.6vh, 20px) clamp(12px, 1.2vw, 24px) 28px; }
 .compass-plan-studio .studio-full-main { flex: 1; min-height: 0; display: flex; position: relative; gap: clamp(12px, 1.4vw, 24px); }
 .compass-plan-studio .studio-full-main .studio-drawing { flex: 1; min-width: 0; }
-/* Plan and Top view: Up, Whole plan (or Larger plan) and Down beside the drawing. Filled, the image spans the
+/* Plan and Model look: Up, Whole plan (or Larger plan) and Down beside the drawing. Filled, the image spans the
    drawing's width (the plan about three quarters of the screen) and moves under it; whole, it is fitted as before. */
 .compass-plan-studio .studio-full-pan {
   flex: 0 0 clamp(130px, 10vw, 200px); display: grid; grid-template-rows: repeat(3, minmax(0, 1fr));
@@ -65,11 +65,6 @@
   gap: clamp(12px, 1.4vw, 24px); height: clamp(104px, 12vh, 136px);
 }
 .compass-plan-studio .studio-full-bar .studio-button { font-size: clamp(20px, 1.8vw, 30px) !important; }
-.compass-plan-studio .studio-full-status {
-  position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 80%; margin: 0;
-  padding: 12px 22px; border-radius: 14px; border: 1px solid var(--design-border); background: var(--design-panel);
-  font-size: clamp(18px, 1.6vw, 24px); line-height: 1.35; text-align: center;
-}
 .compass-plan-studio .studio-icon-label { display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
 .compass-plan-studio .studio-icon-label svg { width: 1em; height: 1em; flex-shrink: 0; }
 /* At laptop heights keep targets at 104 px by trimming decoration, never keys. */
@@ -85,6 +80,7 @@
 @media (max-height: 850px) {
   .compass-plan-studio .studio-main { grid-template-columns: minmax(0, 1fr) clamp(360px, 34vw, 470px); }
   .compass-plan-studio .studio-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(104px, 1fr)); gap: 16px; }
+  .compass-plan-studio .studio-tools > :last-child { grid-column: span 2; }   /* the floor switch under Plan and Model look */
 }
 .compass-plan-choice { position: fixed; inset: 0; z-index: 7000; background: var(--design-page); display: grid; place-items: center; padding: 32px; }
 .compass-plan-choice-panel { max-width: 1300px; width: 100%; text-align: center; color: var(--design-ink); font-family: var(--design-font); }

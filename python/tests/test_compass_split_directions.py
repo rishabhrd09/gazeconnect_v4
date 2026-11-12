@@ -68,7 +68,7 @@ class SplitDirectionTests(unittest.TestCase):
         model = client.post('/api/floorplan/compass/v2/model', json={'plan': self.plan, 'jobId': 'split-test'})
         self.assertEqual(model.status_code, 200, model.data)
         expected_hash = model.get_json()['modelHash']
-        formats = [('plan', 'png'), ('top', 'png'), ('outside', 'png'), ('sheet', 'png'), ('sheet', 'pdf'),
+        formats = [('plan', 'png'), ('top', 'png'), ('sheet', 'png'), ('sheet', 'pdf'),
                    ('cad', 'dxf-in'), ('cad', 'dxf-mm'), ('cad', 'readme')]
         for view, fmt in formats:
             with self.subTest(view=view, fmt=fmt):

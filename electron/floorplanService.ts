@@ -31,20 +31,6 @@ const READY_LIMIT_MS = 25000;
 const JOB_LIMIT_MS = 35000;
 const HEALTH_EVERY_MS = 5000;
 const HEALTH_LIMIT_MS = 5000;
-/**
- * Memory left for everything else while the Outside view draws (REFINE_FIX_HANDOFF C1). Calibrated on the 8 GB
- * Windows laptop on 16 Oct 2026: during a GazeConnect session Windows' available memory was under the old fixed
- * 600 MB floor in 97 % of samples (median 335 MB), while the view itself added 10-30 MB to the service. With this
- * reserve the view was allowed in 83 % of those samples; below it, memory is genuinely short and paging is near.
- */
-export const OUTSIDE_RESERVE_MB = 150;
-/** Commit (memory and page file together) that stays free after the drawing, so no allocation anywhere fails. */
-export const COMMIT_RESERVE_MB = 256;
-/** The studio's largest Outside preview, and the size light machines draw it at (without supersampling). */
-const FULL_OUTSIDE = { width: 2400, height: 1600 };
-const LIGHT_OUTSIDE = { width: 1600, height: 1000 };
-/** Total memory of a light machine (4 GB), which always draws at the light size. */
-const LIGHT_TOTAL_MB = 4608;
 const SAVE_EXTENSIONS: Record<string, RegExp> = {
   png: /^image\/png/, pdf: /^application\/pdf/, dxf: /^application\/dxf/, txt: /^text\/plain/,
 };
@@ -57,52 +43,6 @@ export interface FloorplanHealth {
   idleS?: number | null;
   /** Seconds the background warm-up took (tools/floorplan_server.py warm_studio); null until it has finished. */
   warmS?: number | null;
-}
-
-/** What the studio is told about memory for the heavier views (src/utils/floorplanApi.ts FloorplanResources). */
-export interface FloorplanResources {
-  totalMb: number;
-  availableMb: number;
-  /** Commit still free (memory and page file), when the system reports it. */
-  commitFreeMb: number | null;
-  /** The Outside view at `width` x `height`: what it may take, and the free memory it needs (cost and reserve). */
-  costMb: number;
-  needMb: number;
-  width: number;
-  height: number;
-  /** Draw at the light size, without supersampled downloads (4 GB machines, or short of memory for the full size). */
-  light: boolean;
-  exterior: boolean;
-}
-
-/** What drawing the Outside view at this size may take: 4 bytes a pixel, three working images, 30 MB of model and scene. */
-export function outsideCostMb(width: number, height: number): number {
-  return Math.ceil((4 * width * height * 3) / (1024 * 1024) + 30);
-}
-
-const sizeWithin = (value: unknown, low: number, high: number, fallback: number) =>
-  (typeof value === 'number' && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : fallback);
-
-/**
- * Whether the Outside view may be drawn now, from Electron's memory figures (kB, as `getSystemMemoryInfo` gives them;
- * on Windows `free` is the available memory Task Manager shows, `swapFree` the commit still free). It is decided for
- * the size the studio asks for, falling back to the light size before refusing (C1).
- */
-export function decideResources(info: { total: number; free: number; swapTotal?: number; swapFree?: number },
-  size?: { width?: unknown; height?: unknown }): FloorplanResources {
-  const totalMb = Math.round(info.total / 1024);
-  const availableMb = Math.round(info.free / 1024);
-  const commitFreeMb = info.swapTotal && typeof info.swapFree === 'number' ? Math.round(info.swapFree / 1024) : null;
-  const wanted = { width: sizeWithin(size?.width, 640, FULL_OUTSIDE.width, FULL_OUTSIDE.width),
-    height: sizeWithin(size?.height, 400, FULL_OUTSIDE.height, FULL_OUTSIDE.height) };
-  const fits = (s: { width: number; height: number }) => {
-    const cost = outsideCostMb(s.width, s.height);
-    return availableMb >= cost + OUTSIDE_RESERVE_MB && (commitFreeMb === null || commitFreeMb >= cost + COMMIT_RESERVE_MB);
-  };
-  const light = totalMb <= LIGHT_TOTAL_MB || !fits(wanted);
-  const drawn = light ? { width: Math.min(wanted.width, LIGHT_OUTSIDE.width), height: Math.min(wanted.height, LIGHT_OUTSIDE.height) } : wanted;
-  const costMb = outsideCostMb(drawn.width, drawn.height);
-  return { totalMb, availableMb, commitFreeMb, costMb, needMb: costMb + OUTSIDE_RESERVE_MB, ...drawn, light, exterior: fits(drawn) };
 }
 
 export interface SaveRequest { endpoint: string; body: string; fileName: string; }
@@ -354,20 +294,6 @@ export class FloorplanService {
       idleS: this.lastHealth.idleS ?? null,
       warmS: this.lastHealth.warmS ?? null,
     };
-  }
-
-  /**
-   * Memory for the heavier views, read now (the studio asks again each time the person chooses Outside, C2). A
-   * refused Outside is written to the health log with the figures it was decided on (C3).
-   */
-  resources(request?: { width?: unknown; height?: unknown; outside?: unknown }): FloorplanResources {
-    const info = process.getSystemMemoryInfo() as { total: number; free: number; swapTotal?: number; swapFree?: number };
-    const decision = decideResources(info, request);
-    if (request?.outside === true && !decision.exterior) {
-      const { totalMb, availableMb, commitFreeMb, costMb, needMb, width, height } = decision;
-      this.deps.event('floorplan-resources', { decision: 'refused', totalMb, availableMb, commitFreeMb, costMb, needMb, width, height });
-    }
-    return decision;
   }
 
   /** Writes one finished drawing to Documents\GazeConnect Plans\<date>\<fileName>. */

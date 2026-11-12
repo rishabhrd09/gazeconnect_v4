@@ -1944,13 +1944,6 @@ function setupIpcHandlers(): void {
     return floorplanService.save(input);
   });
 
-  // Read again each time the person chooses Outside, for the size the studio would draw (sizes only; nothing else is read).
-  ipcMain.handle('floorplan:resources', (event, request?: { width?: unknown; height?: unknown; outside?: unknown }) => {
-    if (!fromMainWindow(event, mainWindow)) throw new Error('Floor-plan requests are only available to the main app.');
-    const input = request && typeof request === 'object' ? request : {};
-    return floorplanService.resources({ width: input.width, height: input.height, outside: input.outside === true });
-  });
-
   // Stream app context
   ipcMain.handle('app:updateContext', (_event, context: { screen: string, isNavHidden: boolean }) => {
     // If navigating away, auto-unlock

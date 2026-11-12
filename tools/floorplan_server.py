@@ -296,7 +296,7 @@ def compass_v2_model():
 
 @app.route("/api/floorplan/compass/v2/render", methods=["POST"])
 def compass_v2_render():
-    """One view or export of the plan: plan / top / outside images, the A3 sheet, or the CAD files."""
+    """One view or export of the plan: the plan or top view (the furnished model) image, the A3 sheet, or the CAD files."""
     from compass_studio import render as studio_render, MIME, model_for, plan_of
     data, failure = _v2_body()
     if failure:
@@ -305,14 +305,14 @@ def compass_v2_render():
     def run():
         settings = {"view": data.get("view", "plan"), "floor": data.get("floor", "ground"),
                     "fmt": data.get("format", "png"), "theme": data.get("theme", "warm"),
-                    "preset": data.get("preset", "front-left"), "width": data.get("width", 1600),
-                    "height": data.get("height", 1000), "export": bool(data.get("export", False)),
-                    "light": bool(data.get("light", False)), "fit": data.get("fit", "contain")}
+                    "width": data.get("width", 1600), "height": data.get("height", 1000),
+                    "fit": data.get("fit", "contain")}
         job_id = str(data.get("jobId") or "")
         produce = lambda: studio_render(data["plan"], **settings)[0]
         if job_id:
+            # A download (export) has its own channel, so a preview never replaces it.
             output = compass_resources.render_latest(data["plan"], settings, produce, job_id=job_id,
-                                                     channel="export" if settings["export"] else "preview")
+                                                     channel="export" if data.get("export") else "preview")
         else:
             with compass_resources.job():
                 output = produce()

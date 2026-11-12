@@ -1,6 +1,7 @@
 """The studio's drawings and exports, all from one PlanModel (IMPLEMENTATION_PLAN.md §6, §9, §11).
 
-The plan, top view and outside are PNG images; the A3 sheets a PDF; the CAD export DXF R2010 in inches and
+The plan and the top view (the furnished model, tests/test_plan25d.py; the Outside view and the earlier top view
+were removed on 12 Nov 2026) are PNG images; the A3 sheets a PDF; the CAD export DXF R2010 in inches and
 in millimetres. Each is checked for what can be checked without a person looking at it: it is produced at
 the requested size, the same plan gives the same bytes, it is oriented as the map (the facing table of F2),
 the sheet chooses portrait for deep plots, and the DXF reads back with the documented units, layers, extents
@@ -21,11 +22,9 @@ import ezdxf
 
 import compass_dxf as dxf
 import compass_geometry as geometry
-import compass_perspective as perspective
 import compass_plan2d as plan2d
 import compass_schema as schema
 import compass_studio as studio
-import compass_top as top
 
 FIXTURES = Path(__file__).parent / 'fixtures' / 'compass'
 U = geometry.U
@@ -85,17 +84,16 @@ class ImageTests(unittest.TestCase):
     def test_the_same_plan_draws_the_same_bytes(self):
         self.assertEqual(plan2d.render_screen(self.half, 'first', 'dark', 1000, 700),
                          plan2d.render_screen(model_of(HALF), 'first', 'dark', 1000, 700))
-        self.assertEqual(top.render(self.c2, 'first', 'warm', 1000, 700), top.render(self.c2, 'first', 'warm', 1000, 700))
-        self.assertEqual(perspective.render(self.c2, 'back-right', 'warm', 900, 600),
-                         perspective.render(self.c2, 'back-right', 'warm', 900, 600))
+        self.assertEqual(studio.render(C2, 'top', 'first', 'png', 'warm', 1000, 700)[0],
+                         studio.render(C2, 'top', 'first', 'png', 'warm', 1000, 700)[0])
 
     def test_fill_width_draws_as_tall_as_filling_the_width_needs(self):
         # The full screen's fill-width view (29 Oct 2026): the width sets the scale, so a deep plot gets a canvas
         # taller than wide and a wide plot one shorter; the requested height is ignored.
-        deep, wide = model_of(small_plan(width_ft=40, depth_ft=60)), model_of(small_plan(width_ft=60, depth_ft=40))
-        renders = {'plan': (plan2d, lambda m, w: plan2d.render_screen(m, 'ground', 'dark', w, 500, fit='width')),
-                   'top': (top, lambda m, w: top.render(m, 'ground', 'dark', w, 500, fit='width'))}
-        for name, (module, render) in renders.items():
+        deep, wide = small_plan(width_ft=40, depth_ft=60), small_plan(width_ft=60, depth_ft=40)
+        renders = {'plan': lambda p, w: plan2d.render_screen(model_of(p), 'ground', 'dark', w, 500, fit='width'),
+                   'top': lambda p, w: studio.render(p, 'top', theme='dark', width=w, height=500, fit='width')[0]}
+        for name, render in renders.items():
             for width in (1200, 1650):
                 with self.subTest(name, width=width):
                     deep_w, deep_h = png_size(render(deep, width))
@@ -103,7 +101,8 @@ class ImageTests(unittest.TestCase):
                     self.assertEqual((deep_w, wide_w), (width, width))
                     self.assertGreater(deep_h, width)
                     self.assertLess(wide_h, width)
-                    self.assertEqual(deep_h, module.fill_height(deep, width))
+                    if name == 'plan':
+                        self.assertEqual(deep_h, plan2d.fill_height(model_of(deep), width))
 
     def test_fill_height_is_the_first_height_at_which_the_width_sets_the_scale(self):
         model = model_of(small_plan(width_ft=40, depth_ft=60))
@@ -113,31 +112,26 @@ class ImageTests(unittest.TestCase):
             _, _, top_margin, left, right, _, bottom = plan2d.screen_margins(width, height)
             return (width - left - right) / W <= (height - top_margin - bottom) / D
 
-        def top_by_width(width, height):
-            _, _, across, down = top.scales(width, height, W / U, D / U)
-            return across <= down
-
-        for module, by_width in ((plan2d, plan_by_width), (top, top_by_width)):
-            for width in (900, 1600, 2400):
-                with self.subTest(module.__name__, width=width):
-                    height = module.fill_height(model, width)
-                    self.assertTrue(by_width(width, height))
-                    self.assertFalse(by_width(width, height - 1))
+        for width in (900, 1600, 2400):
+            with self.subTest(width=width):
+                height = plan2d.fill_height(model, width)
+                self.assertTrue(plan_by_width(width, height))
+                self.assertFalse(plan_by_width(width, height - 1))
         # A very deep plot stops at FILL_MAX_HEIGHT (then fitted by its height) instead of growing without limit.
         needle = model_of(small_plan(width_ft=20, depth_ft=200))
         self.assertEqual(png_size(plan2d.render_screen(needle, 'ground', 'warm', 2400, 500, fit='width')), (2400, 4000))
-        # Every other request keeps its size, the plan and top view as before.
+        # The top view stops there too.
+        self.assertEqual(png_size(studio.render(small_plan(width_ft=20, depth_ft=200), 'top', width=2400, height=500,
+                                                fit='width')[0]), (2400, plan2d.FILL_MAX_HEIGHT))
+        # Every other request keeps its size.
         self.assertEqual(png_size(plan2d.render_screen(model, 'ground', 'warm', 3000, 2000)), (2400, 1600))
-        self.assertEqual(png_size(top.render(model, 'ground', 'warm', 1000, 3000)), (1000, 1600))
         with self.assertRaises(ValueError):
             studio.render(small_plan(), 'plan', fit='stretch')
 
-    def test_top_view_and_every_outside_angle(self):
+    def test_the_top_view_on_both_floors(self):
         for floor in ('ground', 'first'):
-            self.assertEqual(png_size(top.render(self.half, floor, 'midnight-navy', 1000, 650)), (1000, 650))
-        for preset in perspective.PRESETS:
-            with self.subTest(preset):
-                self.assertEqual(png_size(perspective.render(self.c2, preset, 'warm', 960, 600)), (960, 600))
+            self.assertEqual(png_size(studio.render(HALF, 'top', floor, theme='midnight-navy', width=1000, height=650)[0]),
+                             (1000, 650))
 
     def test_sheets_one_page_per_floor_portrait_for_deep_plots(self):
         pdf = plan2d.render_sheet(self.c2, ['ground', 'first'])
@@ -252,7 +246,7 @@ class ServiceTests(unittest.TestCase):
             ({'view': 'cad', 'format': 'dxf-in'}, 'application/dxf', b'  0\nSECTION'),
             ({'view': 'cad', 'format': 'dxf-mm'}, 'application/dxf', b'  0\nSECTION'),
             ({'view': 'cad', 'format': 'readme'}, 'text/plain; charset=utf-8', b'GazeConnect Compass'),
-            ({'view': 'outside', 'format': 'png', 'preset': 'back-left', 'export': True, 'width': 1200, 'height': 800}, 'image/png', b'\x89PNG'),
+            ({'view': 'top', 'format': 'png', 'export': True, 'width': 1200, 'height': 800}, 'image/png', b'\x89PNG'),
         ):
             with self.subTest(options):
                 reply = self.post('render', {'plan': C2, 'floor': 'ground', **options})
@@ -267,7 +261,7 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(self.post('render', {'plan': single, 'floor': 'first'}).status_code, 422)
         self.assertEqual(self.post('render', {'plan': single, 'view': 'video'}).status_code, 422)
         self.assertEqual(self.post('render', {'plan': single, 'width': 10_000}).status_code, 422)
-        self.assertEqual(self.post('render', {'plan': single, 'view': 'outside', 'preset': 'above'}).status_code, 422)
+        self.assertEqual(self.post('render', {'plan': single, 'view': 'outside'}).status_code, 422)   # removed 12 Nov 2026
 
     def test_a_version_1_map_is_migrated_by_the_service(self):
         v1 = {'plot': {'width_ft': 40, 'depth_ft': 60, 'facing': 'East', 'type': 'Middle Plot', 'gate_position': 'Center'},
